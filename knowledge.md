@@ -19,6 +19,45 @@
    - Keep completely separate from existing system
    - Follow v3 structure in architecture.md
    - No v3 code in base coverage directory
+   - NEVER modify original source files
+   - ALWAYS use temp files for instrumentation
+   - Use test_helper and temp_file modules for file management
+
+### Implementation Boundaries
+
+1. **Coverage v3 Directory (lib/coverage/v3/)**:
+   - Complete rewrite/replacement allowed
+   - No need to preserve existing v3 code
+   - Implement new temp file-based approach here
+   - Can restructure files as needed
+
+2. **Core Utility Modules (lib/tools/)**:
+   - Use existing functionality first
+   - OK to add new generic functionality when needed
+   - Example: Adding recursive file listing to filesystem module
+   - Any additions must be:
+     - Generally useful (not specific to one use case)
+     - Well-tested
+     - Properly documented
+     - Consistent with module's design
+
+3. **When to Modify Core Modules**:
+   - When new functionality would be useful project-wide
+   - When the addition is generic and reusable
+   - When existing functions don't quite meet a common need
+   - Example: Adding recursive file listing because many parts of the project need it
+
+4. **When NOT to Modify Core Modules**:
+   - Don't add special-case functionality
+   - Don't modify existing behavior
+   - Don't duplicate existing functionality
+   - Don't add coverage-specific features to generic modules
+
+### Implementation Strategy
+- Build new functionality in v3 directory
+- Use core modules for infrastructure
+- Keep v3 changes isolated from rest of codebase
+- Don't touch anything outside v3 directory
 
 4. **Code Quality Requirements**:
    - NEVER simplify code just to make tests pass
@@ -27,6 +66,29 @@
    - Tests verify code works correctly, not the other way around
    - Implementation must be robust and complete
    - No shortcuts or temporary solutions
+
+## Available Tools and Modules
+
+### Temporary File Management
+- Use test_helper.create_temp_test_directory() for test files
+- temp_file module handles automatic cleanup
+- Files registered with temp_file are cleaned up after tests
+- Use temp_file.register_file() for manual registration
+- Cleanup happens automatically through test contexts
+
+### Filesystem Operations
+- fs module provides safe file operations
+- Use fs.copy_file() for safe file copying
+- Use fs.create_directory() for nested directories
+- Use fs.write_file() for safe file writing
+- Handle all fs operations with proper error checking
+
+### Configuration System
+- Use central_config for all settings
+- NEVER create custom configuration systems
+- NEVER hardcode paths or patterns
+- NEVER remove existing config integration
+- Use .firmo-config.lua for project-wide settings
 
 ## Error Handling in Tests
 
@@ -249,4 +311,241 @@ expect({name = "John"}).to.have_property("name", "John")
 
 - Tasks: `/home/gregg/Projects/lua-library/firmo/docs/firmo/plan.md`
 - Architecture: `/home/gregg/Projects/lua-library/firmo/docs/firmo/architecture.md`
--
+
+## Test Development and Debugging
+
+### Test-Driven Development (TDD)
+- Write tests before implementation
+- Run tests frequently
+- Keep test cases focused
+- Add edge cases separately
+
+### CRITICAL: Error Resolution Process
+1. ALWAYS read complete test output
+2. Find exact ERROR line and message
+3. Track error to specific location
+4. Fix reported error, not assumed issues
+5. Verify error is fixed before moving on
+6. Never assume error cause without evidence
+
+### Common Error Resolution Mistakes
+- Assuming error cause without reading message
+- Fixing assumed issues instead of actual error
+- Moving on before verifying error is fixed
+- Making multiple changes before re-running tests
+- Ignoring exact error location and line numbers
+
+### Test Debugging Best Practices
+1. Run failing test in isolation:
+   ```lua
+   lua test.lua tests/specific_test.lua
+   ```
+
+2. Enable debug logging if needed:
+   ```lua
+   local logger = logging.get_logger("test")
+   logger.set_level(logging.LEVELS.DEBUG)
+   ```
+
+3. Add debug assertions:
+   ```lua
+   it("should handle error case", function()
+     expect(actual_value).to.exist("Value should exist here")
+     expect(actual_value).to.equal(expected, "Values should match")
+   end)
+   ```
+
+4. Check error location:
+   ```lua
+   -- In test file
+   local result, err = test_helper.with_error_capture(function()
+     return problematic_function()
+   end)()
+   
+   -- Error will show exact line number and message
+   expect(err).to.exist()
+   expect(err.message).to.match("expected error")
+   ```
+
+## Coverage Module Requirements
+
+### Core Functionality
+- NEVER remove existing lifecycle management (start/stop/reset)
+- NEVER remove three-state coverage tracking
+- NEVER remove data processing/normalization
+- ALWAYS maintain backward compatibility
+- ALWAYS preserve existing error handling
+
+### Temporary File Management
+1. ALWAYS use test_helper.create_temp_test_directory() for instrumented files:
+   ```lua
+   local test_dir = test_helper.create_temp_test_directory()
+   local temp_path = test_dir.create_file("instrumented.lua", content)
+   ```
+
+2. NEVER manually clean up temp files:
+   ```lua
+   -- WRONG: Manual cleanup
+   os.remove(temp_file)
+   
+   -- CORRECT: Let test_helper handle cleanup
+   test_helper.register_temp_file(temp_file)
+   ```
+
+3. ALWAYS use proper path mapping:
+   ```lua
+   -- Map temp paths back to original paths for reporting
+   local original_path = sourcemap.get_original_path(temp_path)
+   ```
+
+4. NEVER modify original source files:
+   ```lua
+   -- WRONG: Modifying original
+   fs.write_file(original_path, instrumented_code)
+   
+   -- CORRECT: Using temp file
+   test_dir.create_file("temp.lua", instrumented_code)
+   ```
+
+### Available Tools
+
+1. test_helper provides:
+   - create_temp_test_directory()
+   - register_temp_file()
+   - register_temp_directory()
+   - Automatic cleanup
+
+2. temp_file provides:
+   - File registration
+   - Directory registration
+   - Test context management
+   - Automatic cleanup
+
+3. filesystem provides:
+   - Safe file operations
+   - Directory management
+   - Path manipulation
+
+## Code Assessment and Recovery
+
+### Component Assessment Process
+1. **Read All Related Files**:
+   - Read implementation files
+   - Read test files
+   - Read interface files (init.lua)
+   - Check for missing files
+
+2. **Identify Working Components**:
+   - Look for complete implementations
+   - Check for proper error handling
+   - Verify test coverage
+   - Note dependencies on other modules
+
+3. **Identify Broken Components**:
+   - Check for syntax errors
+   - Look for incomplete implementations
+   - Find missing functionality
+   - Note incorrect usage of dependencies
+
+4. **Document Current State**:
+   - List working components
+   - List broken/incomplete components
+   - Note missing tests
+   - Identify critical issues
+
+### Recovery Strategy
+1. **Fix Critical Issues First**:
+   - Fix syntax errors immediately
+   - Fix broken imports/requires
+   - Fix incorrect API usage
+   - Fix type errors
+
+2. **Test-First Recovery**:
+   - Create missing test files first
+   - Write tests for broken functionality
+   - Use tests to verify fixes
+   - Add edge case tests
+
+3. **Dependency Order**:
+   - Fix foundation modules first (e.g., sourcemap)
+   - Then fix dependent modules
+   - Then fix integration points
+   - Then fix high-level modules
+
+4. **Preserve Working Code**:
+   - Don't modify working components
+   - Keep existing tests that pass
+   - Keep correct error handling
+   - Keep proper module structure
+
+### Common Recovery Mistakes
+1. **Rushing to Fix**:
+   - Fixing without full assessment
+   - Fixing symptoms not causes
+   - Breaking working components
+   - Missing critical issues
+
+2. **Poor Planning**:
+   - Wrong fix order
+   - Missing dependencies
+   - Incomplete testing
+   - Inconsistent fixes
+
+3. **Incomplete Assessment**:
+   - Missing broken components
+   - Missing dependencies
+   - Missing test gaps
+   - Missing critical issues
+
+### Recovery Best Practices
+1. **Document Everything**:
+   - List all issues found
+   - Track fix progress
+   - Note test status
+   - Record dependencies
+
+2. **Test Everything**:
+   - Write tests first
+   - Test each fix
+   - Test integration
+   - Test edge cases
+
+3. **Review Everything**:
+   - Check all related files
+   - Verify all fixes
+   - Validate all tests
+   - Confirm all functionality
+
+## CRITICAL: Code Reuse and Existing Modules
+
+### Before Writing ANY Code
+1. **ALWAYS Check Existing Modules First**:
+   - Search ALL core modules for needed functionality
+   - Read module documentation thoroughly
+   - Look for similar implementations
+   - NEVER write new code for functionality that exists
+
+2. **Core Module Examples**:
+   - Path operations: Use `fs.normalize_path`, `fs.join_paths`
+   - File operations: Use `fs.read_file`, `fs.write_file`
+   - Error handling: Use `error_handler` patterns
+   - Logging: Use `logging` module
+   - Testing: Use `test_helper` functions
+
+3. **Common Mistakes to Avoid**:
+   - Writing your own path normalization (use fs.normalize_path)
+   - Writing your own file I/O (use fs module)
+   - Creating new error patterns (use error_handler)
+   - Writing your own test helpers (use test_helper)
+
+4. **When You Find Existing Functionality**:
+   - Study how it's used in other parts of codebase
+   - Copy existing usage patterns exactly
+   - Keep consistent with existing code
+   - Document which module/function you're using
+
+5. **If No Existing Functionality**:
+   - Document your search for existing code
+   - Explain why new code is needed
+   - Consider adding to core modules instead
+   - Get approval before writing new implementation

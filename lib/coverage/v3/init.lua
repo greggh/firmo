@@ -2,6 +2,7 @@
 local error_handler = require("lib.tools.error_handler")
 local logging = require("lib.tools.logging")
 local instrumentation = require("lib.coverage.v3.instrumentation")
+local test_helper = require("lib.tools.test_helper")
 
 -- Initialize module logger
 local logger = logging.get_logger("coverage.v3")
@@ -20,6 +21,7 @@ local M = {
 -- Track module state
 local active = false
 local data = nil
+local temp_dir = nil
 
 -- Start coverage tracking
 ---@return boolean success Whether tracking was started successfully
@@ -31,7 +33,23 @@ function M.start()
 
   logger.debug("Starting v3 coverage tracking")
   
-  -- TODO: Initialize tracking components
+  -- Create temp directory for instrumented files
+  local dir, err = test_helper.create_temp_test_directory()
+  if not dir then
+    return false, error_handler.io_error(
+      "Failed to create temp directory for coverage",
+      {error = err}
+    )
+  end
+  temp_dir = dir
+  
+  -- Initialize tracking components
+  local tracker = require("lib.coverage.v3.runtime.tracker")
+  local success, init_err = tracker.start()
+  if not success then
+    return false, init_err
+  end
+  
   active = true
   data = {}
   
@@ -48,7 +66,15 @@ function M.stop()
 
   logger.debug("Stopping v3 coverage tracking")
   
-  -- TODO: Clean up tracking components
+  -- Stop tracking components
+  local tracker = require("lib.coverage.v3.runtime.tracker")
+  local success, stop_err = tracker.stop()
+  if not success then
+    return false, stop_err
+  end
+  
+  -- Temp files will be cleaned up automatically by test_helper
+  temp_dir = nil
   active = false
   
   return true
@@ -59,6 +85,13 @@ end
 ---@return table? error Error information if reset failed
 function M.reset()
   logger.debug("Resetting v3 coverage data")
+  
+  -- Reset tracking components
+  local tracker = require("lib.coverage.v3.runtime.tracker")
+  local success, reset_err = tracker.reset()
+  if not success then
+    return false, reset_err
+  end
   
   data = nil
   return true
@@ -79,6 +112,16 @@ function M.get_data()
       "No coverage data available",
       {reason = "Coverage tracking not started or no data collected"}
     )
+  end
+  
+  -- Get data from runtime tracker
+  local tracker = require("lib.coverage.v3.runtime.tracker")
+  local tracker_data = tracker.get_data()
+  
+  -- Map temp file paths back to original paths
+  for file_path, file_data in pairs(tracker_data) do
+    -- TODO: Implement path mapping from temp files back to originals
+    data[file_path] = file_data
   end
   
   return data

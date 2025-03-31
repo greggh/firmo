@@ -64,8 +64,7 @@ describe("Coverage v3 Parser", function()
     local source = [[
       -- Header comment
       local x = 1 -- Line comment
-      --[[ Block
-          comment ]]
+      -- Another line comment
       local y = 2
     ]]
     
@@ -82,8 +81,8 @@ describe("Coverage v3 Parser", function()
     expect(ast.comments[2].text).to.match("^%-%- Line comment")
     expect(ast.comments[2].line).to.equal(2)
     
-    -- Block comment
-    expect(ast.comments[3].text).to.match("^%-%-%[%[")
+    -- Another line comment
+    expect(ast.comments[3].text).to.match("^%-%- Another line comment")
     expect(ast.comments[3].line).to.equal(3)
   end)
 

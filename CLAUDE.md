@@ -132,32 +132,38 @@ The ONLY correct approach is to fix issues in the coverage module itself, never 
 The new coverage system MUST use a comprehensive instrumentation-based approach. To ensure the system is robust and future-proof, follow these non-negotiable architectural rules:
 
 1. **THREE-STATE DISTINCTION**: The core design MUST clearly distinguish between:
+   
    - **Covered Lines**: Executed AND verified by assertions (Green)
    - **Executed Lines**: Only executed, NOT verified (Orange)
    - **Not Covered Lines**: Not executed at all (Red)
 
 2. **CODE INSTRUMENTATION**: The system MUST use source code instrumentation:
+   
    - Parse Lua source code and add tracking calls
    - Insert instrumentation at the beginning of each logical line
    - Preserve original line numbering for error reporting
    - Maintain source maps for accurate error reporting
 
 3. **ASSERTION TRACING**: The system MUST trace which lines an assertion actually verifies:
+   
    - Track the call stack when assertions run
    - Identify which functions/lines the assertion calls
    - Connect assertions to the code they verify
 
 4. **UNIFORM DATA STRUCTURES**: All data MUST use consistent structures:
+   
    - Same line data format everywhere
    - Clear properties for executed vs. covered status
    - Normalized at system boundaries
 
 5. **SINGLE SOURCE OF TRUTH**: For each coverage state:
+   
    - One definitive location determines coverage status
    - All components refer to this source
    - No duplicate or conflicting status tracking
 
 6. **CLEAN COMPONENT SEPARATION**:
+   
    - **Instrumentation Engine**: Transform source code with tracking
    - **Module Loader**: Hook into module loading for instrumentation
    - **Runtime Tracker**: Record execution data
@@ -166,16 +172,19 @@ The new coverage system MUST use a comprehensive instrumentation-based approach.
    - **Reporting System**: Visualize results without altering data
 
 7. **NO SPECIAL CASES**: The system MUST work uniformly for all code:
+   
    - No file-specific logic whatsoever
    - No pattern matching on filenames
    - Same behavior for all files regardless of size/location
 
 8. **EXPLICIT > IMPLICIT**: Make all behavior explicit:
+   
    - No automatic promotion from executed to covered
    - Explicit marking of covered state by assertions
    - Clear documentation of how lines get marked
 
 9. **PERFORMANCE BY DESIGN**: Build performance in from the start:
+   
    - Lightweight instrumentation with minimal overhead
    - Caching of instrumented modules
    - Optimized data structures for minimal memory usage
@@ -1040,58 +1049,69 @@ tests/
 2. **Instrumentation Engine**:
    
    - **Parser (parser.lua)**: 
+     
      - Parses Lua source code
      - Identifies logical lines and code structure
      - Builds AST for transformation
    
    - **Transformer (transformer.lua)**:
+     
      - Inserts tracking calls at each logical line
      - Maintains original code structure
      - Preserves comments and whitespace
    
    - **Source Mapper (sourcemap.lua)**:
+     
      - Maps instrumented line numbers to original lines
      - Provides utilities for error reporting
 
 3. **Module Loading Integration**:
    
    - **Loader Hook (loader/hook.lua)**:
+     
      - Hooks into Lua's module loading system
      - Intercepts require calls
      - Instruments modules before execution
    
    - **Module Cache (loader/cache.lua)**:
+     
      - Caches instrumented modules
      - Provides fast lookup of transformed code
 
 4. **Runtime Tracking**:
    
    - **Runtime Tracker (runtime/tracker.lua)**:
+     
      - Provides global tracking functions
      - Records line execution
      - Associates lines with modules
    
    - **Data Store (runtime/data_store.lua)**:
+     
      - Stores execution data
      - Manages coverage information
 
 5. **Assertion Integration**:
    
    - **Assertion Hook (assertion/hook.lua)**:
+     
      - Hooks into firmo's assertion system
      - Captures assertion execution context
    
    - **Line Association (assertion/analyzer.lua)**:
+     
      - Associates assertions with verified lines
      - Marks lines as covered rather than just executed
 
 6. **Reporting System**:
    
    - **HTML Reporter (report/html.lua)**:
+     
      - Generates visual HTML reports
      - Provides three-color visualization
    
    - **JSON Reporter (report/json.lua)**:
+     
      - Outputs machine-readable coverage data
      - Supports integration with other tools
 
@@ -1190,26 +1210,31 @@ When completed, the system must properly distinguish between three states:
 ### Implementation Requirements
 
 1. **Complete Instrumentation Engine Development**:
+   
    - Finish the Lua code parser for accurate code analysis
    - Build an AST transformer that inserts tracking calls
    - Create a robust source mapper for error reporting
 
 2. **Module Loading Integration**:
+   
    - Hook the require system to intercept module loading
    - Instrument modules on-demand during loading
    - Build a caching system for instrumented modules
 
 3. **Runtime Tracking System**:
+   
    - Develop the execution tracking system
    - Create a data store for coverage information
    - Ensure performance with large codebases
 
 4. **Assertion Tracing (Most Critical)**:
+   
    - Build stack-tracing mechanism to connect assertions to code
    - Identify which lines each assertion verifies
    - Differentiate between "executed" and "covered" states
 
 5. **Reporting System Enhancements**:
+   
    - Update HTML reporter to show three distinct states
    - Create a clear visual distinction in reports
    - Ensure accurate representation of coverage data
@@ -1217,21 +1242,25 @@ When completed, the system must properly distinguish between three states:
 ### Technical Requirements
 
 1. **Test Suite Development**:
+   
    - Create comprehensive tests for the instrumentation engine
    - Build tests for each component of the coverage system
    - Develop integration tests for the complete system
 
 2. **Performance Optimization**:
+   
    - Profile and optimize the instrumentation process
    - Minimize runtime overhead during test execution
    - Ensure report generation is efficient for large codebases
 
 3. **Data Consistency**:
+   
    - Implement uniform data structures throughout
    - Create a single source of truth for coverage state
    - Ensure proper normalization at system boundaries
 
 4. **Central Configuration Integration**:
+   
    - Use central_config for all settings
    - No hardcoded values or file patterns
    - Allow configuration of all coverage behaviors
@@ -1239,6 +1268,7 @@ When completed, the system must properly distinguish between three states:
 ### Current Status: Early Development
 
 The initial work has begun but is still in very early stages:
+
 - Basic architecture defined but not implemented
 - Initial file deletion of old debug hook system
 - Framework for instrumentation approach established
@@ -1247,6 +1277,7 @@ The initial work has begun but is still in very early stages:
 ### Verification Process
 
 When the implementation approaches completion:
+
 1. Run: `lua test.lua --coverage --format=html tests/coverage/minimal_coverage_test.lua`
 2. Validate the three distinct states in the HTML report
 3. Verify that no lines are incorrectly marked as "covered"

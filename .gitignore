@@ -91,16 +91,6 @@ pids
 *.seed
 *.pid.lock
 
-# Coverage & Test
-# Don't ignore our lib/coverage module
-/.coverage
-/coverage/
-/htmlcov/
-.tox/
-.nox/
-.hypothesis/
-.pytest_cache/
-
 # Environment & Configuration
 .env
 .env.*

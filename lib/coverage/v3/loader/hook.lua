@@ -1,11 +1,10 @@
 -- Module loader hook for v3 coverage system
 local error_handler = require("lib.tools.error_handler")
 local logging = require("lib.tools.logging")
-local parser = require("lib.tools.parser.grammar")
-local transformer = require("lib.coverage.v3.instrumentation.transformer")
-local sourcemap = require("lib.coverage.v3.instrumentation.sourcemap")
-local cache = require("lib.coverage.v3.loader.cache")
-local central_config = require("lib.core.central_config")
+local fs = require("lib.tools.filesystem")
+local test_helper = require("lib.tools.test_helper")
+local instrumentation = require("lib.coverage.v3.instrumentation")
+local path_mapping = require("lib.coverage.v3.path_mapping")
 
 -- Initialize module logger
 local logger = logging.get_logger("coverage.v3.loader.hook")
@@ -21,8 +20,21 @@ local M = {
 -- Original loader functions
 local original_loaders = {}
 
--- Track loaded modules to handle circular dependencies
+-- Track loading modules to handle circular dependencies
 local loading_modules = {}
+
+-- Temp directory for instrumented files
+local temp_dir
+
+-- Helper to ensure temp directory exists
+local function ensure_temp_dir()
+  if not temp_dir then
+    temp_dir = test_helper.create_temp_test_directory()
+    -- Create instrumented subdirectory
+    fs.create_directory(fs.join_paths(temp_dir.path, "instrumented"))
+  end
+  return temp_dir
+end
 
 -- Helper to get module path from name
 local function get_module_path(name)
@@ -38,56 +50,12 @@ local function get_module_path(name)
   
   -- Try each path
   for _, p in ipairs(paths) do
-    local file = io.open(p)
-    if file then
-      file:close()
-      return p
+    if fs.file_exists(p) then
+      return fs.normalize_path(p)
     end
   end
   
   return nil
-end
-
--- Helper to read module source
-local function read_module_source(path)
-  local file = io.open(path)
-  if not file then
-    return nil, string.format("Cannot open %s", path)
-  end
-  
-  local source = file:read("*a")
-  file:close()
-  
-  return source
-end
-
--- Helper to instrument module source
-local function instrument_module(source, path)
-  -- Parse source into AST
-  local ast, err = parser.parse(source, path)
-  if not ast then
-    return nil, err
-  end
-  
-  -- Transform AST to add coverage tracking
-  local instrumented_ast, source_map = transformer.transform(ast)
-  if not instrumented_ast then
-    return nil, "Failed to transform AST"
-  end
-  
-  -- Generate instrumented code
-  local instrumented_code = transformer.generate(instrumented_ast)
-  if not instrumented_code then
-    return nil, "Failed to generate code"
-  end
-  
-  -- Create source map
-  local map = sourcemap.create(path, source, instrumented_code)
-  if not map then
-    return nil, "Failed to create source map"
-  end
-  
-  return instrumented_code, map
 end
 
 -- Module loader function
@@ -103,52 +71,30 @@ local function coverage_loader(name)
     return nil
   end
   
-  -- Check cache first
-  local cached = cache.get(path)
-  if cached then
-    logger.debug("Using cached module", {
-      name = name,
-      path = path
-    })
-    return cached.loader
-  end
-  
   -- Mark module as being loaded
   loading_modules[name] = true
   
-  -- Read source
-  local source, err = read_module_source(path)
-  if not source then
+  -- Instrument the file
+  local result, err = instrumentation.instrument_file(path)
+  if not result then
     loading_modules[name] = nil
     return nil, err
-  end
-  
-  -- Instrument source
-  local instrumented_code, source_map = instrument_module(source, path)
-  if not instrumented_code then
-    loading_modules[name] = nil
-    return nil, source_map -- source_map contains error in this case
   end
   
   -- Create loader function
-  local loader, err = load(instrumented_code, "@" .. path)
+  local loader, load_err = loadfile(result.instrumented_path)
   if not loader then
     loading_modules[name] = nil
-    return nil, err
+    return nil, load_err
   end
-  
-  -- Cache the instrumented module
-  cache.set(path, {
-    loader = loader,
-    source_map = source_map
-  })
   
   -- Module loaded successfully
   loading_modules[name] = nil
   
   logger.debug("Loaded and instrumented module", {
     name = name,
-    path = path
+    path = path,
+    instrumented_path = result.instrumented_path
   })
   
   return loader
@@ -156,12 +102,8 @@ end
 
 -- Install module loader hook
 function M.install()
-  -- Get configuration
-  local config = central_config.get_config()
-  if not config.coverage.enabled or not config.coverage.use_instrumentation then
-    logger.debug("Coverage instrumentation disabled")
-    return false
-  end
+  -- Create temp directory
+  ensure_temp_dir()
   
   -- Save original loaders
   for i, loader in ipairs(package.loaders) do
@@ -183,8 +125,11 @@ function M.uninstall()
     package.loaders[i] = loader
   end
   
-  -- Clear cache
-  cache.clear()
+  -- Clear loading state
+  loading_modules = {}
+  
+  -- Clear temp directory reference (cleanup handled by test_helper)
+  temp_dir = nil
   
   logger.debug("Uninstalled module loader hook")
   

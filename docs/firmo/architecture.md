@@ -110,13 +110,15 @@ local report_format = config.coverage.report.format
 
 ### 2. Instrumentation-Based Coverage System (v3)
 
-The coverage system has been completely redesigned to use code instrumentation rather than debug hooks. This provides:
+The coverage system has been completely redesigned to use code instrumentation rather than debug hooks, with a focus on safety through temporary file usage. This provides:
 
 - More accurate coverage tracking
 - Support for complex code patterns
 - Better performance
 - Detailed execution data
 - Three-state coverage model (covered, executed, not covered)
+- Safe instrumentation through temporary files
+- Automatic cleanup of instrumented files
 
 #### 2.1 Key Coverage Components
 
@@ -124,14 +126,17 @@ The coverage system has been completely redesigned to use code instrumentation r
   - **Parser**: Parses Lua source code into an AST
   - **Transformer**: Adds tracking calls to the code
   - **Sourcemap**: Maps instrumented code back to original source
+  - **Temp File Manager**: Handles safe file operations through test_helper
 
 - **Module Loading Integration**: Hooks into Lua's module loading system
   - **Loader Hook**: Intercepts require calls
   - **Cache**: Caches instrumented modules
+  - **Path Mapper**: Maps between original and temp paths
 
 - **Runtime Tracking**: Tracks code execution at runtime
   - **Tracker**: Records execution and coverage events
   - **Data Store**: Stores and manages tracking data
+  - **Path Resolution**: Maps temp paths back to originals
 
 - **Assertion Integration**: Connects assertions to the code they verify
   - **Assertion Hook**: Hooks into firmo's assertion system
@@ -143,11 +148,14 @@ The coverage system has been completely redesigned to use code instrumentation r
 
 #### 2.2 Coverage Data Flow
 
-1. **Instrumentation**: When a module is loaded, its code is transformed to include tracking statements
-2. **Execution Tracking**: As the code runs, execution data is stored in the data_store
-3. **Coverage Tracking**: When assertions are made, coverage data is recorded
-4. **Data Processing**: At the end of the test run, data is processed and normalized
-5. **Report Generation**: Coverage reports are generated based on the processed data
+1. **Source Copy**: Original source file is copied to temporary location
+2. **Instrumentation**: Temporary copy is transformed to include tracking
+3. **Module Loading**: Instrumented temp file is loaded instead of original
+4. **Execution Tracking**: As code runs, execution data is stored
+5. **Coverage Tracking**: When assertions run, coverage data is recorded
+6. **Path Mapping**: All paths are mapped back to original source
+7. **Report Generation**: Coverage reports use original source paths
+8. **Cleanup**: Temporary files are automatically cleaned up
 
 #### 2.3 Edge Case Handling
 
