@@ -74,7 +74,8 @@
 - temp_file module handles automatic cleanup
 - Files registered with temp_file are cleaned up after tests
 - Use temp_file.register_file() for manual registration
-- Cleanup happens automatically through test contexts
+- NEVER call cleanup functions directly in tests
+- The test runner uses temp_file_integration.lua to track test contexts and clean up temp files automatically after each test completes
 
 ### Filesystem Operations
 - fs module provides safe file operations

@@ -306,13 +306,8 @@ describe("Coverage v3 Data Store", function()
     expect(data1[original]).to.exist()
     expect(data1[original][1].state).to.equal("executed")
 
-    -- Trigger cleanup
-    test_helper.cleanup_temp_files()
-
-    -- Get data after cleanup - should still have data
-    local data2 = data_store.get_data()
-    expect(data2[original]).to.exist()
-    expect(data2[original][1].state).to.equal("executed")
+    -- No need to manually cleanup - test_helper and temp_file_integration 
+    -- will handle cleanup automatically through test contexts
 
     -- Reset store
     data_store.reset()

@@ -15,7 +15,7 @@ local logger = logging.get_logger("coverage.v3.runtime.data_store")
 ---@field deserialize fun(serialized: string): boolean Deserialize coverage data
 ---@field _VERSION string Module version
 local M = {
-  _VERSION = "3.0.0"
+  _VERSION = "3.0.0",
 }
 
 -- Coverage data structure
@@ -30,16 +30,10 @@ local coverage_data = {}
 function M.record_execution(file_path, line)
   -- Validate inputs
   if not file_path or type(file_path) ~= "string" then
-    return false, error_handler.validation_error(
-      "Invalid file path",
-      { path = file_path }
-    )
+    return false, error_handler.validation_error("Invalid file path", { path = file_path })
   end
   if not line or type(line) ~= "number" then
-    return false, error_handler.validation_error(
-      "Invalid line number",
-      { line = line }
-    )
+    return false, error_handler.validation_error("Invalid line number", { line = line })
   end
 
   -- Map temp path to original path
@@ -50,10 +44,11 @@ function M.record_execution(file_path, line)
 
   -- Initialize data structures if needed
   coverage_data[original_path] = coverage_data[original_path] or {}
-  coverage_data[original_path][line] = coverage_data[original_path][line] or {
-    count = 0,
-    state = "executed"
-  }
+  coverage_data[original_path][line] = coverage_data[original_path][line]
+    or {
+      count = 0,
+      state = "executed",
+    }
 
   -- Update execution count
   coverage_data[original_path][line].count = coverage_data[original_path][line].count + 1
@@ -61,7 +56,7 @@ function M.record_execution(file_path, line)
   logger.debug("Recorded line execution", {
     file = original_path,
     line = line,
-    count = coverage_data[original_path][line].count
+    count = coverage_data[original_path][line].count,
   })
 
   return true
@@ -75,16 +70,10 @@ end
 function M.record_coverage(file_path, line)
   -- Validate inputs
   if not file_path or type(file_path) ~= "string" then
-    return false, error_handler.validation_error(
-      "Invalid file path",
-      { path = file_path }
-    )
+    return false, error_handler.validation_error("Invalid file path", { path = file_path })
   end
   if not line or type(line) ~= "number" then
-    return false, error_handler.validation_error(
-      "Invalid line number",
-      { line = line }
-    )
+    return false, error_handler.validation_error("Invalid line number", { line = line })
   end
 
   -- Map temp path to original path
@@ -95,17 +84,18 @@ function M.record_coverage(file_path, line)
 
   -- Initialize data structures if needed
   coverage_data[original_path] = coverage_data[original_path] or {}
-  coverage_data[original_path][line] = coverage_data[original_path][line] or {
-    count = 0,
-    state = "executed"
-  }
+  coverage_data[original_path][line] = coverage_data[original_path][line]
+    or {
+      count = 0,
+      state = "executed",
+    }
 
   -- Update coverage state
   coverage_data[original_path][line].state = "covered"
 
   logger.debug("Recorded line coverage", {
     file = original_path,
-    line = line
+    line = line,
   })
 
   return true
@@ -126,9 +116,10 @@ function M.reset()
 end
 
 -- Serialize coverage data
----@return string serialized The serialized coverage data
+---@return string|nil serialized The serialized coverage data
 function M.serialize()
-  return error_handler.serialize(coverage_data)
+  local json = require("lib.tools.json")
+  return json.encode(coverage_data)
 end
 
 -- Deserialize coverage data
@@ -136,7 +127,8 @@ end
 ---@return boolean success Whether data was deserialized successfully
 ---@return string? error Error message if deserialization failed
 function M.deserialize(serialized)
-  local data, err = error_handler.deserialize(serialized)
+  local json = require("lib.tools.json")
+  local data, err = json.decode(serialized)
   if not data then
     return false, err
   end

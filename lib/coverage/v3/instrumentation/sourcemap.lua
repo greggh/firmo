@@ -14,28 +14,19 @@ local logger = logging.get_logger("coverage.v3.instrumentation.sourcemap")
 ---@field deserialize fun(serialized: string): table|nil Deserialize source map from string
 ---@field _VERSION string Module version
 local M = {
-  _VERSION = "3.0.0"
+  _VERSION = "3.0.0",
 }
 
 -- Validate inputs
 local function validate_inputs(path, original_content, instrumented_content)
   if not path or type(path) ~= "string" or path == "" then
-    return nil, error_handler.validation_error(
-      "Invalid path",
-      { path = path }
-    )
+    return nil, error_handler.validation_error("Invalid path", { path = path })
   end
   if not original_content or type(original_content) ~= "string" then
-    return nil, error_handler.validation_error(
-      "Invalid content",
-      { content = original_content }
-    )
+    return nil, error_handler.validation_error("Invalid content", { content = original_content })
   end
   if not instrumented_content or type(instrumented_content) ~= "string" then
-    return nil, error_handler.validation_error(
-      "Invalid content",
-      { content = instrumented_content }
-    )
+    return nil, error_handler.validation_error("Invalid content", { content = instrumented_content })
   end
   return true
 end
@@ -56,8 +47,8 @@ function M.create(path, original_content, instrumented_content)
   -- Create map structure
   local map = {
     path = fs.normalize_path(path),
-    original_to_instrumented = {},  -- Map original lines to instrumented lines
-    instrumented_to_original = {},  -- Map instrumented lines to original lines
+    original_to_instrumented = {}, -- Map original lines to instrumented lines
+    instrumented_to_original = {}, -- Map instrumented lines to original lines
   }
 
   -- Split content into lines
@@ -96,7 +87,7 @@ function M.create(path, original_content, instrumented_content)
     path = path,
     original_lines = #original_lines,
     instrumented_lines = #instrumented_lines,
-    mappings = #map.original_to_instrumented
+    mappings = #map.original_to_instrumented,
   })
 
   return map
@@ -117,10 +108,7 @@ function M.get_instrumented_line(map, original_line)
 
   local instrumented_line = map.original_to_instrumented[original_line]
   if not instrumented_line then
-    return nil, error_handler.not_found_error(
-      "Invalid line number",
-      { line = original_line }
-    )
+    return nil, error_handler.not_found_error("Invalid line number", { line = original_line })
   end
 
   return instrumented_line
@@ -141,10 +129,7 @@ function M.get_original_line(map, instrumented_line)
 
   local original_line = map.instrumented_to_original[instrumented_line]
   if not original_line then
-    return nil, error_handler.not_found_error(
-      "Invalid line number",
-      { line = instrumented_line }
-    )
+    return nil, error_handler.not_found_error("Invalid line number", { line = instrumented_line })
   end
 
   return original_line
@@ -152,9 +137,10 @@ end
 
 -- Serialize source map to string
 ---@param map table Source map object
----@return string serialized Serialized source map
+---@return string|nil serialized Serialized source map
 function M.serialize(map)
-  return error_handler.serialize(map)
+  local json = require("lib.tools.json")
+  return json.encode(map)
 end
 
 -- Deserialize source map from string
@@ -162,7 +148,8 @@ end
 ---@return table|nil map Source map object, or nil if deserialization failed
 ---@return string? error Error message if deserialization failed
 function M.deserialize(serialized)
-  return error_handler.deserialize(serialized)
+  local json = require("lib.tools.json")
+  return json.decode(serialized)
 end
 
 return M

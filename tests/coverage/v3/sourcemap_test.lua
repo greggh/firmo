@@ -22,11 +22,11 @@ describe("Coverage v3 Source Map", function()
     local original_content = [[
       -- Line 1: Comment
       local x = 1  -- Line 2
-      
+
       local function test()  -- Line 4
         return x + 1  -- Line 5
       end  -- Line 6
-      
+
       return test()  -- Line 8
     ]]
     local original_path = fs.join_paths(test_dir.path, "original.lua")
@@ -37,13 +37,13 @@ describe("Coverage v3 Source Map", function()
       -- Line 1: Original comment
       _firmo_coverage.track(1)  -- Added line
       local x = 1  -- Original line 2
-      
+
       _firmo_coverage.track(2)  -- Added line
       local function test()  -- Original line 4
         _firmo_coverage.track(3)  -- Added line
         return x + 1  -- Original line 5
       end  -- Original line 6
-      
+
       _firmo_coverage.track(4)  -- Added line
       return test()  -- Original line 8
     ]]
@@ -54,15 +54,15 @@ describe("Coverage v3 Source Map", function()
     expect(map).to.exist()
 
     -- Test original to instrumented line mapping
-    expect(sourcemap.get_instrumented_line(map, 2)).to.equal(3)  -- x = 1
-    expect(sourcemap.get_instrumented_line(map, 4)).to.equal(6)  -- function test()
-    expect(sourcemap.get_instrumented_line(map, 5)).to.equal(8)  -- return x + 1
+    expect(sourcemap.get_instrumented_line(map, 2)).to.equal(3) -- x = 1
+    expect(sourcemap.get_instrumented_line(map, 4)).to.equal(6) -- function test()
+    expect(sourcemap.get_instrumented_line(map, 5)).to.equal(8) -- return x + 1
     expect(sourcemap.get_instrumented_line(map, 8)).to.equal(11) -- return test()
 
     -- Test instrumented to original line mapping
-    expect(sourcemap.get_original_line(map, 3)).to.equal(2)  -- x = 1
-    expect(sourcemap.get_original_line(map, 6)).to.equal(4)  -- function test()
-    expect(sourcemap.get_original_line(map, 8)).to.equal(5)  -- return x + 1
+    expect(sourcemap.get_original_line(map, 3)).to.equal(2) -- x = 1
+    expect(sourcemap.get_original_line(map, 6)).to.equal(4) -- function test()
+    expect(sourcemap.get_original_line(map, 8)).to.equal(5) -- return x + 1
     expect(sourcemap.get_original_line(map, 11)).to.equal(8) -- return test()
   end)
 
@@ -72,7 +72,7 @@ describe("Coverage v3 Source Map", function()
       local x = (1 +
                 2 +
                 3)
-      
+
       local result = x *
                     (4 +
                      5)
@@ -86,7 +86,7 @@ describe("Coverage v3 Source Map", function()
       local x = (1 +
                 2 +
                 3)
-      
+
       _firmo_coverage.track(2)
       local result = x *
                     (4 +
@@ -99,8 +99,8 @@ describe("Coverage v3 Source Map", function()
     expect(map).to.exist()
 
     -- Test mapping of multi-line statement start
-    expect(sourcemap.get_instrumented_line(map, 1)).to.equal(2)  -- x = (1 +
-    expect(sourcemap.get_instrumented_line(map, 5)).to.equal(7)  -- result = x *
+    expect(sourcemap.get_instrumented_line(map, 1)).to.equal(2) -- x = (1 +
+    expect(sourcemap.get_instrumented_line(map, 5)).to.equal(7) -- result = x *
 
     -- Test mapping back to original
     expect(sourcemap.get_original_line(map, 2)).to.equal(1)
@@ -111,32 +111,28 @@ describe("Coverage v3 Source Map", function()
     -- Create original file with empty lines and comments
     local original_content = [[
       -- Header comment
-      
-      --[[ Block
-          comment ]]
-      
+
       local x = 1
-      
+
       -- Another comment
       return x
     ]]
+
     local original_path = fs.join_paths(test_dir.path, "comments.lua")
     test_dir.create_file("comments.lua", original_content)
 
     -- Create instrumented version
     local instrumented_content = [[
       -- Header comment
-      
-      --[[ Block
-          comment ]]
-      
+
       _firmo_coverage.track(1)
       local x = 1
-      
+
       -- Another comment
       _firmo_coverage.track(2)
       return x
     ]]
+
     local instrumented_path = test_dir.create_file("instrumented/comments.lua", instrumented_content)
 
     -- Create source map
@@ -144,7 +140,7 @@ describe("Coverage v3 Source Map", function()
     expect(map).to.exist()
 
     -- Test mapping with comments
-    expect(sourcemap.get_instrumented_line(map, 6)).to.equal(7)  -- local x = 1
+    expect(sourcemap.get_instrumented_line(map, 6)).to.equal(7) -- local x = 1
     expect(sourcemap.get_instrumented_line(map, 9)).to.equal(11) -- return x
 
     -- Test mapping back to original
@@ -158,7 +154,7 @@ describe("Coverage v3 Source Map", function()
       local function might_error()
         error("Something went wrong")
       end
-      
+
       local ok, err = pcall(might_error)
     ]]
     local original_path = fs.join_paths(test_dir.path, "errors.lua")
@@ -171,7 +167,7 @@ describe("Coverage v3 Source Map", function()
         _firmo_coverage.track(2)
         error("Something went wrong")
       end
-      
+
       _firmo_coverage.track(3)
       local ok, err = pcall(might_error)
     ]]
@@ -182,7 +178,7 @@ describe("Coverage v3 Source Map", function()
     expect(map).to.exist()
 
     -- Test error location mapping
-    local error_line = 2  -- Line with error() call in original
+    local error_line = 2 -- Line with error() call in original
     local instrumented_error_line = sourcemap.get_instrumented_line(map, error_line)
     expect(instrumented_error_line).to.equal(4)
 
@@ -196,7 +192,7 @@ describe("Coverage v3 Source Map", function()
     local original_path = fs.join_paths(test_dir.path, "minimal.lua")
     local original_content = "local x = 1\n"
     local instrumented_content = "_firmo_coverage.track(1)\nlocal x = 1\n"
-    
+
     local map = sourcemap.create(original_path, original_content, instrumented_content)
     expect(map).to.exist()
 
@@ -235,17 +231,21 @@ describe("Coverage v3 Source Map", function()
     local original1 = fs.join_paths(test_dir.path, "file1.lua")
     local content1 = "local x = 1\nreturn x\n"
     test_dir.create_file("file1.lua", content1)
-    
-    local instrumented1 = test_dir.create_file("instrumented/file1.lua",
-      "_firmo_coverage.track(1)\nlocal x = 1\n_firmo_coverage.track(2)\nreturn x\n")
+
+    local instrumented1 = test_dir.create_file(
+      "instrumented/file1.lua",
+      "_firmo_coverage.track(1)\nlocal x = 1\n_firmo_coverage.track(2)\nreturn x\n"
+    )
 
     -- Create second file
     local original2 = fs.join_paths(test_dir.path, "file2.lua")
     local content2 = "local y = 2\nreturn y\n"
     test_dir.create_file("file2.lua", content2)
-    
-    local instrumented2 = test_dir.create_file("instrumented/file2.lua",
-      "_firmo_coverage.track(1)\nlocal y = 2\n_firmo_coverage.track(2)\nreturn y\n")
+
+    local instrumented2 = test_dir.create_file(
+      "instrumented/file2.lua",
+      "_firmo_coverage.track(1)\nlocal y = 2\n_firmo_coverage.track(2)\nreturn y\n"
+    )
 
     -- Create source maps for both files
     local map1 = sourcemap.create(original1, content1, fs.read_file(instrumented1))
@@ -255,12 +255,12 @@ describe("Coverage v3 Source Map", function()
     expect(map2).to.exist()
 
     -- Test mappings for first file
-    expect(sourcemap.get_instrumented_line(map1, 1)).to.equal(2)  -- local x = 1
-    expect(sourcemap.get_instrumented_line(map1, 2)).to.equal(4)  -- return x
+    expect(sourcemap.get_instrumented_line(map1, 1)).to.equal(2) -- local x = 1
+    expect(sourcemap.get_instrumented_line(map1, 2)).to.equal(4) -- return x
 
     -- Test mappings for second file
-    expect(sourcemap.get_instrumented_line(map2, 1)).to.equal(2)  -- local y = 2
-    expect(sourcemap.get_instrumented_line(map2, 2)).to.equal(4)  -- return y
+    expect(sourcemap.get_instrumented_line(map2, 1)).to.equal(2) -- local y = 2
+    expect(sourcemap.get_instrumented_line(map2, 2)).to.equal(4) -- return y
   end)
 
   it("should preserve source map across serialization", function()
@@ -290,7 +290,7 @@ describe("Coverage v3 Source Map", function()
     expect(deserialized).to.exist()
 
     -- Test that mappings still work
-    expect(sourcemap.get_instrumented_line(deserialized, 1)).to.equal(2)  -- local x = 1
-    expect(sourcemap.get_instrumented_line(deserialized, 2)).to.equal(4)  -- return x
+    expect(sourcemap.get_instrumented_line(deserialized, 1)).to.equal(2) -- local x = 1
+    expect(sourcemap.get_instrumented_line(deserialized, 2)).to.equal(4) -- return x
   end)
 end)

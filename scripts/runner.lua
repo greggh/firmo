@@ -65,12 +65,12 @@ function runner.run_file(file_path, firmo, options)
   local prev_passes = 0
   local prev_errors = 0
   local prev_skipped = 0
-  
+
   -- Reset test_definition module state if available
   local test_definition = require("lib.core.test_definition")
   if test_definition and test_definition.reset then
     test_definition.reset()
-    
+
     -- Enable debug mode for test_definition if verbose is enabled
     if options.verbose and test_definition.set_debug_mode then
       test_definition.set_debug_mode(true)
@@ -91,41 +91,41 @@ function runner.run_file(file_path, firmo, options)
   -- Override print to capture output for diagnostics
   _G.print = function(...)
     -- Convert arguments to strings first to handle booleans and other non-string values
-    local args = {...}
+    local args = { ... }
     local string_args = {}
-    
+
     for i, v in ipairs(args) do
       string_args[i] = tostring(v)
     end
-    
+
     local output = table.concat(string_args, " ")
     table.insert(output_buffer, output)
-    
+
     -- Still show output
     original_print(...)
   end
-  
+
   -- Create a collection of structured test results for this file
   -- This will be populated from test_definition's test_results
   ---@type TestResult[]
   local file_test_results = {}
-  
+
   -- Intercept logger calls to capture structured test results
   local original_logger_info = logger.info
   local original_logger_error = logger.error
-  
+
   logger.info = function(message, context)
     -- Look for structured test result objects
     if context and context.test_result and type(context.test_result) == "table" then
       local result = context.test_result
-      
+
       -- Store the result for reporting
       table.insert(file_test_results, result)
-      
+
       -- Count based on status
       if result.status == "pass" then
         pass_count = pass_count + 1
-        
+
         -- Display the test result
         if result.expect_error then
           -- Expected error test pass
@@ -136,63 +136,63 @@ function runner.run_file(file_path, firmo, options)
         end
       elseif result.status == "skip" or result.status == "pending" then
         skip_count = skip_count + 1
-        
+
         -- Display skip reason
         local reason = result.reason and (" - " .. result.reason) or ""
         original_print(yellow .. "SKIP " .. result.name .. reason .. normal)
       end
     end
-    
+
     return original_logger_info(message, context)
   end
-  
+
   logger.error = function(message, context)
     -- Look for structured test result objects
     if context and context.test_result and type(context.test_result) == "table" then
       local result = context.test_result
-      
+
       -- Store the result for reporting
       table.insert(file_test_results, result)
-      
+
       -- Count based on status
       if result.status == "fail" then
         fail_count = fail_count + 1
-        
+
         -- Display the failure
         local error_message = result.error_message or message
         original_print(red .. "FAIL " .. result.name .. " - " .. error_message .. normal)
       end
     end
-    
+
     return original_logger_error(message, context)
   end
-  
+
   -- Try to load temp_file integration for test file context
   local temp_file_integration
   local temp_file
-  
+
   -- Try to load temp_file_integration if available
   local temp_file_integration_loaded, temp_file_integration_module = pcall(require, "lib.tools.temp_file_integration")
   if temp_file_integration_loaded then
     temp_file_integration = temp_file_integration_module
-    
+
     -- Also load the temp_file module
     local temp_file_loaded, temp_file_module = pcall(require, "lib.tools.temp_file")
     if temp_file_loaded then
       temp_file = temp_file_module
-      
+
       -- Create a test context for this file
       local file_context = {
         type = "file",
         name = file_path,
-        file_path = file_path
+        file_path = file_path,
       }
-      
+
       -- Set the current test context
       if firmo.set_current_test_context then
         firmo.set_current_test_context(file_context)
       end
-      
+
       -- Also set global context
       _G._current_temp_file_context = file_context
     end
@@ -221,26 +221,26 @@ function runner.run_file(file_path, firmo, options)
 
   -- Restore original print function
   _G.print = original_print
-  
+
   -- Restore original logger functions
   logger.info = original_logger_info
   logger.error = original_logger_error
-  
+
   -- Clean up temporary files
   if temp_file_integration and temp_file then
     -- Clean up any temporary files created during test execution
     logger.debug("Cleaning up temporary files after test execution", { file_path = file_path })
-    
+
     -- Try to clean up, but don't let cleanup failures affect test results
     pcall(function()
       temp_file.cleanup_all()
     end)
-    
+
     -- Clear test context
     if firmo.set_current_test_context then
       firmo.set_current_test_context(nil)
     end
-    
+
     -- Also clear global context
     _G._current_temp_file_context = nil
   end
@@ -254,17 +254,22 @@ function runner.run_file(file_path, firmo, options)
       for _, result in ipairs(state.test_results) do
         table.insert(file_test_results, result)
       end
-      
+
       -- Debug output only in verbose mode
       if options.verbose then
         print(string.format("\n%sStructured Test Result Collection:%s", cyan, normal))
         print(string.format("  File test results count: %d", #file_test_results))
         print(string.format("  Counts: pass=%d, fail=%d, skip=%d", pass_count, fail_count, skip_count))
         print(string.format("  Test definition results count: %d", #state.test_results))
-        print(string.format("  Test definition counters: passes=%d, errors=%d, skipped=%d", 
-          state.passes or 0, state.errors or 0, state.skipped or 0))
-        print(string.format("  Copied %d results from test_definition to file_test_results", 
-          #state.test_results))
+        print(
+          string.format(
+            "  Test definition counters: passes=%d, errors=%d, skipped=%d",
+            state.passes or 0,
+            state.errors or 0,
+            state.skipped or 0
+          )
+        )
+        print(string.format("  Copied %d results from test_definition to file_test_results", #state.test_results))
       end
     end
   end
@@ -280,7 +285,7 @@ function runner.run_file(file_path, firmo, options)
     elapsed = elapsed_time,
     output = table.concat(output_buffer, "\n"),
     test_results = file_test_results, -- Include the full structured test results
-    file = file_path
+    file = file_path,
   }
 
   -- Get test results directly from test_definition, which is more reliable
@@ -293,13 +298,13 @@ function runner.run_file(file_path, firmo, options)
       results.passes = state.passes or 0
       results.errors = state.errors or 0
       results.skipped = state.skipped or 0
-      
+
       logger.debug("Using test_definition state for test results", {
         file = file_path,
         result_count = #state.test_results,
         passes = state.passes,
         errors = state.errors,
-        skipped = state.skipped
+        skipped = state.skipped,
       })
     end
   else
@@ -321,11 +326,11 @@ function runner.run_file(file_path, firmo, options)
         file = file_path,
         test_name = result.name,
         test_path = result.path_string,
-        error = result.error
+        error = result.error,
       })
     end
   end
-  
+
   -- If we don't have structured test errors, try to parse from output (legacy)
   if #results.test_errors == 0 then
     for line in results.output:gmatch("[^\r\n]+") do
@@ -348,13 +353,13 @@ function runner.run_file(file_path, firmo, options)
       file = file_path,
       traceback = debug.traceback(),
     })
-    
+
     -- CRITICAL FIX: Ensure execution errors are counted as failures
     -- This way, even if a test file has syntax errors or errors in describe blocks,
     -- it will still be properly counted as a failure
     results.errors = results.errors + 1
   end
-  
+
   -- Always show the completion status with test counts
   -- Use consistent terminology
   logger.info("Test completed", {
@@ -525,11 +530,10 @@ function runner.run_all(files_or_dir, firmo, options)
   else
     files = files_or_dir
   end
-  
+
   -- Print debugging info if verbose
   if options.verbose then
-    print(string.format("\n%sRunning %d test files with structured result tracking%s\n", 
-      cyan, #files, normal))
+    print(string.format("\n%sRunning %d test files with structured result tracking%s\n", cyan, #files, normal))
   end
 
   logger.info("Running test files", { count = #files })
@@ -562,31 +566,31 @@ function runner.run_all(files_or_dir, firmo, options)
     if options.coverage_instance then
       logger.debug("Using pre-initialized coverage instance from main function", {
         operation = "run_all",
-        coverage_instance_valid = options.coverage_instance ~= nil
+        coverage_instance_valid = options.coverage_instance ~= nil,
       })
-      
+
       -- Ensure coverage instance is active
       if options.coverage_instance.is_active and not options.coverage_instance.is_active() then
         logger.warn("Coverage instance is not active, trying to start it", {
-          operation = "run_all"
+          operation = "run_all",
         })
-        
+
         -- Try to start coverage if it's not active
         local ok, err = pcall(function()
           options.coverage_instance.start()
         end)
-        
+
         if not ok then
           logger.error("Failed to start coverage in run_all", {
             error = error_handler.format_error(err),
-            operation = "run_all.start_coverage"
+            operation = "run_all.start_coverage",
           })
         end
       end
     else
       logger.warn("Coverage enabled but no coverage instance was passed", {
         operation = "run_all",
-        solution = "Coverage instance should be initialized in main and passed in options"
+        solution = "Coverage instance should be initialized in main and passed in options",
       })
     end
   else
@@ -630,16 +634,16 @@ function runner.run_all(files_or_dir, firmo, options)
         file = file,
         execution_success = results.success,
         test_errors = results.errors,
-        reason = not results.success and "Execution error" or "Test failures"
+        reason = not results.success and "Execution error" or "Test failures",
       })
     end
-    
+
     -- Get the actual test counts from the results
     local file_passes = results.passes
     local file_errors = results.errors
     local file_skipped = results.skipped or 0
-    
-    -- If we're getting zero counts back but the test ran successfully, 
+
+    -- If we're getting zero counts back but the test ran successfully,
     -- try to extract counts from the firmo state
     if file_passes == 0 and file_errors == 0 and results.success then
       -- Try to get test definition state if available
@@ -649,13 +653,13 @@ function runner.run_all(files_or_dir, firmo, options)
         file_passes = state.passes or 0
         file_errors = state.errors or 0
         file_skipped = state.skipped or 0
-        
+
         -- Log that we're using state directly for debugging
         logger.debug("Using test_definition state for counts", {
           file = file,
           state_passes = file_passes,
           state_errors = file_errors,
-          state_skipped = file_skipped
+          state_skipped = file_skipped,
         })
       end
     end
@@ -663,30 +667,35 @@ function runner.run_all(files_or_dir, firmo, options)
     -- Collect all structured test results from this file
     if results.test_results and #results.test_results > 0 then
       if options.verbose then
-        print(string.format("\n%sCollecting %d structured test results from %s%s", 
-          cyan, #results.test_results, file, normal))
+        print(
+          string.format(
+            "\n%sCollecting %d structured test results from %s%s",
+            cyan,
+            #results.test_results,
+            file,
+            normal
+          )
+        )
       end
-      
+
       for _, result in ipairs(results.test_results) do
         -- Add the file path to each result for easier tracking
         result.file_path = file
         table.insert(all_test_results, result)
-        
+
         if options.verbose then
-          print(string.format("  - Added result: %s [%s]", 
-            result.name, result.status:upper()))
+          print(string.format("  - Added result: %s [%s]", result.name, result.status:upper()))
         end
       end
-      
+
       logger.debug("Collected structured test results", {
         file = file,
         result_count = #results.test_results,
-        total_collected = #all_test_results
+        total_collected = #all_test_results,
       })
     else
       if options.verbose then
-        print(string.format("\n%sNo structured test results found in %s%s", 
-          red, file, normal))
+        print(string.format("\n%sNo structured test results found in %s%s", red, file, normal))
       end
     end
 
@@ -694,7 +703,7 @@ function runner.run_all(files_or_dir, firmo, options)
     total_passes = total_passes + file_passes
     total_failures = total_failures + file_errors
     total_skipped = total_skipped + file_skipped
-    
+
     -- Log collected counts after each file
     logger.debug("Accumulated test counts", {
       current_file = file,
@@ -703,34 +712,38 @@ function runner.run_all(files_or_dir, firmo, options)
       file_skipped = file_skipped,
       running_total_passes = total_passes,
       running_total_failures = total_failures,
-      running_total_skipped = total_skipped
+      running_total_skipped = total_skipped,
     })
-    
+
     -- Print out the structured test results from this file for debugging
     if options.verbose and results.test_results and #results.test_results > 0 then
       print("\nStructured test results from " .. file .. ":")
       for i, result in ipairs(results.test_results) do
         local status_color = ""
-        if result.status == "pass" then 
+        if result.status == "pass" then
           status_color = green
         elseif result.status == "fail" then
           status_color = red
         else
           status_color = yellow
         end
-        
-        print(string.format("  %d. %s[%s]%s %s (%s)", 
-          i,
-          status_color,
-          result.status:upper(),
-          normal,
-          result.name,
-          result.path_string or ""))
-        
+
+        print(
+          string.format(
+            "  %d. %s[%s]%s %s (%s)",
+            i,
+            status_color,
+            result.status:upper(),
+            normal,
+            result.name,
+            result.path_string or ""
+          )
+        )
+
         if result.expect_error then
           print(string.format("     Expected error: %s", tostring(result.error or "")))
         end
-        
+
         if result.execution_time then
           print(string.format("     Time: %.4f seconds", result.execution_time))
         end
@@ -747,24 +760,28 @@ function runner.run_all(files_or_dir, firmo, options)
     for i, result in ipairs(all_test_results) do
       if i <= 10 then -- Only show first 10 to avoid flooding the output
         local status_color = ""
-        if result.status == "pass" then 
+        if result.status == "pass" then
           status_color = green
         elseif result.status == "fail" then
           status_color = red
         else
           status_color = yellow
         end
-        
-        print(string.format("  %d. %s[%s]%s %s (%s)", 
-          i,
-          status_color,
-          result.status:upper(),
-          normal,
-          result.name,
-          result.file_path or ""))
+
+        print(
+          string.format(
+            "  %d. %s[%s]%s %s (%s)",
+            i,
+            status_color,
+            result.status:upper(),
+            normal,
+            result.name,
+            result.file_path or ""
+          )
+        )
       end
     end
-    
+
     if #all_test_results > 10 then
       print(string.format("  ... and %d more", #all_test_results - 10))
     end
@@ -777,13 +794,13 @@ function runner.run_all(files_or_dir, firmo, options)
   logger.info("Test run summary", {
     files_passed = passed_files,
     files_failed = failed_files,
-    tests_passed = total_passes, -- Same as 'passes' 
+    tests_passed = total_passes, -- Same as 'passes'
     tests_failed = total_failures, -- Same as 'failures'
     tests_skipped = total_skipped,
     passes = total_passes, -- Add these for consistency
-    failures = total_failures, -- Add these for consistency 
+    failures = total_failures, -- Add these for consistency
     elapsed_time_seconds = string.format("%.2f", elapsed_time),
-    structured_results_count = #all_test_results
+    structured_results_count = #all_test_results,
   })
 
   -- Calculate statistics on test execution time if available
@@ -792,49 +809,49 @@ function runner.run_all(files_or_dir, firmo, options)
     local slowest_tests = {}
     local total_execution_time = 0
     local count_with_execution_time = 0
-    
+
     for _, result in ipairs(all_test_results) do
       if result.execution_time then
         total_execution_time = total_execution_time + result.execution_time
         count_with_execution_time = count_with_execution_time + 1
-        
+
         -- Track slowest tests
         if #slowest_tests < 5 then
           table.insert(slowest_tests, result)
           -- Sort by execution time (descending)
-          table.sort(slowest_tests, function(a, b) 
-            return (a.execution_time or 0) > (b.execution_time or 0) 
+          table.sort(slowest_tests, function(a, b)
+            return (a.execution_time or 0) > (b.execution_time or 0)
           end)
         elseif result.execution_time > (slowest_tests[5].execution_time or 0) then
           -- Replace the fastest of our 5 slowest
           slowest_tests[5] = result
           -- Resort
-          table.sort(slowest_tests, function(a, b) 
-            return (a.execution_time or 0) > (b.execution_time or 0) 
+          table.sort(slowest_tests, function(a, b)
+            return (a.execution_time or 0) > (b.execution_time or 0)
           end)
         end
       end
     end
-    
+
     -- Calculate average execution time
     if count_with_execution_time > 0 then
       timing_stats = {
         total_test_execution_time = total_execution_time,
         average_test_execution_time = total_execution_time / count_with_execution_time,
         tests_with_timing = count_with_execution_time,
-        slowest_tests = {}
+        slowest_tests = {},
       }
-      
+
       -- Add info about slowest tests
       for i, slow_test in ipairs(slowest_tests) do
         table.insert(timing_stats.slowest_tests, {
           name = slow_test.name,
           path = slow_test.path_string,
           execution_time = slow_test.execution_time,
-          file = slow_test.file_path
+          file = slow_test.file_path,
         })
       end
-      
+
       -- Log timing stats at debug level
       logger.debug("Test timing statistics", timing_stats)
     end
@@ -842,11 +859,11 @@ function runner.run_all(files_or_dir, firmo, options)
 
   local all_passed = failed_files == 0
   if not all_passed then
-    logger.error("Test run failed", { 
+    logger.error("Test run failed", {
       failed_files = failed_files,
-      failed_tests = total_failures
+      failed_tests = total_failures,
     })
-    
+
     -- Show detailed failure information
     if #all_test_results > 0 then
       local failed_tests = {}
@@ -856,19 +873,19 @@ function runner.run_all(files_or_dir, firmo, options)
             name = result.name,
             path = result.path_string,
             file = result.file_path,
-            error_message = result.error_message
+            error_message = result.error_message,
           })
         end
       end
-      
+
       if #failed_tests > 0 then
         logger.debug("Failed tests", { failed_tests = failed_tests })
       end
     end
   else
-    logger.info("Test run successful", { 
+    logger.info("Test run successful", {
       all_passed = true,
-      test_count = total_passes + total_skipped
+      test_count = total_passes + total_skipped,
     })
   end
 
@@ -877,12 +894,12 @@ function runner.run_all(files_or_dir, firmo, options)
   logger.debug("Checking coverage conditions:", {
     coverage_loaded = coverage_loaded,
     has_coverage_object = coverage ~= nil,
-    coverage_option_set = options.coverage
+    coverage_option_set = options.coverage,
   })
-  
+
   if coverage_loaded and coverage and options.coverage then
     logger.info("Coverage conditions met - will generate reports")
-    
+
     -- Stop coverage tracking
     logger.info("Stopping coverage tracking")
     if coverage.stop then
@@ -894,7 +911,7 @@ function runner.run_all(files_or_dir, firmo, options)
 
     -- Calculate and save coverage reports
     logger.info("Generating coverage report")
-    
+
     -- get_report_data() handles stats computation internally
     -- Generate reports in different formats
     local report_dir = options.report_dir or "./coverage-reports"
@@ -904,7 +921,7 @@ function runner.run_all(files_or_dir, firmo, options)
     -- Try to load the reporting module
     local reporting_loaded, reporting
     reporting_loaded, reporting = pcall(require, "lib.reporting")
-    
+
     if not reporting_loaded then
       logger.error("Failed to load reporting module", {
         error = error_handler.format_error(reporting),
@@ -914,7 +931,7 @@ function runner.run_all(files_or_dir, firmo, options)
     -- Get coverage report data
     logger.info("Getting coverage report data")
     local report_data = coverage.get_report_data()
-    
+
     if not report_data then
       logger.error("Failed to get coverage report data")
     else
@@ -925,28 +942,28 @@ function runner.run_all(files_or_dir, firmo, options)
           file_count = file_count + 1
         end
       end
-      
+
       logger.info("Successfully got coverage report data", {
         has_summary = report_data.summary ~= nil,
         has_files = report_data.files ~= nil,
-        files_count = file_count
+        files_count = file_count,
       })
-      
+
       if reporting_loaded and reporting then
         logger.info("Reporting module loaded, generating reports")
-        
+
         -- Use reporting module to generate reports
         for _, format in ipairs(formats) do
           local report_path = fs.join_paths(report_dir, "coverage-report." .. format)
           logger.info("Generating report", { format = format, path = report_path })
-          
+
           local success, err = reporting.save_coverage_report(report_path, report_data, format)
           if success then
             logger.info("Generated coverage report", { format = format, path = report_path })
           else
-            logger.error("Failed to generate coverage report", { 
-              format = format, 
-              error = err and error_handler.format_error(err) or "Unknown error" 
+            logger.error("Failed to generate coverage report", {
+              format = format,
+              error = err and error_handler.format_error(err) or "Unknown error",
             })
           end
         end
@@ -965,7 +982,7 @@ function runner.run_all(files_or_dir, firmo, options)
         print("  Line coverage: " .. string.format("%.2f", summary.line_coverage_percent or 0) .. "%")
         print("  Function coverage: " .. string.format("%.2f", summary.function_coverage_percent or 0) .. "%")
         print("  File coverage: " .. string.format("%.2f", summary.file_coverage_percent or 0) .. "%")
-        
+
         -- Print raw values for debugging
         print("\nDEBUG: Raw coverage values:")
         print("  Overall coverage (raw): " .. tostring(summary.overall_coverage_percent))
@@ -973,7 +990,7 @@ function runner.run_all(files_or_dir, firmo, options)
         print("  Function coverage (raw): " .. tostring(summary.function_coverage_percent))
         print("  File coverage (raw): " .. tostring(summary.file_coverage_percent))
       end
-      
+
       -- Use the numeric values for the logger to ensure proper display
       -- Convert percentages to strings with formatting to ensure consistent display
       logger.info("Coverage summary", {
@@ -982,13 +999,13 @@ function runner.run_all(files_or_dir, firmo, options)
         functions = string.format("%.2f%%", summary.function_coverage_percent or 0),
         files = string.format("%.2f%%", summary.file_coverage_percent or 0),
       })
-      
+
       -- Debug: Print raw values
       logger.debug("Raw coverage percentage values:", {
         overall_percent = summary.overall_coverage_percent,
         line_percent = summary.line_coverage_percent,
         function_percent = summary.function_coverage_percent,
-        file_percent = summary.file_coverage_percent
+        file_percent = summary.file_coverage_percent,
       })
     else
       logger.error("Failed to get coverage summary from report data")
@@ -1006,39 +1023,33 @@ function runner.run_all(files_or_dir, firmo, options)
 
     -- Use the reporting module if available, otherwise fall back to quality.save_report
     local reporting_loaded, reporting = pcall(require, "lib.reporting")
-    
+
     if reporting_loaded and reporting then
       -- Get quality report data
       local quality_data = quality.get_report_data()
-      
+
       if quality_data then
         -- Generate HTML quality report
-        local success, err = reporting.save_quality_report(
-          fs.join_paths(report_dir, "quality-report.html"), 
-          quality_data, 
-          "html"
-        )
-        
+        local success, err =
+          reporting.save_quality_report(fs.join_paths(report_dir, "quality-report.html"), quality_data, "html")
+
         if success then
           logger.info("Generated HTML quality report")
         else
           logger.error("Failed to generate HTML quality report", {
-            error = err and error_handler.format_error(err) or "Unknown error"
+            error = err and error_handler.format_error(err) or "Unknown error",
           })
         end
-        
+
         -- Generate JSON quality report
-        success, err = reporting.save_quality_report(
-          fs.join_paths(report_dir, "quality-report.json"), 
-          quality_data, 
-          "json"
-        )
-        
+        success, err =
+          reporting.save_quality_report(fs.join_paths(report_dir, "quality-report.json"), quality_data, "json")
+
         if success then
           logger.info("Generated JSON quality report")
         else
           logger.error("Failed to generate JSON quality report", {
-            error = err and error_handler.format_error(err) or "Unknown error"
+            error = err and error_handler.format_error(err) or "Unknown error",
           })
         end
       else
@@ -1047,13 +1058,13 @@ function runner.run_all(files_or_dir, firmo, options)
     else
       -- Fall back to legacy approach
       logger.warn("Reporting module not available, using legacy quality.save_report")
-      
+
       -- Generate HTML quality report
       local success = quality.save_report(fs.join_paths(report_dir, "quality-report.html"), "html")
       if success then
         logger.info("Generated HTML quality report")
       end
-      
+
       -- Generate JSON quality report
       success = quality.save_report(fs.join_paths(report_dir, "quality-report.json"), "json")
       if success then
@@ -1096,9 +1107,9 @@ function runner.run_all(files_or_dir, firmo, options)
         files_passed = passed_files,
         files_failed = failed_files,
         success = all_passed,
-        test_cases = {}
+        test_cases = {},
       }
-      
+
       -- Add individual test cases from structured results if available
       if #all_test_results > 0 then
         for _, result in ipairs(all_test_results) do
@@ -1107,27 +1118,27 @@ function runner.run_all(files_or_dir, firmo, options)
             path = result.path_string,
             status = result.status,
             file = result.file_path,
-            time = result.execution_time or 0
+            time = result.execution_time or 0,
           }
-          
+
           -- Add error details for failed tests
           if result.status == "fail" and result.error_message then
             test_case.failure = {
               message = result.error_message,
-              type = "Assertion"
+              type = "Assertion",
             }
           end
-          
+
           -- Add metadata
           if result.options then
             test_case.metadata = result.options
           end
-          
+
           table.insert(test_results.test_cases, test_case)
         end
-        
+
         logger.debug("Added structured test cases to JSON output", {
-          test_case_count = #test_results.test_cases
+          test_case_count = #test_results.test_cases,
         })
       end
 
@@ -1268,7 +1279,7 @@ function runner.parse_arguments(args)
     threshold = 80, -- Coverage/quality threshold
     exclude_patterns = { "fixtures/*" }, -- Patterns to exclude
   }
-  
+
   print("Parse arguments input:")
   for i, arg in ipairs(args) do
     print(i, arg)
@@ -1384,16 +1395,16 @@ function runner.main(args)
   for i, arg in ipairs(args) do
     print(i, arg)
   end
-  
+
   -- Parse command-line arguments
   local path, options = runner.parse_arguments(args)
-  
+
   -- Print options for debugging
   print("Parsed options:")
   print("  path:", path)
   print("  coverage:", options.coverage)
   print("  report_dir:", options.report_dir)
-  
+
   -- Make sure we have a path
   if not path then
     logger.error("No path specified", { usage = "lua scripts/runner.lua [options] [path]" })
@@ -1421,14 +1432,14 @@ function runner.main(args)
   -- Initialize coverage if running with --coverage flag
   local coverage_init_success = true
   local coverage = nil
-  
+
   -- Try to load the central configuration
   local central_config
   local central_config_loaded, central_config_result = pcall(require, "lib.core.central_config")
   if central_config_loaded then
     central_config = central_config_result
     logger.info("Central configuration loaded successfully")
-    
+
     -- Try to load from .firmo-config.lua if it exists
     if fs.file_exists(".firmo-config.lua") then
       local config_loaded, config_err = central_config.load_from_file(".firmo-config.lua")
@@ -1436,28 +1447,28 @@ function runner.main(args)
         logger.info("Loaded configuration from .firmo-config.lua")
       else
         logger.warn("Failed to load .firmo-config.lua", {
-          error = error_handler.format_error(config_err)
+          error = error_handler.format_error(config_err),
         })
       end
     end
   else
     logger.warn("Central configuration module not available", {
-      error = error_handler.format_error(central_config_result)
+      error = error_handler.format_error(central_config_result),
     })
   end
-  
+
   if options.coverage then
     -- Load coverage module
     local coverage_loaded
     coverage_loaded, coverage = pcall(require, "lib.coverage")
-    
+
     if not coverage_loaded then
       logger.error("Failed to load coverage module", {
-        error = error_handler.format_error(coverage)
+        error = error_handler.format_error(coverage),
       })
       return false
     end
-    
+
     -- Initialize and start coverage tracking
     local ok, err = pcall(function()
       -- Build coverage configuration from configuration file and command line options
@@ -1466,103 +1477,105 @@ function runner.main(args)
         full_reset = true,
         debug = options.coverage_debug == true,
         discover_uncovered = options.discover_uncovered ~= false,
-        threshold = options.threshold or 80
+        threshold = options.threshold or 80,
       }
-      
+
       -- Apply config from central configuration if available
       if central_config then
         local file_config = central_config.get("coverage", {})
-        
+
         -- Merge include/exclude from config file
-        if file_config.include then 
+        if file_config.include then
           coverage_config.include = file_config.include
         end
-        
+
         if file_config.exclude then
           coverage_config.exclude = file_config.exclude
         end
-        
+
         -- Apply other config file settings (but command line options take precedence)
         if file_config.track_blocks ~= nil then
           coverage_config.track_blocks = file_config.track_blocks
         end
-        
+
         if file_config.use_static_analysis ~= nil then
           coverage_config.use_static_analysis = file_config.use_static_analysis
         end
-        
+
         if file_config.auto_fix_block_relationships ~= nil then
           coverage_config.auto_fix_block_relationships = file_config.auto_fix_block_relationships
         end
-        
+
         if file_config.track_all_executed ~= nil then
           coverage_config.track_all_executed = file_config.track_all_executed
         end
-        
+
         if file_config.debug ~= nil and not options.coverage_debug then
           coverage_config.debug = file_config.debug
         end
-        
+
         logger.debug("Applied coverage settings from config file", {
           include_patterns = #(coverage_config.include or {}),
-          exclude_patterns = #(coverage_config.exclude or {})
+          exclude_patterns = #(coverage_config.exclude or {}),
         })
       else
         -- Fallback to reasonable defaults if no config file
-        coverage_config.include = coverage_config.include or {
-          "**/*.lua",     -- All Lua files by default
-          "lib/**/*.lua", -- Library code
-          "firmo.lua"     -- Main module
-        }
-        
-        coverage_config.exclude = coverage_config.exclude or {
-          "**/tests/**/*.lua", -- Test files
-          "**/test/**/*.lua",  -- Another test directory
-          "**/*_test.lua",     -- Test files with suffix
-          "**/*_spec.lua"      -- Spec files
-        }
+        coverage_config.include = coverage_config.include
+          or {
+            "**/*.lua", -- All Lua files by default
+            "lib/**/*.lua", -- Library code
+            "firmo.lua", -- Main module
+          }
+
+        coverage_config.exclude = coverage_config.exclude
+          or {
+            "**/tests/**/*.lua", -- Test files
+            "**/test/**/*.lua", -- Another test directory
+            "**/*_test.lua", -- Test files with suffix
+            "**/*_spec.lua", -- Spec files
+          }
       end
-      
+
       -- Initialize coverage with the merged configuration
       -- Modern coverage module (v3) doesn't have init(), just start()
       if type(coverage.init) == "function" then
         -- Legacy coverage module
         coverage.init(coverage_config)
       end
-      
+
       -- Always call start (works for both legacy and modern modules)
       coverage.start()
-      
+
       -- Debug output of final configuration
       logger.debug("Coverage initialized with configuration", {
         include_patterns = coverage_config.include and table.concat(coverage_config.include, ", ") or "none",
         exclude_patterns = coverage_config.exclude and table.concat(coverage_config.exclude, ", ") or "none",
-        debug_mode = coverage_config.debug
+        debug_mode = coverage_config.debug,
       })
     end)
-    
+
     if not ok then
       logger.error("Failed to initialize or start coverage", {
-        error = error_handler.format_error(err)
+        error = error_handler.format_error(err),
       })
       coverage_init_success = false
     else
       logger.info("Coverage tracking started successfully")
     end
-    
+
     -- Always store coverage in options so it can be passed to both run_file and run_all
     options.coverage_instance = coverage
   end
-  
+
   -- Check if path is a file or directory
   -- We can automatically detect directories without a flag
   local test_success = false
-  
+
   if fs.directory_exists(path) then
     -- Run all tests in directory
     logger.info("Detected directory path", { path = path })
     test_success = runner.run_all(path, firmo, options)
-    
+
     -- CRITICAL FIX: Ensure test failures cause the process to fail
     if not test_success then
       logger.error("Test failures detected in directory", { path = path })
@@ -1573,26 +1586,26 @@ function runner.main(args)
     logger.info("Detected file path", { path = path })
     local result = runner.run_file(path, firmo, options)
     test_success = result.success and result.errors == 0
-    
+
     -- CRITICAL FIX: Ensure test failures cause the process to fail
     if not test_success then
-      logger.error("Test failures detected in file", { 
+      logger.error("Test failures detected in file", {
         path = path,
         success = result.success,
         errors = result.errors,
-        test_errors = #(result.test_errors or {})
+        test_errors = #(result.test_errors or {}),
       })
-      
+
       -- Print specific error details
       if result.test_errors and #result.test_errors > 0 then
         for i, err in ipairs(result.test_errors) do
           logger.error(string.format("Test error #%d: %s", i, err.message), {
             test_name = err.test_name,
-            file = err.file
+            file = err.file,
           })
         end
       end
-      
+
       -- Continue to generate reports, but remember to return false at the end
     end
   else
@@ -1600,30 +1613,30 @@ function runner.main(args)
     logger.error("Path not found", { path = path })
     return false
   end
-  
+
   -- Generate coverage reports if needed
   local report_success = true
-  
+
   if options.coverage and coverage and coverage_init_success then
     -- Stop coverage tracking
     local ok, err = pcall(function()
       coverage.stop()
     end)
-    
+
     if not ok then
       logger.error("Failed to stop coverage tracking", {
-        error = error_handler.format_error(err)
+        error = error_handler.format_error(err),
       })
       report_success = false
     end
-    
+
     -- Get coverage report data
     local report_data
-    ok, report_data = pcall(function() 
+    ok, report_data = pcall(function()
       -- Try both methods to get report data
       if type(coverage.get_report_data) == "function" then
         -- Legacy method
-        return coverage.get_report_data() 
+        return coverage.get_report_data()
       elseif type(coverage.get_data) == "function" then
         -- New instrumentation-based method
         return coverage.get_data()
@@ -1631,16 +1644,16 @@ function runner.main(args)
         error("No compatible function found to get coverage data")
       end
     end)
-    
+
     if not ok or not report_data then
       logger.error("Failed to get coverage report data", {
-        error = ok and "No data returned" or error_handler.format_error(report_data)
+        error = ok and "No data returned" or error_handler.format_error(report_data),
       })
       report_success = false
     else
       -- Count files in report_data
       local file_count = 0
-      
+
       -- Handle both old and new formats
       if report_data.files then
         -- Old format (legacy)
@@ -1653,24 +1666,24 @@ function runner.main(args)
           file_count = file_count + 1
         end
       end
-      
+
       if file_count == 0 then
         logger.error("No files were tracked in coverage data", {
-          operation = "coverage tracking"
+          operation = "coverage tracking",
         })
         report_success = false
       else
         -- Create reports directory
         local report_dir = options.report_dir or "./coverage-reports"
         fs.ensure_directory_exists(report_dir)
-        
+
         -- Generate reports
         local formats = options.formats or { "html", "json", "lcov", "cobertura" }
-        
+
         -- First try using the instrumentation-based generate_report method
         if type(coverage.generate_report) == "function" then
           logger.info("Using instrumentation-based coverage report generation")
-          
+
           -- Try to load data_store module for coverage summary calculations
           local data_store
           local data_store_loaded, data_store_result = pcall(require, "lib.coverage.runtime.data_store")
@@ -1678,23 +1691,23 @@ function runner.main(args)
             data_store = data_store_result
             logger.debug("Loaded data_store module for coverage calculations")
           end
-          
+
           for _, format in ipairs(formats) do
             local report_path = fs.join_paths(report_dir, "coverage-report." .. format)
             logger.info("Generating " .. format .. " report using instrumentation system", {
-              path = report_path
+              path = report_path,
             })
-            
+
             -- Use the direct method
-            local success, result = pcall(function() 
+            local success, result = pcall(function()
               return coverage.generate_report(format, report_path)
             end)
-            
+
             if success and result == true then
               logger.info("Successfully generated " .. format .. " coverage report", {
-                path = report_path
+                path = report_path,
               })
-              
+
               -- Get summary data from the instrumentation system
               if format == "html" and data_store and data_store.calculate_summary then
                 -- Use the values from the report for the summary output
@@ -1703,13 +1716,13 @@ function runner.main(args)
                   summary_data = data_store.calculate_summary(report_data)
                   return true
                 end)
-                
+
                 if summary_success and summary_data then
                   -- Update the report_data summary with the calculated values
                   report_data.summary = summary_data
                 end
               end
-              
+
               -- Verify the HTML report
               if format == "html" then
                 local file_exists = fs.file_exists(report_path)
@@ -1717,16 +1730,16 @@ function runner.main(args)
                 logger.info("HTML report verification", {
                   path = report_path,
                   exists = file_exists,
-                  is_file = is_file
+                  is_file = is_file,
                 })
-                
+
                 -- Update the coverage summary with the values from the HTML report
                 if data_store_loaded and data_store and report_data and report_data.summary then
                   logger.info("Updated coverage summary", {
                     overall = string.format("%.2f%%", (report_data.summary.overall_coverage_percent or 0)),
                     lines = string.format("%.2f%%", (report_data.summary.line_coverage_percent or 0)),
                     functions = string.format("%.2f%%", (report_data.summary.function_coverage_percent or 0)),
-                    files = string.format("%.2f%%", (report_data.summary.file_coverage_percent or 0))
+                    files = string.format("%.2f%%", (report_data.summary.file_coverage_percent or 0)),
                   })
                 end
               end
@@ -1734,7 +1747,7 @@ function runner.main(args)
               logger.error("Failed to generate " .. format .. " report with instrumentation", {
                 format = format,
                 path = report_path,
-                error = success and "Unknown error" or tostring(result)
+                error = success and "Unknown error" or tostring(result),
               })
               report_success = false
             end
@@ -1744,7 +1757,7 @@ function runner.main(args)
           logger.info("Falling back to legacy reporting module")
           local reporting
           ok, reporting = pcall(require, "lib.reporting")
-          
+
           if not ok then
             logger.error("Failed to load reporting module")
             report_success = false
@@ -1753,17 +1766,17 @@ function runner.main(args)
             for _, format in ipairs(formats) do
               local report_path = fs.join_paths(report_dir, "coverage-report." .. format)
               local format_success, err = reporting.save_coverage_report(report_path, report_data, format)
-              
+
               if not format_success then
                 logger.error("Failed to generate " .. format .. " report", {
-                  error = err and error_handler.format_error(err) or "Unknown error"
+                  error = err and error_handler.format_error(err) or "Unknown error",
                 })
                 report_success = false
               end
             end
           end
         end
-        
+
         -- Print coverage summary
         if report_data.summary then
           -- Calculate actual file counts manually
@@ -1771,11 +1784,11 @@ function runner.main(args)
           local covered_file_count = 0
           local total_lines = 0
           local covered_lines = 0
-          
+
           for file_path, file_data in pairs(report_data.files or {}) do
             file_count = file_count + 1
-            covered_file_count = covered_file_count + 1  -- All files with data are considered covered
-            
+            covered_file_count = covered_file_count + 1 -- All files with data are considered covered
+
             -- Count lines
             if file_data.lines then
               for line_num, line_data in pairs(file_data.lines) do
@@ -1788,49 +1801,54 @@ function runner.main(args)
               end
             end
           end
-          
+
           -- Calculate percentages
           local file_percent = file_count > 0 and (covered_file_count / file_count * 100) or 0
           local line_percent = total_lines > 0 and (covered_lines / total_lines * 100) or 0
-          
+
           -- Also update the summary values directly to ensure they're consistent everywhere
           report_data.summary.line_coverage_percent = line_percent
           report_data.summary.file_coverage_percent = file_percent
-          report_data.summary.overall_coverage_percent = (file_percent + line_percent + (report_data.summary.function_coverage_percent or 0)) / 3
-          
-          local overall_percent = (file_percent + line_percent + (report_data.summary.function_coverage_percent or 0)) / 3
-          
+          report_data.summary.overall_coverage_percent = (
+            file_percent
+            + line_percent
+            + (report_data.summary.function_coverage_percent or 0)
+          ) / 3
+
+          local overall_percent = (file_percent + line_percent + (report_data.summary.function_coverage_percent or 0))
+            / 3
+
           -- Print report with manually calculated values
           logger.info("Coverage summary", {
             overall = string.format("%.2f%%", overall_percent),
             lines = string.format("%.2f%%", line_percent),
             functions = string.format("%.2f%%", report_data.summary.function_coverage_percent or 0),
-            files = string.format("%.2f%%", file_percent)
+            files = string.format("%.2f%%", file_percent),
           })
-          
+
           -- Debug output for manual calculation
           logger.debug("Manual coverage calculation", {
             file_count = file_count,
             covered_file_count = covered_file_count,
             total_lines = total_lines,
-            covered_lines = covered_lines
+            covered_lines = covered_lines,
           })
         end
       end
     end
   end
-  
+
   -- CRITICAL FIX: Return success only if all operations succeeded AND no test failures
   local final_success = test_success and coverage_init_success and report_success
-  
+
   -- Add more detailed logging about the exit status
   logger.debug("Exit status components", {
     test_success = test_success,
     coverage_init_success = coverage_init_success,
     report_success = report_success,
-    final_success = final_success
+    final_success = final_success,
   })
-  
+
   -- Add additional debug logging for coverage data if coverage was enabled
   if options.coverage and coverage and coverage_init_success then
     -- Check if we have report data that includes coverage metrics
@@ -1838,19 +1856,19 @@ function runner.main(args)
     local line_coverage_percent = 0
     local function_coverage_percent = 0
     local file_coverage_percent = 0
-    
+
     -- Try to safely extract coverage percentages for validation
-    local success, report_data = pcall(function() 
-      return coverage.get_report_data() 
+    local success, report_data = pcall(function()
+      return coverage.get_report_data()
     end)
-    
+
     if success and report_data and report_data.summary then
       has_report_data = true
       line_coverage_percent = report_data.summary.line_coverage_percent or 0
       function_coverage_percent = report_data.summary.function_coverage_percent or 0
       file_coverage_percent = report_data.summary.file_coverage_percent or 0
     end
-    
+
     logger.debug("Coverage data consistency check", {
       is_coverage_enabled = options.coverage == true,
       coverage_object_valid = coverage ~= nil,
@@ -1859,18 +1877,18 @@ function runner.main(args)
       has_report_data = has_report_data,
       line_coverage_percent = string.format("%.2f%%", line_coverage_percent),
       function_coverage_percent = string.format("%.2f%%", function_coverage_percent),
-      file_coverage_percent = string.format("%.2f%%", file_coverage_percent)
+      file_coverage_percent = string.format("%.2f%%", file_coverage_percent),
     })
   end
-  
+
   -- Log a clear error message if tests failed
   if not test_success then
     logger.error("TESTS FAILED! Returning non-zero exit code", {
       reason = "Tests had failures or execution errors",
-      exit_code = 1
+      exit_code = 1,
     })
   end
-  
+
   -- Return the combined success status
   return final_success
 end
@@ -1886,14 +1904,14 @@ if arg and arg[0]:match("runner%.lua$") then
   -- CRITICAL FIX: Run the main function and always exit with appropriate code
   -- This ensures test failures are properly propagated to the OS exit code
   local success = runner.main(args)
-  
+
   -- Log the exit code to ensure transparency
-  logger.info("Exiting with code", { 
-    success = success, 
+  logger.info("Exiting with code", {
+    success = success,
     exit_code = success and 0 or 1,
-    reason = success and "All tests passed" or "Test failures detected"
+    reason = success and "All tests passed" or "Test failures detected",
   })
-  
+
   -- Always exit with appropriate code
   os.exit(success and 0 or 1)
 end

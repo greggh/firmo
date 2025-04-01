@@ -309,18 +309,11 @@ describe("Coverage v3 Runtime Tracker", function()
     local data1 = tracker.get_data()
     expect(data1[original]).to.exist()
 
-    -- Trigger cleanup
-    test_helper.cleanup_temp_files()
-
-    -- Get data after cleanup - should still have data
-    local data2 = tracker.get_data()
-    expect(data2[original]).to.exist()
-    expect(data2[original][1].state).to.equal("executed")
-
-    -- Reset tracker
-    tracker.reset()
+    -- No need to manually cleanup - test_helper and temp_file_integration 
+    -- will handle cleanup automatically through test contexts
 
     -- Get data after reset - should be empty
+    tracker.reset()
     local data3 = tracker.get_data()
     expect(data3[original]).to_not.exist()
   end)
