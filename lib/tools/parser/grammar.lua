@@ -507,16 +507,16 @@ local G = {
 
   OrOp = kw("or") / "or",
   AndOp = kw("and") / "and",
-  RelOp = sym("~=") / "ne" + sym("==") / "eq" + sym("<=") / "le" + sym(">=") / "ge" + sym("<") / "lt" + sym(">") / "gt",
-  BOrOp = sym("|") / "bor",
-  BXorOp = sym("~" * -P("=")) / "bxor",
-  BAndOp = sym("&") / "band",
-  ShiftOp = sym("<<") / "shl" + sym(">>") / "shr",
-  ConcatOp = sym("..") / "concat",
-  AddOp = sym("+") / "add" + sym("-") / "sub",
-  MulOp = sym("*") / "mul" + sym("//") / "idiv" + sym("/") / "div" + sym("%") / "mod",
-  UnaryOp = kw("not") / "not" + sym("-") / "unm" + sym("#") / "len" + sym("~") / "bnot",
-  PowOp = sym("^") / "pow",
+  RelOp = sym("~=") / "~=" + sym("==") / "==" + sym("<=") / "<=" + sym(">=") / ">=" + sym("<") / "<" + sym(">") / ">",
+  BOrOp = sym("|") / "|",
+  BXorOp = sym("~" * -P("=")) / "~",
+  BAndOp = sym("&") / "&",
+  ShiftOp = sym("<<") / "<<" + sym(">>") / ">>",
+  ConcatOp = sym("..") / "..",
+  AddOp = sym("+") / "+" + sym("-") / "-",
+  MulOp = sym("*") / "*" + sym("//") / "//" + sym("/") / "/" + sym("%") / "%",
+  UnaryOp = kw("not") / "not" + sym("-") / "-" + sym("#") / "#" + sym("~") / "~",
+  PowOp = sym("^") / "^",
 }
 
 -- Helper function to calculate line number and column

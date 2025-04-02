@@ -10,8 +10,8 @@ firmo is an enhanced Lua testing framework that provides comprehensive testing c
 
 The firmo codebase uses a centralized configuration system to handle all settings and ensure consistency across the framework. You MUST follow these critical requirements:
 
-1. **ALWAYS use the central_config module**: 
-   
+1. **ALWAYS use the central_config module**:
+
    ```lua
    -- CORRECT: Use the central configuration system
    local central_config = require("lib.core.central_config")
@@ -22,13 +22,13 @@ The firmo codebase uses a centralized configuration system to handle all setting
 2. **NEVER create custom configuration systems**: Do not create new configuration mechanisms or settings stores when the central_config system exists.
 
 3. **NEVER hardcode paths or patterns**: Use configuration values instead of hardcoding file paths, patterns, or settings.
-   
+
    ```lua
    -- ABSOLUTELY FORBIDDEN:
    if file_path:match("calculator%.lua") or file_path:match("/lib/samples/") then
      -- Special handling
    end
-   
+
    -- CORRECT:
    if config.coverage.include(file_path) and not config.coverage.exclude(file_path) then
      -- General handling based on configuration
@@ -38,23 +38,23 @@ The firmo codebase uses a centralized configuration system to handle all setting
 4. **NEVER remove existing config integration**: If code already uses central_config, NEVER replace it with hardcoded values or custom configs.
 
 5. **Configuration structure**: Access configuration in the standardized way:
-   
+
    ```lua
    local config = central_config.get_config()
-   
+
    -- Coverage settings
    local track_all = config.coverage.track_all_executed
-   local include_pattern = config.coverage.include 
+   local include_pattern = config.coverage.include
    local exclude_pattern = config.coverage.exclude
-   
-   -- Reporting settings  
+
+   -- Reporting settings
    local report_format = config.reporting.format
    ```
 
 6. **Default config file**: The system uses `.firmo-config.lua` for project-wide settings. NEVER bypass this in favor of hardcoded values.
 
 7. **Configuration override**: Always allow configuration values to override defaults:
-   
+
    ```lua
    -- CORRECT: Allow configuration to determine behavior
    local function should_track_file(file_path)
@@ -99,14 +99,14 @@ Special case code causes technical debt, makes the codebase harder to maintain, 
 This is an ABSOLUTE rule that must NEVER be violated:
 
 1. **NEVER import the coverage module in test files**: Tests should NEVER directly require or use the coverage module
-   
+
    ```lua
    -- ABSOLUTELY FORBIDDEN in any test file:
    local coverage = require("lib.coverage")
    ```
 
 2. **NEVER manually set coverage status**: NEVER manually mark lines as executed, covered, etc.
-   
+
    ```lua
    -- ABSOLUTELY FORBIDDEN code:
    debug_hook.set_line_covered(file_path, line_num, true)
@@ -132,38 +132,38 @@ The ONLY correct approach is to fix issues in the coverage module itself, never 
 The new coverage system MUST use a comprehensive instrumentation-based approach. To ensure the system is robust and future-proof, follow these non-negotiable architectural rules:
 
 1. **THREE-STATE DISTINCTION**: The core design MUST clearly distinguish between:
-   
+
    - **Covered Lines**: Executed AND verified by assertions (Green)
    - **Executed Lines**: Only executed, NOT verified (Orange)
    - **Not Covered Lines**: Not executed at all (Red)
 
 2. **CODE INSTRUMENTATION**: The system MUST use source code instrumentation:
-   
+
    - Parse Lua source code and add tracking calls
    - Insert instrumentation at the beginning of each logical line
    - Preserve original line numbering for error reporting
    - Maintain source maps for accurate error reporting
 
 3. **ASSERTION TRACING**: The system MUST trace which lines an assertion actually verifies:
-   
+
    - Track the call stack when assertions run
    - Identify which functions/lines the assertion calls
    - Connect assertions to the code they verify
 
 4. **UNIFORM DATA STRUCTURES**: All data MUST use consistent structures:
-   
+
    - Same line data format everywhere
    - Clear properties for executed vs. covered status
    - Normalized at system boundaries
 
 5. **SINGLE SOURCE OF TRUTH**: For each coverage state:
-   
+
    - One definitive location determines coverage status
    - All components refer to this source
    - No duplicate or conflicting status tracking
 
 6. **CLEAN COMPONENT SEPARATION**:
-   
+
    - **Instrumentation Engine**: Transform source code with tracking
    - **Module Loader**: Hook into module loading for instrumentation
    - **Runtime Tracker**: Record execution data
@@ -172,19 +172,19 @@ The new coverage system MUST use a comprehensive instrumentation-based approach.
    - **Reporting System**: Visualize results without altering data
 
 7. **NO SPECIAL CASES**: The system MUST work uniformly for all code:
-   
+
    - No file-specific logic whatsoever
    - No pattern matching on filenames
    - Same behavior for all files regardless of size/location
 
 8. **EXPLICIT > IMPLICIT**: Make all behavior explicit:
-   
+
    - No automatic promotion from executed to covered
    - Explicit marking of covered state by assertions
    - Clear documentation of how lines get marked
 
 9. **PERFORMANCE BY DESIGN**: Build performance in from the start:
-   
+
    - Lightweight instrumentation with minimal overhead
    - Caching of instrumented modules
    - Optimized data structures for minimal memory usage
@@ -251,37 +251,36 @@ The ONLY time specialized logic is acceptable is when it is based on objective, 
 When fixing coverage tracking or reporting issues, follow this exact procedure:
 
 1. **Identify the fundamental problem**:
-   
+
    - Is there an inconsistency in data structures?
-   - Is there a tracking issue in the debug hook?
    - Is there a normalization problem?
 
 2. **Locate the boundary where normalization should occur**:
-   
+
    - Coverage data should be normalized at collection time in init.lua's stop() function
    - ALL files should be processed identically
    - ALL data structures should be consistent after normalization
 
 3. **Implement a SINGLE general solution**:
-   
+
    - The solution must work for ALL files, not just problematic ones
    - The solution must handle ALL edge cases
    - The solution must normalize ALL data structures consistently
 
 4. **Remove ALL special cases**:
-   
+
    - Remove ANY conditional logic based on file names
    - Remove ANY special handling for specific paths
    - Remove ANY code that treats different files differently
 
 5. **Test with MULTIPLE different files**:
-   
+
    - Never test only with calculator.lua
    - Verify the solution works for ALL file types
    - Verify ALL files show correct coverage data
 
 6. **Document the architectural solution**:
-   
+
    - Explain how the general solution works
    - Document why it's better than special-case handling
    - Note any remaining edge cases that need addressing
@@ -307,51 +306,51 @@ Only remove these comments when you are specifically fixing the issue they're su
 The codebase uses several standardized error handling patterns that require diagnostic suppressions. These suppressions are necessary and intentional, not code smell:
 
 1. **pcall Pattern**:
-   
+
    ```lua
    ---@diagnostic disable-next-line: unused-local
    local ok, err = pcall(function()
      return some_operation()
    end)
-   
+
    if not ok then
      -- Handle error in err
    end
    ```
-   
+
    The `ok` variable appears unused because it's only used for control flow.
 
 2. **error_handler.try Pattern**:
-   
+
    ```lua
    ---@diagnostic disable-next-line: unused-local
    local success, result, err = error_handler.try(function()
      return some_operation()
    end)
-   
+
    if not success then
      -- Handle error in result (which contains the error object)
    end
    ```
-   
+
    The `success` variable appears unused for the same reason.
 
 3. **Table Access Without nil Check**:
-   
+
    ```lua
    ---@diagnostic disable-next-line: need-check-nil
    local value = table[key]
    ```
-   
+
    Used when the code knows the key exists or handles nil values correctly afterward.
 
 4. **Redundant Parameter Pattern**:
-   
+
    ```lua
    ---@diagnostic disable-next-line: redundant-parameter
    await(50) -- Wait 50ms
    ```
-   
+
    Used when calling functions that are imported from one module and re-exported through another (like `firmo.await` which comes from `lib/async/init.lua`). The Lua Language Server cannot correctly trace the parameter types through these re-exports, resulting in false "redundant parameter" warnings.
 
 Always include these diagnostic suppressions when implementing these patterns. They are part of our standardized approach and removing them would cause unnecessary static analyzer warnings.
@@ -363,17 +362,17 @@ The codebase uses comprehensive JSDoc-style type annotations for improved type c
 #### Required Type Annotations
 
 1. **Module Interface Declarations** - All module files must begin with class/module definition:
-   
+
    ```lua
    ---@class ModuleName
-   ---@field function_name fun(param: type): return_type Description 
+   ---@field function_name fun(param: type): return_type Description
    ---@field another_function fun(param1: type, param2?: type): return_type|nil, error? Description
    ---@field _VERSION string Module version
    local M = {}
    ```
 
 2. **Module Function Definitions**:
-   
+
    ```lua
    --- Description of what the function does
    ---@param name type Description of the parameter
@@ -386,7 +385,7 @@ The codebase uses comprehensive JSDoc-style type annotations for improved type c
 
 3. **Function Re-exports**:
    When a function is defined in one module but exported through another:
-   
+
    ```lua
    --- Description of what the function does
    ---@param name type Description of the parameter
@@ -396,7 +395,7 @@ The codebase uses comprehensive JSDoc-style type annotations for improved type c
    ```
 
 4. **Local Function Annotations** - Helper functions should have annotations:
-   
+
    ```lua
    ---@private
    ---@param value any The value to process
@@ -405,11 +404,11 @@ The codebase uses comprehensive JSDoc-style type annotations for improved type c
    ```
 
 5. **Variable Type Annotations** - For complex types:
-   
+
    ```lua
    ---@type string[]
    local names = {}
-   
+
    ---@type table<string, {id: number, name: string}>
    local cache = {}
    ```
@@ -417,32 +416,32 @@ The codebase uses comprehensive JSDoc-style type annotations for improved type c
 #### Annotation Style Guidelines
 
 1. **Error Handling Pattern** - For functions that may fail, use this pattern:
-   
+
    ```lua
    ---@return ValueType|nil value The result or nil if operation failed
    ---@return table|nil error Error information if operation failed
    ```
 
 2. **Optional Parameters** - Mark with question mark suffix:
-   
+
    ```lua
    ---@param options? table Optional configuration
    ```
 
 3. **Nullable Types** - Use pipe with nil:
-   
+
    ```lua
    ---@return string|nil The result or nil if not found
    ```
 
 4. **Union Types** - Use pipe for multiple possible types:
-   
+
    ```lua
    ---@param id string|number The identifier (string or number)
    ```
 
 5. **Complex Return Patterns** - Document each possible return value:
-   
+
    ```lua
    ---@return boolean|nil success Whether operation succeeded or nil if error
    ---@return table|nil result Result data if success, nil if error
@@ -450,13 +449,13 @@ The codebase uses comprehensive JSDoc-style type annotations for improved type c
    ```
 
 6. **Tables with Specific Fields** - Document the structure:
-   
+
    ```lua
    ---@param options {timeout?: number, retry?: boolean, max_attempts?: number} Configuration options
    ```
 
 7. **Callback Signatures** - Document the callback function signature:
-   
+
    ```lua
    ---@param callback fun(result: string, success: boolean): boolean Function called with result
    ```
@@ -486,7 +485,7 @@ The standard annotation structure follows sumneko Lua Language Server format for
 Until all functions have proper type annotations throughout the export chain, continue using the diagnostic suppressions as needed. The goal is to gradually add type annotations to all major modules in this priority order:
 
 1. Core modules (async, error_handler, logging)
-2. Tools modules (filesystem, benchmark, codefix)  
+2. Tools modules (filesystem, benchmark, codefix)
 3. Public API functions in firmo.lua
 4. Test helper functions and utilities
 
@@ -495,13 +494,13 @@ Until all functions have proper type annotations throughout the export chain, co
 When working with Markdown files:
 
 1. **Code Block Format**: Use simple triple backticks without language specifiers when the language is obvious:
-   
+
    ```
    -- Lua code goes here
    ```
-   
+
    NOT:
-   
+
    ```text
    -- Lua code goes here
    ```
@@ -515,13 +514,13 @@ When working with Markdown files:
 For cross-version Lua compatibility:
 
 1. **Table Unpacking**: Always use the compatibility function for unpacking:
-   
+
    ```lua
    local unpack_table = table.unpack or unpack
    ```
 
 2. **Table Length**: Use the `#` operator instead of `table.getn`:
-   
+
    ```lua
    local length = #my_table  -- Correct
    local length = table.getn(my_table)  -- Incorrect, deprecated
@@ -531,13 +530,13 @@ For cross-version Lua compatibility:
 
 ### Testing Commands
 
-- Run All Tests: `env -C /home/gregg/Projects/lua-library/firmo lua test.lua tests/`
-- Run Specific Test: `env -C /home/gregg/Projects/lua-library/firmo lua test.lua tests/reporting_test.lua`
-- Run Tests by Pattern: `env -C /home/gregg/Projects/lua-library/firmo lua test.lua --pattern=coverage tests/`
-- Run Tests with Coverage: `env -C /home/gregg/Projects/lua-library/firmo lua test.lua --coverage tests/`
-- Run Tests with Watch Mode: `env -C /home/gregg/Projects/lua-library/firmo lua test.lua --watch tests/`
-- Run Tests with Quality Validation: `env -C /home/gregg/Projects/lua-library/firmo lua test.lua --quality tests/`
-- Run Example: `env -C /home/gregg/Projects/lua-library/firmo lua examples/report_example.lua`
+- Run All Tests: `lua test.lua tests/`
+- Run Specific Test: `lua test.lua tests/reporting_test.lua`
+- Run Tests by Pattern: `lua test.lua --pattern=coverage tests/`
+- Run Tests with Coverage: `lua test.lua --coverage tests/`
+- Run Tests with Watch Mode: `lua test.lua --watch tests/`
+- Run Tests with Quality Validation: `lua test.lua --quality tests/`
+- Run Example: `lua examples/report_example.lua`
 
 ### Test Command Format
 
@@ -645,7 +644,7 @@ end)
 ### Error Testing Best Practices
 
 1. **Always use the `expect_error` flag**: This marks the test as one that expects errors:
-   
+
    ```lua
    it("test description", { expect_error = true }, function()
      -- Test code that should produce errors
@@ -653,7 +652,7 @@ end)
    ```
 
 2. **Always use `test_helper.with_error_capture()`**: This safely captures errors without crashing tests:
-   
+
    ```lua
    local result, err = test_helper.with_error_capture(function()
      return function_that_throws()
@@ -661,27 +660,27 @@ end)
    ```
 
 3. **Be flexible with error categories**: Avoid hard-coding specific categories to make tests more resilient:
-   
+
    ```lua
    -- Recommended:
    expect(err.category).to.exist()
-   
+
    -- More specific but still flexible:
    expect(err.category).to.match("^[A-Z_]+$")
-   
+
    -- Avoid unless necessary:
    expect(err.category).to.equal(error_handler.CATEGORY.VALIDATION)
    ```
 
 4. **Use pattern matching for error messages**: Use `match()` instead of `equal()` for error messages:
-   
+
    ```lua
    expect(err.message).to.match("invalid file")  -- Good
    expect(err.message).to.equal("Invalid file format")  -- Too specific
    ```
 
 5. **Test for existence first**: Always check that the value exists before making assertions about it:
-   
+
    ```lua
    expect(err).to.exist()
    if err then
@@ -690,7 +689,7 @@ end)
    ```
 
 6. **Handle both error patterns**: Some functions return `nil, error` while others return `false`:
-   
+
    ```lua
    if result == nil then
      expect(err).to.exist()
@@ -700,16 +699,16 @@ end)
    ```
 
 7. **Clean up resources properly**: If your test creates files or resources, ensure they're cleaned up:
-   
+
    ```lua
    -- Track resources for cleanup
    local test_files = {}
-   
+
    -- Create with error handling
    local file_path, create_err = temp_file.create_with_content(content, "lua")
    expect(create_err).to_not.exist("Failed to create test file: " .. tostring(create_err))
    table.insert(test_files, file_path)
-   
+
    -- Cleanup in after() hook with error handling
    after(function()
      for _, path in ipairs(test_files) do
@@ -723,14 +722,14 @@ end)
    ```
 
 8. **Document expected error behavior**: Add comments that explain what errors are expected:
-   
+
    ```lua
    it("should reject invalid input", { expect_error = true }, function()
      -- Passing a number should cause a validation error
      local result, err = test_helper.with_error_capture(function()
        return module.process_string(123)
      end)()
-   
+
      expect(result).to_not.exist()
      expect(err).to.exist()
      expect(err.message).to.match("string expected")
@@ -759,33 +758,33 @@ expect(value).to_not.be.a("number")
 ### Common Assertion Mistakes to Avoid
 
 1. **Incorrect negation syntax**:
-   
+
    ```lua
    -- WRONG:
    expect(value).not_to.equal(other_value)  -- "not_to" is not valid
-   
+
    -- CORRECT:
    expect(value).to_not.equal(other_value)  -- use "to_not" instead
    ```
 
 2. **Incorrect member access syntax**:
-   
+
    ```lua
    -- WRONG:
    expect(value).to_be(true)  -- "to_be" is not a valid method
    expect(number).to_be_greater_than(5)  -- underscore methods need dot access
-   
+
    -- CORRECT:
    expect(value).to.be(true)  -- use "to.be" not "to_be"
    expect(number).to.be_greater_than(5)  -- this is correct because it's a method
    ```
 
 3. **Inconsistent operator order**:
-   
+
    ```lua
    -- WRONG:
    expect(expected).to.equal(actual)  -- parameters reversed
-   
+
    -- CORRECT:
    expect(actual).to.equal(expected)  -- what you have, what you expect
    ```
@@ -998,14 +997,14 @@ tests/
 
 ### Other Useful Commands
 
-- Fix Markdown Files: `env -C /home/gregg/Projects/lua-library/firmo lua scripts/fix_markdown.lua docs`
-- Fix Specific Markdown Files: `env -C /home/gregg/Projects/lua-library/firmo lua scripts/fix_markdown.lua README.md CHANGELOG.md`
-- Debug Report Generation: `env -C /home/gregg/Projects/lua-library/firmo lua test.lua --coverage --format=html tests/reporting_test.lua`
-- Test Quality Validation: `env -C /home/gregg/Projects/lua-library/firmo lua test.lua --quality --quality-level=2 tests/quality_test.lua`
-- Clean Orphaned Temp Files: `env -C /home/gregg/Projects/lua-library/firmo lua scripts/cleanup_temp_files.lua`
-- Clean Orphaned Temp Files (Dry Run): `env -C /home/gregg/Projects/lua-library/firmo lua scripts/cleanup_temp_files.lua --dry-run`
-- Check Lua Syntax: `env -C /home/gregg/Projects/lua-library/firmo lua scripts/check_syntax.lua <file_path>` 
-- Find Print Statements: `env -C /home/gregg/Projects/lua-library/firmo lua scripts/find_print_statements.lua lib/`
+- Fix Markdown Files: `lua scripts/fix_markdown.lua docs`
+- Fix Specific Markdown Files: `lua scripts/fix_markdown.lua README.md CHANGELOG.md`
+- Debug Report Generation: `lua test.lua --coverage --format=html tests/reporting_test.lua`
+- Test Quality Validation: `lua test.lua --quality --quality-level=2 tests/quality_test.lua`
+- Clean Orphaned Temp Files: `lua scripts/cleanup_temp_files.lua`
+- Clean Orphaned Temp Files (Dry Run): `lua scripts/cleanup_temp_files.lua --dry-run`
+- Check Lua Syntax: `lua scripts/check_syntax.lua <file_path>`
+- Find Print Statements: `lua scripts/find_print_statements.lua lib/`
 
 ## Project Structure
 
@@ -1040,78 +1039,78 @@ tests/
 ### Components
 
 1. **Coverage Module (init.lua)**:
-   
+
    - Provides public API for coverage tracking
    - Initializes and configures subsystems
    - Manages coverage lifecycle (start, stop, reset)
    - Processes coverage data before reporting
 
 2. **Instrumentation Engine**:
-   
-   - **Parser (parser.lua)**: 
-     
+
+   - **Parser (parser.lua)**:
+
      - Parses Lua source code
      - Identifies logical lines and code structure
      - Builds AST for transformation
-   
+
    - **Transformer (transformer.lua)**:
-     
+
      - Inserts tracking calls at each logical line
      - Maintains original code structure
      - Preserves comments and whitespace
-   
+
    - **Source Mapper (sourcemap.lua)**:
-     
+
      - Maps instrumented line numbers to original lines
      - Provides utilities for error reporting
 
 3. **Module Loading Integration**:
-   
+
    - **Loader Hook (loader/hook.lua)**:
-     
+
      - Hooks into Lua's module loading system
      - Intercepts require calls
      - Instruments modules before execution
-   
+
    - **Module Cache (loader/cache.lua)**:
-     
+
      - Caches instrumented modules
      - Provides fast lookup of transformed code
 
 4. **Runtime Tracking**:
-   
+
    - **Runtime Tracker (runtime/tracker.lua)**:
-     
+
      - Provides global tracking functions
      - Records line execution
      - Associates lines with modules
-   
+
    - **Data Store (runtime/data_store.lua)**:
-     
+
      - Stores execution data
      - Manages coverage information
 
 5. **Assertion Integration**:
-   
+
    - **Assertion Hook (assertion/hook.lua)**:
-     
+
      - Hooks into firmo's assertion system
      - Captures assertion execution context
-   
+
    - **Line Association (assertion/analyzer.lua)**:
-     
+
      - Associates assertions with verified lines
      - Marks lines as covered rather than just executed
 
 6. **Reporting System**:
-   
+
    - **HTML Reporter (report/html.lua)**:
-     
+
      - Generates visual HTML reports
      - Provides three-color visualization
-   
+
    - **JSON Reporter (report/json.lua)**:
-     
+
      - Outputs machine-readable coverage data
      - Supports integration with other tools
 
@@ -1120,7 +1119,7 @@ tests/
 When working with the coverage module and implementing error handling:
 
 1. **Use Structured Error Objects**: Always use error_handler.create() or specialized functions
-   
+
    ```lua
    local err = error_handler.validation_error(
      "Missing required parameter",
@@ -1129,7 +1128,7 @@ When working with the coverage module and implementing error handling:
    ```
 
 2. **Proper Error Propagation**: Return nil and error object
-   
+
    ```lua
    if not file_content then
      return nil, error_handler.io_error(
@@ -1140,12 +1139,12 @@ When working with the coverage module and implementing error handling:
    ```
 
 3. **Try/Catch Pattern**: Use error_handler.try for operations that might throw errors
-   
+
    ```lua
    local success, result, err = error_handler.try(function()
      return analyze_file(file_path)
    end)
-   
+
    if not success then
      logger.error("Failed to analyze file", {
        file_path = file_path,
@@ -1156,7 +1155,7 @@ When working with the coverage module and implementing error handling:
    ```
 
 4. **Safe I/O Operations**: Use error_handler.safe_io_operation for file access
-   
+
    ```lua
    local content, err = error_handler.safe_io_operation(
      function() return fs.read_file(file_path) end,
@@ -1166,7 +1165,7 @@ When working with the coverage module and implementing error handling:
    ```
 
 5. **Validation Functions**: Always validate input parameters
-   
+
    ```lua
    error_handler.assert(type(file_path) == "string",
      "file_path must be a string",
@@ -1210,31 +1209,31 @@ When completed, the system must properly distinguish between three states:
 ### Implementation Requirements
 
 1. **Complete Instrumentation Engine Development**:
-   
+
    - Finish the Lua code parser for accurate code analysis
    - Build an AST transformer that inserts tracking calls
    - Create a robust source mapper for error reporting
 
 2. **Module Loading Integration**:
-   
+
    - Hook the require system to intercept module loading
    - Instrument modules on-demand during loading
    - Build a caching system for instrumented modules
 
 3. **Runtime Tracking System**:
-   
+
    - Develop the execution tracking system
    - Create a data store for coverage information
    - Ensure performance with large codebases
 
 4. **Assertion Tracing (Most Critical)**:
-   
+
    - Build stack-tracing mechanism to connect assertions to code
    - Identify which lines each assertion verifies
    - Differentiate between "executed" and "covered" states
 
 5. **Reporting System Enhancements**:
-   
+
    - Update HTML reporter to show three distinct states
    - Create a clear visual distinction in reports
    - Ensure accurate representation of coverage data
@@ -1242,25 +1241,25 @@ When completed, the system must properly distinguish between three states:
 ### Technical Requirements
 
 1. **Test Suite Development**:
-   
+
    - Create comprehensive tests for the instrumentation engine
    - Build tests for each component of the coverage system
    - Develop integration tests for the complete system
 
 2. **Performance Optimization**:
-   
+
    - Profile and optimize the instrumentation process
    - Minimize runtime overhead during test execution
    - Ensure report generation is efficient for large codebases
 
 3. **Data Consistency**:
-   
+
    - Implement uniform data structures throughout
    - Create a single source of truth for coverage state
    - Ensure proper normalization at system boundaries
 
 4. **Central Configuration Integration**:
-   
+
    - Use central_config for all settings
    - No hardcoded values or file patterns
    - Allow configuration of all coverage behaviors
@@ -1284,9 +1283,3 @@ When the implementation approaches completion:
 4. Check that report generation completes in a reasonable time
 
 IMPORTANT: This task supersedes ALL other tasks. The coverage system overhaul must be completed before moving on to other enhancements.
-
-## Documentation Links
-
-- Tasks: `/home/gregg/Projects/docs-projects/neovim-ecosystem-docs/tasks/firmo-tasks.md`
-- Architecture: `/home/gregg/Projects/docs-projects/neovim-ecosystem-docs/plans/firmo-architecture.md`
-- Project Status: `/home/gregg/Projects/docs-projects/neovim-ecosystem-docs/project-status.md`

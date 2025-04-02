@@ -15,14 +15,15 @@ describe("Coverage v3 Parser", function()
     
     local ast = parser.parse(source)
     expect(ast).to.exist()
-    expect(ast.tag).to.equal("Chunk")
+    expect(ast.tag).to.equal("Block")
     expect(#ast).to.equal(2) -- Two statements
     
     -- First statement
     expect(ast[1].tag).to.equal("Local")
     expect(ast[1].pos).to.exist()
     expect(ast[1].line).to.equal(1)
-    expect(ast[1][1][1]).to.equal("x")
+    expect(ast[1][1][1].tag).to.equal("Id")
+    expect(ast[1][1][1][1]).to.equal("x")
     expect(ast[1][2][1].tag).to.equal("Number")
     expect(ast[1][2][1][1]).to.equal(1)
     
@@ -30,7 +31,8 @@ describe("Coverage v3 Parser", function()
     expect(ast[2].tag).to.equal("Local")
     expect(ast[2].pos).to.exist()
     expect(ast[2].line).to.equal(2)
-    expect(ast[2][1][1]).to.equal("y")
+    expect(ast[2][1][1].tag).to.equal("Id")
+    expect(ast[2][1][1][1]).to.equal("y")
     expect(ast[2][2][1].tag).to.equal("Number")
     expect(ast[2][2][1][1]).to.equal(2)
   end)
@@ -43,20 +45,29 @@ describe("Coverage v3 Parser", function()
     ]]
     
     local ast = parser.parse(source)
+    
+    
     expect(ast).to.exist()
-    expect(ast.tag).to.equal("Chunk")
+    expect(ast.tag).to.equal("Block")
     expect(#ast).to.equal(1)
     
-    local func = ast[1]
+    local func = ast[1]  -- The Localrec node
     expect(func.tag).to.equal("Localrec")
     expect(func.pos).to.exist()
     expect(func.line).to.equal(1)
-    expect(func[1][1][1]).to.equal("add") -- Function name
-    
-    -- Function parameters
+
+    -- Function name is in the first list
+    local name = func[1][1]  -- The Id node
+    expect(name.tag).to.equal("Id")
+    expect(name[1]).to.equal("add")
+
+    -- Function parameters are in the second list's first function node
     local params = func[2][1][1]
+    expect(params.tag).to.equal("NameList")
     expect(#params).to.equal(2)
+    expect(params[1].tag).to.equal("Id")
     expect(params[1][1]).to.equal("a")
+    expect(params[2].tag).to.equal("Id")
     expect(params[2][1]).to.equal("b")
   end)
 

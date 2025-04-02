@@ -246,7 +246,11 @@ The quality module validates that tests meet specified quality criteria:
 
 Several utility modules provide supporting functionality:
 
-- **Filesystem**: Cross-platform file operations
+- **Filesystem**: Cross-platform file operations with:
+  - Consistent handling of hidden files in directory operations
+  - Standardized function aliases (e.g., remove_directory → delete_directory)
+  - Unified directory listing through a single implementation
+  - Comprehensive path manipulation functions
 - **Logging**: Structured, level-based logging
 - **Watcher**: File monitoring for live reloading
 - **Benchmark**: Performance measurement and analysis

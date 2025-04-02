@@ -57,7 +57,7 @@
 --- @field delete_directory fun(dir_path: string, recursive?: boolean): boolean|nil, string? Alias for remove_directory
 --- @field remove_file fun(file_path: string): boolean|nil, string? Remove a file
 --- @field delete_file fun(file_path: string): boolean|nil, string? Alias for remove_file
---- @field get_directory_contents fun(dir_path: string): table|nil, string? Get all items in a directory
+--- @field get_directory_contents fun(dir_path: string, include_hidden?: boolean): table|nil, string? Get all items in a directory (optionally including hidden files)
 --- @field get_directory_items fun(dir_path: string, include_hidden?: boolean): table<number, string>|nil, string? Get items in a directory
 --- @field list_files fun(dir_path: string, include_hidden?: boolean): string[]|nil, string? List files in a directory (non-recursive)
 --- @field list_files_recursive fun(dir_path: string, include_hidden?: boolean): string[]|nil, string? List files recursively in a directory and its subdirectories
@@ -591,9 +591,12 @@ end
 --- List the contents of a directory (files and subdirectories)
 --- This function returns a list of all items (files and subdirectories) in the
 --- specified directory. It uses platform-specific commands to get the listing
---- and handles errors appropriately.
+--- and handles errors appropriately. By default, it excludes hidden files and 
+--- directories (those starting with a dot), but they can be included by setting
+--- the include_hidden parameter to true.
 ---
 --- @param path string Path to the directory to list
+--- @param include_hidden boolean Whether to include hidden files (default: false)
 --- @return table|nil files List of file and directory names or nil on error
 --- @return string|nil error Error message if listing failed
 ---
@@ -614,7 +617,13 @@ end
 ---     print("Directory: " .. item_name)
 ---   end
 --- end
-function fs.get_directory_contents(path)
+---
+--- -- Include hidden files and directories
+--- local all_items = fs.get_directory_contents("/home/user", true)
+function fs.get_directory_contents(path, include_hidden)
+  -- Default include_hidden to false if not provided
+  include_hidden = include_hidden or false
+  
   return safe_io_action(function(dir_path)
     if not fs.directory_exists(dir_path) then
       return nil, "Directory does not exist: " .. dir_path
@@ -622,9 +631,14 @@ function fs.get_directory_contents(path)
 
     local files = {}
     local normalized_path = fs.normalize_path(dir_path)
-    local command = is_windows() and 'dir /b "' .. normalized_path .. '"'
-      or 'ls -1 "' .. normalized_path
-      .. '" 2>/dev/null' -- Redirect stderr to /dev/null
+    local command
+    
+    if is_windows() then
+      command = 'dir /b "' .. normalized_path .. '"'
+    else
+      -- Use -a flag for ls to show hidden files, we'll filter them later if needed
+      command = 'ls -a "' .. normalized_path .. '" 2>/dev/null' -- Redirect stderr to /dev/null
+    end
 
     local handle = io.popen(command)
     if not handle then
@@ -632,7 +646,13 @@ function fs.get_directory_contents(path)
     end
 
     for file in handle:lines() do
-      table.insert(files, file)
+      -- Skip . and .. directories on Unix
+      if file ~= "." and file ~= ".." then
+        -- Only include hidden files if include_hidden is true
+        if include_hidden or file:sub(1, 1) ~= "." then
+          table.insert(files, file)
+        end
+      end
     end
 
     local close_ok, close_err = handle:close()
@@ -1575,41 +1595,13 @@ end
 --- @param dir_path string Directory to list
 --- @return table|nil entries Array of file/directory names or nil on error
 --- @return string|nil error Error message if the operation failed
-function fs.list_directory(dir_path)
+function fs.list_directory(dir_path, include_hidden)
   if not dir_path then
     return nil, "No directory path provided"
   end
 
-  if not fs.directory_exists(dir_path) then
-    return nil, "Directory does not exist: " .. dir_path
-  end
-
-  local entries = {}
-  local command
-
-  if is_windows() then
-    -- Use PowerShell on Windows for consistent output
-    command =
-      string.format('powershell -Command "Get-ChildItem -Path "%s" | Select-Object -ExpandProperty Name"', dir_path)
-  else
-    -- Use ls command on Unix systems
-    command = string.format('ls -A "%s"', dir_path)
-  end
-
-  local handle = io.popen(command)
-  if not handle then
-    return nil, "Failed to list directory"
-  end
-
-  for line in handle:lines() do
-    -- Skip current and parent directory entries
-    if line ~= "." and line ~= ".." then
-      table.insert(entries, line)
-    end
-  end
-
-  handle:close()
-  return entries
+  -- Use get_directory_contents for consistency
+  return fs.get_directory_contents(dir_path, include_hidden)
 end
 
 function fs.get_files(dir_path, pattern)
@@ -2308,6 +2300,129 @@ function fs.find_files(dir_path, pattern, recursive)
   end
 
   return matching_files
+end
+
+--- Resolve a symbolic link to its target path
+--- This function resolves a symbolic link to its target path. If the path is not
+--- a symlink, it returns the original path. It uses platform-specific commands
+--- to resolve the symlink, falling back to the original path if the resolution fails.
+---
+--- @param path string Path that might be a symlink
+--- @return string|nil resolved_path The resolved path or nil on error
+--- @return string|nil error Error message if resolution failed
+---
+--- @usage
+--- -- Resolve a symlink to its target path
+--- local real_path, err = fs.resolve_symlink("/path/to/symlink")
+--- if not real_path then
+---   print("Error resolving symlink: " .. (err or "unknown error"))
+---   return
+--- end
+--- print("Symlink points to: " .. real_path)
+---
+--- -- Will return the original path if not a symlink
+--- local path = fs.resolve_symlink("/regular/file.txt") -- Returns "/regular/file.txt"
+function fs.resolve_symlink(path)
+  if not path then
+    return nil, "Cannot resolve nil path"
+  end
+
+  -- Check if the file or directory exists first
+  local exists = fs.file_exists(path) or fs.directory_exists(path)
+  if not exists then
+    return path -- Return original path if it doesn't exist
+  end
+
+  return safe_io_action(function(file_path)
+    local command
+    local handle
+    local resolved_path
+
+    if is_windows() then
+      -- Windows PowerShell command to resolve symlinks
+      command = string.format('powershell -Command "if (Test-Path -Path \'%s\' -PathType Any) { $item = Get-Item -Path \'%s\' -Force; if ($item.LinkType) { $item.Target } else { \'%s\' } } else { \'%s\' }"', 
+        file_path, file_path, file_path, file_path)
+    else
+      -- Unix readlink command to resolve symlinks, if not a symlink it will fail silently
+      command = string.format('readlink -f "%s" 2>/dev/null || echo "%s"', file_path, file_path)
+    end
+
+    handle = io.popen(command)
+    if not handle then
+      return file_path -- Return original path if command fails
+    end
+
+    resolved_path = handle:read("*l")
+    handle:close()
+
+    -- If resolved_path is empty or nil, return original path
+    if not resolved_path or resolved_path == "" then
+      return file_path
+    end
+
+    return resolved_path
+  end, path) or path -- Return original path as fallback on any error
+end
+
+--- Alias for delete_directory
+--- This is an alias for fs.delete_directory for compatibility and alternative naming.
+--- 
+--- @param path string Path to the directory to delete
+--- @param recursive boolean If true, recursively delete contents
+--- @return boolean|nil success True if deletion was successful, nil on error
+--- @return string|nil error Error message if deletion failed
+function fs.remove_directory(path, recursive)
+  return fs.delete_directory(path, recursive)
+end
+
+--- Alias for delete_file
+--- This is an alias for fs.delete_file for compatibility and alternative naming.
+---
+--- @param path string Path to the file to delete
+--- @return boolean|nil success True if deletion was successful, nil on error
+--- @return string|nil error Error message if deletion failed
+function fs.remove_file(path)
+  return fs.delete_file(path)
+end
+
+--- Alias for get_directory_name
+--- This is an alias for fs.get_directory_name for compatibility and alternative naming.
+---
+--- @param path string Path to process
+--- @return string|nil directory_name Directory component of path or nil if path is nil
+function fs.get_directory(path)
+  return fs.get_directory_name(path)
+end
+
+--- Alias for get_file_name
+--- This is an alias for fs.get_file_name for compatibility and alternative naming.
+---
+--- @param path string Path to process
+--- @return string|nil filename File name component of path or nil on error
+--- @return string|nil error Error message if extraction failed
+function fs.get_filename(path)
+  return fs.get_file_name(path)
+end
+
+--- Alias for get_modified_time
+--- This is an alias for fs.get_modified_time for compatibility and alternative naming.
+---
+--- @param path string Path to the file or directory
+--- @return number|nil timestamp Modification time as Unix timestamp or nil on error
+--- @return string|nil error Error message if getting the time failed
+function fs.get_file_modified_time(path)
+  return fs.get_modified_time(path)
+end
+
+--- Alias for get_directory_contents
+--- This is an alias for fs.get_directory_contents for compatibility and alternative naming.
+---
+--- @param dir_path string Directory to list
+--- @param include_hidden boolean Whether to include hidden files (default: false)
+--- @return table|nil entries Array of file/directory names or nil on error
+--- @return string|nil error Error message if the operation failed
+function fs.get_directory_items(dir_path, include_hidden)
+  return fs.get_directory_contents(dir_path, include_hidden)
 end
 
 return fs
