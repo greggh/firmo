@@ -5,10 +5,9 @@ return {
   -- Coverage Configuration
   coverage = {
     enabled = false,                     -- Only enable with --coverage flag
-    version = 3,                         -- Use v3 instrumentation-based coverage
     debug = false,                       -- Disable debug mode to avoid excessive logging
     
-    -- Include/exclude function patterns for v3
+    -- Include/exclude function patterns
     include = function(path)
       -- Include all Lua files by default
       if path:match("%.lua$") then
@@ -24,21 +23,15 @@ return {
       end
       return false
     end,
-    
-    -- Cache settings for instrumented modules
-    cache = {
-      enabled = true,                    -- Enable caching for better performance
-      dir = "./.firmo-cache"             -- Cache directory
     },
     
-    -- Instrumentation options
-    instrumentation = {
-      preserve_comments = true,          -- Keep comments in instrumented code
-      preserve_whitespace = true,        -- Preserve whitespace
-      track_branches = true,             -- Track branches for detailed coverage
-      track_functions = true             -- Track function coverage
+    -- LuaCov debug hook options
+    debug_hook = {
+      track_lines = true,                -- Track line execution
+      track_calls = true,                -- Track function calls
+      coroutine_support = true,          -- Support for coroutines
+      save_stats = true                  -- Automatically save stats on completion
     },
-    
     -- Report settings
     report = {
       format = "html",                   -- Default report format
@@ -78,7 +71,7 @@ return {
         show_file_navigator = true,      -- Show file navigation panel
         collapsible_sections = true,     -- Make report sections collapsible
         
-        -- Processing for v3 coverage system
+        -- Processing for debug hook coverage system
         force_three_state_visualization = true, -- Use three-state visualization
         
         -- Enhanced features
@@ -107,5 +100,12 @@ return {
       coverage = 2,                     -- WARN level for coverage module to reduce logging
       runner = 3,                       -- INFO level for runner
     }
+  },
+  
+  -- Debug Configuration
+  debug = {
+    ast_output = true,                  -- Enable AST structure debugging
+    source_mapping = true,              -- Show source mapping information
+    generated_code = true               -- Show generated code during transformation
   }
 }

@@ -35,10 +35,6 @@ describe("Coverage tests", function()
     require("tests.coverage.large_file_coverage_test")
     require("tests.coverage.fallback_heuristic_analysis_test")
     
-    -- Instrumentation tests
-    require("tests.coverage.instrumentation.instrumentation_test")
-    require("tests.coverage.instrumentation.instrumentation_module_test")
-    require("tests.coverage.instrumentation.single_test")
 end)
 
 -- Quality tests 

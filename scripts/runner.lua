@@ -1267,7 +1267,6 @@ function runner.parse_arguments(args)
     performance = false, -- Show performance stats
     coverage = false, -- Enable coverage tracking
     coverage_debug = false, -- Enable debug output for coverage
-    discover_uncovered = true, -- Discover files that aren't executed by tests
     quality = false, -- Enable quality validation
     quality_level = 3, -- Quality validation level
     watch = false, -- Enable watch mode
@@ -1463,22 +1462,11 @@ function runner.main(args)
     coverage_loaded, coverage = pcall(require, "lib.coverage")
 
     if not coverage_loaded then
-      logger.error("Failed to load coverage module", {
-        error = error_handler.format_error(coverage),
-      })
-      return false
-    end
+      -- Initialize coverage with the merged configuration
+      coverage.init(coverage_config)
 
-    -- Initialize and start coverage tracking
-    local ok, err = pcall(function()
-      -- Build coverage configuration from configuration file and command line options
-      local coverage_config = {
-        enabled = true,
-        full_reset = true,
-        debug = options.coverage_debug == true,
-        discover_uncovered = options.discover_uncovered ~= false,
-        threshold = options.threshold or 80,
-      }
+      -- Start coverage tracking
+      coverage.start()
 
       -- Apply config from central configuration if available
       if central_config then
@@ -1492,24 +1480,8 @@ function runner.main(args)
         if file_config.exclude then
           coverage_config.exclude = file_config.exclude
         end
-
-        -- Apply other config file settings (but command line options take precedence)
-        if file_config.track_blocks ~= nil then
-          coverage_config.track_blocks = file_config.track_blocks
-        end
-
-        if file_config.use_static_analysis ~= nil then
-          coverage_config.use_static_analysis = file_config.use_static_analysis
-        end
-
-        if file_config.auto_fix_block_relationships ~= nil then
-          coverage_config.auto_fix_block_relationships = file_config.auto_fix_block_relationships
-        end
-
-        if file_config.track_all_executed ~= nil then
-          coverage_config.track_all_executed = file_config.track_all_executed
-        end
-
+        
+        -- Apply debug setting from config if not overridden by command line
         if file_config.debug ~= nil and not options.coverage_debug then
           coverage_config.debug = file_config.debug
         end
@@ -1530,22 +1502,13 @@ function runner.main(args)
         coverage_config.exclude = coverage_config.exclude
           or {
             "**/tests/**/*.lua", -- Test files
-            "**/test/**/*.lua", -- Another test directory
-            "**/*_test.lua", -- Test files with suffix
-            "**/*_spec.lua", -- Spec files
-          }
-      end
 
       -- Initialize coverage with the merged configuration
-      -- Modern coverage module (v3) doesn't have init(), just start()
-      if type(coverage.init) == "function" then
-        -- Legacy coverage module
-        coverage.init(coverage_config)
-      end
+      -- Initialize coverage with the merged configuration
+      coverage.init(coverage_config)
 
-      -- Always call start (works for both legacy and modern modules)
+      -- Start coverage tracking
       coverage.start()
-
       -- Debug output of final configuration
       logger.debug("Coverage initialized with configuration", {
         include_patterns = coverage_config.include and table.concat(coverage_config.include, ", ") or "none",
@@ -1631,44 +1594,24 @@ function runner.main(args)
     end
 
     -- Get coverage report data
+    -- Get coverage report data
+    local report_data
+    -- Get coverage report data
+    local report_data
     local report_data
     ok, report_data = pcall(function()
-      -- Try both methods to get report data
-      if type(coverage.get_report_data) == "function" then
-        -- Legacy method
-        return coverage.get_report_data()
-      elseif type(coverage.get_data) == "function" then
-        -- New instrumentation-based method
-        return coverage.get_data()
-      else
-        error("No compatible function found to get coverage data")
-      end
+      return coverage.get_report_data()
     end)
-
-    if not ok or not report_data then
-      logger.error("Failed to get coverage report data", {
-        error = ok and "No data returned" or error_handler.format_error(report_data),
-      })
-      report_success = false
-    else
-      -- Count files in report_data
+    
+    if ok and report_data then
       local file_count = 0
 
-      -- Handle both old and new formats
+      -- Count files in the coverage data
       if report_data.files then
-        -- Old format (legacy)
         for _ in pairs(report_data.files) do
           file_count = file_count + 1
         end
-      elseif report_data.execution_data then
-        -- New format (v3 instrumentation)
-        for _ in pairs(report_data.execution_data) do
-          file_count = file_count + 1
-        end
       end
-
-      if file_count == 0 then
-        logger.error("No files were tracked in coverage data", {
           operation = "coverage tracking",
         })
         report_success = false
@@ -1679,106 +1622,33 @@ function runner.main(args)
 
         -- Generate reports
         local formats = options.formats or { "html", "json", "lcov", "cobertura" }
+        -- Use the reporting module
+        -- Generate reports
+        local formats = options.formats or { "html", "json", "lcov", "cobertura" }
+        logger.info("Using reporting module for coverage report generation")
+        
+        -- Load the reporting module
+        local reporting
+        ok, reporting = pcall(require, "lib.reporting")
 
-        -- First try using the instrumentation-based generate_report method
-        if type(coverage.generate_report) == "function" then
-          logger.info("Using instrumentation-based coverage report generation")
-
-          -- Try to load data_store module for coverage summary calculations
-          local data_store
-          local data_store_loaded, data_store_result = pcall(require, "lib.coverage.runtime.data_store")
-          if data_store_loaded then
-            data_store = data_store_result
-            logger.debug("Loaded data_store module for coverage calculations")
-          end
-
+        if not ok then
+          logger.error("Failed to load reporting module")
+          report_success = false
+        else
+          -- Generate reports with the reporting module
           for _, format in ipairs(formats) do
             local report_path = fs.join_paths(report_dir, "coverage-report." .. format)
-            logger.info("Generating " .. format .. " report using instrumentation system", {
-              path = report_path,
-            })
+            local format_success, err = reporting.save_coverage_report(report_path, report_data, format)
 
-            -- Use the direct method
-            local success, result = pcall(function()
-              return coverage.generate_report(format, report_path)
-            end)
-
-            if success and result == true then
-              logger.info("Successfully generated " .. format .. " coverage report", {
-                path = report_path,
-              })
-
-              -- Get summary data from the instrumentation system
-              if format == "html" and data_store and data_store.calculate_summary then
-                -- Use the values from the report for the summary output
-                local summary_data
-                local summary_success, summary_err = pcall(function()
-                  summary_data = data_store.calculate_summary(report_data)
-                  return true
-                end)
-
-                if summary_success and summary_data then
-                  -- Update the report_data summary with the calculated values
-                  report_data.summary = summary_data
-                end
-              end
-
-              -- Verify the HTML report
-              if format == "html" then
-                local file_exists = fs.file_exists(report_path)
-                local is_file = file_exists and not fs.directory_exists(report_path)
-                logger.info("HTML report verification", {
-                  path = report_path,
-                  exists = file_exists,
-                  is_file = is_file,
-                })
-
-                -- Update the coverage summary with the values from the HTML report
-                if data_store_loaded and data_store and report_data and report_data.summary then
-                  logger.info("Updated coverage summary", {
-                    overall = string.format("%.2f%%", (report_data.summary.overall_coverage_percent or 0)),
-                    lines = string.format("%.2f%%", (report_data.summary.line_coverage_percent or 0)),
-                    functions = string.format("%.2f%%", (report_data.summary.function_coverage_percent or 0)),
-                    files = string.format("%.2f%%", (report_data.summary.file_coverage_percent or 0)),
-                  })
-                end
-              end
-            else
-              logger.error("Failed to generate " .. format .. " report with instrumentation", {
+            if not format_success then
+              logger.error("Failed to generate " .. format .. " report", {
+                error = tostring(err),
                 format = format,
-                path = report_path,
-                error = success and "Unknown error" or tostring(result),
               })
               report_success = false
             end
           end
-        else
-          -- Fall back to the legacy reporting module
-          logger.info("Falling back to legacy reporting module")
-          local reporting
-          ok, reporting = pcall(require, "lib.reporting")
-
-          if not ok then
-            logger.error("Failed to load reporting module")
-            report_success = false
-          else
-            -- Generate reports with the reporting module
-            for _, format in ipairs(formats) do
-              local report_path = fs.join_paths(report_dir, "coverage-report." .. format)
-              local format_success, err = reporting.save_coverage_report(report_path, report_data, format)
-
-              if not format_success then
-                logger.error("Failed to generate " .. format .. " report", {
-                  error = err and error_handler.format_error(err) or "Unknown error",
-                })
-                report_success = false
-              end
-            end
-          end
         end
-
-        -- Print coverage summary
-        if report_data.summary then
           -- Calculate actual file counts manually
           local file_count = 0
           local covered_file_count = 0
@@ -1789,14 +1659,13 @@ function runner.main(args)
             file_count = file_count + 1
             covered_file_count = covered_file_count + 1 -- All files with data are considered covered
 
-            -- Count lines
-            if file_data.lines then
-              for line_num, line_data in pairs(file_data.lines) do
-                if type(line_data) == "table" and line_data.executable then
-                  total_lines = total_lines + 1
-                  if line_data.covered or line_data.executed then
-                    covered_lines = covered_lines + 1
-                  end
+          -- Process line data
+          for _, file_data in pairs(report_data.files or {}) do
+            for _, line_data in pairs(file_data.lines or {}) do
+              if type(line_data) == "table" and line_data.executable then
+                total_lines = total_lines + 1
+                if line_data.covered or line_data.executed then
+                  covered_lines = covered_lines + 1
                 end
               end
             end
@@ -1819,11 +1688,11 @@ function runner.main(args)
             / 3
 
           -- Print report with manually calculated values
-          logger.info("Coverage summary", {
             overall = string.format("%.2f%%", overall_percent),
             lines = string.format("%.2f%%", line_percent),
             functions = string.format("%.2f%%", report_data.summary.function_coverage_percent or 0),
             files = string.format("%.2f%%", file_percent),
+          })
           })
 
           -- Debug output for manual calculation
@@ -1872,14 +1741,10 @@ function runner.main(args)
     logger.debug("Coverage data consistency check", {
       is_coverage_enabled = options.coverage == true,
       coverage_object_valid = coverage ~= nil,
-      is_active = coverage.is_active and coverage.is_active() or false,
-      report_success = report_success,
-      has_report_data = has_report_data,
-      line_coverage_percent = string.format("%.2f%%", line_coverage_percent),
+      is_coverage_enabled = options.coverage == true,
+      coverage_object_valid = coverage ~= nil,
       function_coverage_percent = string.format("%.2f%%", function_coverage_percent),
       file_coverage_percent = string.format("%.2f%%", file_coverage_percent),
-    })
-  end
 
   -- Log a clear error message if tests failed
   if not test_success then

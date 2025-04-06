@@ -1,394 +1,395 @@
----@class Coverage
----@field start fun(): boolean Start coverage tracking
----@field stop fun(): boolean Stop coverage tracking
----@field reset fun(): boolean Reset coverage data
----@field is_active fun(): boolean Check if coverage is active
----@field get_data fun(): table Get the current coverage data
----@field generate_report fun(format: string, output_path: string): boolean Generate a coverage report
----@field _VERSION string Version of this module
-local M = {}
+--- Coverage module for firmo
+-- Integrates LuaCov's debug hook system with firmo's ecosystem
+-- @module coverage
 
--- Dependencies
 local error_handler = require("lib.tools.error_handler")
-local logger = require("lib.tools.logging")
-local fs = require("lib.tools.filesystem")
 local central_config = require("lib.core.central_config")
+local filesystem = require("lib.tools.filesystem")
+local temp_file = require("lib.tools.temp_file")
 
--- Lazy-loaded v3 module
-local v3 = nil
+-- Module constants for better performance and clarity
+local STATS_FILE_HEADER = "FIRMO_COVERAGE_1.0\n"
+local MAX_BUFFER_SIZE = 10000
+local MIN_SAVE_INTERVAL = 50
+local DEFAULT_SAVE_STEPS = 100
 
--- Get v3 module implementation
-local function get_v3()
-  if not v3 then
-    local success, result = pcall(function()
-      return require("lib.coverage.v3.init")
-    end)
-    
-    if success and type(result) == "table" then
-      v3 = result
-      logger.info("Loaded v3 coverage module")
-    else
-      logger.warn("Failed to load v3 coverage module, using v2 fallback", {
-        error = tostring(result)
-      })
-    end
-  end
-  
-  return v3
-end
+local coverage = {}
 
--- Version
-M._VERSION = "3.0.0"
+-- Register with central_config
+central_config.register_module("coverage", {
+  -- Schema definition
+  field_types = {
+    enabled = "boolean",
+    include = "table",
+    exclude = "table",
+    statsfile = "string",
+    savestepsize = "number",
+    tick = "boolean",
+    codefromstrings = "boolean"
+  }
+}, {
+  -- Default values
+  enabled = true,
+  include = {".*%.lua$"},  -- Include all Lua files by default
+  exclude = {},            -- No excludes by default
+  statsfile = ".coverage-stats",
+  savestepsize = 100,     -- Save stats every 100 lines
+  tick = false,           -- Don't use tick-based saving by default
+  codefromstrings = false -- Don't track code loaded from strings
+})
 
--- Module state (for v2 fallback)
-local coverage_active = false
-local coverage_data = nil
+-- Module state with optimized structure
+local state = {
+  initialized = false,
+  data = {},      -- Coverage data by filename
+  paused = true,  -- Start paused
+  buffer = {      -- Performance optimization buffer
+    size = 0,
+    changes = 0,
+    last_save = os.time()
+  }
+}
 
--- Get configuration with default fallbacks
-local function get_config()
-  local config = {}
-  
-  -- Try to get central configuration
-  local success, result = pcall(function()
-    if central_config and type(central_config.get_config) == "function" then
-      return central_config.get_config()
-    end
-    return nil
-  end)
-  
-  if success and type(result) == "table" and type(result.coverage) == "table" then
-    config = result
-  else
-    -- Use default configuration
-    config = {
-      coverage = {
-        version = 3,  -- Default to v3
-        enabled = false,
-        include = function(path) return path:match("%.lua$") ~= nil end,
-        exclude = function(path) return path:match("/tests/") ~= nil or path:match("test%.lua$") ~= nil end,
-        report = {
-          dir = "./coverage-reports"
-        }
-      }
-    }
-  end
-  
-  return config
-end
+-- Fast lookup tables for better performance
+local ignored_files = {}
+local file_patterns = {
+  include = {},
+  exclude = {}
+}
 
--- Check if we should use v3
-local function should_use_v3()
-  local config = get_config()
-  return config.coverage.version == 3
-end
-
--- Start coverage tracking
----@return boolean success Whether tracking was successfully started
-function M.start()
-  -- Check if v3 is enabled
-  if should_use_v3() then
-    local v3_module = get_v3()
-    if v3_module then
-      local result = v3_module.start()
-      return result ~= nil
-    end
-  end
+-- Precompile patterns for better performance
+local function compile_patterns()
+  local config = central_config.get("coverage")
+  if not config then return end
   
-  -- v2 fallback implementation
-  if coverage_active then
-    logger.warn("Coverage tracking is already active")
-    return false
-  end
+  -- Clear existing patterns
+  file_patterns.include = {}
+  file_patterns.exclude = {}
   
-  -- Load fallback components for v2
-  local components_success, components = pcall(function()
-    return {
-      loader_hook = require("lib.coverage.loader.hook"),
-      tracker = require("lib.coverage.runtime.tracker"),
-      data_store = require("lib.coverage.runtime.data_store"),
-      assertion_hook = require("lib.coverage.assertion.hook")
-    }
-  end)
-  
-  if not components_success then
-    logger.error("Failed to load coverage components", {
-      error = tostring(components)
+  -- Compile include patterns
+  for _, pattern in ipairs(config.include or {}) do
+    table.insert(file_patterns.include, {
+      raw = pattern,
+      compiled = pattern
     })
+  end
+  
+  -- Compile exclude patterns
+  for _, pattern in ipairs(config.exclude or {}) do
+    table.insert(file_patterns.exclude, {
+      raw = pattern,
+      compiled = pattern
+    })
+  end
+}
+
+-- Optimized file pattern matching
+local function should_track_file(filename)
+  -- Quick lookup for previously checked files
+  if ignored_files[filename] then
     return false
   end
   
-  -- Create data store
-  coverage_data = components.data_store.create()
-  
-  -- Install hooks
-  components.loader_hook.install()
-  components.assertion_hook.install()
-  
-  -- Start tracker
-  components.tracker.start()
-  
-  coverage_active = true
-  logger.info("Started coverage tracking (v2 fallback)")
-  
-  return true
-end
-
--- Stop coverage tracking
----@return boolean success Whether tracking was successfully stopped
-function M.stop()
-  -- Check if v3 is enabled
-  if should_use_v3() then
-    local v3_module = get_v3()
-    if v3_module then
-      local result = v3_module.stop()
-      return result ~= nil
+  -- Check include patterns
+  local included = #file_patterns.include == 0 -- Include all if no patterns
+  for _, pattern in ipairs(file_patterns.include) do
+    if filename:match(pattern.compiled) then
+      included = true
+      break
     end
   end
   
-  -- v2 fallback implementation
-  if not coverage_active then
-    logger.warn("Coverage tracking is not active")
-    return false
-  end
-  
-  -- Load fallback components for v2
-  local components_success, components = pcall(function()
-    return {
-      loader_hook = require("lib.coverage.loader.hook"),
-      tracker = require("lib.coverage.runtime.tracker"),
-      data_store = require("lib.coverage.runtime.data_store"),
-      assertion_hook = require("lib.coverage.assertion.hook")
-    }
-  end)
-  
-  if not components_success then
-    logger.error("Failed to load coverage components", {
-      error = tostring(components)
-    })
-    return false
-  end
-  
-  -- Stop tracker
-  components.tracker.stop()
-  
-  -- Uninstall hooks
-  components.assertion_hook.uninstall()
-  components.loader_hook.uninstall()
-  
-  -- Update coverage data
-  local tracker_data = components.tracker.get_data()
-  
-  -- Add tracked data to our data store
-  for file_id, lines in pairs(tracker_data.execution_data or {}) do
-    for line_number, count in pairs(lines) do
-      for i = 1, count do
-        components.data_store.add_execution(coverage_data, file_id, line_number)
+  -- Check exclude patterns if included
+  if included then
+    for _, pattern in ipairs(file_patterns.exclude) do
+      if filename:match(pattern.compiled) then
+        ignored_files[filename] = true
+        return false
       end
     end
   end
   
-  for file_id, lines in pairs(tracker_data.coverage_data or {}) do
-    for line_number, _ in pairs(lines) do
-      components.data_store.add_coverage(coverage_data, file_id, line_number)
-    end
-  end
-  
-  -- Copy file mappings
-  for file_id, file_path in pairs(tracker_data.file_map or {}) do
-    if type(file_path) == "string" then  -- Only copy string->string mappings
-      components.data_store.register_file(coverage_data, file_id, file_path)
-    end
-  end
-  
-  -- Log coverage data for diagnostic purposes
-  local file_ids = {}
-  
-  -- Count execution data
-  if coverage_data.execution_data then
-    for file_id, _ in pairs(coverage_data.execution_data) do
-      file_ids[file_id] = true
-    end
-  end
-  
-  -- Count coverage data
-  if coverage_data.coverage_data then
-    for file_id, _ in pairs(coverage_data.coverage_data) do
-      file_ids[file_id] = true
-    end
-  end
-  
-  -- Log tracked files
-  for file_id, _ in pairs(file_ids) do
-    local file_path = coverage_data.file_map and coverage_data.file_map[file_id] or file_id
-    logger.info("Tracked file in coverage", {
-      file_id = file_id,
-      file_path = file_path,
-      has_execution = coverage_data.execution_data and coverage_data.execution_data[file_id] ~= nil,
-      has_coverage = coverage_data.coverage_data and coverage_data.coverage_data[file_id] ~= nil
-    })
-  end
-  
-  -- Calculate summary
-  components.data_store.calculate_summary(coverage_data)
-  
-  coverage_active = false
-  logger.info("Stopped coverage tracking (v2 fallback)")
-  
-  return true
-end
+  return included
+}
 
--- Reset coverage data
----@return boolean success Whether data was successfully reset
-function M.reset()
-  -- Check if v3 is enabled
-  if should_use_v3() then
-    local v3_module = get_v3()
-    if v3_module then
-      local result = v3_module.reset()
-      return result ~= nil
-    end
+-- Optimized debug hook function
+local function debug_hook(_, line_nr, level)
+  -- Skip if not initialized or paused
+  if not state.initialized or state.paused then
+    return
   end
-  
-  -- v2 fallback implementation
-  if coverage_active then
-    logger.warn("Cannot reset while coverage tracking is active")
-    return false
-  end
-  
-  -- Load data store component for v2
-  local data_store_success, data_store = pcall(function()
-    return require("lib.coverage.runtime.data_store")
-  end)
-  
-  if not data_store_success then
-    logger.error("Failed to load data store component", {
-      error = tostring(data_store)
-    })
-    return false
-  end
-  
-  coverage_data = data_store.create()
-  
-  logger.info("Reset coverage data (v2 fallback)")
-  return true
-end
 
--- Check if coverage tracking is active
----@return boolean is_active Whether coverage tracking is active
-function M.is_active()
-  -- Check if v3 is enabled
-  if should_use_v3() then
-    local v3_module = get_v3()
-    if v3_module then
-      return v3_module.is_active()
-    end
-  end
+  level = level or 2
   
-  -- v2 fallback implementation
-  return coverage_active
-end
+  -- Get source file info
+  local info = debug.getinfo(level, "S")
+  if not info then return end
 
--- Get the current coverage data
----@return table data The current coverage data
-function M.get_data()
-  -- Check if v3 is enabled
-  if should_use_v3() then
-    local v3_module = get_v3()
-    if v3_module then
-      return v3_module.get_data()
-    end
-  end
+  local name = info.source
+  local prefixed_name = name:match("^@(.*)")
   
-  -- v2 fallback implementation
-  if not coverage_data then
-    -- Load data store component for v2
-    local data_store_success, data_store = pcall(function()
-      return require("lib.coverage.runtime.data_store")
-    end)
+  if prefixed_name then
+    name = filesystem.normalize_path(prefixed_name)
+  elseif not central_config.get("coverage.codefromstrings") then
+    return -- Skip code from strings unless enabled
+  end
+
+  -- Get or create file data with buffering
+  local file = state.data[name]
+  if not file then
+    -- Check if we should track this file
+    if not should_track_file(name) then
+      ignored_files[name] = true
+      return
+    end
+
+    file = {
+      max = 0,
+      max_hits = 0
+    }
+    state.data[name] = file
+    state.buffer.changes = state.buffer.changes + 1
+  end
+
+  -- Update line stats
+  if line_nr > file.max then
+    file.max = line_nr
+  end
+
+  local hits = (file[line_nr] or 0) + 1
+  file[line_nr] = hits
+
+  if hits > file.max_hits then
+    file.max_hits = hits
+  end
+
+  -- Update buffer stats
+  state.buffer.size = state.buffer.size + 1
+  state.buffer.changes = state.buffer.changes + 1
+
+  -- Check if we should save stats
+  local config = central_config.get("coverage")
+  if config and config.tick and state.buffer.changes >= (config.savestepsize or DEFAULT_SAVE_STEPS) then
+    coverage.save_stats()
+    state.buffer.changes = 0
+    state.buffer.last_save = os.time()
+  elseif state.buffer.size >= MAX_BUFFER_SIZE then
+    coverage.save_stats()
+    state.buffer.size = 0
+  end
+}
+
+-- Initialize coverage system
+function coverage.init()
+  if state.initialized then
+    return true
+  end
+
+  local success, err = error_handler.try(function()
+    -- Set debug hook
+    debug.sethook(debug_hook, "l")
+
+    -- Handle hook per thread if needed
+    if coverage.has_hook_per_thread() then
+      -- Patch coroutine.create
+      local raw_create = coroutine.create
+      coroutine.create = function(...)
+        local co = raw_create(...)
+        debug.sethook(co, debug_hook, "l")
+        return co
+      end
+
+      -- Patch coroutine.wrap
+      local raw_wrap = coroutine.wrap
+      coroutine.wrap = function(...)
+        local co = raw_create(...)
+        debug.sethook(co, debug_hook, "l")
+        return function(...)
+          local success, result = coroutine.resume(co, ...)
+          if not success then
+            error(result, 0)
+          end
+          return result
+        end
+      end
+    end
+
+    -- Initialize tracking state
+    state.initialized = true
+    state.paused = false
+    state.data = {}
+    state.buffer = {
+      size = 0,
+      changes = 0,
+      last_save = os.time()
+    }
     
-    if data_store_success then
-      coverage_data = data_store.create()
-    else
-      logger.error("Failed to load data store component", {
-        error = tostring(data_store)
-      })
-      return {}
-    end
-  end
-  
-  return coverage_data
-end
+    -- Clear lookup tables
+    ignored_files = {}
+    
+    -- Compile patterns from config
+    compile_patterns()
 
--- Generate a coverage report
----@param format string The report format (html, json, lcov)
----@param output_path string The path to write the report to
----@return boolean success Whether the report was successfully generated
-function M.generate_report(format, output_path)
-  -- Parameter validation
-  error_handler.assert(type(format) == "string", "format must be a string", error_handler.CATEGORY.VALIDATION)
-  
-  -- Check if v3 is enabled
-  if should_use_v3() then
-    local v3_module = get_v3()
-    if v3_module then
-      local result = v3_module.report(format, {
-        output_dir = output_path
-      })
-      return result or false
-    end
-  end
-  
-  -- v2 fallback implementation
-  error_handler.assert(type(output_path) == "string", "output_path must be a string", error_handler.CATEGORY.VALIDATION)
-  
-  -- Get configuration
-  local config = get_config()
-  
-  -- Use default output path if not specified
-  if not output_path or output_path == "" then
-    output_path = config.coverage.report.dir or "./coverage-reports"
-  end
-  
-  -- Ensure the output directory exists
-  local dir_path = output_path:match("(.+)/[^/]*$") or output_path
-  local mkdir_success, mkdir_err = fs.ensure_directory_exists(dir_path)
-  if not mkdir_success then
-    logger.error("Failed to create output directory", {
-      directory = dir_path,
-      error = error_handler.format_error(mkdir_err)
-    })
-    return false
-  end
-  
-  -- Load the report generator
-  local generator_path = string.format("lib.coverage.report.%s", format:lower())
-  local success, generator = pcall(require, generator_path)
-  
+    return true
+  end)
+
   if not success then
-    logger.error("Failed to load report generator", {
-      format = format,
-      error = tostring(generator)
-    })
+    error_handler.throw("Failed to initialize coverage system: " .. err.message, 
+      error_handler.CATEGORY.RUNTIME,
+      error_handler.SEVERITY.ERROR,
+      {error = err}
+    )
     return false
   end
-  
-  -- Generate the report
-  local gen_success, err = generator.generate(coverage_data, output_path)
-  if not gen_success then
-    logger.error("Failed to generate report", {
-      format = format,
-      output_path = output_path,
-      error = error_handler.format_error(err)
-    })
-    return false
-  end
-  
-  logger.info("Generated coverage report (v2 fallback)", {
-    format = format,
-    output_path = output_path
-  })
   
   return true
+}
+
+-- Check if debug hooks are per-thread
+function coverage.has_hook_per_thread()
+  -- Get current hook
+  local old_hook = debug.gethook()
+  
+  -- Set a test hook
+  local test_hook = function() end
+  debug.sethook(test_hook, "l")
+
+  -- Check if hook is same in new thread
+  local thread_hook = coroutine.wrap(function()
+    return debug.gethook()
+  end)()
+
+  -- Restore original hook
+  debug.sethook(old_hook)
+
+  -- Different hooks means per-thread hooks
+  return thread_hook ~= test_hook
 end
 
-return M
+-- Pause coverage collection
+function coverage.pause()
+  state.paused = true
+end
+
+-- Resume coverage collection  
+function coverage.resume()
+  state.paused = false
+end
+
+    local content = {}
+    for _, name in ipairs(filenames) do
+      local file_data = old_stats[name]
+      table.insert(content, string.format("%d:%s\n", file_data.max, name))
+      
+      local line_stats = {}
+      for i = 1, file_data.max do
+        table.insert(line_stats, tostring(file_data[i] or 0))
+      end
+      table.insert(content, table.concat(line_stats, " ") .. "\n")
+    end
+
+    -- Write to temp file
+    local ok, write_err = filesystem.write_file(temp_stats, table.concat(content))
+    if not ok then
+      return nil, write_err
+    end
+
+    -- Move temp file to final location
+    local move_ok, move_err = filesystem.move_file(temp_stats, statsfile)
+    if not move_ok then
+      -- Try to clean up temp file
+      temp_file.remove(temp_stats)
+      return nil, move_err
+    end
+
+    -- Clear current data
+    state.data = {}
+  end)
+
+  if not success then
+    error_handler.throw("Failed to save coverage stats: " .. err.message,
+      error_handler.CATEGORY.IO,
+      error_handler.SEVERITY.ERROR,
+      {error = err}
+    )
+  end
+end
+
+-- Load coverage stats from file
+function coverage.load_stats()
+  local statsfile = central_config.get("coverage.statsfile")
+  
+  -- Check if stats file exists
+  if not filesystem.file_exists(statsfile) then
+    return nil
+  end
+
+  -- Read stats file content
+  local content, read_err = filesystem.read_file(statsfile)
+  if not content then
+    error_handler.throw("Failed to read coverage stats: " .. (read_err or "unknown error"),
+      error_handler.CATEGORY.IO,
+      error_handler.SEVERITY.ERROR
+    )
+    return nil
+  end
+
+  local stats = {}
+
+  -- Process file content line by line
+  local lines = {}
+  for line in content:gmatch("[^\n]+") do
+    table.insert(lines, line)
+  end
+
+  local i = 1
+  while i <= #lines do
+    -- Parse header line
+    local max, filename = lines[i]:match("(%d+):(.*)")
+    if not max or not filename then
+      break
+    end
+    max = tonumber(max)
+
+    -- Move to data line
+    i = i + 1
+    if i > #lines then break end
+
+    -- Initialize file stats
+    stats[filename] = {
+      max = max,
+      max_hits = 0
+    }
+
+    -- Parse line hits
+    local hits = {}
+    for hit in lines[i]:gmatch("%d+") do
+      table.insert(hits, tonumber(hit))
+    end
+
+    -- Store non-zero hits
+    for line_nr, hit_count in ipairs(hits) do
+      if hit_count > 0 then
+        stats[filename][line_nr] = hit_count
+        stats[filename].max_hits = math.max(stats[filename].max_hits, hit_count)
+      end
+    end
+
+    i = i + 1
+  end
+
+  return stats
+end
+
+-- Clean shutdown
+function coverage.shutdown()
+  if state.initialized then
+    coverage.save_stats()
+    debug.sethook()
+    state.initialized = false
+    state.paused = true
+  end
+end
+
+return coverage
+

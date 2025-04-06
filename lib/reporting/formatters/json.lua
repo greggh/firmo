@@ -9,8 +9,6 @@ local M = {}
 local error_handler = require("lib.tools.error_handler")
 local logger = require("lib.tools.logging")
 local fs = require("lib.tools.filesystem")
-local data_store = require("lib.coverage.runtime.data_store")
-
 -- Version
 M._VERSION = "0.2.0"
 

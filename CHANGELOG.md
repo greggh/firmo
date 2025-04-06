@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Comprehensive test coverage for all formatters:
+  - Test suites for HTML, JSON, LCOV, TAP, CSV, and JUnit XML formatters
+  - Standardized error handling patterns across all formatters
+  - Performance testing with large datasets
+  - Configuration validation for all formatter options
+  - Data structure normalization testing
+  - Edge case handling for all formatters
+  - Special character handling in CSV and XML outputs
+  - Custom separators and column configuration
+  - File operation error testing
+  - Empty and malformed data handling
+
 - Advanced mock sequences:
   - Sequential returns with returns_in_sequence() for stubbed functions
   - Multiple return behaviors for sequence exhaustion:
@@ -85,6 +97,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reset function for proper state management between test runs
 
 ### Improved
+
+- TAP formatter enhancements:
+  - TAP v13 compliance verification
+  - YAML diagnostics integration
+  - Proper line range grouping
+  - Customizable indentation
+  - Configurable thresholds
+  - Function coverage reporting
+
+- CSV formatter enhancements:
+  - Custom column definitions
+  - Configurable separators
+  - Special character escaping
+  - Line-level and file-level output modes
+  - Summary row support
+  - Optional headers
+  - Nested field handling
 
 - Version bumped to 0.7.5
 - Coverage tracking with better source file detection

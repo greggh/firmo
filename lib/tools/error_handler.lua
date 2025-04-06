@@ -458,6 +458,15 @@ function M.configure(options)
     end
   end
 
+--- Create a not found error object
+---@param message string The error message
+---@param context? table Additional context for the error
+---@param cause? table|string The cause of the error
+---@return table The not found error object
+function M.not_found_error(message, context, cause)
+  return create_error(message, M.CATEGORY.VALIDATION, M.SEVERITY.ERROR, context, cause)
+end
+
   return M
 end
 
@@ -820,6 +829,15 @@ function M.configure_from_config()
       M.configure(error_handler_config)
     end
   end
+--- Create a not found error object
+---@param message string The error message
+---@param context? table Additional context for the error
+---@param cause? table|string The cause of the error
+---@return table The not found error object
+function M.not_found_error(message, context, cause)
+  return create_error(message, M.CATEGORY.VALIDATION, M.SEVERITY.ERROR, context, cause)
+end
+
   return M
 end
 
@@ -934,5 +952,14 @@ end
 
 -- Automatically configure from global config if available
 M.configure_from_config()
+
+--- Create a not found error object
+---@param message string The error message
+---@param context? table Additional context for the error
+---@param cause? table|string The cause of the error
+---@return table The not found error object
+function M.not_found_error(message, context, cause)
+  return create_error(message, M.CATEGORY.VALIDATION, M.SEVERITY.ERROR, context, cause)
+end
 
 return M

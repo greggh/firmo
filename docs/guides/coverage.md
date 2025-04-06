@@ -1,3 +1,239 @@
+# Coverage System Guide
+
+The firmo coverage system provides comprehensive code coverage tracking using LuaCov's proven debug hook system, enhanced with firmo's robust file operations, error handling, and reporting capabilities.
+
+## Table of Contents
+
+1. [Quick Start](#quick-start)
+2. [Configuration](#configuration)
+3. [Core Functions](#core-functions)
+4. [Reporting](#reporting)
+5. [Best Practices](#best-practices)
+6. [Troubleshooting](#troubleshooting)
+
+## Quick Start
+
+To start tracking coverage in your tests:
+
+```lua
+local coverage = require("lib.coverage")
+
+-- Initialize coverage tracking
+coverage.init()
+
+-- Your test code here
+describe("my module", function()
+  it("does something", function()
+    -- Code executed here will be tracked
+    my_function()
+  end)
+end)
+
+-- Save coverage report
+coverage.save_reports("coverage-reports")
+```
+
+## Configuration
+
+Coverage settings are managed through central_config. Available options:
+
+```lua
+central_config.set("coverage", {
+  enabled = true,           -- Enable/disable coverage tracking
+  include = {".*%.lua$"},   -- Patterns for files to include
+  exclude = {},            -- Patterns for files to exclude
+  statsfile = ".coverage-stats", -- Stats file location
+  savestepsize = 100,      -- Save frequency (in lines)
+  tick = false,            -- Use tick-based saving
+  codefromstrings = false  -- Track code loaded from strings
+})
+```
+
+### Include/Exclude Patterns
+
+Use Lua patterns to control which files are tracked:
+
+```lua
+central_config.set("coverage", {
+  include = {
+    "src/.*%.lua$",        -- All Lua files in src/
+    "lib/core/.*%.lua$"    -- All Lua files in lib/core/
+  },
+  exclude = {
+    "test/.*_test%.lua$",  -- Exclude test files
+    "lib/vendor/.*"        -- Exclude vendor files
+  }
+})
+```
+
+## Core Functions
+
+### Initialization
+
+```lua
+-- Initialize coverage tracking
+coverage.init()
+
+-- Stop tracking and cleanup
+coverage.shutdown()
+```
+
+### Pause/Resume
+
+Control tracking during execution:
+
+```lua
+-- Pause coverage tracking
+coverage.pause()
+
+-- Code here won't be tracked
+untracked_function()
+
+-- Resume tracking
+coverage.resume()
+```
+
+### Manual Stats Management
+
+```lua
+-- Save current stats
+coverage.save_stats()
+
+-- Load stats from file
+local stats = coverage.load_stats()
+```
+
+## Reporting
+
+The coverage system integrates with firmo's reporting module to provide rich coverage reports.
+
+### Generate Reports
+
+```lua
+-- Generate a single format
+local report = coverage.generate_report("html")
+
+-- Save a specific report
+coverage.save_report("coverage.html", "html")
+
+-- Generate all formats
+coverage.save_reports("coverage-reports")
+```
+
+### Available Formats
+
+- `html`: Rich HTML report with source highlighting
+- `json`: Machine-readable JSON format
+- `lcov`: Standard LCOV format for CI tools
+- `cobertura`: Cobertura XML format
+
+### Report Options
+
+When saving reports, you can configure various options:
+
+```lua
+local results = coverage.save_reports("reports", {
+  report_suffix = "_coverage",  -- Add suffix to filenames
+  validate = true,             -- Enable data validation
+  strict_validation = false,   -- Continue on validation issues
+  validation_report = true,    -- Generate validation report
+})
+```
+
+## Best Practices
+
+1. **Initialize Early**: Call `coverage.init()` before any code execution you want to track.
+
+2. **Clean Shutdown**: Always call `coverage.shutdown()` at the end to ensure stats are saved.
+
+3. **Use Include/Exclude**: Define specific patterns to focus coverage on relevant code:
+   ```lua
+   central_config.set("coverage", {
+     include = {"src/.*%.lua$"},
+     exclude = {"test/.*", "lib/vendor/.*"}
+   })
+   ```
+
+4. **Regular Saves**: For long-running tests, enable tick-based saving:
+   ```lua
+   central_config.set("coverage", {
+     tick = true,
+     savestepsize = 100
+   })
+   ```
+
+5. **Validation**: Enable validation when generating reports:
+   ```lua
+   coverage.save_reports("reports", {
+     validate = true,
+     validation_report = true
+   })
+   ```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **No Coverage Data**
+   - Check if coverage is initialized
+   - Verify include/exclude patterns
+   - Ensure files are being executed
+
+2. **Missing Files in Reports**
+   - Check file paths against include patterns
+   - Verify files are actually executed
+   - Check for path normalization issues
+
+3. **Report Generation Fails**
+   - Check write permissions
+   - Verify report directory exists
+   - Check for disk space
+
+### Debug Mode
+
+Enable debug logging for troubleshooting:
+
+```lua
+central_config.set("coverage", {
+  debug = true,
+  verbose = true
+})
+```
+
+### Stats File Issues
+
+If the stats file becomes corrupted:
+
+1. Stop coverage tracking
+2. Delete the stats file
+3. Reinitialize coverage
+4. Re-run your tests
+
+```lua
+coverage.shutdown()
+filesystem.remove_file(".coverage-stats")
+coverage.init()
+```
+
+### Report Validation
+
+Use validation reports to identify issues:
+
+```lua
+coverage.save_reports("reports", {
+  validate = true,
+  validation_report = true,
+  validation_report_path = "validation.json"
+})
+```
+
+## See Also
+
+- [Coverage Architecture](../coverage/architecture.md)
+- [Configuration Guide](./central_config.md)
+- [Error Handling](./error_handling.md)
+- [Reporting Guide](./reporting.md)
+
 # Code Coverage Guide
 
 This guide explains how to use Firmo's code coverage features to identify which parts of your code are being exercised by your tests.
@@ -11,56 +247,64 @@ Code coverage is a measure of how much of your source code is executed when your
 - Ensure critical paths are tested
 - Monitor coverage trends
 
-Firmo provides an instrumentation-based coverage system that tracks:
+Firmo provides a robust coverage system using LuaCov's debug hook mechanism that tracks:
 
-- Executed lines (lines that ran during tests)
-- Covered lines (lines that were verified by assertions)
-- Uncovered lines (lines that never executed)
+- Line execution (which lines of code were run)
+- Line hits (how many times each line executed)
+- Coverage statistics (percentages and summaries)
+
+The system integrates seamlessly with LuaCov's battle-tested coverage tracking while adding firmo's robust file handling, error management, and reporting capabilities.
 
 ## Basic Usage
 
 ### Running Tests with Coverage
 
-The simplest way to enable coverage is through the command line:
+Enable coverage through the command line:
 
 ```bash
 lua test.lua --coverage tests/
 ```
 
-This runs your tests with coverage tracking enabled and generates a summary report.
+This will:
+1. Initialize the debug hook system
+2. Track all executed lines during test runs
+3. Generate coverage reports when complete
 
 ### Generating Coverage Reports
 
-You can specify the report format:
+Specify report formats:
 
 ```bash
-# Generate HTML report
+# Generate HTML report (rich visualization)
 lua test.lua --coverage --format html tests/
 
-# Generate JSON report
+# Generate JSON report (machine-readable)
 lua test.lua --coverage --format json tests/
 
-# Generate LCOV report
+# Generate LCOV report (CI integration)
 lua test.lua --coverage --format lcov tests/
 ```
 
 ### Viewing Coverage Reports
 
-After running tests with HTML coverage:
+The HTML report provides the most detailed view:
 
-1. Open the generated file (e.g., `coverage-reports/coverage-report.html`) in a browser
-2. Navigate through files to see coverage details
-3. Use the color-coding to identify covered, executed, and uncovered code
+1. Open `coverage-reports/coverage-report.html` in a browser
+2. Navigate through your project's files
+3. View line-by-line execution data with hit counts
+4. See overall statistics and summaries
 
-## Understanding Coverage States
+## Understanding Coverage Data
 
-Firmo's coverage system distinguishes between three states:
+Firmo's coverage tracking provides:
 
-1. **Covered Lines (Green)**: Code that is both executed AND verified by assertions
-2. **Executed Lines (Orange)**: Code that executes during tests but is NOT verified by assertions
-3. **Not Covered Lines (Red)**: Code that does not execute at all
-
-This three-state model provides valuable insight beyond simple executed/not-executed tracking.
+1. **Line Execution**: Whether a line was executed
+2. **Hit Counts**: How many times each line ran
+3. **Coverage Statistics**: 
+   - Total lines in file
+   - Lines executed
+   - Coverage percentage
+   - Hit counts distribution
 
 ## Configuring Coverage
 
@@ -229,13 +473,48 @@ reporting.configure_formatter("html", {
 reporting.generate_coverage_report("html", "./coverage-reports/custom-report.html")
 ```
 
-### Advanced Configuration
+## Debug Hook Coverage System
 
-For detailed configuration of specific reporting components, see:
+Firmo uses LuaCov's proven debug hook system for coverage tracking, which offers several advantages:
 
-- [Coverage Report Formatters](./configuration-details/formatters.md) - Comprehensive documentation of all formatter options
-- [Report Validation Configuration](./configuration-details/report_validation.md) - Ensure accuracy of coverage reports
-- [File Watcher Configuration](./configuration-details/watcher.md) - Configure continuous testing with file watching
+### Features
+
+1. **Reliable Tracking**
+   - Uses Lua's built-in debug hooks
+   - No code modification required
+   - Accurate line execution tracking
+   - Support for all Lua versions
+
+2. **Thread Support**
+   - Automatic coroutine handling
+   - Per-thread coverage tracking
+   - Safe concurrent operation
+   - Clean thread cleanup
+
+3. **Performance**
+   - Minimal runtime overhead
+   - Efficient hit counting
+   - Optimized file I/O
+   - Smart stats buffering
+
+### Considerations
+
+1. **Code Loading**
+   - By default, only tracks files loaded from disk
+   - Can optionally track code loaded from strings
+   - Configure via `codefromstrings` setting
+
+2. **Coroutines**
+   - Automatically patches coroutine.create
+   - Handles coroutine.wrap properly
+   - Maintains consistent tracking across threads
+   - Some overhead for thread management
+
+3. **Memory Usage**
+   - Keeps hit counts in memory
+   - Regular stats file updates
+   - Configurable save frequency
+   - Clean memory management
 
 ## Troubleshooting
 
@@ -244,17 +523,17 @@ For detailed configuration of specific reporting components, see:
 If you have unexpectedly low coverage:
 
 1. **Check include/exclude patterns**: Ensure your patterns match the expected files
-2. **Verify assertions**: Make sure your tests include assertions that verify results
-3. **Look for dead code**: Unreachable code won't be covered no matter what
-4. **Check test execution**: Ensure all your tests are actually running
+2. **Check file paths**: Different paths may cause files to be missed
+3. **Look for dead code**: Unreachable code won't be covered
+4. **Check test execution**: Ensure all your tests are running
 
 ### Report Problems
 
 If your coverage reports don't look right:
 
-1. **Check file paths**: Ensure paths are consistent between coverage tracking and report generation
+1. **Check file paths**: Ensure paths are consistent between tracking and reporting
 2. **Verify central configuration**: Check your central_config settings
-3. **Look for conflicts**: Other tools or instrumentation might interfere with coverage tracking
+3. **Look for conflicts**: Other debug hooks might interfere with coverage
 
 ## Understanding Report Data
 
@@ -263,8 +542,8 @@ If your coverage reports don't look right:
 The HTML report contains:
 
 1. **Summary page**: Overall statistics and file listing
-2. **File views**: Line-by-line coverage visualization
-3. **Legend**: Color key for covered, executed, and uncovered lines
+2. **File views**: Line-by-line coverage visualization with hit counts
+3. **Legend**: Color key showing execution frequency
 4. **Navigation**: File tree navigation
 
 ### Coverage Metrics
@@ -272,13 +551,50 @@ The HTML report contains:
 Important metrics in reports:
 
 1. **Line coverage**: Percentage of lines executed
-2. **Assertion coverage**: Percentage of lines verified by assertions
-3. **Function coverage**: Percentage of functions executed
-4. **Branch coverage**: Coverage of logical branches (if available)
+2. **Hit counts**: How many times each line ran
+3. **File coverage**: Percentage of files with any coverage
+4. **Overall coverage**: Weighted average across all files
+
+## Best Practices for Debug Hook Coverage
+
+1. **Initialize/Shutdown Properly**
+   ```lua
+   -- Always initialize before coverage tracking
+   coverage.init()
+   
+   -- Clean up after testing
+   coverage.shutdown()
+   ```
+
+2. **Thread Safety**
+   ```lua
+   -- Safe coroutine usage
+   local co = coroutine.create(function()
+     -- Coverage automatically tracked
+     my_function()
+   end)
+   ```
+
+3. **Performance Optimization**
+   ```lua
+   -- For long-running tests
+   central_config.set("coverage", {
+     tick = true,          -- Enable tick-based saving
+     savestepsize = 1000,  -- Increase save interval
+   })
+   ```
+
+4. **Regular Stats Saving**
+   ```lua
+   -- For large test suites, save periodically
+   after(function()
+     coverage.save_stats()
+   end)
+   ```
 
 ## Conclusion
 
-Firmo's coverage features provide deep insight into test effectiveness. By regularly tracking coverage and working to improve it, you can build more reliable code with fewer defects.
+Firmo's debug hook coverage system provides deep insight into test effectiveness. By regularly tracking coverage and working to improve it, you can build more reliable code with fewer defects.
 
 Remember that coverage is just one aspect of test quality. Combine it with thoughtful test design, effective assertions, and good development practices for the best results.
 

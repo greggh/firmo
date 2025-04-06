@@ -23,28 +23,18 @@ firmo.lua                  # Main entry point and public API
 │   │
 │   ├── coverage/          # Code coverage system
 │   │   ├── init.lua       # Coverage API and lifecycle management
-│   │   ├── v3/            # v3 instrumentation-based coverage
-│   │   │   ├── init.lua   # v3 API entry point
-│   │   │   ├── instrumentation/  # Code instrumentation
-│   │   │   │   ├── parser.lua    # Lua source parser
-│   │   │   │   ├── transformer.lua # Code transformer
-│   │   │   │   └── sourcemap.lua # Source mapping
-│   │   │   ├── loader/    # Module loading
-│   │   │   │   ├── hook.lua    # Module loader hook
-│   │   │   │   └── cache.lua   # Instrumented module cache
-│   │   │   ├── runtime/   # Runtime tracking
-│   │   │   │   ├── tracker.lua    # Execution tracker
-│   │   │   │   └── data_store.lua # Data storage
-│   │   │   ├── assertion/ # Assertion integration
-│   │   │   │   ├── hook.lua      # Assertion hook
-│   │   │   │   └── analyzer.lua  # Stack analyzer
-│   │   │   └── report/    # Reporting
-│   │   │       ├── html.lua      # HTML reporter
-│   │   │       └── json.lua      # JSON reporter
-│   │   ├── report/        # Report generation (legacy)
-│   │   │   ├── html.lua   # HTML report formatter
-│   │   │   ├── json.lua   # JSON report formatter
-│   │   │   └── lcov.lua   # LCOV report formatter
+│   │   ├── hook.lua       # Debug hook integration
+│   │   ├── stats.lua      # Coverage statistics collection
+│   │   ├── runner.lua     # Coverage runner
+│   │   ├── util.lua       # Coverage utilities
+│   │   └── report/        # Report generation
+│   │       ├── formatter.lua # Base report formatter
+│   │       ├── html.lua      # HTML reporter with syntax highlighting
+│   │       ├── json.lua      # JSON reporter with pretty printing
+│   │       ├── lcov.lua      # LCOV report formatter
+│   │       ├── tap.lua       # TAP v13 report formatter
+│   │       ├── csv.lua       # CSV report formatter with configurable columns
+│   │       └── junit.lua     # JUnit XML report formatter
 │   │
 │   ├── tools/             # Utility tools
 │   │   ├── logging/       # Structured logging system
@@ -108,80 +98,84 @@ local exclude = config.coverage.exclude
 local report_format = config.coverage.report.format
 ```
 
-### 2. Instrumentation-Based Coverage System (v3)
+### 2. Debug Hook-Based Coverage System
 
-The coverage system has been completely redesigned to use code instrumentation rather than debug hooks, with a focus on safety through temporary file usage. This provides:
+The coverage system integrates LuaCov's proven debug hook approach, enhanced with firmo's robust file operations, error handling, and reporting capabilities. This provides:
 
-- More accurate coverage tracking
+- Reliable coverage tracking through Lua's debug hooks
 - Support for complex code patterns
-- Better performance
-- Detailed execution data
-- Three-state coverage model (covered, executed, not covered)
-- Safe instrumentation through temporary files
-- Automatic cleanup of instrumented files
+- Comprehensive execution data
+- Detailed coverage reporting
+- Integration with firmo's reporting system
+- All file operations through firmo's filesystem module
+- Standardized error handling
 
 #### 2.1 Key Coverage Components
 
-- **Instrumentation Engine**: Transforms Lua code to insert tracking statements
-  - **Parser**: Parses Lua source code into an AST
-  - **Transformer**: Adds tracking calls to the code
-  - **Sourcemap**: Maps instrumented code back to original source
-  - **Temp File Manager**: Handles safe file operations through test_helper
+- **Debug Hook Integration**: Uses Lua's debug hooks to track line execution
+  - **Hook Management**: Proper hook setup and teardown
+  - **Thread Safety**: Support for coroutines and multiple threads
+  - **Lifecycle Management**: Clean start, stop, and reset operations
 
-- **Module Loading Integration**: Hooks into Lua's module loading system
-  - **Loader Hook**: Intercepts require calls
-  - **Cache**: Caches instrumented modules
-  - **Path Mapper**: Maps between original and temp paths
+- **File Operations**: Uses firmo's filesystem module
+  - **Path Handling**: Standardized path operations
+  - **File Access**: Safe file reading and writing
+  - **Temp Files**: Proper temporary file management through temp_file module
 
-- **Runtime Tracking**: Tracks code execution at runtime
-  - **Tracker**: Records execution and coverage events
-  - **Data Store**: Stores and manages tracking data
-  - **Path Resolution**: Maps temp paths back to originals
+- **Statistics Collection**: Tracks and stores coverage data
+  - **Data Store**: Efficient storage of coverage information
+  - **Persistence**: Proper saving and loading of data
+  - **Normalization**: Clean data structures for reporting
 
-- **Assertion Integration**: Connects assertions to the code they verify
-  - **Assertion Hook**: Hooks into firmo's assertion system
-  - **Stack Analyzer**: Analyzes stack traces to identify covered lines
+- **Configuration Management**: Uses central_config for all settings
+  - **Include/Exclude Patterns**: Control what files are tracked
+  - **Output Settings**: Configure report formats and locations
+  - **Hook Behavior**: Configure the debug hook system
 
 - **Reporting System**: Generates coverage reports in various formats
-  - Supports HTML, JSON, LCOV, Cobertura, JUnit, TAP, and CSV formats
-  - Visualizes the three-state coverage model
+  - **HTML Format**: Interactive reports with syntax highlighting, color-coded line coverage, and collapsible file views
+  - **JSON Format**: Structured data with configurable pretty printing for easy parsing
+  - **LCOV Format**: Standard format compatible with external LCOV tools, including function and line coverage
+  - **TAP Format**: Test Anything Protocol v13 compliant output with test case formatting and YAML diagnostics for integration with TAP consumers
+  - **CSV Format**: Configurable columns for tabular data export and spreadsheet integration with proper field escaping for special characters
+  - **JUnit XML Format**: CI/CD compatible format treating coverage metrics as test cases
+  - Integration with firmo's formatters
 
 #### 2.2 Coverage Data Flow
 
-1. **Source Copy**: Original source file is copied to temporary location
-2. **Instrumentation**: Temporary copy is transformed to include tracking
-3. **Module Loading**: Instrumented temp file is loaded instead of original
-4. **Execution Tracking**: As code runs, execution data is stored
-5. **Coverage Tracking**: When assertions run, coverage data is recorded
-6. **Path Mapping**: All paths are mapped back to original source
-7. **Report Generation**: Coverage reports use original source paths
-8. **Cleanup**: Temporary files are automatically cleaned up
+1. **Hook Setup**: Debug hooks registered at the start of test runs
+2. **Execution Tracking**: Debug hooks record each line execution
+3. **Data Collection**: Coverage data collected in memory
+4. **Data Persistence**: Coverage data saved to files through filesystem module
+5. **Report Generation**: Coverage reports generated using firmo's reporting system
+6. **Hook Cleanup**: Debug hooks properly removed when coverage tracking ends
 
 #### 2.3 Edge Case Handling
 
-The v3 system handles various edge cases:
+The coverage system handles various edge cases:
 
-- **Dynamically Generated Code**: Tracks code generated via `load` and `loadstring`
-- **Metaprogramming Patterns**: Handles metatables and delegation patterns
-- **Multi-line Constructs**: Tracks complex, multi-line statements and expressions
-- **Asynchronous Code**: Works with coroutines and async execution patterns
+- **Coroutines**: Properly tracks code running in coroutines
+- **Module Loading**: Works with various module loading patterns
+- **Error Conditions**: Properly recovers from errors during tracking
+- **Large Codebases**: Efficiently handles large projects
 
 #### 2.4 Memory Management
 
-The v3 system includes memory optimization strategies:
+The coverage system includes memory optimization strategies:
 
-- **Minimal Code Injection**: Adds only essential tracking calls
-- **Lazy Instrumentation**: Only instruments modules when loaded
-- **Compact Data Structures**: Uses efficient data representations
-- **Periodic Cleanup**: Removes tracking for unused modules
+- **Efficient Data Structures**: Uses compact representations for coverage data
+- **Smart Persistence**: Only saves data when needed
+- **Resource Cleanup**: Proper cleanup of all resources
+- **Minimal Overhead**: Low impact on application performance
 
 #### 2.5 Error Recovery
 
-The v3 system provides robust error handling:
+The coverage system provides robust error handling:
 
-- **Parser Recovery**: Handles syntax errors gracefully
-- **Tracking Error Isolation**: Prevents tracking errors from affecting tests
+- **Hook Error Isolation**: Prevents hook errors from affecting tests
+- **File Operation Safety**: Safe handling of all file operations
 - **Graceful Degradation**: Falls back to partial coverage when needed
+- **Error Context**: Detailed error information for troubleshooting
 
 ### 3. Assertion System
 
@@ -270,9 +264,9 @@ Several utility modules provide supporting functionality:
 - ✅ Test runner
 
 ### In-Progress Components
-
-- 🔄 v3 Instrumentation-based coverage system (high priority)
-- 🔄 Enhanced HTML report visualization (high priority)
+- ✅ LuaCov-based debug hook coverage system
+- ✅ Enhanced HTML report visualization with syntax highlighting and interactive features
+- ✅ Coverage reporting in multiple formats (HTML, JSON, LCOV, TAP, CSV, JUnit)
 - 🔄 Quality validation module (medium priority)
 - 🔄 File watcher module (medium priority)
 - 🔄 CodeFix module (medium priority)
@@ -282,7 +276,7 @@ Several utility modules provide supporting functionality:
 
 ### Current Work (3-Week Timeline)
 
-- **Days 1-15**: Complete v3 coverage system implementation
+- **Days 1-15**: Complete LuaCov integration for coverage system
 - **Days 16-17**: Complete quality module
 - **Days 18-19**: Complete watcher module
 - **Day 20**: Complete HTML coverage report enhancements
@@ -298,7 +292,7 @@ Several utility modules provide supporting functionality:
             |                  |                 ||
 +-----------v----------+ +-----v------+   +------v+-----+
 |  Coverage System     | |  Quality   |   |  Reporting  |
-| (instrumentation)    | |  Module    |   |  System     |
+|   (debug hook)       | |  Module    |   |  System     |
 +-----------+----------+ +-----+------+   +------+------+
             |                  |                 |
             v                  v                 v

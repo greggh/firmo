@@ -5,9 +5,7 @@ local M = {}
 -- Dependencies
 local error_handler = require("lib.tools.error_handler")
 local logger = require("lib.tools.logging")
-local data_store = require("lib.coverage.runtime.data_store")
 local fs = require("lib.tools.filesystem")
-local central_config = require("lib.core.central_config")
 
 -- Version
 M._VERSION = "1.0.0"

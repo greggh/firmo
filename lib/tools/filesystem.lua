@@ -2384,7 +2384,6 @@ end
 function fs.remove_file(path)
   return fs.delete_file(path)
 end
-
 --- Alias for get_directory_name
 --- This is an alias for fs.get_directory_name for compatibility and alternative naming.
 ---
@@ -2392,6 +2391,43 @@ end
 --- @return string|nil directory_name Directory component of path or nil if path is nil
 function fs.get_directory(path)
   return fs.get_directory_name(path)
+end
+
+--- Check if a path is absolute
+--- This function determines if a path is absolute (as opposed to relative).
+--- On Unix-like systems, a path is absolute if it starts with "/".
+--- On Windows, a path is absolute if it starts with a drive letter (e.g., "C:")
+--- or a UNC path (e.g., "\\server").
+---
+--- @param path string Path to check
+--- @return boolean is_absolute True if the path is absolute, false otherwise
+---
+--- @usage
+--- -- Check if path is absolute
+--- if fs.is_absolute_path("/var/log/syslog") then
+---   print("Absolute path")
+--- else
+---   print("Relative path")
+--- end
+---
+--- -- Windows example
+--- local is_abs = fs.is_absolute_path("C:\\Windows\\System32") -- Returns true
+--- local is_rel = fs.is_absolute_path("docs\\readme.txt") -- Returns false
+function fs.is_absolute_path(path)
+  if not path or type(path) ~= "string" or path == "" then
+    return false
+  end
+
+  -- Normalize path separators for consistency
+  local normalized = path:gsub("\\", "/")
+
+  if is_windows() then
+    -- Windows: Check for drive letter (C:/, etc.) or UNC paths (//server)
+    return normalized:match("^%a:/") ~= nil or normalized:match("^//") ~= nil
+  else
+    -- Unix-like: Check for leading slash
+    return normalized:sub(1, 1) == "/"
+  end
 end
 
 --- Alias for get_file_name
