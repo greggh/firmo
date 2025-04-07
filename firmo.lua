@@ -14,31 +14,21 @@
 ---@field config table|nil Central configuration if available through central_config module
 ---@field _current_test_context table|nil Current test context for temp file tracking integration
 ---@field test_results table|nil Structured test results for reporting and analysis
-
--- Test definition functions
 ---@field describe fun(name: string, fn: function, options?: {focused?: boolean, excluded?: boolean, _parent_focused?: boolean, tags?: string[]}): nil Create a test group that can contain nested tests and other groups
 ---@field fdescribe fun(name: string, fn: function): nil Create a focused test group (only focused tests will run)
 ---@field xdescribe fun(name: string, fn: function): nil Create a skipped test group (none of the contained tests will run)
 ---@field it fun(name: string, options_or_fn: table|function, fn?: function): nil Create a test case with optional configuration
 ---@field fit fun(name: string, options_or_fn: table|function, fn?: function): nil Create a focused test case (only focused tests will run)
 ---@field xit fun(name: string, options_or_fn: table|function, fn?: function): nil Create a skipped test case (will not run but reports as skipped)
-
--- Test lifecycle hooks
 ---@field before fun(fn: function): nil Add a setup hook for the current test block that runs before each test
 ---@field after fun(fn: function): nil Add a teardown hook for the current test block that runs after each test
 ---@field pending fun(message?: string): string Mark a test as pending with an optional explanation message
-
--- Assertion functions
 ---@field expect fun(value: any): ExpectChain Create an assertion chain that allows chaining various assertions
 ---@field assert table Backward compatibility assertion interface for older tests (deprecated)
-
--- Test organization
 ---@field tags fun(...: string): firmo Set tags for the current describe block or test for filtering
 ---@field nocolor fun(): nil Disable colors in the output for CI environments or logs
 ---@field only_tags fun(...: string): firmo Filter tests to run only those with specified tags
 ---@field set_filter fun(pattern: string): firmo Set a pattern filter for test names
-
--- Test execution and reporting
 ---@field discover fun(dir?: string, pattern?: string): table, table|nil Discover test files in a directory
 ---@field run_file fun(file: string): table, table|nil Run a single test file with full lifecycle management
 ---@field run_discovered fun(dir?: string, pattern?: string): boolean, table|nil Run all discovered test files
@@ -47,19 +37,13 @@
 ---@field reset fun(): nil Reset the test state completely for a fresh test run
 ---@field get_current_test_context fun(): table|nil Get the current test context for temp file tracking
 ---@field get_structured_results fun(): table Get structured test results for reporting
-
--- Advanced testing features
 ---@field get_coverage fun(): table|nil Get code coverage data for tests (when coverage module is loaded)
 ---@field get_quality fun(): table|nil Get quality metrics for tests (when quality module is loaded)
 ---@field watch fun(dir: string, pattern?: string): nil Watch for file changes and run tests automatically
-
--- Mocking and spying
 ---@field mock fun(target: table, method_or_options?: string|table, impl_or_value?: any): table|nil, table|nil Create a mock object or method
 ---@field spy fun(target: table|function, method?: string): table|nil, table|nil Create a spy on an object method or function
 ---@field stub fun(value_or_fn?: any): table|nil, table|nil Create a stub that returns a value or executes a function
 ---@field with_mocks fun(fn: function): any Execute a function with automatic mock cleanup
-
--- Async testing (when async module is available)
 ---@field async fun(fn: function): function Convert a function to one that can be executed asynchronously
 ---@field await fun(ms: number): nil Wait for a specified time in milliseconds
 ---@field wait_until fun(condition: function, timeout?: number, check_interval?: number): boolean Wait until a condition is true or timeout occurs
@@ -195,7 +179,7 @@ logger.debug("Logging system initialized", {
     test_definition = test_definition ~= nil,
     cli = cli_module ~= nil,
     discover = discover_module ~= nil,
-    runner = runner_module ~= nil, 
+    runner = runner_module ~= nil,
     coverage = coverage ~= nil,
     quality = quality ~= nil,
     codefix = codefix ~= nil,
@@ -235,10 +219,10 @@ firmo.async_options = {
 -- Store reference to configuration in firmo if available
 if central_config then
   firmo.config = central_config
-  
+
   -- Try to load default configuration if it exists
   central_config.load_from_file()
-  
+
   -- Register firmo core with central_config
   central_config.register_module("firmo", {
     field_types = {
@@ -258,20 +242,20 @@ if test_definition then
   firmo.it = test_definition.it
   firmo.fit = test_definition.fit
   firmo.xit = test_definition.xit
-  
+
   -- Test lifecycle hooks
   firmo.before = test_definition.before
   firmo.after = test_definition.after
   firmo.pending = test_definition.pending
-  
+
   -- Test organization
   firmo.tags = test_definition.tags
   firmo.only_tags = test_definition.only_tags
   firmo.filter_pattern = test_definition.filter_pattern
-  
+
   -- Test state management
   firmo.reset = test_definition.reset
-  
+
   -- Sync the state fields
   --- Synchronize test state fields from test_definition module to firmo table
   ---@return nil
@@ -283,7 +267,7 @@ if test_definition then
     firmo.skipped = state.skipped
     firmo.focus_mode = state.focus_mode
   end
-  
+
   -- Call sync_state periodically or when needed
   sync_state()
 else
@@ -324,7 +308,7 @@ if async_module then
   firmo.await = async_module.await
   firmo.wait_until = async_module.wait_until
   firmo.parallel_async = async_module.parallel_async
-  
+
   -- Configure the async module with our options
   if firmo.async_options and firmo.async_options.timeout then
     async_module.set_timeout(firmo.async_options.timeout)
@@ -336,7 +320,7 @@ else
   local function async_error()
     error("Async module not available. Make sure lib/async.lua exists.", 2)
   end
-  
+
   firmo.async = async_error
   firmo.await = async_error
   firmo.wait_until = async_error
@@ -381,7 +365,7 @@ end
 local module = setmetatable({
   ---@type firmo
   firmo = firmo,
-  
+
   -- Export the main functions directly
   describe = firmo.describe,
   fdescribe = firmo.fdescribe,
@@ -396,24 +380,24 @@ local module = setmetatable({
   tags = firmo.tags,
   only_tags = firmo.only_tags,
   reset = firmo.reset,
-  
+
   -- Export CLI functions
   parse_args = firmo.parse_args,
   show_help = firmo.show_help,
-  
+
   -- Export mocking functions if available
   spy = firmo.spy,
   stub = firmo.stub,
   mock = firmo.mock,
-  
+
   -- Export async functions
   async = firmo.async,
   await = firmo.await,
   wait_until = firmo.wait_until,
-  
+
   -- Export interactive mode
   interactive = interactive,
-  
+
   --- Global exposure utility for easier test writing
   ---@return firmo The firmo module
   expose_globals = function()
@@ -428,32 +412,32 @@ local module = setmetatable({
     _G.before_each = firmo.before -- Alias for compatibility
     _G.after = firmo.after
     _G.after_each = firmo.after -- Alias for compatibility
-    
+
     -- Assertions
     _G.expect = firmo.expect
     _G.pending = firmo.pending
-    
+
     -- Expose firmo.assert namespace and global assert for convenience
     _G.firmo = { assert = firmo.assert }
     _G.assert = firmo.assert
-    
+
     -- Mocking utilities
     if firmo.spy then
       _G.spy = firmo.spy
       _G.stub = firmo.stub
       _G.mock = firmo.mock
     end
-    
+
     -- Async testing utilities
     if async_module then
       _G.async = firmo.async
       _G.await = firmo.await
       _G.wait_until = firmo.wait_until
     end
-    
+
     return firmo
   end,
-  
+
   -- Main entry point when called
   ---@diagnostic disable-next-line: unused-vararg
   ---@param _ table The module itself
@@ -463,7 +447,7 @@ local module = setmetatable({
     -- Check if we are running tests directly or just being required
     local info = debug.getinfo(2, "S")
     local is_main_module = info and (info.source == "=(command line)" or info.source:match("firmo%.lua$"))
-    
+
     if is_main_module and arg then
       -- Simply forward to CLI module if available
       if cli_module then
@@ -478,7 +462,7 @@ local module = setmetatable({
         os.exit(1)
       end
     end
-    
+
     -- When required as module, just return the module
     return firmo
   end,
@@ -497,17 +481,17 @@ local temp_file_integration_loaded, temp_file_integration = pcall(require, "lib.
 if temp_file_integration_loaded and temp_file_integration then
   -- Initialize the temp file integration system
   logger.info("Initializing temp file integration system")
-  
+
   -- Initialize integration with explicit firmo instance
   temp_file_integration.initialize(firmo)
-  
+
   -- Add getter/setter for current test context
   --- Get the current test context for temp file tracking
   ---@return table|nil The current test context or nil if not set
   firmo.get_current_test_context = function()
     return firmo._current_test_context
   end
-  
+
   --- Set the current test context for temp file tracking
   ---@param context table|nil The test context to set
   ---@return nil
@@ -517,7 +501,7 @@ if temp_file_integration_loaded and temp_file_integration then
 else
   logger.debug("Temp file integration not available", {
     reason = "Module not loaded or not found",
-    status = "using fallback cleanup"
+    status = "using fallback cleanup",
   })
 end
 

@@ -1,5 +1,5 @@
 --- Format coverage data for reporting
--- @module coverage.format
+-- @module reporting.format
 
 local format = {}
 

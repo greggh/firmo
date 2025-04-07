@@ -51,7 +51,7 @@ local TEST_STATUS = {
   PASS = "pass",
   FAIL = "fail",
   SKIP = "skip",
-  PENDING = "pending"
+  PENDING = "pending",
 }
 
 -- Track tests
@@ -86,7 +86,9 @@ local logger = logging.get_logger("TestDefinition")
 ---@return table|nil The loaded module or nil if it couldn't be loaded
 local function try_require(name)
   local success, mod = pcall(require, name)
-  if success then return mod end
+  if success then
+    return mod
+  end
   return nil
 end
 
@@ -115,7 +117,7 @@ local function has_required_tags(test_tags)
   if not active_tags or #active_tags == 0 then
     return true
   end
-  
+
   for _, tag in ipairs(active_tags) do
     for _, test_tag in ipairs(test_tags) do
       if test_tag == tag then
@@ -123,7 +125,7 @@ local function has_required_tags(test_tags)
       end
     end
   end
-  
+
   return false
 end
 
@@ -145,7 +147,7 @@ end
 --- -- Run tests tagged with either "fast" or "critical"
 --- firmo.only_tags("fast", "critical")
 function M.only_tags(...)
-  active_tags = {...}
+  active_tags = { ... }
   return M
 end
 
@@ -161,13 +163,13 @@ end
 --- -- Tag a block of tests
 --- describe("Database operations", function()
 ---   firmo.tags("integration", "database")
----   
+---
 ---   it("should connect to database", function()
 ---     -- This test will have both "integration" and "database" tags
 ---   end)
 --- end)
 function M.tags(...)
-  local new_tags = {...}
+  local new_tags = { ... }
   current_tags = new_tags
   return M
 end
@@ -233,7 +235,7 @@ end
 ---   it("should allow valid users to log in", function()
 ---     -- test implementation
 ---   end)
----   
+---
 ---   it("should reject invalid credentials", function()
 ---     -- test implementation
 ---   end)
@@ -245,7 +247,7 @@ end
 ---     it("should read text files", function() end)
 ---     it("should read binary files", function() end)
 ---   end)
----   
+---
 ---   describe("Writing files", function()
 ---     it("should write text files", function() end)
 ---     it("should write binary files", function() end)
@@ -256,19 +258,19 @@ function M.describe(name, fn, options)
   local parent_focused = options._parent_focused or false
   local focused = options.focused or false
   local excluded = options.excluded or false
-  
+
   -- Update focus mode if this is a focused describe
   if focused and not excluded then
     focus_mode = true
   end
-  
+
   -- Save previous tags and level
   local previous_level = level
   local previous_tags = {}
   for i, v in ipairs(current_tags) do
     previous_tags[i] = v
   end
-  
+
   -- Create a new describe block
   local block = {
     name = name,
@@ -278,27 +280,27 @@ function M.describe(name, fn, options)
     parent_focused = parent_focused,
     tags = {},
   }
-  
+
   -- Copy current tags to the block
   for i, v in ipairs(current_tags) do
     block.tags[i] = v
   end
-  
+
   -- Check if block should be skipped based on tags
   local should_skip_block = not has_required_tags(block.tags)
-  
+
   -- Save previous describe block and set current
   local previous_describe_block = current_describe_block
   current_describe_block = block
-  
+
   -- Insert block into test_blocks
   table.insert(test_blocks, block)
-  
+
   -- Increase level and ensure hooks tables exist
   level = level + 1
   befores[level] = befores[level] or {}
   afters[level] = afters[level] or {}
-  
+
   if not should_skip_block then
     -- Execute the test group function to register its tests
     local success, err = error_handler.try(fn)
@@ -311,7 +313,7 @@ function M.describe(name, fn, options)
       errors = errors + 1
     end
   end
-  
+
   -- Restore previous state
   level = previous_level
   current_tags = previous_tags
@@ -333,7 +335,7 @@ end
 ---   it("should authenticate valid users", function()
 ---     -- Test implementation
 ---   end)
----   
+---
 ---   it("should reject invalid credentials", function()
 ---     -- Test implementation
 ---   end)
@@ -344,7 +346,7 @@ end
 ---   it("will be skipped when focus mode is active", function() end)
 --- end)
 function M.fdescribe(name, fn)
-  return M.describe(name, fn, {focused = true})
+  return M.describe(name, fn, { focused = true })
 end
 
 --- Create a skipped test group
@@ -361,7 +363,7 @@ end
 ---   it("has tests that aren't ready yet", function()
 ---     -- Incomplete test
 ---   end)
----   
+---
 ---   it("contains features under development", function()
 ---     -- Incomplete test
 ---   end)
@@ -372,7 +374,7 @@ end
 ---   it("runs normally", function() end)
 --- end)
 function M.xdescribe(name, fn)
-  return M.describe(name, fn, {excluded = true})
+  return M.describe(name, fn, { excluded = true })
 end
 
 --- Create a test case
@@ -415,7 +417,7 @@ function M.it(name, options_or_fn, fn)
   else
     fn = options_or_fn
   end
-  
+
   -- Apply defaults to options
   options = merge_options(options, {
     focused = false,
@@ -424,20 +426,20 @@ function M.it(name, options_or_fn, fn)
     tags = {},
     timeout = nil,
   })
-  
+
   -- Determine if test should be skipped based on focus mode
   local should_skip = false
-  
+
   -- Skip if exclude flag is set
   if options.excluded then
     should_skip = true
   end
-  
+
   -- Skip if there are focused tests and this one isn't focused
   if focus_mode and not options.focused and not (current_describe_block and current_describe_block.focused) then
     should_skip = true
   end
-  
+
   -- Skip if tags don't match
   local test_tags = {}
   -- Add tags from current describe block
@@ -446,27 +448,27 @@ function M.it(name, options_or_fn, fn)
       table.insert(test_tags, tag)
     end
   end
-  
+
   -- Add tags from options
   for _, tag in ipairs(options.tags) do
     table.insert(test_tags, tag)
   end
-  
+
   -- Add tags from current context
   for _, tag in ipairs(current_tags) do
     table.insert(test_tags, tag)
   end
-  
+
   -- Skip if test doesn't have required tags
   if not has_required_tags(test_tags) then
     should_skip = true
   end
-  
+
   -- Skip if name doesn't match pattern
   if filter_pattern and name:match(filter_pattern) == nil then
     should_skip = true
   end
-  
+
   -- Record test path
   local path = {}
   local current = current_describe_block
@@ -475,10 +477,10 @@ function M.it(name, options_or_fn, fn)
     current = current.parent
   end
   table.insert(path, name)
-  
+
   -- Store full test path
   table.insert(test_paths, path)
-  
+
   if should_skip then
     -- Record this test as skipped with structured data
     local result = M.add_test_result({
@@ -488,19 +490,19 @@ function M.it(name, options_or_fn, fn)
       path_string = table.concat(path, " / "),
       timestamp = os.time(),
       options = options,
-      reason = "Test skipped due to filtering or tagging"
+      reason = "Test skipped due to filtering or tagging",
     })
-    
+
     -- Log as skipped with proper structure
     logger.info("Test skipped: " .. name, {
       test_name = name,
       test_path = table.concat(path, " / "),
-      test_result = result
+      test_result = result,
     })
-    
+
     return
   end
-  
+
   -- Run test with proper error handling
   local test_start_time = os.clock()
   local success, err = error_handler.try(function()
@@ -512,29 +514,29 @@ function M.it(name, options_or_fn, fn)
         path = table.concat(path, " / "),
       })
     end
-    
+
     -- Run before hooks for each level
     for i = 1, level do
       for _, hook in ipairs(befores[i] or {}) do
         hook()
       end
     end
-    
+
     -- Run the test
     fn()
-    
+
     -- Run after hooks in reverse order
     for i = level, 1, -1 do
       for _, hook in ipairs(afters[i] or {}) do
         hook()
       end
     end
-    
+
     -- Clean up test context
     if temp_file and temp_file.set_current_test_context then
       temp_file.set_current_test_context(nil)
     end
-    
+
     -- Create a test pass result
     local result = M.add_test_result({
       status = TEST_STATUS.PASS,
@@ -543,21 +545,21 @@ function M.it(name, options_or_fn, fn)
       path_string = table.concat(path, " / "),
       execution_time = os.clock() - test_start_time,
       timestamp = os.time(),
-      options = options
+      options = options,
     })
-    
+
     -- Log pass with proper structure
     logger.info("Test passed: " .. name, {
       test_name = name,
       test_path = table.concat(path, " / "),
-      test_result = result
+      test_result = result,
     })
   end)
-  
+
   -- Handle test errors
   if not success then
     local execution_time = os.clock() - test_start_time
-    
+
     if options.expect_error then
       -- Test expects an error, so this is a pass
       local result = M.add_test_result({
@@ -571,13 +573,13 @@ function M.it(name, options_or_fn, fn)
         expect_error = true,
         error = err, -- Store the error for inspection
       })
-      
+
       -- Log pass with proper structure for expected errors
       logger.info("Test passed with expected error: " .. name, {
         test_name = name,
         test_path = table.concat(path, " / "),
         test_result = result,
-        expect_error = true
+        expect_error = true,
       })
     else
       -- Unexpected error, test fails
@@ -590,15 +592,15 @@ function M.it(name, options_or_fn, fn)
         timestamp = os.time(),
         options = options,
         error = err,
-        error_message = error_handler.format_error(err)
+        error_message = error_handler.format_error(err),
       })
-      
+
       -- Log error details with the structured result
       logger.error("Test failed: " .. error_handler.format_error(err), {
         test_name = name,
         test_path = table.concat(path, " / "),
         test_result = result,
-        error_message = error_handler.format_error(err)
+        error_message = error_handler.format_error(err),
       })
     end
   end
@@ -634,7 +636,7 @@ end
 function M.fit(name, options_or_fn, fn)
   -- Set focus mode
   focus_mode = true
-  
+
   -- Determine if first argument is options or function
   local options = {}
   if type(options_or_fn) == "table" then
@@ -642,9 +644,9 @@ function M.fit(name, options_or_fn, fn)
     options.focused = true
   else
     fn = options_or_fn
-    options = {focused = true}
+    options = { focused = true }
   end
-  
+
   return M.it(name, options, fn)
 end
 
@@ -684,9 +686,9 @@ function M.xit(name, options_or_fn, fn)
     options.excluded = true
   else
     fn = options_or_fn
-    options = {excluded = true}
+    options = { excluded = true }
   end
-  
+
   return M.it(name, options, fn)
 end
 
@@ -706,7 +708,7 @@ end
 ---     db.connect()
 ---     db.clear_test_data()
 ---   end)
----   
+---
 ---   it("should insert records", function()
 ---     -- db is already connected and cleared due to before hook
 ---     db.insert({id = 1, name = "Test"})
@@ -720,13 +722,13 @@ end
 ---     -- This runs first for all tests in this and nested blocks
 ---     setup_parent_resources()
 ---   end)
----   
+---
 ---   describe("Child suite", function()
 ---     before(function()
 ---       -- This runs after parent's before but before the test
 ---       setup_child_resources()
 ---     end)
----     
+---
 ---     it("test in child suite", function()
 ---       -- Both parent and child setup have run
 ---     end)
@@ -749,16 +751,16 @@ end
 --- -- Basic teardown hook
 --- describe("File operations", function()
 ---   local temp_file
----   
+---
 ---   before(function()
 ---     temp_file = create_temp_file()
 ---   end)
----   
+---
 ---   after(function()
 ---     -- Cleanup after each test
 ---     delete_file(temp_file)
 ---   end)
----   
+---
 ---   it("should write to file", function()
 ---     write_to_file(temp_file, "content")
 ---     expect(read_file(temp_file)).to.equal("content")
@@ -776,7 +778,7 @@ end
 ---       end
 ---     end
 ---   end)
----   
+---
 ---   if not success then
 ---     print("Warning: Cleanup failed - " .. tostring(err))
 ---   end
@@ -834,7 +836,7 @@ end
 ---@usage
 --- -- Get test statistics
 --- local state = firmo.get_state()
---- print(string.format("Tests: %d passed, %d failed, %d skipped", 
+--- print(string.format("Tests: %d passed, %d failed, %d skipped",
 ---   state.passes, state.errors, state.skipped))
 ---
 --- -- Check if focus mode is active
@@ -845,7 +847,7 @@ end
 --- -- Inspect test results
 --- for _, result in ipairs(state.test_results) do
 ---   if result.status == "fail" then
----     print(string.format("FAILURE: %s - %s", 
+---     print(string.format("FAILURE: %s - %s",
 ---       result.path_string, result.error_message or "unknown error"))
 ---   end
 --- end
@@ -928,15 +930,15 @@ function M.add_test_result(result)
   if not result or type(result) ~= "table" then
     return nil
   end
-  
+
   -- Ensure required fields
   result.status = result.status or TEST_STATUS.FAIL
   result.name = result.name or "unknown test"
   result.timestamp = result.timestamp or os.time()
-  
+
   -- Add result to collection
   table.insert(test_results, result)
-  
+
   -- Print debug output if enabled
   if debug_mode then
     local status_color = ""
@@ -947,15 +949,19 @@ function M.add_test_result(result)
     else
       status_color = "\27[33m" -- yellow
     end
-    
-    print(string.format("ADD RESULT: %s[%s]\27[0m %s (%s) %s", 
-      status_color,
-      result.status:upper(),
-      result.name,
-      result.path_string or "",
-      result.expect_error and "[expects error]" or ""))
+
+    print(
+      string.format(
+        "ADD RESULT: %s[%s]\27[0m %s (%s) %s",
+        status_color,
+        result.status:upper(),
+        result.name,
+        result.path_string or "",
+        result.expect_error and "[expects error]" or ""
+      )
+    )
   end
-  
+
   -- Update counters based on status
   if result.status == TEST_STATUS.PASS then
     passes = passes + 1
@@ -964,9 +970,10 @@ function M.add_test_result(result)
   elseif result.status == TEST_STATUS.SKIP or result.status == TEST_STATUS.PENDING then
     skipped = skipped + 1
   end
-  
+
   return result
 end
 
 -- Initialize and return the module
 return M
+

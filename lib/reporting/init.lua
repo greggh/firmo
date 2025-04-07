@@ -20,21 +20,30 @@
 ---@field configure fun(options?: table): reporting Configure the reporting module with custom options
 ---@field get_config fun(): table Get the current configuration
 ---@field register_formatter fun(format: string, formatter: table): reporting Register a custom formatter
----@field get_formatter fun(format: string): table|nil Get a formatter by name
+---@field register_coverage_formatter fun(name: string, formatter_fn: function): boolean|nil, table? Register a custom coverage report formatter
+---@field register_quality_formatter fun(name: string, formatter_fn: function): boolean|nil, table? Register a custom quality report formatter
+---@field register_results_formatter fun(name: string, formatter_fn: function): boolean|nil, table? Register a custom test results formatter
+---@field get_formatter fun(format: string, type: string): table|nil Get a formatter by name and type
+---@field get_formatter_config fun(formatter_name: string): table|nil Get configuration for a specific formatter
+---@field configure_formatter fun(formatter_name: string, formatter_config: table): reporting Configure a specific formatter
+---@field configure_formatters fun(formatters_config: table): reporting Configure multiple formatters at once
+---@field load_formatters fun(formatter_module: table): number|nil, table? Load formatters from a module
+---@field get_available_formatters fun(): table Get list of available formatters for each type
 ---@field generate_report fun(data: table, options?: table): boolean|nil, string? Generate a report
 ---@field get_report_path fun(type: string, format: string, options?: table): string Get the path for a report file
----@field load_formatter fun(format: string): table|nil Load a formatter module
+---@field load_formatter fun(format: string, type: string): table|nil Load a formatter module with lazy loading
 ---@field run_formatter fun(formatter: table, data: table, options?: table): string|nil Generate report output with a formatter
----@field format_coverage fun(coverage_data: table, format?: string): string|table Format coverage data into the specified format
----@field format_quality fun(quality_data: table, format?: string): string|table Format quality data into the specified format
----@field format_results fun(results_data: table, format?: string): string|table Format test results data into the specified format
+---@field format_coverage fun(coverage_data: table, format?: string, options?: table): string|table Format coverage data into the specified format
+---@field format_quality fun(quality_data: table, format?: string, options?: table): string|table Format quality data into the specified format
+---@field format_results fun(results_data: table, format?: string, options?: table): string|table Format test results data into the specified format
 ---@field save_coverage_report fun(file_path: string, coverage_data: table, format: string, options?: table): boolean|nil, table? Save a coverage report to a file
----@field save_quality_report fun(file_path: string, quality_data: table, format: string): boolean|nil, table? Save a quality report to a file
----@field save_results_report fun(file_path: string, results_data: table, format: string): boolean|nil, table? Save a test results report to a file
+---@field save_quality_report fun(file_path: string, quality_data: table, format: string, options?: table): boolean|nil, table? Save a quality report to a file
+---@field save_results_report fun(file_path: string, results_data: table, format: string, options?: table): boolean|nil, table? Save a test results report to a file
 ---@field auto_save_reports fun(coverage_data: table, quality_data: table, results_data: table, options?: table|string): table Generate and save all reports to default locations
 ---@field validate_coverage_data fun(coverage_data: table): boolean, table? Validate coverage data structure
 ---@field validate_report_format fun(formatted_data: string|table, format: string): boolean, string? Validate formatted report
 ---@field validate_report fun(coverage_data: table, formatted_output?: string|table, format?: string): table Run comprehensive validation of report
+---@field validate_formatter_config fun(formatter_name: string, config: table): boolean, table? Validate formatter configuration
 ---@field write_file fun(file_path: string, content: string|table): boolean|nil, table? Write content to a file
 ---@field reset fun(): reporting Reset the module to default configuration
 ---@field full_reset fun(): reporting Reset both local and central configuration
@@ -44,7 +53,7 @@
 local M = {}
 
 -- Module version
-M._VERSION = "0.4.0"
+M._VERSION = "0.5.0"
 
 -- Import modules
 local fs = require("lib.tools.filesystem")
@@ -80,38 +89,78 @@ local DEFAULT_CONFIG = {
       highlight_syntax = true,
       asset_base_path = nil,
       include_legend = true,
+      max_file_size = 10 * 1024 * 1024, -- 10MB max file size for HTML report
+      template_path = nil,               -- Custom template path
+      stylesheet_path = nil,             -- Custom stylesheet path
+      enable_dark_mode = true,           -- Support dark mode toggle
+      inline_source = true,              -- Include source code inline
+      line_number_anchors = true,        -- Enable line number anchors
     },
     summary = {
       detailed = false,
       show_files = true,
       colorize = true,
+      show_function_coverage = true,     -- Show function coverage
+      sort_by = "coverage",              -- Sort by coverage percentage
+      max_files = 100,                   -- Maximum files to show in summary
     },
     json = {
       pretty = false,
       schema_version = "1.0",
+      indentation = 2,                   -- Indentation level when pretty-printing
+      enable_streaming = true,           -- Enable streaming for large files
+      chunk_size = 1024 * 1024,          -- 1MB chunks for streaming
+      omit_source_code = false,          -- Whether to include source code
     },
     lcov = {
       absolute_paths = false,
+      include_function_coverage = true,  -- Include function coverage data
+      include_branch_coverage = false,   -- Include branch coverage data
+      normalize_paths = true,            -- Normalize paths for cross-platform compatibility
     },
     cobertura = {
       schema_version = "4.0",
       include_packages = true,
+      include_source = true,             -- Include source in report
+      include_methods = true,            -- Include methods in report
+      include_conditions = false,        -- Include conditions in report
     },
     junit = {
       schema_version = "2.0",
       include_timestamps = true,
       include_hostname = true,
+      include_properties = true,         -- Include properties in report
+      format_stack_traces = true,        -- Format stack traces for readability
+      use_cdata = true,                  -- Use CDATA sections for message content
     },
     tap = {
       version = 13,
       verbose = true,
+      include_yaml_diagnostics = true,   -- Include YAML diagnostics
+      include_summary = true,            -- Include summary comments
+      include_stack_traces = true,       -- Include stack traces in diagnostics
+      include_uncovered_list = false,    -- List uncovered items
     },
     csv = {
       delimiter = ",",
       quote = '"',
       include_header = true,
+      columns = nil,                     -- Custom columns specification
+      escape_special_chars = true,       -- Properly escape special characters
+      include_line_data = false,         -- Include per-line data
     },
   },
+  lazy_loading = {
+    enabled = true,                      -- Enable lazy loading of formatters
+    formatters_path = "lib.reporting.formatters",  -- Base path for formatters
+    load_on_demand = true,               -- Load formatters only when needed
+  },
+  validation = {
+    validate_config = true,              -- Validate formatter configurations
+    validate_data = true,                -- Validate data before formatting
+    validate_output = true,              -- Validate output after formatting
+    strict = false,                      -- Whether to fail on validation errors
+  }
 }
 
 -- Current configuration (will be synchronized with central config)
@@ -568,27 +617,89 @@ local formatters = {
   results = {}, -- Test results formatters
 }
 
--- Load and register all formatter modules
-local ok, formatter_registry = pcall(require, "lib.reporting.formatters.init")
-if ok then
-  formatter_registry.register_all(formatters)
-else
-  logger.warn("Failed to load formatter registry. Using fallback formatters.")
+-- Load and register all formatter modules with improved error handling
+local function load_formatter_registry()
+  logger.debug("Loading formatter registry")
+  
+  -- Use error_handler.try for better error handling
+  local success, result, err = error_handler.try(function()
+    return require("lib.reporting.formatters.init")
+  end)
+  
+  if success and result then
+    logger.debug("Successfully loaded formatter registry")
+    
+    -- Register formatters with error handling
+    local register_success, register_result, register_err = error_handler.try(function()
+      return result.register_all(formatters)
+    end)
+    
+    if register_success then
+      logger.debug("Successfully registered all formatters", {
+        coverage_count = formatters.coverage and #formatters.coverage or 0,
+        quality_count = formatters.quality and #formatters.quality or 0,
+        results_count = formatters.results and #formatters.results or 0
+      })
+      return true
+    else
+      logger.warn("Failed to register formatters", {
+        error = error_handler.format_error(register_result),
+        module = "reporting"
+      })
+      return false
+    end
+  else
+    logger.warn("Failed to load formatter registry", {
+      error = error_handler.format_error(result),
+      module = "reporting"
+    })
+    return false
+  end
 end
 
--- Fallback formatters if registry failed to load
-if not formatters.coverage.summary then
-  formatters.coverage.summary = function(coverage_data)
-    return {
-      files = coverage_data and coverage_data.files or {},
-      total_files = 0,
-      covered_files = 0,
-      files_pct = 0,
-      total_lines = 0,
-      covered_lines = 0,
-      lines_pct = 0,
-      overall_pct = 0,
-    }
+-- Attempt to load formatter registry
+if not load_formatter_registry() then
+  logger.warn("Using fallback formatters due to registry loading failure")
+  
+  -- Fallback formatters with proper error handling
+  -- Summary formatter
+  if not formatters.coverage.summary then
+    formatters.coverage.summary = function(coverage_data, options)
+      options = options or {}
+      
+      -- Use error handler to safely process data
+      local success, result, err = error_handler.try(function()
+        return {
+          files = coverage_data and coverage_data.files or {},
+          total_files = coverage_data and coverage_data.summary and coverage_data.summary.total_files or 0,
+          covered_files = coverage_data and coverage_data.summary and coverage_data.summary.covered_files or 0,
+          files_pct = coverage_data and coverage_data.summary and coverage_data.summary.files_percent or 0,
+          total_lines = coverage_data and coverage_data.summary and coverage_data.summary.total_lines or 0,
+          covered_lines = coverage_data and coverage_data.summary and coverage_data.summary.covered_lines or 0,
+          lines_pct = coverage_data and coverage_data.summary and coverage_data.summary.coverage_percent or 0,
+          overall_pct = coverage_data and coverage_data.summary and coverage_data.summary.coverage_percent or 0
+        }
+      end)
+      
+      if success then
+        return result
+      else
+        logger.error("Summary formatter processing error", {
+          error = error_handler.format_error(result),
+          module = "reporting.summary"
+        })
+        return {
+          files = {},
+          total_files = 0,
+          covered_files = 0,
+          files_pct = 0,
+          total_lines = 0,
+          covered_lines = 0,
+          lines_pct = 0,
+          overall_pct = 0
+        }
+      end
+    end
   end
 end
 

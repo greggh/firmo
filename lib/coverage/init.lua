@@ -61,11 +61,11 @@ local file_patterns = {
 local function compile_patterns()
   local config = central_config.get("coverage")
   if not config then return end
-  
+
   -- Clear existing patterns
   file_patterns.include = {}
   file_patterns.exclude = {}
-  
+
   -- Compile include patterns
   for _, pattern in ipairs(config.include or {}) do
     table.insert(file_patterns.include, {
@@ -73,7 +73,7 @@ local function compile_patterns()
       compiled = pattern
     })
   end
-  
+
   -- Compile exclude patterns
   for _, pattern in ipairs(config.exclude or {}) do
     table.insert(file_patterns.exclude, {
@@ -81,7 +81,7 @@ local function compile_patterns()
       compiled = pattern
     })
   end
-}
+end
 
 -- Optimized file pattern matching
 local function should_track_file(filename)
@@ -89,7 +89,7 @@ local function should_track_file(filename)
   if ignored_files[filename] then
     return false
   end
-  
+
   -- Check include patterns
   local included = #file_patterns.include == 0 -- Include all if no patterns
   for _, pattern in ipairs(file_patterns.include) do
@@ -98,7 +98,7 @@ local function should_track_file(filename)
       break
     end
   end
-  
+
   -- Check exclude patterns if included
   if included then
     for _, pattern in ipairs(file_patterns.exclude) do
@@ -108,9 +108,9 @@ local function should_track_file(filename)
       end
     end
   end
-  
+
   return included
-}
+end
 
 -- Optimized debug hook function
 local function debug_hook(_, line_nr, level)
@@ -120,14 +120,14 @@ local function debug_hook(_, line_nr, level)
   end
 
   level = level or 2
-  
+
   -- Get source file info
   local info = debug.getinfo(level, "S")
   if not info then return end
 
   local name = info.source
   local prefixed_name = name:match("^@(.*)")
-  
+
   if prefixed_name then
     name = filesystem.normalize_path(prefixed_name)
   elseif not central_config.get("coverage.codefromstrings") then
@@ -177,7 +177,7 @@ local function debug_hook(_, line_nr, level)
     coverage.save_stats()
     state.buffer.size = 0
   end
-}
+end
 
 -- Initialize coverage system
 function coverage.init()
@@ -223,10 +223,10 @@ function coverage.init()
       changes = 0,
       last_save = os.time()
     }
-    
+
     -- Clear lookup tables
     ignored_files = {}
-    
+
     -- Compile patterns from config
     compile_patterns()
 
@@ -234,22 +234,22 @@ function coverage.init()
   end)
 
   if not success then
-    error_handler.throw("Failed to initialize coverage system: " .. err.message, 
+    error_handler.throw("Failed to initialize coverage system: " .. err.message,
       error_handler.CATEGORY.RUNTIME,
       error_handler.SEVERITY.ERROR,
       {error = err}
     )
     return false
   end
-  
+
   return true
-}
+end
 
 -- Check if debug hooks are per-thread
 function coverage.has_hook_per_thread()
   -- Get current hook
   local old_hook = debug.gethook()
-  
+
   -- Set a test hook
   local test_hook = function() end
   debug.sethook(test_hook, "l")
@@ -271,16 +271,77 @@ function coverage.pause()
   state.paused = true
 end
 
--- Resume coverage collection  
+-- Resume coverage collection
 function coverage.resume()
   state.paused = false
 end
+
+--- Save collected coverage statistics to a file
+-- @return boolean success Whether stats were saved successfully
+-- @return string|nil error Error message if saving failed
+function coverage.save_stats()
+  -- Always try to save stats even if buffer is small
+  if state.buffer.size == 0 and state.buffer.changes == 0 then
+    return true -- Nothing to save
+  end
+
+  -- Get config
+  local config = central_config.get("coverage")
+  if not config then
+    return false, "Coverage configuration not found"
+  end
+
+  local statsfile = config.statsfile
+  if not statsfile then
+    return false, "Stats file path not configured"
+  end
+
+  -- Create temp file for atomic write
+  local temp_stats = temp_file.create_temp_file("coverage-stats")
+  if not temp_stats then
+    return false, "Failed to create temporary stats file"
+  end
+
+  -- Write file header
+  local ok, write_err = filesystem.write_file(temp_stats, STATS_FILE_HEADER)
+  if not ok then
+    temp_file.remove(temp_stats)
+    return false, write_err
+  end
+
+  local success, err = error_handler.try(function()
+    -- Load existing stats if they exist
+    local old_stats = coverage.load_stats() or {}
+
+    -- Merge current stats with old stats
+    for name, data in pairs(state.data) do
+      old_stats[name] = old_stats[name] or {}
+      local file_data = old_stats[name]
+      
+      -- Update file stats
+      file_data.max = math.max(file_data.max or 0, data.max or 0)
+      file_data.max_hits = math.max(file_data.max_hits or 0, data.max_hits or 0)
+      
+      -- Merge line hits
+      for line, hits in pairs(data) do
+        if type(line) == "number" then
+          file_data[line] = (file_data[line] or 0) + hits
+        end
+      end
+    end
+
+    -- Sort filenames for consistent output
+    local filenames = {}
+    for name in pairs(old_stats) do
+      table.insert(filenames, name)
+    end
+    table.sort(filenames)
 
     local content = {}
     for _, name in ipairs(filenames) do
       local file_data = old_stats[name]
       table.insert(content, string.format("%d:%s\n", file_data.max, name))
-      
+
       local line_stats = {}
       for i = 1, file_data.max do
         table.insert(line_stats, tostring(file_data[i] or 0))
@@ -318,7 +379,7 @@ end
 -- Load coverage stats from file
 function coverage.load_stats()
   local statsfile = central_config.get("coverage.statsfile")
-  
+
   -- Check if stats file exists
   if not filesystem.file_exists(statsfile) then
     return nil

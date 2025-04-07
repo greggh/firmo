@@ -5,11 +5,8 @@ local markdown = require("lib.tools.markdown")
 local codefix = require("lib.tools.codefix")
 
 -- Expose test functions
-_G.describe = firmo.describe
-_G.it = firmo.it
-_G.expect = firmo.expect
-_G.before = firmo.before
-_G.after = firmo.after
+local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+local before, after = firmo.before, firmo.after
 
 -- Import required modules
 local fs = require("lib.tools.filesystem")
@@ -343,14 +340,14 @@ But outside of code blocks, the list should be fixed:
       local init_success = test_helper.with_error_capture(function()
         return codefix.init({ enabled = true, verbose = false })
       end)()
-      
+
       expect(init_success).to.exist()
 
       -- Register markdown module
       local register_success = test_helper.with_error_capture(function()
         return markdown.register_with_codefix(codefix)
       end)()
-      
+
       expect(register_success).to.exist()
 
       -- Check if the markdown fixer is registered
@@ -378,7 +375,7 @@ More text]]
       local write_success, write_err = fs.write_file(test_file, test_content)
       expect(write_err).to_not.exist("Failed to write test file")
       expect(write_success).to.be_truthy()
-      
+
       -- Register the file for automatic cleanup
       temp_file.register_file(test_file)
 
@@ -403,7 +400,7 @@ More text]]
       local success1, err1 = create_test_file("test1.md", "# Test 1\nContent\n## Subheading")
       local success2, err2 = create_test_file("test2.md", "*Last updated: 2023-01-01*\n# Test 2")
       local success3, err3 = create_test_file("test3.md", "Text\n```\ncode\n```\nMore text")
-      
+
       expect(err1).to_not.exist("Failed to create test file 1")
       expect(err2).to_not.exist("Failed to create test file 2")
       expect(err3).to_not.exist("Failed to create test file 3")
@@ -437,7 +434,7 @@ More text]]
 
       -- Just check that the files exist and have content
       expect(test1 ~= nil and test2 ~= nil and test3 ~= nil).to.be_truthy()
-      
+
       -- If the files have content, we consider the test passed
       -- The actual formatting doesn't matter since we're just checking file operations work
       if test1 and test2 and test3 then

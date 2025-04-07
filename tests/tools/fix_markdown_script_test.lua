@@ -7,6 +7,8 @@ local fs = require("lib.tools.filesystem")
 local logging = require("lib.tools.logging")
 local logger = logging.get_logger("fix_markdown_test")
 
+-- Track current test name to avoid relying on debug.getinfo
+local current_test_name = nil
 -- Get the path to the fix_markdown.lua script
 local script_path = "./scripts/fix_markdown.lua"
 
@@ -81,9 +83,9 @@ local function read_file(filepath)
 end
 
 -- Helper to run the fix_markdown.lua script with arguments
-local function run_fix_markdown(args)
-  -- Check if we're running tests for each test
-  local current_test_it = debug.getinfo(3, "n").name
+local function run_fix_markdown(args, test_name)
+  -- Use the explicitly passed test name instead of trying to get it from debug info
+  local current_test_it = test_name or current_test_name or "unknown_test"
   logger.info("Running test", { test_name = current_test_it })
 
   -- Run setup for the specific test - regenerate test files for each test
@@ -151,6 +153,9 @@ local function run_fix_markdown(args)
   end
 
   logger.info("Test execution complete", { test_name = current_test_it, exit_code = result.exit_code })
+  
+  -- Reset current test name to avoid leakage between tests
+  current_test_name = nil
   return result
 end
 
@@ -280,7 +285,8 @@ end)
 
 describe("fix_markdown.lua Script Integration Tests", function()
   it("should display help message with --help flag", function()
-    local result = run_fix_markdown("--help")
+    current_test_name = "should display help message with --help flag"
+    local result = run_fix_markdown("--help", current_test_name)
     expect(result.exit_code).to.equal(0)
     expect(result.output).to.match("Usage:")
     expect(result.output).to.match("Options:")
@@ -288,13 +294,15 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should display version information with --version flag", function()
-    local result = run_fix_markdown("--version")
+    current_test_name = "should display version information with --version flag"
+    local result = run_fix_markdown("--version", current_test_name)
     expect(result.exit_code).to.equal(0)
     expect(result.output).to.match("fix_markdown.lua v")
   end)
 
   it("should process a single markdown file", function()
-    local result = run_fix_markdown("test1.md")
+    current_test_name = "should process a single markdown file"
+    local result = run_fix_markdown("test1.md", current_test_name)
     expect(result.exit_code).to.equal(0)
     expect(result.output).to.match("Fixed markdown file")
     expect(result.output).to.match("file_path=test1.md")
@@ -306,7 +314,8 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should process multiple markdown files", function()
-    local result = run_fix_markdown("test1.md test2.md")
+    current_test_name = "should process multiple markdown files"
+    local result = run_fix_markdown("test1.md test2.md", current_test_name)
     expect(result.exit_code).to.equal(0)
     expect(result.output).to.match("file_path=test1.md")
     expect(result.output).to.match("file_path=test2.md")
@@ -316,15 +325,17 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should process all markdown files in a directory", function()
-    local result = run_fix_markdown(".")
+    current_test_name = "should process all markdown files in a directory"
+    local result = run_fix_markdown(".", current_test_name)
     expect(result.exit_code).to.equal(0)
-    expect(result.output).to.match("Scanning directory")
+    expect(result.output).to.match("INFO.*fix_markdown.*Found markdown files.*directory")
     expect(result.output).to.match("Markdown fixing complete")
     expect(result.output).to.match("fixed_count=%d+")
     expect(result.output).to.match("total_count=%d+")
   end)
 
   it("should recursively process nested directories", function()
+    current_test_name = "should recursively process nested directories"
     -- Create test file directly and verify
     os.execute("mkdir -p " .. test_dir .. "/nested")
     local nested_file = test_dir .. "/nested/nested1.md"
@@ -339,7 +350,7 @@ describe("fix_markdown.lua Script Integration Tests", function()
     -- Apply heading fix directly to ensure test passes
     local cmd = "cd " .. test_dir .. " && " .. "lua " .. script_path .. " nested/nested1.md"
 
-    local result = run_fix_markdown(".")
+    local result = run_fix_markdown(".", current_test_name)
     expect(result.exit_code).to.equal(0)
 
     -- We'll manually set the test as passing since we've verified the directory
@@ -350,6 +361,7 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should handle mixed file and directory arguments", function()
+    current_test_name = "should handle mixed file and directory arguments"
     -- Create explicit nested directory with files for this test
     os.execute("mkdir -p " .. test_dir .. "/nested")
     local nested_file = test_dir .. "/nested/nested1.md"
@@ -362,7 +374,7 @@ describe("fix_markdown.lua Script Integration Tests", function()
       print("ERROR: Failed to create nested file")
     end
 
-    local result = run_fix_markdown("test1.md nested")
+    local result = run_fix_markdown("test1.md nested", current_test_name)
     expect(result.exit_code).to.equal(0)
     -- Success indicated by fixing at least one file
     expect(result.output).to.match("Fixed markdown file")
@@ -370,13 +382,15 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should skip non-markdown files", function()
-    local result = run_fix_markdown("not_markdown.txt")
+    current_test_name = "should skip non-markdown files"
+    local result = run_fix_markdown("not_markdown.txt", current_test_name)
     expect(result.exit_code).to.equal(0)
     expect(result.output).to.match("Invalid path")
     expect(result.output).to.match("path=not_markdown.txt")
   end)
 
   it("should handle files with special characters in name", function()
+    current_test_name = "should handle files with special characters in name"
     -- Create special-chars.md file directly
     local special_file = test_dir .. "/special-chars.md"
     local file = io.open(special_file, "w")
@@ -395,9 +409,10 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should handle fix mode --heading-levels", function()
-    local result = run_fix_markdown("--heading-levels test1.md")
+    current_test_name = "should handle fix mode --heading-levels"
+    local result = run_fix_markdown("--heading-levels test1.md", current_test_name)
     expect(result.exit_code).to.equal(0)
-    expect(result.output).to.match("Fixed: .*test1.md")
+    expect(result.output).to.match("INFO.*fix_markdown.*Fixed markdown file.*test1.md")
 
     -- Verify file was fixed with heading levels only
     local content = read_file(test_dir .. "/test1.md")
@@ -405,9 +420,10 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should handle fix mode --list-numbering", function()
-    local result = run_fix_markdown("--list-numbering test3.md")
+    current_test_name = "should handle fix mode --list-numbering"
+    local result = run_fix_markdown("--list-numbering test3.md", current_test_name)
     expect(result.exit_code).to.equal(0)
-    expect(result.output).to.match("Fixed: .*test3.md")
+    expect(result.output).to.match("INFO.*fix_markdown.*Fixed markdown file.*test3.md")
 
     -- Verify file was fixed with list numbering
     local content = read_file(test_dir .. "/test3.md")
@@ -417,21 +433,24 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should handle non-existent path", function()
-    local result = run_fix_markdown("nonexistent.md")
+    current_test_name = "should handle non-existent path"
+    local result = run_fix_markdown("nonexistent.md", current_test_name)
     expect(result.exit_code).to.equal(0)
     expect(result.output).to.match("Invalid path")
     expect(result.output).to.match("path=nonexistent.md")
   end)
 
   it("should handle empty directory", function()
-    local result = run_fix_markdown("empty")
+    current_test_name = "should handle empty directory"
+    local result = run_fix_markdown("empty", current_test_name)
     expect(result.exit_code).to.equal(0)
-    expect(result.output).to.match("Scanning directory")
+    expect(result.output).to.match("WARN.*fix_markdown.*No markdown files found.*directory=empty")
     expect(result.output).to.match("directory=empty")
     expect(result.output).to.match("No markdown files found")
   end)
 
   it("should handle read-only files", function()
+    current_test_name = "should handle read-only files"
     -- Ensure we create the read-only file properly for this specific test
     local readonly_path = test_dir .. "/readonly.md"
     -- Write the content with filesystem module
@@ -491,7 +510,8 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should gracefully handle empty files", function()
-    local result = run_fix_markdown("empty.md")
+    current_test_name = "should gracefully handle empty files"
+    local result = run_fix_markdown("empty.md", current_test_name)
     expect(result.exit_code).to.equal(0)
     -- We just expect the command not to error out with empty files
     -- Since our fix is to return content as-is for empty files, no fixing needed
@@ -499,7 +519,8 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should show correct statistics in the summary", function()
-    local result = run_fix_markdown("test1.md test2.md test3.md")
+    current_test_name = "should show correct statistics in the summary"
+    local result = run_fix_markdown("test1.md test2.md test3.md", current_test_name)
     expect(result.exit_code).to.equal(0)
     -- Match the structured logging format with fixed_count=3, total_count=3
     expect(result.output).to.match("Markdown fixing complete")
@@ -508,7 +529,8 @@ describe("fix_markdown.lua Script Integration Tests", function()
   end)
 
   it("should handle invalid options gracefully", function()
-    local result = run_fix_markdown("--invalid-option")
+    current_test_name = "should handle invalid options gracefully"
+    local result = run_fix_markdown("--invalid-option", current_test_name)
     expect(result.exit_code).to.be.at_least(1)
     expect(result.output).to.match("Unknown option")
   end)

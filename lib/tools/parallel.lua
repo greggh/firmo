@@ -28,14 +28,14 @@ local logger = logging.get_logger("parallel")
 
 -- Default configuration
 local DEFAULT_CONFIG = {
-  workers = 4,                 -- Default number of worker processes
-  timeout = 60,                -- Default timeout in seconds per test file
-  output_buffer_size = 10240,  -- Buffer size for capturing output
-  verbose = false,             -- Verbose output flag
-  show_worker_output = true,   -- Show output from worker processes
-  fail_fast = false,           -- Stop on first failure
-  aggregate_coverage = true,   -- Combine coverage data from all workers
-  debug = false,               -- Debug mode
+  workers = 4, -- Default number of worker processes
+  timeout = 60, -- Default timeout in seconds per test file
+  output_buffer_size = 10240, -- Buffer size for capturing output
+  verbose = false, -- Verbose output flag
+  show_worker_output = true, -- Show output from worker processes
+  fail_fast = false, -- Stop on first failure
+  aggregate_coverage = true, -- Combine coverage data from all workers
+  debug = false, -- Debug mode
 }
 
 -- Current configuration (will be synchronized with central config)
@@ -59,7 +59,7 @@ local function get_central_config()
     local success, central_config = pcall(require, "lib.core.central_config")
     if success then
       _central_config = central_config
-      
+
       -- Register this module with central_config
       _central_config.register_module("parallel", {
         -- Schema
@@ -71,25 +71,25 @@ local function get_central_config()
           show_worker_output = "boolean",
           fail_fast = "boolean",
           aggregate_coverage = "boolean",
-          debug = "boolean"
+          debug = "boolean",
         },
         field_ranges = {
-          workers = {min = 1, max = 64},
-          timeout = {min = 1},
-          output_buffer_size = {min = 1024}
-        }
+          workers = { min = 1, max = 64 },
+          timeout = { min = 1 },
+          output_buffer_size = { min = 1024 },
+        },
       }, DEFAULT_CONFIG)
-      
+
       logger.debug("Successfully loaded central_config", {
-        module = "parallel"
+        module = "parallel",
       })
     else
       logger.debug("Failed to load central_config", {
-        error = tostring(central_config)
+        error = tostring(central_config),
       })
     end
   end
-  
+
   return _central_config
 end
 
@@ -100,14 +100,14 @@ local function register_change_listener()
     logger.debug("Cannot register change listener - central_config not available")
     return false
   end
-  
+
   -- Register change listener for parallel configuration
   central_config.on_change("parallel", function(path, old_value, new_value)
     logger.debug("Configuration change detected", {
       path = path,
-      changed_by = "central_config"
+      changed_by = "central_config",
     })
-    
+
     -- Update local configuration from central_config
     local parallel_config = central_config.get("parallel")
     if parallel_config then
@@ -117,23 +117,23 @@ local function register_change_listener()
           parallel.options[key] = value
           logger.debug("Updated configuration from central_config", {
             key = key,
-            value = value
+            value = value,
           })
         end
       end
-      
+
       -- Update logging configuration if debug/verbose changed
       if parallel.options.debug ~= nil or parallel.options.verbose ~= nil then
         logging.configure_from_options("parallel", {
           debug = parallel.options.debug,
-          verbose = parallel.options.verbose
+          verbose = parallel.options.verbose,
         })
       end
-      
+
       logger.debug("Applied configuration changes from central_config")
     end
   end)
-  
+
   logger.debug("Registered change listener for central configuration")
   return true
 end
@@ -144,29 +144,27 @@ end
 ---@return parallel_module The module instance for method chaining
 function parallel.configure(options)
   options = options or {}
-  
+
   logger.debug("Configuring parallel module", {
-    options = options
+    options = options,
   })
-  
+
   -- Check for central configuration first
   local central_config = get_central_config()
   if central_config then
     -- Get existing central config values
     local parallel_config = central_config.get("parallel")
-    
+
     -- Apply central configuration (with defaults as fallback)
     if parallel_config then
       logger.debug("Using central_config values for initialization", {
         workers = parallel_config.workers,
-        timeout = parallel_config.timeout
+        timeout = parallel_config.timeout,
       })
-      
+
       -- Apply each configuration option with fallbacks to defaults
       for key, default_value in pairs(DEFAULT_CONFIG) do
-        parallel.options[key] = parallel_config[key] ~= nil
-                              and parallel_config[key]
-                              or default_value
+        parallel.options[key] = parallel_config[key] ~= nil and parallel_config[key] or default_value
       end
     else
       logger.debug("No central_config values found, using defaults")
@@ -175,7 +173,7 @@ function parallel.configure(options)
         parallel.options[key] = value
       end
     end
-    
+
     -- Register change listener if not already done
     register_change_listener()
   else
@@ -185,26 +183,26 @@ function parallel.configure(options)
       parallel.options[key] = value
     end
   end
-  
+
   -- Apply user options (highest priority) and update central config
   for key, value in pairs(options) do
     if parallel.options[key] ~= nil then
       -- Apply local option
       parallel.options[key] = value
-      
+
       -- Update central_config if available
       if central_config then
         central_config.set("parallel." .. key, value)
       end
     end
   end
-  
+
   -- Configure logging
   logging.configure_from_options("parallel", {
     debug = parallel.options.debug,
-    verbose = parallel.options.verbose
+    verbose = parallel.options.verbose,
   })
-  
+
   logger.debug("Parallel module configuration complete", {
     workers = parallel.options.workers,
     timeout = parallel.options.timeout,
@@ -214,9 +212,9 @@ function parallel.configure(options)
     fail_fast = parallel.options.fail_fast,
     aggregate_coverage = parallel.options.aggregate_coverage,
     debug = parallel.options.debug,
-    using_central_config = central_config ~= nil
+    using_central_config = central_config ~= nil,
   })
-  
+
   return parallel
 end
 
@@ -251,30 +249,30 @@ function Results:add_file_result(file, result, output)
   self.failed = self.failed + result.failed
   self.skipped = self.skipped + result.skipped
   self.pending = self.pending + result.pending
-  
+
   if result.elapsed then
     self.elapsed = self.elapsed + result.elapsed
   end
-  
+
   -- Add file to list of run files
   table.insert(self.files_run, file)
-  
+
   -- Store the worker output
   if output then
     table.insert(self.worker_outputs, output)
   end
-  
+
   -- Add any errors
   if result.errors and #result.errors > 0 then
     for _, err in ipairs(result.errors) do
       table.insert(self.errors, {
         file = file,
         message = err.message,
-        traceback = err.traceback
+        traceback = err.traceback,
       })
     end
   end
-  
+
   -- Add coverage data if available
   if result.coverage and parallel.options.aggregate_coverage then
     for file_path, file_data in pairs(result.coverage) do
@@ -288,7 +286,7 @@ function Results:add_file_result(file, result, output)
             self.coverage[file_path].lines[line] = (self.coverage[file_path].lines[line] or 0) + count
           end
         end
-        
+
         -- Merge function coverage
         if file_data.functions then
           for func, count in pairs(file_data.functions) do
@@ -304,72 +302,72 @@ end
 local function run_test_file(file, options)
   -- Build command to run test file
   local cmd = "lua " .. file
-  
+
   -- Add coverage option if enabled
   if options.coverage then
     cmd = cmd .. " --coverage"
   end
-  
+
   -- Add tag filters if specified
   if options.tags and #options.tags > 0 then
     for _, tag in ipairs(options.tags) do
       cmd = cmd .. " --tag " .. tag
     end
   end
-  
+
   -- Add filter pattern if specified
   if options.filter then
-    cmd = cmd .. " --filter \"" .. options.filter .. "\""
+    cmd = cmd .. ' --filter "' .. options.filter .. '"'
   end
-  
+
   -- Add option to output results as JSON for parsing
   cmd = cmd .. " --results-format json"
-  
+
   -- Add timeout
   local timeout_cmd = ""
-  if package.config:sub(1,1) == "\\" then
+  if package.config:sub(1, 1) == "\\" then
     -- Windows - timeout not directly available, but we can use timeout.exe from coreutils if available
     timeout_cmd = "timeout " .. options.timeout .. " "
   else
     -- Unix systems have timeout command
     timeout_cmd = "timeout " .. options.timeout .. " "
   end
-  
+
   -- Combine commands
   cmd = timeout_cmd .. cmd
-  
+
   -- Execute command and capture output
   local start_time = os.clock()
   local temp_file = require("lib.tools.temp_file")
   local result_file = temp_file.generate_temp_path("out")
   temp_file.register_file(result_file)
-  
+
   -- Redirect output to temporary file to capture it
   cmd = cmd .. " > " .. result_file .. " 2>&1"
-  
+
   if options.verbose then
-    logger.debug("Running test file", {command = cmd, file = file})
+    logger.debug("Running test file", { command = cmd, file = file })
     -- Keep console output for verbose mode
     io.write("Running: " .. cmd .. "\n")
   else
-    logger.debug("Running test file", {file = file})
+    logger.debug("Running test file", { file = file })
   end
-  
+
   -- Execute the command
   local exit_code = os.execute(cmd)
   local elapsed = os.clock() - start_time
-  
+
   -- Read the command output
   local output = ""
   local content, err = fs.read_file(result_file)
   if content then
     output = content
-    -- No need to delete the file manually - it will be automatically cleaned up 
+    -- No need to delete the file manually - it will be automatically cleaned up
     -- by the temp_file management system
   else
-    logger.warn("Failed to read result file", {file = result_file, error = err})
+    logger.warn("Failed to read result file", { file = result_file, error = err })
   end
-  
+
   -- Parse the JSON results from the output
   local result = {
     total = 0,
@@ -379,18 +377,18 @@ local function run_test_file(file, options)
     pending = 0,
     errors = {},
     elapsed = elapsed,
-    success = exit_code == 0 or exit_code == true
+    success = exit_code == 0 or exit_code == true,
   }
-  
+
   -- Extract JSON data from the output if present
   local json_data = output:match("RESULTS_JSON_BEGIN(.-)RESULTS_JSON_END")
-  
+
   -- Alternative approach: Count results directly from the output
   local clean_output = output:gsub("\027%[[^m]*m", "") -- Remove ANSI color codes
   local pass_count = 0
   local fail_count = 0
   local skip_count = 0
-  
+
   for line in clean_output:gmatch("[^\r\n]+") do
     if line:match("PASS%s+should") then
       pass_count = pass_count + 1
@@ -400,13 +398,13 @@ local function run_test_file(file, options)
       skip_count = skip_count + 1
     end
   end
-  
+
   -- Update result with counted data
   result.total = pass_count + fail_count + skip_count
   result.passed = pass_count
   result.failed = fail_count
   result.skipped = skip_count
-  
+
   -- Also try to extract error messages
   for line in clean_output:gmatch("[^\r\n]+") do
     if line:match("FAIL%s+should") then
@@ -414,17 +412,17 @@ local function run_test_file(file, options)
       if error_msg then
         table.insert(result.errors, {
           message = "Test failed: " .. error_msg,
-          traceback = ""
+          traceback = "",
         })
       end
     end
   end
-  
+
   return {
     result = result,
     output = output,
     elapsed = elapsed,
-    success = exit_code == 0 or exit_code == true
+    success = exit_code == 0 or exit_code == true,
   }
 end
 
@@ -435,34 +433,34 @@ end
 ---@return table results Combined results from all test runs
 function parallel.run_tests(files, options)
   options = options or {}
-  
+
   -- Merge with default options
   for k, v in pairs(parallel.options) do
     if options[k] == nil then
       options[k] = v
     end
   end
-  
+
   logger.info("Starting parallel test execution", {
     file_count = #files,
     worker_count = options.workers,
     timeout = options.timeout,
-    fail_fast = options.fail_fast
+    fail_fast = options.fail_fast,
   })
-  
+
   if options.verbose then
     io.write("Running " .. #files .. " test files with " .. options.workers .. " workers\n")
   end
-  
+
   -- Create results object
   local results = Results.new()
   local start_time = os.clock()
-  
+
   -- Set up worker tracking
   local next_file = 1
   local active_workers = 0
   local failures = 0
-  
+
   -- Process test files in batches
   while next_file <= #files or active_workers > 0 do
     -- Start new workers until we reach the maximum or run out of files
@@ -470,32 +468,32 @@ function parallel.run_tests(files, options)
       local file = files[next_file]
       next_file = next_file + 1
       active_workers = active_workers + 1
-      
+
       if options.verbose then
-        logger.debug("Starting worker", {file = file, worker_id = active_workers})
+        logger.debug("Starting worker", { file = file, worker_id = active_workers })
         io.write("Starting worker for: " .. file .. "\n")
       end
-      
+
       -- Run the test file and process results
       local worker_result = run_test_file(file, options)
-      
+
       -- Log worker completion
       logger.debug("Worker completed", {
         file = file,
         success = worker_result.success,
-        elapsed = worker_result.elapsed
+        elapsed = worker_result.elapsed,
       })
-      
+
       -- Show worker output if requested
       if options.show_worker_output then
         io.write("\n--- Output from " .. file .. " ---\n")
         io.write(worker_result.output .. "\n")
         io.write("--- End output from " .. file .. " ---\n\n")
       end
-      
+
       -- Add results to aggregated results
       results:add_file_result(file, worker_result.result, worker_result.output)
-      
+
       -- Check for failure
       if not worker_result.success then
         failures = failures + 1
@@ -503,45 +501,47 @@ function parallel.run_tests(files, options)
           logger.warn("Stopping parallel execution due to failure", {
             fail_fast = true,
             failure_count = failures,
-            file = file
+            file = file,
           })
-          
+
           if options.verbose then
             io.write("Stopping due to failure (fail_fast is enabled)\n")
           end
           break
         end
       end
-      
+
       -- Decrement active workers counter
       active_workers = active_workers - 1
-      
+
       -- Add a small sleep to allow other processes to run
       local function sleep(ms)
         local start = os.clock()
-        while os.clock() - start < ms/1000 do end
+        while os.clock() - start < ms / 1000 do
+        end
       end
       sleep(10) -- 10ms
     end
-    
+
     -- If we're stopping due to failure, break the loop
     if options.fail_fast and failures > 0 then
       break
     end
-    
+
     -- Small sleep to prevent CPU hogging
     if active_workers > 0 then
       local function sleep(ms)
         local start = os.clock()
-        while os.clock() - start < ms/1000 do end
+        while os.clock() - start < ms / 1000 do
+        end
       end
       sleep(50) -- 50ms
     end
   end
-  
+
   -- Calculate total elapsed time
   results.elapsed = os.clock() - start_time
-  
+
   return results
 end
 
@@ -552,10 +552,10 @@ end
 function parallel.register_with_firmo(firmo)
   -- Store reference to firmo
   parallel.firmo = firmo
-  
+
   -- Add parallel functionality to firmo
   firmo.parallel = parallel
-  
+
   -- Add CLI options for parallel execution
   local original_cli_run = firmo.cli_run
   if original_cli_run then
@@ -568,35 +568,35 @@ function parallel.register_with_firmo(firmo)
         verbose = parallel.options.verbose,
         show_worker_output = parallel.options.show_worker_output,
         fail_fast = parallel.options.fail_fast,
-        aggregate_coverage = parallel.options.aggregate_coverage
+        aggregate_coverage = parallel.options.aggregate_coverage,
       }
-      
+
       local i = 1
       while i <= #args do
         local arg = args[i]
-        
+
         if arg == "--parallel" or arg == "-p" then
           parallel_options.enabled = true
           i = i + 1
-        elseif arg == "--workers" or arg == "-w" and args[i+1] then
-          parallel_options.workers = tonumber(args[i+1]) or parallel.options.workers
+        elseif arg == "--workers" or arg == "-w" and args[i + 1] then
+          parallel_options.workers = tonumber(args[i + 1]) or parallel.options.workers
           -- Update central_config if available
           local central_config = get_central_config()
           if central_config and parallel_options.workers then
             central_config.set("parallel.workers", parallel_options.workers)
             logger.debug("Updated workers in central_config from CLI", {
-              workers = parallel_options.workers
+              workers = parallel_options.workers,
             })
           end
           i = i + 2
-        elseif arg == "--timeout" and args[i+1] then
-          parallel_options.timeout = tonumber(args[i+1]) or parallel.options.timeout
+        elseif arg == "--timeout" and args[i + 1] then
+          parallel_options.timeout = tonumber(args[i + 1]) or parallel.options.timeout
           -- Update central_config if available
           local central_config = get_central_config()
           if central_config and parallel_options.timeout then
             central_config.set("parallel.timeout", parallel_options.timeout)
             logger.debug("Updated timeout in central_config from CLI", {
-              timeout = parallel_options.timeout
+              timeout = parallel_options.timeout,
             })
           end
           i = i + 2
@@ -640,15 +640,15 @@ function parallel.register_with_firmo(firmo)
           i = i + 1
         end
       end
-      
+
       -- If parallel mode is not enabled, use the original cli_run
       if not parallel_options.enabled then
         return original_cli_run(args)
       end
-      
+
       -- If we get here, we're running in parallel mode
       local options = firmo.parse_cli_options(args)
-      
+
       -- Discover test files
       local files
       if #options.files > 0 then
@@ -656,24 +656,24 @@ function parallel.register_with_firmo(firmo)
       else
         files = firmo.discover(options.dir, options.pattern)
       end
-      
+
       if #files == 0 then
         logger.warn("No test files found for parallel execution")
         io.write("No test files found\n")
         return false
       end
-      
+
       logger.info("Starting CLI parallel test execution", {
         file_count = #files,
         worker_count = parallel_options.workers,
         timeout = parallel_options.timeout,
         coverage_enabled = options.coverage,
         tags = options.tags,
-        filter = options.filter
+        filter = options.filter,
       })
-      
+
       io.write("Running " .. #files .. " test files in parallel with " .. parallel_options.workers .. " workers\n")
-      
+
       -- Run tests in parallel
       local results = parallel.run_tests(files, {
         workers = parallel_options.workers,
@@ -684,9 +684,9 @@ function parallel.register_with_firmo(firmo)
         aggregate_coverage = parallel_options.aggregate_coverage,
         coverage = options.coverage,
         tags = options.tags,
-        filter = options.filter
+        filter = options.filter,
       })
-      
+
       -- Log summary results
       logger.info("Parallel test execution completed", {
         files_tested = #results.files_run,
@@ -696,9 +696,9 @@ function parallel.register_with_firmo(firmo)
         skipped = results.skipped,
         pending = results.pending,
         elapsed_seconds = results.elapsed,
-        error_count = #results.errors
+        error_count = #results.errors,
       })
-      
+
       -- Display summary for console
       io.write("\nParallel Test Summary:\n")
       io.write("  Files tested: " .. #results.files_run .. "\n")
@@ -708,19 +708,19 @@ function parallel.register_with_firmo(firmo)
       io.write("  Skipped: " .. results.skipped .. "\n")
       io.write("  Pending: " .. results.pending .. "\n")
       io.write("  Total time: " .. string.format("%.2f", results.elapsed) .. " seconds\n")
-      
+
       -- Log and display errors
       if #results.errors > 0 then
         -- Log errors with detailed information
         for i, err in ipairs(results.errors) do
           logger.error("Test failure in parallel execution", {
             index = i,
-            file = err.file, 
+            file = err.file,
             message = err.message,
-            traceback = err.traceback
+            traceback = err.traceback,
           })
         end
-        
+
         -- Display errors in console
         io.write("\nErrors:\n")
         for i, err in ipairs(results.errors) do
@@ -731,7 +731,7 @@ function parallel.register_with_firmo(firmo)
           end
         end
       end
-      
+
       -- Generate reports if coverage was enabled
       if options.coverage and parallel_options.aggregate_coverage and firmo.coverage then
         -- Convert coverage data to the format expected by the reporting module
@@ -743,29 +743,29 @@ function parallel.register_with_firmo(firmo)
             total_lines = 0,
             covered_lines = 0,
             total_functions = 0,
-            covered_functions = 0
-          }
+            covered_functions = 0,
+          },
         }
-        
+
         -- Generate reports
         if firmo.reporting then
           local report_config = firmo.report_config or {}
-          
+
           logger.info("Generating coverage reports from parallel execution", {
             report_config = report_config,
-            files_to_report = coverage_data.summary.total_files
+            files_to_report = coverage_data.summary.total_files,
           })
-          
+
           firmo.reporting.auto_save_reports(coverage_data, nil, nil, report_config)
           io.write("\nCoverage reports generated from parallel execution\n")
         end
       end
-      
+
       -- Return success status
       return results.failed == 0
     end
   end
-  
+
   -- Parse CLI options - helper function used by parallel mode
   function firmo.parse_cli_options(args)
     local options = {
@@ -790,13 +790,13 @@ function parallel.register_with_firmo(firmo)
       formatter_module = nil,
       coverage_format = nil,
       quality_format = nil,
-      results_format = nil
+      results_format = nil,
     }
-    
+
     local i = 1
     while i <= #args do
       local arg = args[i]
-      
+
       if arg == "--coverage" or arg == "-c" then
         options.coverage = true
         i = i + 1
@@ -804,8 +804,8 @@ function parallel.register_with_firmo(firmo)
         options.quality = true
         i = i + 1
       elseif arg == "--quality-level" or arg == "-ql" then
-        if args[i+1] then
-          options.quality_level = tonumber(args[i+1]) or 1
+        if args[i + 1] then
+          options.quality_level = tonumber(args[i + 1]) or 1
           i = i + 2
         else
           i = i + 1
@@ -817,70 +817,70 @@ function parallel.register_with_firmo(firmo)
         options.interactive = true
         i = i + 1
       elseif arg == "--format" or arg == "-f" then
-        if args[i+1] then
-          options.format = args[i+1]
+        if args[i + 1] then
+          options.format = args[i + 1]
           i = i + 2
         else
           i = i + 1
         end
       elseif arg == "--dir" or arg == "-d" then
-        if args[i+1] then
-          options.dir = args[i+1]
+        if args[i + 1] then
+          options.dir = args[i + 1]
           i = i + 2
         else
           i = i + 1
         end
       elseif arg == "--pattern" or arg == "-p" then
-        if args[i+1] then
-          options.pattern = args[i+1]
+        if args[i + 1] then
+          options.pattern = args[i + 1]
           i = i + 2
         else
           i = i + 1
         end
       elseif arg == "--tag" or arg == "-t" then
-        if args[i+1] then
-          table.insert(options.tags, args[i+1])
+        if args[i + 1] then
+          table.insert(options.tags, args[i + 1])
           i = i + 2
         else
           i = i + 1
         end
-      elseif arg == "--filter" and args[i+1] then
-        options.filter = args[i+1]
+      elseif arg == "--filter" and args[i + 1] then
+        options.filter = args[i + 1]
         i = i + 2
       -- Report configuration options
-      elseif arg == "--output-dir" and args[i+1] then
-        options.report_dir = args[i+1]
+      elseif arg == "--output-dir" and args[i + 1] then
+        options.report_dir = args[i + 1]
         i = i + 2
-      elseif arg == "--report-suffix" and args[i+1] then
-        options.report_suffix = args[i+1]
+      elseif arg == "--report-suffix" and args[i + 1] then
+        options.report_suffix = args[i + 1]
         i = i + 2
-      elseif arg == "--coverage-path" and args[i+1] then
-        options.coverage_path_template = args[i+1]
+      elseif arg == "--coverage-path" and args[i + 1] then
+        options.coverage_path_template = args[i + 1]
         i = i + 2
-      elseif arg == "--quality-path" and args[i+1] then
-        options.quality_path_template = args[i+1]
+      elseif arg == "--quality-path" and args[i + 1] then
+        options.quality_path_template = args[i + 1]
         i = i + 2
-      elseif arg == "--results-path" and args[i+1] then
-        options.results_path_template = args[i+1]
+      elseif arg == "--results-path" and args[i + 1] then
+        options.results_path_template = args[i + 1]
         i = i + 2
-      elseif arg == "--timestamp-format" and args[i+1] then
-        options.timestamp_format = args[i+1]
+      elseif arg == "--timestamp-format" and args[i + 1] then
+        options.timestamp_format = args[i + 1]
         i = i + 2
       elseif arg == "--verbose-reports" then
         options.verbose = true
         i = i + 1
       -- Custom formatter options
-      elseif arg == "--coverage-format" and args[i+1] then
-        options.coverage_format = args[i+1]
+      elseif arg == "--coverage-format" and args[i + 1] then
+        options.coverage_format = args[i + 1]
         i = i + 2
-      elseif arg == "--quality-format" and args[i+1] then
-        options.quality_format = args[i+1]
+      elseif arg == "--quality-format" and args[i + 1] then
+        options.quality_format = args[i + 1]
         i = i + 2
-      elseif arg == "--results-format" and args[i+1] then
-        options.results_format = args[i+1]
+      elseif arg == "--results-format" and args[i + 1] then
+        options.results_format = args[i + 1]
         i = i + 2
-      elseif arg == "--formatter-module" and args[i+1] then
-        options.formatter_module = args[i+1]
+      elseif arg == "--formatter-module" and args[i + 1] then
+        options.formatter_module = args[i + 1]
         i = i + 2
       elseif arg == "--help" or arg == "-h" then
         i = i + 1
@@ -893,18 +893,18 @@ function parallel.register_with_firmo(firmo)
         i = i + 1
       end
     end
-    
+
     return options
   end
-  
+
   -- Extend help text to include parallel options
   local original_show_help = firmo.show_help
   if original_show_help then
     firmo.show_help = function()
       original_show_help()
-      
+
       logger.debug("Displaying parallel execution help options")
-      
+
       logging.info("\nParallel Execution Options:")
       logging.info("  --parallel, -p            Run tests in parallel")
       logging.info("  --workers, -w <num>       Number of worker processes (default: 4)")
@@ -915,7 +915,7 @@ function parallel.register_with_firmo(firmo)
       logging.info("  --no-aggregate-coverage   Don't combine coverage data from workers")
     end
   end
-  
+
   return firmo
 end
 
@@ -924,12 +924,12 @@ end
 ---@return parallel_module The module instance for method chaining
 function parallel.reset()
   logger.debug("Resetting parallel module configuration to defaults")
-  
+
   -- Reset configuration to defaults
   for key, value in pairs(DEFAULT_CONFIG) do
     parallel.options[key] = value
   end
-  
+
   return parallel
 end
 
@@ -939,14 +939,14 @@ end
 function parallel.full_reset()
   -- Reset local configuration
   parallel.reset()
-  
+
   -- Reset central configuration if available
   local central_config = get_central_config()
   if central_config then
     central_config.reset("parallel")
     logger.debug("Reset central configuration for parallel module")
   end
-  
+
   return parallel
 end
 
@@ -957,24 +957,24 @@ function parallel.debug_config()
   local debug_info = {
     local_config = {},
     using_central_config = false,
-    central_config = nil
+    central_config = nil,
   }
-  
+
   -- Copy local configuration
   for key, value in pairs(parallel.options) do
     debug_info.local_config[key] = value
   end
-  
+
   -- Check for central_config
   local central_config = get_central_config()
   if central_config then
     debug_info.using_central_config = true
     debug_info.central_config = central_config.get("parallel")
   end
-  
+
   -- Display configuration
   logger.info("Parallel module configuration", debug_info)
-  
+
   return debug_info
 end
 
