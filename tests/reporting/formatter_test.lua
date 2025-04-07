@@ -673,4 +673,229 @@ describe("reporting formatter interface", function()
       expect(err).to.exist("Error should explain validation failure")
     end)
   end)
+  
+  describe("summary formatter", function()
+    it("formats basic coverage data", function()
+      local coverage_data = create_sample_coverage_data()
+      
+      -- Format with summary formatter
+      local output = reporting.format_coverage(coverage_data, "summary")
+      expect(output).to.exist()
+      
+      -- Verify basic output structure
+      if type(output) == "string" then
+        -- For legacy formatters returning strings
+        expect(output).to.match("Coverage Summary")
+        expect(output).to.match("Overall Coverage")
+        expect(output).to.match("Files:")
+        expect(output).to.match("Lines:")
+      elseif type(output) == "table" then
+        if output.output then
+          -- For structured formatters with output field
+          expect(output.output).to.match("Coverage Summary")
+          expect(output.output).to.match("Overall Coverage")
+          expect(output.output).to.match("Files:")
+          expect(output.output).to.match("Lines:")
+        end
+        
+        -- Verify structured data is included
+        expect(output.overall_pct).to.exist()
+        expect(output.total_files).to.equal(2)
+        expect(output.covered_files).to.equal(2)
+        expect(output.total_lines).to.exist()
+        expect(output.covered_lines).to.exist()
+      end
+    end)
+    
+    it("supports detailed file information for coverage", function()
+      -- Configure formatter for detailed output
+      reporting.configure_formatter("summary", { 
+        detailed = true,
+        show_files = true
+      })
+      
+      local coverage_data = create_sample_coverage_data()
+      
+      -- Format with summary formatter in detailed mode
+      local output = reporting.format_coverage(coverage_data, "summary")
+      expect(output).to.exist()
+      
+      -- Verify detailed output includes file information
+      if type(output) == "string" then
+        expect(output).to.match("File Details")
+        expect(output).to.match("test1.lua")
+        expect(output).to.match("test2.lua")
+      elseif type(output) == "table" and output.output then
+        expect(output.output).to.match("File Details")
+        expect(output.output).to.match("test1.lua")
+        expect(output.output).to.match("test2.lua")
+      end
+      
+      -- Reset formatter config
+      reporting.reset()
+    end)
+    
+    it("supports color configuration for coverage output", function()
+      -- Configure formatter with custom color thresholds
+      reporting.configure_formatter("summary", { 
+        colorize = true,
+        min_coverage_warn = 60,
+        min_coverage_ok = 80 
+      })
+      
+      local coverage_data = create_sample_coverage_data()
+      -- Adjust coverage to test color thresholds
+      coverage_data.summary.coverage_percent = 70
+      coverage_data.summary.overall_percent = 70
+      
+      -- Format with summary formatter
+      local output = reporting.format_coverage(coverage_data, "summary")
+      expect(output).to.exist()
+      
+      -- Color verification is limited in automated tests,
+      -- but we can check it doesn't crash with color enabled
+      expect(output).to.exist()
+      
+      -- Reset formatter config
+      reporting.reset()
+    end)
+    
+    it("handles invalid coverage data gracefully", function()
+      -- Create invalid coverage data
+      local invalid_data = {
+        -- Missing files and summary
+      }
+      
+      -- Format with summary formatter
+      local output = reporting.format_coverage(invalid_data, "summary")
+      expect(output).to.exist("Should handle invalid data gracefully")
+      
+      if type(output) == "string" then
+        expect(output).to.match("No coverage data available")
+      elseif type(output) == "table" then
+        if output.output then
+          expect(output.output).to.match("No coverage data available")
+        end
+        -- Verify it provides default values
+        expect(output.overall_pct).to.equal(0)
+        expect(output.total_files).to.equal(0)
+        expect(output.covered_files).to.equal(0)
+      end
+    end)
+    
+    it("formats basic quality data", function()
+      local quality_data = create_sample_quality_data()
+      
+      -- Format with summary formatter
+      local output = reporting.format_quality(quality_data, "summary")
+      expect(output).to.exist()
+      
+      -- Verify basic quality output
+      if type(output) == "string" then
+        expect(output).to.match("Quality Summary")
+        expect(output).to.match("Quality Level")
+        expect(output).to.match("good")  -- level_name from sample data
+        expect(output).to.match("Level 3")  -- level from sample data
+        expect(output).to.match("Quality Rating")
+        expect(output).to.match("Tests Analyzed")
+      elseif type(output) == "table" then
+        if output.output then
+          expect(output.output).to.match("Quality Summary")
+          expect(output.output).to.match("Quality Level")
+          expect(output.output).to.match("good")
+          expect(output.output).to.match("Level 3")
+          expect(output.output).to.match("Quality Rating")
+        end
+        
+        -- Verify structured data
+        expect(output.level).to.equal(3)
+        expect(output.level_name).to.equal("good")
+        expect(output.tests_analyzed).to.equal(2)
+        expect(output.quality_pct).to.equal(100)
+      end
+    end)
+    
+    it("supports detailed quality issue reporting", function()
+      -- Configure formatter for detailed output
+      reporting.configure_formatter("summary", { detailed = true })
+      
+      -- Create quality data with issues
+      local quality_data = create_sample_quality_data()
+      quality_data.summary.issues = {
+        { test = "test_function", issue = "Insufficient assertions" },
+        { test = "test_complex", issue = "Missing edge case coverage" }
+      }
+      
+      -- Format with summary formatter
+      local output = reporting.format_quality(quality_data, "summary")
+      expect(output).to.exist()
+      
+      -- Verify issues are included in detailed output
+      if type(output) == "string" then
+        expect(output).to.match("Quality Issues")
+        expect(output).to.match("test_function")
+        expect(output).to.match("Insufficient assertions")
+        expect(output).to.match("test_complex")
+      elseif type(output) == "table" and output.output then
+        expect(output.output).to.match("Quality Issues")
+        expect(output.output).to.match("test_function")
+        expect(output.output).to.match("Insufficient assertions")
+        expect(output.output).to.match("test_complex")
+      end
+      
+      -- Reset formatter config
+      reporting.reset()
+    end)
+    
+    it("handles invalid quality data gracefully", function()
+      -- Create invalid quality data
+      local invalid_data = {
+        -- Missing required fields
+      }
+      
+      -- Format with summary formatter
+      local output = reporting.format_quality(invalid_data, "summary")
+      expect(output).to.exist("Should handle invalid data gracefully")
+      
+      if type(output) == "string" then
+        expect(output).to.match("Quality Summary")
+        expect(output).to.match("No quality data available")
+      elseif type(output) == "table" then
+        if output.output then
+          expect(output.output).to.match("Quality Summary")
+          expect(output.output).to.match("No quality data available")
+        end
+        
+        -- Verify default values
+        expect(output.level).to.equal(0)
+        expect(output.level_name).to.equal("unknown")
+        expect(output.tests_analyzed).to.equal(0)
+        expect(output.quality_pct).to.equal(0)
+      end
+    end)
+    
+    it("supports file output for reports", function()
+      local coverage_data = create_sample_coverage_data()
+      local quality_data = create_sample_quality_data()
+      
+      -- Save coverage report
+      local coverage_file = temp_dir .. "/coverage-summary.txt"
+      local cov_success = reporting.save_coverage_report(coverage_file, coverage_data, "summary")
+      expect(cov_success).to.be_truthy()
+      expect(fs.file_exists(coverage_file)).to.be_truthy()
+      
+      -- Save quality report
+      local quality_file = temp_dir .. "/quality-summary.txt"
+      local qual_success = reporting.save_quality_report(quality_file, quality_data, "summary")
+      expect(qual_success).to.be_truthy()
+      expect(fs.file_exists(quality_file)).to.be_truthy()
+      
+      -- Verify file contents
+      local cov_content = fs.read_file(coverage_file)
+      expect(cov_content).to.match("Coverage Summary")
+      
+      local qual_content = fs.read_file(quality_file)
+      expect(qual_content).to.match("Quality Summary")
+    end)
+  end)
 end)

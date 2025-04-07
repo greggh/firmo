@@ -72,7 +72,6 @@ describe("Logging Formatter Integration Module", function()
     -- But we can ensure the function doesn't throw errors
   end)
 
-
   it("creates a log formatter", function()
     local log_formatter = formatter_integration.create_log_formatter()
 
@@ -90,39 +89,38 @@ describe("Logging Formatter Integration Module", function()
 
     local result = formatter_integration.integrate_with_reporting()
     expect(result).to.exist()
-    
+
     -- Verify enhanced reporting functions
     local reporting = require("lib.reporting")
     expect(reporting.test_start).to.be.a("function")
     expect(reporting.test_end).to.be.a("function")
     expect(reporting.generate).to.be.a("function")
   end)
-  
+
   it("creates JSON formatted output", function()
     local temp_dir = require("lib.tools.test_helper").create_temp_test_directory()
     local output_file = temp_dir.create_file("test_results.json", "")
-    
+
     local formatter = formatter_integration.create_log_formatter()
     expect(formatter).to.exist()
-    
+
     formatter:init({ format = "json", output_file = output_file })
-    
+
     local result = formatter:format({
       tests = {
-        { name = "test1", status = "passed", duration = 100 }
+        { name = "test1", status = "passed", duration = 100 },
       },
       total = 1,
       passed = 1,
       failed = 0,
       pending = 0,
       success_percent = 100,
-      duration = 100
+      duration = 100,
     })
-    
+
     expect(result).to.exist()
     expect(result.output_file).to.exist()
   end)
 
   -- Add more tests for other formatter integration functionality
-end)
 end)

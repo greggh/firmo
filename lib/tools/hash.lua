@@ -49,14 +49,29 @@ end
 function M.hash_file(path)
   local fs = require("lib.tools.filesystem")
 
+  -- Validate input
+  if type(path) ~= "string" then
+    return nil, error_handler.validation_error(
+      "File path must be a string",
+      {provided_type = type(path)}
+    )
+  end
+
   -- Read the file
   local content, err = fs.read_file(path)
   if not content then
-    logger.error("Failed to read file for hashing", {
-      path = path,
-      error = err
-    })
-    return nil, err
+    -- Create a proper error object using error_handler
+    local error_obj = error_handler.operation_error(
+      "Failed to read file for hashing",
+      {
+        path = path,
+        operation = "hash_file",
+        original_error = err
+      }
+    )
+    
+    logger.error(error_obj.message, error_obj.context)
+    return nil, error_obj
   end
 
   -- Hash the content

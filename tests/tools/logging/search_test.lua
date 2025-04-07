@@ -3,6 +3,7 @@
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+local before, after = firmo.before, firmo.after
 local log_search = require("lib.tools.logging.search")
 local fs = require("lib.tools.filesystem")
 local temp_file = require("lib.tools.temp_file")
