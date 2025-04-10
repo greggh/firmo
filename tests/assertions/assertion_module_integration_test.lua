@@ -62,30 +62,36 @@ describe("Assertion Module Integration", function()
       expect(true).to.be_truthy() -- Just to have an explicit assertion
     end)
 
-    it("should handle error cases in the same way", function()
-      -- Both should generate errors for failing assertions
-      local firmo_error
-      pcall(function()
+    it("should handle error cases in the same way", { expect_error = true }, function()
+      local test_helper = require("lib.tools.test_helper")
+
+      -- Capture firmo error
+      local firmo_fn = test_helper.with_error_capture(function()
         expect(5).to.equal(6)
-      end, function(err)
-        firmo_error = err
       end)
+      local _, firmo_error = firmo_fn()
 
-      local assertion_error
-      pcall(function()
+      -- Capture assertion module error
+      local assertion_fn = test_helper.with_error_capture(function()
         assertion.expect(5).to.equal(6)
-      end, function(err)
-        assertion_error = err
       end)
+      local _, assertion_error = assertion_fn()
 
-      -- Both errors should indicate the values are not equal
-      expect(firmo_error).to_not.be(nil)
-      expect(assertion_error).to_not.be(nil)
+      -- Verify errors are captured
+      expect(firmo_error).to.exist("Firmo assertion should generate error")
+      expect(assertion_error).to.exist("Standalone assertion should generate error")
 
-      -- The error messages should indicate the same fundamental issue
-      if firmo_error and assertion_error then
-        expect(assertion_error:match("not equal")).to_not.be(nil)
-      end
+      -- Verify error messages
+      expect(firmo_error.message).to.exist("Firmo error should have message")
+      expect(assertion_error.message).to.exist("Assertion error should have message")
+
+      -- Verify error messages indicate the same issue
+      expect(firmo_error.message).to.match("not equal", "Firmo error should indicate values not equal")
+      expect(assertion_error.message).to.match("not equal", "Assertion error should indicate values not equal")
+
+      -- Compare error structures
+      expect(type(firmo_error)).to.equal(type(assertion_error), "Error types should match")
+      expect(type(firmo_error.message)).to.equal(type(assertion_error.message), "Error message types should match")
     end)
   end)
 end)

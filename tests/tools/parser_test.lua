@@ -18,6 +18,7 @@ The tests cover different Lua syntax constructs including:
 
 local firmo = require("firmo")
 local parser = require("lib.tools.parser")
+local test_helper = require("lib.tools.test_helper")
 
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
@@ -45,14 +46,31 @@ test(5, 10)
       expect(ast).to.exist()
     end)
     
-    it("should pretty print the AST", function()
+    it("should pretty print the AST", { expect_error = true }, function()
+      -- Test valid case first
       local ast = parser.parse(code, "test_code")
       local pp_output = parser.pretty_print(ast)
       expect(pp_output).to.be.a("string")
       expect(pp_output).to_not.be.empty()
+      
+      -- Test invalid AST (nil)
+      local err = test_helper.expect_error(function()
+        return parser.pretty_print(nil)
+      end)
+      expect(err).to.exist()
+      expect(err.message).to.match("invalid AST")
+      
+      -- Test malformed AST (wrong structure)
+      local malformed_ast = { type = "invalid_type" }
+      local err2 = test_helper.expect_error(function()
+        return parser.pretty_print(malformed_ast)
+      end)
+      expect(err2).to.exist()
+      expect(err2.message).to.match("malformed AST")
     end)
     
-    it("should detect executable lines", function()
+    it("should detect executable lines", { expect_error = true }, function()
+      -- Test valid case first
       local ast = parser.parse(code, "test_code")
       local executable_lines = parser.get_executable_lines(ast, code)
       
@@ -66,6 +84,28 @@ test(5, 10)
       
       -- We should have several executable lines in our sample
       expect(count).to.be_greater_than(3)
+      
+      -- Test with invalid AST
+      local err = test_helper.expect_error(function()
+        return parser.get_executable_lines(nil, code)
+      end)
+      expect(err).to.exist()
+      expect(err.message).to.match("invalid AST")
+      
+      -- Test with invalid code
+      local err2 = test_helper.expect_error(function()
+        return parser.get_executable_lines(ast, nil)
+      end)
+      expect(err2).to.exist()
+      expect(err2.message).to.match("invalid code")
+      
+      -- Test with malformed AST
+      local malformed_ast = { type = "invalid_type" }
+      local err3 = test_helper.expect_error(function()
+        return parser.get_executable_lines(malformed_ast, code)
+      end)
+      expect(err3).to.exist()
+      expect(err3.message).to.match("malformed AST")
     end)
     
     it("should detect functions", function()
@@ -100,9 +140,13 @@ function broken(
 end
 ]]
       
-      local ast, err = parser.parse(invalid_code, "invalid_code")
-      expect(ast).to_not.exist()
+      local err = test_helper.expect_error(function()
+        return parser.parse(invalid_code, "invalid_code")
+      end)
+      
       expect(err).to.exist()
+      expect(err.message).to.match("syntax")  -- Should mention syntax error
+      expect(err.source).to.equal("invalid_code")  -- Should include source name
     end)
   end)
 end)

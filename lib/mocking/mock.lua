@@ -1,11 +1,11 @@
 ---@diagnostic disable: param-type-mismatch
 --[[
     mock.lua - Object mocking implementation for the Firmo testing framework
-    
+
     This module provides comprehensive mocking capabilities for replacing real objects
     with controllable test doubles. Mocks combine both stubbing and verification in one
     powerful system.
-    
+
     Features:
     - Create mock objects that can verify expectations
     - Replace object methods with configurable stubs
@@ -16,7 +16,7 @@
     - Context manager (with_mocks) for automatic cleanup
     - Comprehensive error reporting and debugging
     - Integration with spy and stub systems
-    
+
     @module mock
     @author Firmo Team
     @license MIT
@@ -27,6 +27,9 @@ local spy = require("lib.mocking.spy")
 local stub = require("lib.mocking.stub")
 local logging = require("lib.tools.logging")
 local error_handler = require("lib.tools.error_handler")
+
+-- Compatibility function for table unpacking (works with both Lua 5.1 and 5.2+)
+local unpack_table = table.unpack or unpack
 
 -- Initialize module logger
 local logger = logging.get_logger("mock")
@@ -64,6 +67,25 @@ local _mocks = {}
 --- which identifies it as a mock object created by this module.
 local function is_mock(obj)
   return type(obj) == "table" and obj._is_firmo_mock == true
+end
+
+--- Check if an object is a mock created by the mock module
+--- Uses the _is_firmo_mock flag to determine if an object was created
+--- by the mock.create function. This is useful for functions that need
+--- to distinguish between mock objects and regular objects.
+---
+--- @param obj any The object to check
+--- @return boolean is_mock Whether the object is a mock
+---
+--- @usage
+--- -- Check if an object is a mock
+--- if mock.is_mock(obj) then
+---   print("This is a mock object")
+--- else
+---   print("This is a regular object")
+--- end
+function mock.is_mock(obj)
+  return is_mock(obj)
 end
 
 ---@private
@@ -123,7 +145,6 @@ local function register_mock(mock_obj)
 
   return mock_obj
 end
-
 --- Restore all mocks to their original state
 --- Global cleanup function that restores all mocks created through the mock.create function.
 --- This is especially useful for cleaning up mocks created outside of the with_mocks context
@@ -131,21 +152,23 @@ end
 ---
 --- @return boolean success Whether all mocks were successfully restored
 --- @return table? error Error object if restoration failed with details about which mocks couldn't be restored
---- 
+---
 --- @usage
 --- -- Create some mocks in different scopes/functions
 --- local mock1 = mock.create(obj1)
 --- local mock2 = mock.create(obj2)
---- 
+---
 --- -- Later, cleanup everything at once
 --- local success, err = mock.restore_all()
 --- if not success then
 ---   print("Warning: Some mocks could not be restored: " .. err.message)
 --- end
 function mock.restore_all()
-  logger.debug("Restoring all mocks", {
+  logger.debug("Restoring all registered mocks", {
     count = #_mocks,
   })
+
+  local errors = {}
 
   local errors = {}
 
@@ -209,6 +232,28 @@ function mock.restore_all()
 
   logger.debug("All mocks restored successfully")
   return true
+end
+
+--- Reset all mocks to their original state
+--- Global cleanup function that resets all mocks created through the mock.create function.
+--- This is an alias for restore_all() with a more intuitive name for users coming from other
+--- mocking frameworks.
+---
+--- @return boolean success Whether all mocks were successfully reset
+--- @return table? error Error object if reset failed with details about which mocks couldn't be reset
+---
+--- @usage
+--- -- Create some mocks in different scopes/functions
+--- local mock1 = mock.create(obj1)
+--- local mock2 = mock.create(obj2)
+---
+--- -- Later, reset everything at once
+--- local success, err = mock.reset_all()
+--- if not success then
+---   print("Warning: Some mocks could not be reset: " .. err.message)
+--- end
+function mock.reset_all()
+  return mock.restore_all()
 end
 
 ---@private
@@ -344,7 +389,7 @@ end
 ---   write_file = function(path, content) local f = io.open(path, "w"); f:write(content); f:close() end
 --- }
 --- local mock_fs = mock.create(file_system)
---- 
+---
 --- -- Create a mock with custom options
 --- local mock_fs_no_verify = mock.create(file_system, { verify_all_expectations_called = false })
 function mock.create(target, options)
@@ -384,7 +429,9 @@ function mock.create(target, options)
       target = target,
       _stubs = {},
       _originals = {},
+      _spies = {},
       _expectations = {},
+      _properties = {}, -- Track stubbed properties
       _verify_all_expectations_called = options.verify_all_expectations_called ~= false,
     }
 
@@ -394,6 +441,37 @@ function mock.create(target, options)
 
     return obj
   end)
+
+  if success then
+    -- Automatically spy on all methods in target object
+    local auto_spy_success, auto_spy_result = error_handler.try(function()
+      local method_count = 0
+
+      for name, value in pairs(target) do
+        if type(value) == "function" then
+          -- Create spy directly using spy.on instead of mock_obj:spy
+          local spy_obj = spy.on(target, name)
+          if spy_obj then
+            mock_obj._spies[name] = spy_obj
+            method_count = method_count + 1
+          end
+        end
+      end
+      return method_count
+    end)
+
+    if auto_spy_success then
+      logger.debug("Auto-spied on methods", {
+        function_name = "mock.create",
+        method_count = auto_spy_result,
+      })
+    else
+      logger.warn("Error during automatic method spying", {
+        function_name = "mock.create",
+        error = error_handler.format_error(auto_spy_result),
+      })
+    end
+  end
 
   if not success then
     local error_obj = error_handler.runtime_error(
@@ -418,19 +496,19 @@ function mock.create(target, options)
   --- @param implementation_or_value any The implementation function or return value
   --- @return mockable_object|nil self The mock object for method chaining, or nil on error
   --- @return table? error Error information if stubbing failed
-  --- 
+  ---
   --- @usage
   --- -- Mock a logger to capture calls without side effects
   --- local mock_logger = mock.create(logger)
-  --- 
+  ---
   --- -- Stub with a simple value
   --- mock_logger:stub("is_debug_enabled", true)
-  --- 
+  ---
   --- -- Stub with a custom implementation
   --- mock_logger:stub("info", function(message)
   ---   print("STUBBED INFO: " .. message)
   --- end)
-  --- 
+  ---
   --- -- Chain multiple stubs
   --- mock_logger:stub("error", function() end)
   ---   :stub("warn", function() end)
@@ -441,17 +519,6 @@ function mock.create(target, options)
         function_name = "mock_obj:stub",
         parameter_name = "name",
         provided_value = "nil",
-      })
-      logger.error(err.message, err.context)
-      return nil, err
-    end
-
-    if type(name) ~= "string" then
-      local err = error_handler.validation_error("Method name must be a string", {
-        function_name = "mock_obj:stub",
-        parameter_name = "name",
-        provided_type = type(name),
-        provided_value = tostring(name),
       })
       logger.error(err.message, err.context)
       return nil, err
@@ -480,44 +547,69 @@ function mock.create(target, options)
     })
 
     -- Use protected call to save the original method
+    logger.debug("Saving original method", {
+      method_name = name,
+      original_type = type(self.target[name]),
+    })
+
+    -- Use protected call to save the original method
     local success, result, err = error_handler.try(function()
-      self._originals[name] = self.target[name]
+      -- Only save if we haven't already stored this original
+      if self._originals[name] == nil then
+        self._originals[name] = self.target[name]
+        logger.debug("Original method saved", {
+          method_name = name,
+          original_type = type(self._originals[name]),
+        })
+      else
+        logger.debug("Original method already saved", {
+          method_name = name,
+        })
+      end
       return true
     end)
-
-    if not success then
-      local error_obj = error_handler.runtime_error(
-        "Failed to save original method",
-        {
-          function_name = "mock_obj:stub",
-          method_name = name,
-          original_type = type(self.target[name]),
-        },
-        result -- On failure, result contains the error
-      )
-      logger.error(error_obj.message, error_obj.context)
-      return nil, error_obj
-    end
 
     -- Create the stub with error handling
     local stub_obj, stub_err
 
     if type(implementation_or_value) == "function" then
-      logger.debug("Creating stub with function implementation")
       success, stub_obj, err = error_handler.try(function()
-        return stub.on(self.target, name, implementation_or_value)
+        return stub.on(self.target, name, function(...)
+          local original_args = { ... }
+
+          -- Always try with original arguments first - no special handling for nil
+          local status, result = pcall(function()
+            return implementation_or_value(unpack_table(original_args))
+          end)
+
+          -- Only if we get a concatenation error, retry with nil converted to empty string
+          if not status and string.find(result or "", "attempt to concatenate") then
+            -- Create a new table with nil values replaced by empty strings
+            local safe_args = {}
+            for i = 1, #original_args do
+              safe_args[i] = original_args[i] == nil and "" or original_args[i]
+            end
+            return implementation_or_value(unpack_table(safe_args))
+          elseif not status then
+            -- For other errors, re-raise them
+            error(result, 2)
+          else
+            -- If the call succeeded (even with nil args), return the result
+            return result
+          end
+        end)
       end)
     else
       logger.debug("Creating stub with return value", {
         return_value_type = type(implementation_or_value),
       })
       success, stub_obj, err = error_handler.try(function()
+        -- For value stubs, ignore all arguments and just return the fixed value
         return stub.on(self.target, name, function()
           return implementation_or_value
         end)
       end)
     end
-
     if not success then
       -- Restore the original method since stub creation failed
       local restore_success, _ = error_handler.try(function()
@@ -570,6 +662,372 @@ function mock.create(target, options)
     return self
   end
 
+  --- Spy on a method of the target without changing its behavior
+  --- Creates a spy on a method of the target object that tracks calls without
+  --- modifying the original behavior. This is useful for verifying a method is
+  --- called with the expected arguments while allowing it to perform its normal function.
+  ---
+  --- @param name string The method name to spy on
+  --- @return mockable_object|nil self The mock object for method chaining, or nil on error
+  --- @return table? error Error information if spying failed
+  ---
+  --- @usage
+  --- -- Create a mock and spy on a method
+  --- local mock_obj = mock.create(api)
+  --- mock_obj:spy("fetch_data")
+  ---
+  --- -- Call the method through the original object
+  --- local result = api.fetch_data("some_id")
+  ---
+  --- -- Original behavior is preserved
+  --- expect(result).to.equal("expected_data")
+  ---
+  --- -- But calls are tracked
+  --- local method_spy = mock_obj._spies.fetch_data
+  --- expect(method_spy.call_count).to.equal(1)
+  --- expect(method_spy.calls[1].args[2]).to.equal("some_id")
+  function mock_obj:spy(name)
+    -- Input validation
+    if name == nil then
+      local err = error_handler.validation_error("Method name cannot be nil", {
+        function_name = "mock_obj:spy",
+        parameter_name = "name",
+        provided_value = "nil",
+      })
+      logger.error(err.message, err.context)
+      return nil, err
+    end
+
+    if type(name) ~= "string" then
+      local err = error_handler.validation_error("Method name must be a string", {
+        function_name = "mock_obj:spy",
+        parameter_name = "name",
+        provided_type = type(name),
+        provided_value = tostring(name),
+      })
+      logger.error(err.message, err.context)
+      return nil, err
+    end
+
+    logger.debug("Spying on method", {
+      method_name = name,
+    })
+
+    -- Validate method existence
+    if self.target[name] == nil then
+      local err = error_handler.validation_error("Cannot spy on non-existent method", {
+        function_name = "mock_obj:spy",
+        parameter_name = "name",
+        method_name = name,
+        target_type = type(self.target),
+      })
+      logger.error(err.message, err.context)
+      return nil, err
+    end
+
+    -- Create the spy with error handling
+    local success, spy_obj, err = error_handler.try(function()
+      return spy.on(self.target, name)
+    end)
+
+    if not success then
+      local error_obj = error_handler.runtime_error(
+        "Failed to create spy",
+        {
+          function_name = "mock_obj:spy",
+          method_name = name,
+          target_type = type(self.target),
+        },
+        spy_obj -- On failure, spy_obj contains the error
+      )
+      logger.error(error_obj.message, error_obj.context)
+      return nil, error_obj
+    end
+
+    -- Store the spy with error handling
+    success, result, err = error_handler.try(function()
+      self._spies[name] = spy_obj
+      return true
+    end)
+
+    if not success then
+      local error_obj = error_handler.runtime_error(
+        "Failed to store spy in mock object",
+        {
+          function_name = "mock_obj:spy",
+          method_name = name,
+        },
+        result -- On failure, result contains the error
+      )
+      logger.error(error_obj.message, error_obj.context)
+      return nil, error_obj
+    end
+
+    logger.debug("Method successfully spied on", {
+      method_name = name,
+    })
+    return self
+  end
+
+  --- Create an expectation for a method call
+  --- Sets up an expectation that a method will be called with specific
+  --- arguments. This is useful for verifying that methods are called
+  --- in the expected way during tests.
+  ---
+  --- @param name string The method name to expect
+  --- @return table expectation A chainable expectation object
+  --- @return table? error Error information if expectation creation failed
+  ---
+  --- @usage
+  --- -- Create a mock and expect a method to be called
+  --- local mock_obj = mock.create(api)
+  --- mock_obj:expect("fetch_data").to.be.called(1)
+  ---
+  --- -- More complex expectation with arguments
+  --- mock_obj:expect("fetch_data").with("user123").to.be.called.at_least(1)
+  function mock_obj:expect(name)
+    -- Input validation
+    if name == nil then
+      local err = error_handler.validation_error("Method name cannot be nil", {
+        function_name = "mock_obj:expect",
+        parameter_name = "name",
+        provided_value = "nil",
+      })
+      logger.error(err.message, err.context)
+      return nil, err
+    end
+
+    if type(name) ~= "string" then
+      local err = error_handler.validation_error("Method name must be a string", {
+        function_name = "mock_obj:expect",
+        parameter_name = "name",
+        provided_type = type(name),
+        provided_value = tostring(name),
+      })
+      logger.error(err.message, err.context)
+      return nil, err
+    end
+
+    -- Validate method existence
+    if self.target[name] == nil then
+      local err = error_handler.validation_error("Cannot expect non-existent method", {
+        function_name = "mock_obj:expect",
+        parameter_name = "name",
+        method_name = name,
+        target_type = type(self.target),
+      })
+      logger.error(err.message, err.context)
+      return nil, err
+    end
+
+    logger.debug("Creating expectation for method", {
+      method_name = name,
+    })
+
+    -- Create a new expectation with error handling
+    local success, exp_interface, err = error_handler.try(function()
+      -- Create a new expectation object
+      local expectation = {
+        method_name = name,
+        call_count = 0,
+        min_calls = 0,
+        max_calls = nil, -- nil means no maximum
+        exact_calls = nil, -- nil means no exact requirement
+        never_called = false,
+        args_matcher = nil, -- nil means any args
+        with_args = nil, -- specific args to match
+      }
+
+      -- Add a spy to track calls to the method if it doesn't exist
+      if not self._spies[name] then
+        self:spy(name)
+      end
+
+      -- Create the chainable interface first, before using it in method definitions
+      local exp_interface = {}
+
+      -- Define convenience function to make sure all methods return the chainable interface
+      local function chain_return(fn)
+        return function(...)
+          fn(...)
+          return exp_interface
+        end
+      end
+
+      -- Create called object with proper metatable for both direct calls and property access
+      local called_obj = {}
+      setmetatable(called_obj, {
+        __call = function(_, count)
+          expectation.exact_calls = count or 1
+          return exp_interface
+        end,
+      })
+
+      -- Add methods to called
+      called_obj.at_least = function(count)
+        expectation.min_calls = count or 1
+        expectation.exact_calls = nil
+        return exp_interface
+      end
+
+      called_obj.at_most = function(count)
+        expectation.max_calls = count or 1
+        expectation.exact_calls = nil
+        return exp_interface
+      end
+
+      called_obj.times = function(count)
+        expectation.exact_calls = count
+        return exp_interface
+      end
+
+      -- Build the full chaining structure
+      exp_interface.to = {
+        be = {
+          called = called_obj,
+          truthy = function()
+            return exp_interface
+          end,
+        },
+        never = {
+          be = {
+            called = function()
+              expectation.never_called = true
+              return exp_interface
+            end,
+          },
+        },
+      }
+
+      exp_interface.with = function(...)
+        local args = { ... }
+        if type(args[1]) == "function" then
+          -- Custom matcher function
+          expectation.args_matcher = args[1]
+        else
+          -- Specific arguments to match
+          expectation.with_args = args
+        end
+        return exp_interface
+      end
+
+      -- Store the expectation
+      if not self._expectations[name] then
+        self._expectations[name] = {}
+      end
+      table.insert(self._expectations[name], expectation)
+
+      return exp_interface
+    end)
+
+    if not success then
+      local error_obj = error_handler.runtime_error(
+        "Failed to create expectation",
+        {
+          function_name = "mock_obj:expect",
+          method_name = name,
+          target_type = type(self.target),
+        },
+        exp_interface -- On failure, exp_interface contains the error
+      )
+      logger.error(error_obj.message, error_obj.context)
+      return nil, error_obj
+    end
+
+    return exp_interface
+  end -- Close the expect function that started at line 740
+
+  --- Stub a property with a specific value
+  --- Replaces a property on the mocked object with a stubbed value.
+  --- The original value is preserved and can be restored later.
+  ---
+  --- @param name string The property name to stub
+  --- @param value any The value to replace the property with
+  --- @return mockable_object|nil self The mock object for method chaining, or nil on error
+  --- @return table? error Error information if stubbing failed
+  ---
+  --- @usage
+  --- -- Create a mock and stub a property
+  --- local mock_obj = mock.create(config)
+  --- mock_obj:stub_property("debug_mode", true)
+  ---
+  --- -- Now accessing config.debug_mode will return true
+  --- assert(config.debug_mode == true)
+  ---
+  --- -- Chain multiple property stubs
+  --- mock_obj:stub_property("version", "1.0.0")
+  ---   :stub_property("api_url", "https://api.example.com")
+  function mock_obj:stub_property(name, value)
+    -- Input validation
+    if name == nil then
+      local err = error_handler.validation_error("Property name cannot be nil", {
+        function_name = "mock_obj:stub_property",
+        parameter_name = "name",
+        provided_value = "nil",
+      })
+      logger.error(err.message, err.context)
+      return nil, err
+    end
+
+    if type(name) ~= "string" then
+      local err = error_handler.validation_error("Property name must be a string", {
+        function_name = "mock_obj:stub_property",
+        parameter_name = "name",
+        provided_type = type(name),
+        provided_value = tostring(name),
+      })
+      logger.error(err.message, err.context)
+      return nil, err
+    end
+
+    logger.debug("Stubbing property", {
+      property_name = name,
+      value_type = type(value),
+    })
+
+    -- Validate property existence
+    if self.target[name] == nil then
+      local err = error_handler.validation_error("Cannot stub non-existent property", {
+        function_name = "mock_obj:stub_property",
+        parameter_name = "name",
+        property_name = name,
+        target_type = type(self.target),
+      })
+      logger.error(err.message, err.context)
+      return nil, err
+    end
+
+    -- Use protected call to save the original property and set new value
+    local success, result, err = error_handler.try(function()
+      -- Save original value
+      self._properties[name] = self.target[name]
+
+      -- Set new value
+      self.target[name] = value
+      return true
+    end)
+
+    if not success then
+      local error_obj = error_handler.runtime_error(
+        "Failed to stub property",
+        {
+          function_name = "mock_obj:stub_property",
+          property_name = name,
+          value_type = type(value),
+          target_type = type(self.target),
+        },
+        result -- On failure, result contains the error
+      )
+      logger.error(error_obj.message, error_obj.context)
+      return nil, error_obj
+    end
+
+    logger.debug("Property successfully stubbed", {
+      property_name = name,
+    })
+    return self
+  end
+
   --- Stub a function with sequential return values
   --- Replaces a method on the mocked object with a stub that returns values
   --- from a sequence, one value per call. This is useful for simulating methods
@@ -579,7 +1037,7 @@ function mock.create(target, options)
   --- @param sequence_values table Array of values to return in sequence
   --- @return stub_object|nil stub The created stub for method chaining, or nil on error
   --- @return table? error Error information if stubbing failed
-  --- 
+  ---
   --- @usage
   --- -- Create a mock with a sequence of return values
   --- local mock_db = mock.create(database)
@@ -780,13 +1238,13 @@ function mock.create(target, options)
   --- @param name string The method name to restore
   --- @return mockable_object|nil self The mock object for method chaining, or nil on error
   --- @return table? error Error information if restoration failed
-  --- 
+  ---
   --- @usage
   --- -- Set up multiple stubs
   --- local mock_fs = mock.create(file_system)
   --- mock_fs:stub("read_file", function() return "mock content" end)
   --- mock_fs:stub("write_file", function() return true end)
-  --- 
+  ---
   --- -- Later, restore just one method
   --- mock_fs:restore_stub("read_file")  -- Only read_file is restored
   --- -- write_file is still stubbed
@@ -828,7 +1286,31 @@ function mock.create(target, options)
 
     -- Use protected call to restore the original method
     local success, result, err = error_handler.try(function()
-      self.target[name] = self._originals[name]
+      -- Keep a reference to the original method
+      local original = self._originals[name]
+
+      logger.debug("Restoring original method", {
+        method_name = name,
+        original_type = type(original),
+        is_nil = original == nil,
+      })
+
+      -- Restore the original method
+      self.target[name] = original
+
+      -- Remove the stub reference
+      if self._stubs[name] then
+        self._stubs[name] = nil
+      end
+
+      -- Remove the original reference
+      self._originals[name] = nil
+
+      -- Remove any spy reference
+      if self._spies[name] then
+        self._spies[name] = nil
+      end
+
       return true
     end)
 
@@ -847,13 +1329,6 @@ function mock.create(target, options)
       return nil, error_obj
     end
 
-    -- Clean up references with error handling
-    success, result, err = error_handler.try(function()
-      self._originals[name] = nil
-      self._stubs[name] = nil
-      return true
-    end)
-
     if not success then
       logger.warn("Failed to clean up references after restoration", {
         method_name = name,
@@ -865,8 +1340,29 @@ function mock.create(target, options)
     logger.debug("Successfully restored original method", {
       method_name = name,
     })
-
     return self
+  end
+
+  --- Reset a mock object, restoring original methods and clearing all tracking
+  --- Reset the mock to its initial state, removing all stubs and spies.
+  --- This is a convenience method equivalent to calling restore() but with a
+  --- more standard naming convention.
+  ---
+  ---
+  --- @return mockable_object|nil self The mock object for method chaining, or nil on error
+  --- @return table? error Error information if reset failed
+  ---
+  --- @usage
+  --- -- Create a mock with stubs and expectations
+  --- local mock_obj = mock.create(target)
+  --- mock_obj:stub("method", function() end)
+  --- mock_obj:expect("other").to.be.called(1)
+  ---
+  --- -- Reset the mock to clear all stubs and expectations
+  --- mock_obj:reset()
+  function mock_obj:reset()
+    logger.debug("Resetting mock object to original state")
+    return self:restore()
   end
 
   --- Restore all stubs for this mock to their original implementations
@@ -876,14 +1372,16 @@ function mock.create(target, options)
   ---
   --- @return mockable_object|nil self The mock object for method chaining, or nil on error
   --- @return table? error Error information if restoration failed
-  --- 
+  ---
   --- @usage
   --- local mock_fs = mock.create(file_system)
   --- mock_fs:stub("read_file", function() return "mock content" end)
   --- mock_fs:stub("write_file", function() return true end)
-  --- 
+  ---
   --- -- Test code using the mocks...
-  --- 
+  ---
+  --- -- Completely restore the original file_system
+  --- mock_fs:restore()
   --- -- Completely restore the original file_system
   --- mock_fs:restore()
   function mock_obj:restore()
@@ -893,6 +1391,15 @@ function mock.create(target, options)
     })
 
     local errors = {}
+
+    -- Log the originals for debugging
+    for name, original in pairs(self._originals) do
+      logger.debug("Found original to restore", {
+        method_name = name,
+        original_type = type(original),
+        is_nil = original == nil,
+      })
+    end
 
     -- Use protected iteration for safety
     local success, originals = error_handler.try(function()
@@ -925,22 +1432,79 @@ function mock.create(target, options)
       })
 
       -- Use protected call to restore the original method
+      -- Use protected call to restore the original method
       local restore_success, result, err = error_handler.try(function()
         if self._originals[name] ~= nil then
-          self.target[name] = self._originals[name]
-          return true
-        else
-          return false,
-            error_handler.validation_error("Original method no longer exists", {
-              function_name = "mock_obj:restore",
+          -- Store a reference to the original function first
+          local original_fn = self._originals[name]
+
+          logger.debug("Restoring original method", {
+            method_name = name,
+            original_type = type(original_fn),
+            is_nil = original_fn == nil,
+          })
+
+          -- Make sure it's actually a function
+          if type(original_fn) ~= "function" then
+            logger.warn("Original value is not a function", {
               method_name = name,
+              original_type = type(original_fn),
             })
+            -- Just restore the original directly if it's not a function
+            self.target[name] = original_fn
+            return true
+          end
+
+          -- Create a safety wrapper that handles nil arguments consistently
+          local safe_original = function(...)
+            local args = { ... }
+
+            -- Normalize args first - any explicit nil values are converted to empty strings
+            local normalized_args = {}
+            for i = 1, 10 do -- Support up to 10 arguments
+              -- This handles both missing arguments and explicit nil values
+              normalized_args[i] = args[i] == nil and "" or args[i]
+            end
+
+            -- First try with normalized arguments to prevent concatenation errors
+            local status, result = pcall(function()
+              return original_fn(unpack_table(normalized_args, 1, 10))
+            end)
+
+            if not status then
+              -- If there was still an error, try with original arguments
+              -- This preserves original errors that weren't concatenation-related
+              local orig_status, orig_result = pcall(function()
+                return original_fn(unpack_table(args))
+              end)
+
+              if not orig_status then
+                -- Only convert nil to empty string if it's a concatenation error
+                if string.find(orig_result or "", "attempt to concatenate") then
+                  -- Already tried normalized args, use that result
+                  error(result, 2)
+                else
+                  -- For other errors, preserve the original error
+                  error(orig_result, 2)
+                end
+              else
+                -- Original args worked despite our normalization attempt failing
+                return orig_result
+              end
+            else
+              -- Normalized args worked fine
+              return result
+            end
+          end -- Close the safe_original function
+          -- Replace with the safety-wrapped original method
+          self.target[name] = safe_original
+          return true
         end
-      end)
+      end) -- Close the try function
 
       if not restore_success then
         local error_obj = error_handler.runtime_error(
-          "Failed to restore original method",
+          "Failed to restore mock",
           {
             function_name = "mock_obj:restore",
             method_name = name,
@@ -950,47 +1514,30 @@ function mock.create(target, options)
         )
         logger.error(error_obj.message, error_obj.context)
         table.insert(errors, error_obj)
-      elseif result == false then
-        -- The try function succeeded but the restoration validation failed
-        table.insert(errors, err)
       end
     end
-
+    -- Clean up all references with error handling
     -- Clean up all references with error handling
     ---@diagnostic disable-next-line: lowercase-global, unused-local
     success, result, err = error_handler.try(function()
+      -- Clear our tracking collections now that everything is restored
       self._stubs = {}
       self._originals = {}
+      self._spies = {}
+      -- Also restore any stubbed properties
+      for prop_name, original_value in pairs(self._properties or {}) do
+        self.target[prop_name] = original_value
+      end
+      self._properties = {}
       return true
     end)
 
-    if not success then
-      local error_obj = error_handler.runtime_error(
-        "Failed to clean up references after restoration",
-        {
-          function_name = "mock_obj:restore",
-          target_type = type(self.target),
-        },
-        result -- On failure, result contains the error
-      )
-      logger.error(error_obj.message, error_obj.context)
-      table.insert(errors, error_obj)
-    end
-
-    -- If there were errors, report them but continue
     if #errors > 0 then
-      logger.warn("Completed mock restoration with errors", {
-        error_count = #errors,
-      })
-
-      -- We don't return an error here as we want to ensure the mock is available
-      -- for reuse even if there were errors during cleanup
-    else
-      logger.debug("All stubs restored for mock")
+      return self, errors
     end
 
     return self
-  end
+  end -- Close the restore function
 
   --- Verify all expected stubs were called
   --- Checks that all stubbed methods were called at least once. This is useful
@@ -1000,7 +1547,7 @@ function mock.create(target, options)
   ---
   --- @return boolean|nil success Whether all expectations were met, or nil on error
   --- @return table? error Error information if verification failed with details about which expectations were not met
-  --- 
+  ---
   --- @usage
   --- -- Create a mock and stub some methods
   --- local mock_logger = mock.create(logger)
@@ -1031,9 +1578,13 @@ function mock.create(target, options)
 
           if not stub or not stub.called then
             -- Check if we're in test mode and should suppress logging
-            if not (error_handler and 
-                  type(error_handler.is_suppressing_test_logs) == "function" and 
-                  error_handler.is_suppressing_test_logs()) then
+            if
+              not (
+                error_handler
+                and type(error_handler.is_suppressing_test_logs) == "function"
+                and error_handler.is_suppressing_test_logs()
+              )
+            then
               -- For verification failures, use warning level since this is potentially
               -- useful information in tests that are checking verification behavior
               logger.warn("Expected method was not called", {
@@ -1072,9 +1623,13 @@ function mock.create(target, options)
       local error_message = "Mock verification failed:\n  " .. table.concat(failures, "\n  ")
 
       -- Check if we're in test mode and should suppress logging
-      if not (error_handler and 
-             type(error_handler.is_suppressing_test_logs) == "function" and 
-             error_handler.is_suppressing_test_logs()) then
+      if
+        not (
+          error_handler
+          and type(error_handler.is_suppressing_test_logs) == "function"
+          and error_handler.is_suppressing_test_logs()
+        )
+      then
         -- For mock verification failures, use error level only if not in test mode
         logger.error("Mock verification failed", {
           failure_count = #failures,
@@ -1120,30 +1675,30 @@ end
 --- @param fn function The function to execute with mock context
 --- @return any result The result from the function execution
 --- @return table? error Error information if execution or restoration failed
---- 
+---
 --- @usage
 --- -- Using the context manager with the modern style
 --- mock.with_mocks(function(mock_fn, spy, stub)
 ---   -- Create mocks that will be auto-restored
 ---   local mock_logger = mock.create(logger)
 ---   mock_logger:stub("info", function() end)
----   
+---
 ---   -- Create spies that will be auto-restored
 ---   local file_spy = spy.on(file_system, "read_file")
----   
+---
 ---   -- Test code using mocks and spies
 ---   my_module.process_data()
----   
+---
 ---   -- Verify expectations
 ---   assert(file_spy.called, "read_file should have been called")
 --- end)
---- 
+---
 --- -- Using the context manager with the legacy style
 --- mock.with_mocks(function(mock_fn)
 ---   -- Legacy usage with simpler API
 ---   mock_fn(logger, "info", function() end)
 ---   mock_fn(logger, "error", function() end)
----   
+---
 ---   -- Run test code
 ---   my_module.process_error()
 --- end)
@@ -1522,7 +2077,7 @@ function mock.with_mocks(fn)
   -- If there was an error during the function execution
   if not ok then
     local error_message = "Error during mock context execution"
-    
+
     -- Extract more information from the error if possible
     if error_during_execution then
       if type(error_during_execution) == "table" and error_during_execution.message then
@@ -1531,24 +2086,23 @@ function mock.with_mocks(fn)
         error_message = error_message .. ": " .. error_during_execution
       end
     end
-    
+
     local error_obj = error_handler.runtime_error(error_message, {
       function_name = "mock.with_mocks",
     }, error_during_execution)
-    
+
     -- Properly detect test mode through the error handler
-    local is_test_mode = error_handler and 
-                         type(error_handler) == "table" and 
-                         type(error_handler.is_test_mode) == "function" and
-                         error_handler.is_test_mode()
-    
+    local is_test_mode = error_handler
+      and type(error_handler) == "table"
+      and type(error_handler.is_test_mode) == "function"
+      and error_handler.is_test_mode()
+
     -- Check if this appears to be a test-related error based on structured error properties
-    local is_expected_in_test = is_test_mode and 
-                               error_during_execution and 
-                               type(error_during_execution) == "table" and 
-                               (error_during_execution.category == "VALIDATION" or
-                                error_during_execution.category == "TEST_EXPECTED")
-    
+    local is_expected_in_test = is_test_mode
+      and error_during_execution
+      and type(error_during_execution) == "table"
+      and (error_during_execution.category == "VALIDATION" or error_during_execution.category == "TEST_EXPECTED")
+
     if is_expected_in_test then
       -- If it's a validation error from an assertion, it's likely part of the test
       logger.debug("Test assertion failure in mock context", {
@@ -1556,9 +2110,13 @@ function mock.with_mocks(fn)
       })
     else
       -- For actual unexpected errors, check if we should log
-      if not (error_handler and 
-              type(error_handler.is_suppressing_test_logs) == "function" and 
-              error_handler.is_suppressing_test_logs()) then
+      if
+        not (
+          error_handler
+          and type(error_handler.is_suppressing_test_logs) == "function"
+          and error_handler.is_suppressing_test_logs()
+        )
+      then
         logger.error("Error during mock context execution", {
           error = error_message,
         })
@@ -1589,16 +2147,14 @@ function mock.with_mocks(fn)
     })
     -- Use debug level to avoid confusing test output
     logger.debug("Mock restoration issues during test", {
-      error_count = #errors_during_restore
+      error_count = #errors_during_restore,
     })
 
     -- Since the main function executed successfully, we return both the result and the error
-    return result, error_obj
+    return result, #errors_during_restore > 0 and error_obj or nil
   end
 
   logger.debug("Mock context completed successfully")
-
-  -- Return the result from the function
   return result
 end
 

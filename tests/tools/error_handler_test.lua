@@ -46,6 +46,7 @@ describe("Error Handler Module", function()
 
     expect(error_success).to_not.be_truthy()
     expect(error_result).to.exist() -- Contains the error
+    expect(error_result).to.match("Test error") -- Verify the error message
     expect(error_err).to_not.exist() -- No third return value in error case
   end)
 

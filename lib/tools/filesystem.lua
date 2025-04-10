@@ -68,8 +68,12 @@
 --- @field get_modified_time fun(file_path: string): number|nil, string? Alias for get_file_modified_time
 --- @field get_creation_time fun(file_path: string): number|nil, string? Get the creation time of a file (when available)
 --- @field copy_file fun(source_path: string, dest_path: string, overwrite?: boolean): boolean|nil, string? Copy a file from source to destination
---- @field move_file fun(source_path: string, dest_path: string, overwrite?: boolean): boolean|nil, string? Move a file from source to destination
+--- @field copy_directory fun(source_path: string, dest_path: string, overwrite?: boolean): boolean|nil, string? Recursively copy a directory and its contents
+--- @field create_symlink fun(target_path: string, link_path: string): boolean|nil, string? Create a symbolic link pointing to a target
+--- @field is_symlink fun(path: string): boolean Check if a path is a symbolic link
+--- @field supports_symlinks boolean Flag indicating whether the current platform supports symbolic links
 --- @field rename fun(old_path: string, new_path: string): boolean|nil, string? Rename a file or directory
+--- @field move_file fun(source_path: string, dest_path: string): boolean|nil, string? Move or rename a file from source to destination
 --- @field normalize_path fun(path: string): string|nil Normalize a path (remove .., ., duplicate separators)
 --- @field join_paths fun(...: string): string|nil, string? Join multiple path components
 --- @field get_directory_name fun(file_path: string): string|nil Get the directory part of a path
@@ -83,9 +87,6 @@
 --- @field get_relative_path fun(path: string, base: string): string|nil Convert absolute path to relative path from base
 --- @field get_current_directory fun(): string|nil, string? Get the current working directory
 --- @field set_current_directory fun(dir_path: string): boolean|nil, string? Set the current working directory
---- @field get_temp_directory fun(): string Get the system's temporary directory
---- @field create_temp_file fun(prefix?: string, suffix?: string): string|nil, string? Create a temporary file
---- @field create_temp_directory fun(prefix?: string): string|nil, string? Create a temporary directory
 --- @field glob fun(pattern: string, base_dir?: string): table<number, string>|nil, string? Find files matching a glob pattern
 --- @field glob_to_pattern fun(glob: string): string|nil Convert a glob pattern to a Lua pattern
 --- @field matches_pattern fun(path: string, pattern: string): boolean|nil, string? Check if a path matches a pattern
@@ -591,7 +592,7 @@ end
 --- List the contents of a directory (files and subdirectories)
 --- This function returns a list of all items (files and subdirectories) in the
 --- specified directory. It uses platform-specific commands to get the listing
---- and handles errors appropriately. By default, it excludes hidden files and 
+--- and handles errors appropriately. By default, it excludes hidden files and
 --- directories (those starting with a dot), but they can be included by setting
 --- the include_hidden parameter to true.
 ---
@@ -623,7 +624,7 @@ end
 function fs.get_directory_contents(path, include_hidden)
   -- Default include_hidden to false if not provided
   include_hidden = include_hidden or false
-  
+
   return safe_io_action(function(dir_path)
     if not fs.directory_exists(dir_path) then
       return nil, "Directory does not exist: " .. dir_path
@@ -632,7 +633,7 @@ function fs.get_directory_contents(path, include_hidden)
     local files = {}
     local normalized_path = fs.normalize_path(dir_path)
     local command
-    
+
     if is_windows() then
       command = 'dir /b "' .. normalized_path .. '"'
     else
@@ -1510,6 +1511,45 @@ function fs.scan_directory(path, recursive)
   return results
 end
 
+--- Get the last component of a file path, optionally removing a suffix
+--- This function mimics the Unix basename command. It returns the last component of a path.
+--- If suffix is provided and matches the end of the basename, it is removed.
+--- @param path string The file path
+--- @param suffix string (optional) A suffix to remove from the basename
+--- @return string|nil basename The basename of the path, optionally with suffix removed
+function fs.basename(path, suffix)
+  return safe_io_action(function(file_path, suffix_to_remove)
+    if not file_path or file_path == "" then
+      return ""
+    end
+
+    -- Handle root directory specially
+    if file_path == "/" then
+      return "/"
+    end
+
+    -- Normalize path first (handle Windows backslashes)
+    local normalized = file_path:gsub("\\", "/")
+
+    -- Remove trailing slashes except for root path
+    while #normalized > 1 and normalized:sub(-1) == "/" do
+      normalized = normalized:sub(1, -2)
+    end
+
+    -- Extract the last component (everything after the last slash)
+    local basename = normalized:match("([^/]+)$") or normalized
+
+    -- Remove suffix if specified and it matches the end of the basename
+    if suffix_to_remove and suffix_to_remove ~= "" then
+      local suffix_pattern = suffix_to_remove:gsub("([%%%^%$%(%)%.%[%]%*%+%-%?])", "%%%1") .. "$"
+      if basename:match(suffix_pattern) then
+        return basename:sub(1, -(#suffix_to_remove + 1))
+      end
+    end
+
+    return basename
+  end, path, suffix) or nil
+end
 --- Filter a list of files based on a pattern
 --- This function takes a list of file paths and returns only those that match
 --- the specified pattern. It supports both file extension patterns (*.lua) and
@@ -1533,16 +1573,6 @@ end
 --- local all_files = fs.scan_directory("/path/to/project", true)
 --- local config_files = fs.find_matches(all_files, "*.json")
 --- local user_configs = fs.find_matches(config_files, "user_*")
-
---- Alternate name for fs.get_file_name for clarity
---- This function is an alias for fs.get_file_name to provide clarity in usage.
---- @param path string The file path
---- @return string|nil filename Just the filename part
-function fs.basename(path)
-  -- This is an alias for fs.get_file_name for clarity
-  return fs.get_file_name(path)
-end
-
 function fs.find_matches(files, pattern)
   if not files or not pattern then
     return {}
@@ -1637,23 +1667,67 @@ end
 
 -- Information Functions
 
---- Check if a file exists and is accessible
---- This function verifies that the specified path exists as a readable file.
---- It attempts to open the file for reading, which confirms both existence
---- and read permissions. This is useful for validating file paths before
---- performing operations on them.
+--- Check if a path is a symbolic link
+--- This function determines if the specified path is a symbolic link.
+--- It provides cross-platform support for detecting symbolic links on
+--- both Windows and Unix-like systems.
 ---
---- @param path string Path to the file to check
---- @return boolean exists True if the file exists and is readable
+--- @param path string The path to check
+--- @return boolean is_symlink True if the path is a symbolic link, false otherwise
 ---
 --- @usage
---- -- Check before reading a configuration file
---- if fs.file_exists("/etc/app/config.json") then
----   local content = fs.read_file("/etc/app/config.json")
+--- -- Check if a path is a symlink
+--- if fs.is_symlink("/path/to/check") then
+---   print("This is a symbolic link")
 --- else
----   print("Configuration file not found")
+---   print("This is not a symbolic link")
 --- end
 ---
+--- -- Use with get_symlink_target (alias for resolve_symlink)
+--- if fs.is_symlink(some_path) then
+---   local target = fs.get_symlink_target(some_path)
+---   print("The symlink points to: " .. target)
+--- end
+function fs.is_symlink(path)
+  if not path then
+    return false
+  end
+
+  -- First check if the path exists at all
+  if not (fs.file_exists(path) or fs.directory_exists(path)) then
+    return false
+  end
+
+  return safe_io_action(function(check_path)
+    local result = false
+
+    if is_windows() then
+      -- Use PowerShell to check if path is a symlink on Windows
+      local command = string.format(
+        "powershell -Command \"if ((Get-Item -Path '%s' -Force).LinkType -ne $null) { exit 0 } else { exit 1 }\"",
+        check_path
+      )
+      result = os.execute(command) == 0 or os.execute(command) == true
+    else
+      -- Unix command to check if path is a symlink
+      local command = string.format('test -L "%s"', check_path)
+      result = os.execute(command) == 0 or os.execute(command) == true
+    end
+
+    return result
+  end, path) or false -- Return false on any error
+end
+
+--- Alias for resolve_symlink
+--- This is an alias for fs.resolve_symlink for compatibility and consistency with is_symlink.
+---
+--- @param link_path string Path to the symbolic link
+--- @return string|nil target_path Target path of the symbolic link or nil on error
+--- @return string|nil error Error message if resolution failed
+function fs.get_symlink_target(link_path)
+  return fs.resolve_symlink(link_path)
+end
+
 --- -- Use with error handling pattern
 --- local success, err = some_function()
 --- if not success and fs.file_exists(backup_file_path) then
@@ -1665,6 +1739,12 @@ function fs.file_exists(path)
     return false
   end
 
+  -- Return false if path is a directory
+  if fs.directory_exists(path) then
+    return false
+  end
+
+  -- Check if path exists as a regular file
   local file = io.open(path, "rb")
   if file then
     file:close()
@@ -2340,8 +2420,13 @@ function fs.resolve_symlink(path)
 
     if is_windows() then
       -- Windows PowerShell command to resolve symlinks
-      command = string.format('powershell -Command "if (Test-Path -Path \'%s\' -PathType Any) { $item = Get-Item -Path \'%s\' -Force; if ($item.LinkType) { $item.Target } else { \'%s\' } } else { \'%s\' }"', 
-        file_path, file_path, file_path, file_path)
+      command = string.format(
+        "powershell -Command \"if (Test-Path -Path '%s' -PathType Any) { $item = Get-Item -Path '%s' -Force; if ($item.LinkType) { $item.Target } else { '%s' } } else { '%s' }\"",
+        file_path,
+        file_path,
+        file_path,
+        file_path
+      )
     else
       -- Unix readlink command to resolve symlinks, if not a symlink it will fail silently
       command = string.format('readlink -f "%s" 2>/dev/null || echo "%s"', file_path, file_path)
@@ -2366,7 +2451,7 @@ end
 
 --- Alias for delete_directory
 --- This is an alias for fs.delete_directory for compatibility and alternative naming.
---- 
+---
 --- @param path string Path to the directory to delete
 --- @param recursive boolean If true, recursively delete contents
 --- @return boolean|nil success True if deletion was successful, nil on error
@@ -2459,6 +2544,208 @@ end
 --- @return string|nil error Error message if the operation failed
 function fs.get_directory_items(dir_path, include_hidden)
   return fs.get_directory_contents(dir_path, include_hidden)
+end
+
+--- Detect if the current platform supports symbolic links
+--- This internal function checks if the platform supports creating symbolic links.
+--- Windows may require administrator privileges or developer mode enabled.
+---
+--- @private
+--- @return boolean has_support True if the platform supports symbolic links
+local function has_symlink_support()
+  -- Check based on platform
+  if is_windows() then
+    -- On Windows, try to determine if symlinks are supported
+    -- Windows 10+ in developer mode or with admin rights supports symlinks
+    local handle = io.popen("cmd /c ver")
+    if not handle then
+      return false
+    end
+
+    local result = handle:read("*a")
+    handle:close()
+
+    -- Check for Windows 10 or later
+    if result and (result:match("10%.") or result:match("11%.")) then
+      return true
+    else
+      return false
+    end
+  else
+    -- Most Unix-like platforms support symlinks by default
+    return true
+  end
+end
+
+--- Flag indicating whether this platform supports symbolic links
+fs.supports_symlinks = has_symlink_support()
+
+--- Copy a directory and its contents recursively
+--- This function copies a directory and all its contents (files and subdirectories)
+--- to a destination path. It preserves the directory structure and file contents.
+--- If the destination directory already exists, it can optionally overwrite files
+--- depending on the overwrite parameter.
+---
+--- @param source_dir string Path to the source directory to copy
+--- @param target_dir string Path to the destination directory
+--- @param overwrite? boolean If true, overwrite existing files (default: false)
+--- @return boolean|nil success True if the copy was successful, nil on error
+--- @return string|nil error Error message if copying failed
+---
+--- @usage
+--- -- Copy a directory with all its contents
+--- local success, err = fs.copy_directory("/path/to/source", "/path/to/destination")
+--- if not success then
+---   print("Failed to copy directory: " .. (err or "unknown error"))
+---   return
+--- end
+---
+--- -- Copy a directory and overwrite existing files
+--- fs.copy_directory("/templates", "/user/config", true)
+function fs.copy_directory(source_dir, target_dir, overwrite)
+  overwrite = overwrite or false
+
+  return safe_io_action(function(src, dst)
+    -- Validate inputs
+    if not src or src == "" then
+      return nil, "Invalid source directory path: path cannot be empty"
+    end
+    if not dst or dst == "" then
+      return nil, "Invalid destination directory path: path cannot be empty"
+    end
+
+    -- Check if source directory exists
+    if not fs.directory_exists(src) then
+      return nil, "Source directory does not exist: " .. src
+    end
+
+    -- Check if destination already exists and we're not overwriting
+    if fs.directory_exists(dst) and not overwrite then
+      return nil, "Destination directory already exists and overwrite is not enabled"
+    end
+
+    -- Create destination directory if it doesn't exist
+    if not fs.directory_exists(dst) then
+      local success, err = fs.create_directory(dst)
+      if not success then
+        return nil, "Failed to create destination directory: " .. (err or "unknown error")
+      end
+    end
+
+    -- Get all items from source directory
+    local items, err = fs.get_directory_contents(src, true) -- Include hidden files
+    if not items then
+      return nil, "Failed to read source directory: " .. (err or "unknown error")
+    end
+
+    -- Copy each item
+    for _, item in ipairs(items) do
+      local src_item_path = fs.join_paths(src, item)
+      local dst_item_path = fs.join_paths(dst, item)
+
+      if fs.is_directory(src_item_path) then
+        -- Recursively copy subdirectory
+        local success, err = fs.copy_directory(src_item_path, dst_item_path, overwrite)
+        if not success then
+          return nil, "Failed to copy subdirectory '" .. item .. "': " .. (err or "unknown error")
+        end
+      else
+        -- Copy file
+        local success, err = fs.copy_file(src_item_path, dst_item_path)
+        if not success then
+          return nil, "Failed to copy file '" .. item .. "': " .. (err or "unknown error")
+        end
+      end
+    end
+
+    return true
+  end, source_dir, target_dir)
+end
+
+--- Create a symbolic link with cross-platform support
+--- This function creates a symbolic link at link_path that points to target_path.
+--- It automatically detects if the target is a file or directory and creates
+--- the appropriate type of link. Note that on Windows, this may require
+--- administrator privileges or developer mode to be enabled.
+---
+--- @param target_path string Path to the target file or directory
+--- @param link_path string Path where the symbolic link will be created
+--- @return boolean|nil success True if the symlink was created successfully, nil on error
+--- @return string|nil error Error message if creating the symlink failed
+---
+--- @usage
+--- -- Create a symlink to a file
+--- local success, err = fs.create_symlink("/path/to/real_file.txt", "/path/to/link.txt")
+--- if not success then
+---   print("Failed to create symlink: " .. (err or "unknown error"))
+---   return
+--- end
+---
+--- -- Create a symlink to a directory
+--- fs.create_symlink("/path/to/real_directory", "/path/to/link_directory")
+function fs.create_symlink(target_path, link_path)
+  return safe_io_action(function(target, link)
+    -- Validate inputs
+    if not target or target == "" then
+      return nil, "Invalid target path: path cannot be empty"
+    end
+    if not link or link == "" then
+      return nil, "Invalid link path: path cannot be empty"
+    end
+
+    -- Check if target exists
+    if not (fs.file_exists(target) or fs.directory_exists(target)) then
+      return nil, "Target path does not exist: " .. target
+    end
+
+    -- Check if link already exists
+    if fs.file_exists(link) or fs.directory_exists(link) then
+      return nil, "Link path already exists: " .. link
+    end
+
+    -- Create parent directory for link if it doesn't exist
+    local link_dir = fs.get_directory_name(link)
+    if link_dir and link_dir ~= "" and not fs.directory_exists(link_dir) then
+      local success, err = fs.create_directory(link_dir)
+      if not success then
+        return nil, "Failed to create parent directory for link: " .. (err or "unknown error")
+      end
+    end
+
+    -- Determine if target is a directory
+    local is_dir = fs.is_directory(target)
+    local result, err
+
+    if is_windows() then
+      -- Windows command to create symlink
+      local command
+      if is_dir then
+        command = string.format('cmd /c mklink /D "%s" "%s"', link, target)
+      else
+        command = string.format('cmd /c mklink "%s" "%s"', link, target)
+      end
+
+      result = os.execute(command)
+      if not result then
+        err = "Failed to create symlink using command: "
+          .. command
+          .. " (This may require administrator privileges or developer mode on Windows)"
+      end
+    else
+      -- Unix command to create symlink
+      local command = string.format('ln -s "%s" "%s"', target, link)
+      result = os.execute(command)
+      if not result then
+        err = "Failed to create symlink using command: " .. command
+      end
+    end
+
+    if not result then
+      return nil, err or "Unknown error creating symlink"
+    end
+
+    return true
+  end, target_path, link_path)
 end
 
 return fs

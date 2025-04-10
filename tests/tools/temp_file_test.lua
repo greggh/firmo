@@ -144,21 +144,25 @@ describe("temp_file", function()
   end)
   
   describe("error handling", function()
-    it("should handle invalid paths for removal", function()
-      -- These functions return false, err rather than nil, err
-      local result, err = temp_file.remove(nil)
+    it("should fail when removing nil file path", { expect_error = true }, function()
+      -- Use test_helper.expect_error to properly capture and verify errors
+      local err = test_helper.expect_error(function()
+        return temp_file.remove(nil)
+      end)
       
-      expect(result).to.equal(false)
+      expect(err).to.exist()
       expect(err).to.be.a("table")
       expect(err.category).to.exist()
       expect(err.message).to.match("Missing file path")
     end)
     
-    it("should handle invalid paths for directory removal", function()
-      -- These functions return false, err rather than nil, err
-      local result, err = temp_file.remove_directory(nil)
+    it("should fail when removing nil directory path", { expect_error = true }, function()
+      -- Use test_helper.expect_error to properly capture and verify errors
+      local err = test_helper.expect_error(function()
+        return temp_file.remove_directory(nil)
+      end)
       
-      expect(result).to.equal(false)
+      expect(err).to.exist()
       expect(err).to.be.a("table")
       expect(err.category).to.exist()
       expect(err.message).to.match("Missing directory path")

@@ -266,7 +266,7 @@ local function deep_equals(a, b)
 end
 
 --- Gets a configuration value from the specified path
---- This function retrieves a value from the central configuration store using a 
+--- This function retrieves a value from the central configuration store using a
 --- dot-separated path notation. It returns a copy of the value to prevent direct
 --- modification of configuration data. If the path doesn't exist, it returns either
 --- the provided default value or an error object.
@@ -280,7 +280,7 @@ end
 --- -- Get a simple setting with default value
 --- local logging_level = central_config.get("logging.level", "info")
 ---
---- -- Get a complex configuration object 
+--- -- Get a complex configuration object
 --- local database_config = central_config.get("database")
 --- if database_config then
 ---   db.connect(database_config.host, database_config.port)
@@ -383,7 +383,7 @@ end
 ---
 --- -- Set a nested value
 --- central_config.set("database.connection", {
----   host = "localhost", 
+---   host = "localhost",
 ---   port = 5432,
 ---   username = "app_user",
 ---   password = "secret"
@@ -663,7 +663,7 @@ end
 --- -- Listen for all configuration changes
 --- central_config.on_change(nil, function(path, old_value, new_value)
 ---   print("Config changed: " .. path)
----   
+---
 ---   -- Trigger cache invalidation on core settings changes
 ---   if path:match("^cache%.") then
 ---     cache_system.invalidate(path)
@@ -719,7 +719,7 @@ end
 --- -- External process changed version file
 --- local new_version = read_version_from_file()
 --- central_config.set("app.version", new_version)
---- 
+---
 --- -- In rare cases, manually notify if bypass setter:
 --- -- central_config.notify_change("app.version", old_value, new_version)
 function M.notify_change(path, old_value, new_value)
@@ -1749,7 +1749,7 @@ function M.reset(module_name)
 end
 
 --- Configures the system from command-line or program options
---- This function applies configuration values from a table of options, typically coming from 
+--- This function applies configuration values from a table of options, typically coming from
 --- command-line arguments or program initialization parameters. It only processes options
 --- that follow the "module.setting" dot notation format, ignoring other entries. The function
 --- safely applies each valid option, logging warnings for any options that fail to apply.
@@ -1900,8 +1900,8 @@ end
 -- Export public interface with error handling wrappers
 
 --- Creates a deep copy of an object
---- This function creates a complete deep copy of the provided object, ensuring that 
---- modifications to the returned object don't affect the original. It's particularly 
+--- This function creates a complete deep copy of the provided object, ensuring that
+--- modifications to the returned object don't affect the original. It's particularly
 --- useful for tables, where it recursively copies all nested tables. For non-table
 --- values, it simply returns the value itself. This function is safe to use with any
 --- value type and handles nil values appropriately.
@@ -1916,7 +1916,7 @@ end
 ---   cache = { enabled = true, ttl = 3600 }
 --- }
 --- local config_copy = central_config.serialize(original_config)
---- 
+---
 --- -- Modify the copy without affecting the original
 --- config_copy.logging.level = "debug"
 --- print(original_config.logging.level) -- Still "info"
@@ -1936,8 +1936,8 @@ M.serialize = function(obj)
 end
 
 --- Deeply merges two tables together
---- This function recursively merges the source table into the target table. For overlapping 
---- keys that contain tables in both source and target, it performs a deep merge. For other 
+--- This function recursively merges the source table into the target table. For overlapping
+--- keys that contain tables in both source and target, it performs a deep merge. For other
 --- value types or when a key exists only in one table, the source value takes precedence.
 --- If an error occurs during merging, the function logs the error and returns the original
 --- target table unmodified.
@@ -1952,12 +1952,12 @@ end
 ---   logging = { level = "info", format = "text" },
 ---   timeouts = { connection = 30, request = 10 }
 --- }
---- 
+---
 --- local overrides = {
 ---   logging = { level = "debug" }, -- Only override the level
 ---   database = { host = "localhost", port = 5432 } -- Add new section
 --- }
---- 
+---
 --- local merged = central_config.merge(base_config, overrides)
 --- -- Result:
 --- -- {

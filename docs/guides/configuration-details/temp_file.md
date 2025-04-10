@@ -73,27 +73,87 @@ temp_file.configure({
 temp_file.set_temp_dir("./my-test-temp")
 ```
 
-## Creating Temporary Files
+## Creating and Using Temporary Files
 
-Create temporary files with automatic tracking:
+### Recommended Approach: Automatic Cleanup
+
+Always prefer automatic cleanup functions to ensure proper resource management, even when errors occur:
 
 ```lua
--- Create an empty temporary file
-local file_path, err = temp_file.create_temp_file("txt")
-if not file_path then
-  print("Error creating file:", err.message)
-  return
-end
+-- Use a temporary file with automatic cleanup
+local result, err = temp_file.with_temp_file("Initial content", function(file_path)
+  -- File is created with content and available at file_path
+  print("Using temporary file:", file_path)
+  
+  -- Read the file content
+  local content = fs.read_file(file_path)
+  
+  -- Process data
+  local processed = transform_data(content)
+  
+  -- Write back to the file
+  fs.write_file(file_path, processed)
+  
+  -- Return results from your operation
+  return {
+    success = true,
+    data_processed = #processed
+  }
+  
+  -- File is automatically removed after function returns,
+  -- even if an error occurs during processing
+end, "dat")
 
--- Create a temporary file with content
+-- Use a temporary directory with automatic cleanup
+local dir_result, dir_err = temp_file.with_temp_directory(function(dir_path)
+  -- Directory is created and available at dir_path
+  print("Using temporary directory:", dir_path)
+  
+  -- Create files in the directory
+  fs.write_file(dir_path .. "/config.json", '{"test": true}')
+  fs.write_file(dir_path .. "/data.csv", "id,name\n1,test")
+  
+  -- Run your operations with these files
+  run_tests_with_config(dir_path)
+  
+  -- Return results
+  return true
+  
+  -- Directory and all its contents are automatically removed
+  -- after function returns, even if an error occurs
+end)
+```
+
+### Alternative Approach (For Advanced Use Cases)
+
+For specialized scenarios where you need direct control over file lifecycle, you can use these functions:
+
+```lua
+-- Create a temporary file with content (requires manual cleanup)
 local file_with_content, err = temp_file.create_with_content(
   "This is test content",
   "lua"  -- File extension
 )
+if not file_with_content then
+  print("Error creating file:", err.message)
+  return
+end
 
--- Create a temporary directory
+-- IMPORTANT: Always register the file for cleanup
+temp_file.register_file(file_with_content)
+
+-- Create a temporary directory (requires manual cleanup)
 local dir_path, err = temp_file.create_temp_directory()
+if not dir_path then
+  print("Error creating directory:", err.message)
+  return
+end
+
+-- IMPORTANT: Always register the directory for cleanup
+temp_file.register_directory(dir_path)
 ```
+
+> ⚠️ **Warning**: Always prefer `with_temp_file()` and `with_temp_directory()` for automatic cleanup. Manual file management should only be used in cases where you need to control the lifecycle across multiple functions.
 
 ## Test Context Integration
 

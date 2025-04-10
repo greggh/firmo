@@ -32,46 +32,46 @@ logging.configure_from_config("Reporting:Schema")
 -- Schema for coverage data structure
 M.COVERAGE_SCHEMA = {
   type = "table",
-  required = {"files", "summary"},
+  required = { "files", "summary" },
   properties = {
     files = {
       type = "table",
       description = "Table containing coverage data for each file",
       dynamic_properties = {
         type = "table",
-        required = {"total_lines", "covered_lines", "line_coverage_percent"},
+        required = { "total_lines", "covered_lines", "line_coverage_percent" },
         properties = {
-          total_lines = {type = "number", minimum = 0},
-          covered_lines = {type = "number", minimum = 0},
-          executable_lines = {type = "number", minimum = 0, optional = true},
-          line_coverage_percent = {type = "number", minimum = 0, maximum = 100},
-          total_functions = {type = "number", minimum = 0, optional = true},
-          covered_functions = {type = "number", minimum = 0, optional = true},
-          function_coverage_percent = {type = "number", minimum = 0, maximum = 100, optional = true},
-          total_blocks = {type = "number", minimum = 0, optional = true},
-          covered_blocks = {type = "number", minimum = 0, optional = true},
-          block_coverage_percent = {type = "number", minimum = 0, maximum = 100, optional = true}
-        }
-      }
+          total_lines = { type = "number", minimum = 0 },
+          covered_lines = { type = "number", minimum = 0 },
+          executable_lines = { type = "number", minimum = 0, optional = true },
+          line_coverage_percent = { type = "number", minimum = 0, maximum = 100 },
+          total_functions = { type = "number", minimum = 0, optional = true },
+          covered_functions = { type = "number", minimum = 0, optional = true },
+          function_coverage_percent = { type = "number", minimum = 0, maximum = 100, optional = true },
+          total_blocks = { type = "number", minimum = 0, optional = true },
+          covered_blocks = { type = "number", minimum = 0, optional = true },
+          block_coverage_percent = { type = "number", minimum = 0, maximum = 100, optional = true },
+        },
+      },
     },
     summary = {
       type = "table",
-      required = {"total_files", "total_lines", "covered_lines", "line_coverage_percent"},
+      required = { "total_files", "total_lines", "covered_lines", "line_coverage_percent" },
       properties = {
-        total_files = {type = "number", minimum = 0},
-        covered_files = {type = "number", minimum = 0, optional = true},
-        total_lines = {type = "number", minimum = 0},
-        covered_lines = {type = "number", minimum = 0},
-        executable_lines = {type = "number", minimum = 0, optional = true},
-        line_coverage_percent = {type = "number", minimum = 0, maximum = 100},
-        total_functions = {type = "number", minimum = 0, optional = true},
-        covered_functions = {type = "number", minimum = 0, optional = true},
-        function_coverage_percent = {type = "number", minimum = 0, maximum = 100, optional = true},
-        total_blocks = {type = "number", minimum = 0, optional = true},
-        covered_blocks = {type = "number", minimum = 0, optional = true},
-        block_coverage_percent = {type = "number", minimum = 0, maximum = 100, optional = true},
-        overall_percent = {type = "number", minimum = 0, maximum = 100, optional = true}
-      }
+        total_files = { type = "number", minimum = 0 },
+        covered_files = { type = "number", minimum = 0, optional = true },
+        total_lines = { type = "number", minimum = 0 },
+        covered_lines = { type = "number", minimum = 0 },
+        executable_lines = { type = "number", minimum = 0, optional = true },
+        line_coverage_percent = { type = "number", minimum = 0, maximum = 100 },
+        total_functions = { type = "number", minimum = 0, optional = true },
+        covered_functions = { type = "number", minimum = 0, optional = true },
+        function_coverage_percent = { type = "number", minimum = 0, maximum = 100, optional = true },
+        total_blocks = { type = "number", minimum = 0, optional = true },
+        covered_blocks = { type = "number", minimum = 0, optional = true },
+        block_coverage_percent = { type = "number", minimum = 0, maximum = 100, optional = true },
+        overall_percent = { type = "number", minimum = 0, maximum = 100, optional = true },
+      },
     },
     original_files = {
       type = "table",
@@ -80,145 +80,145 @@ M.COVERAGE_SCHEMA = {
       dynamic_properties = {
         type = "table",
         properties = {
-          source = {type = "any"}, -- Can be string or table of lines
-          executable_lines = {type = "table", optional = true},
-          functions = {type = "table", optional = true},
-          lines = {type = "table", optional = true}
-        }
-      }
+          source = { type = "any" }, -- Can be string or table of lines
+          executable_lines = { type = "table", optional = true },
+          functions = { type = "table", optional = true },
+          lines = { type = "table", optional = true },
+        },
+      },
     },
-    timestamp = {type = "string", optional = true},
-    version = {type = "string", optional = true}
-  }
+    timestamp = { type = "string", optional = true },
+    version = { type = "string", optional = true },
+  },
 }
 
 -- Schema for test results data structure
 M.TEST_RESULTS_SCHEMA = {
   type = "table",
-  required = {"name", "tests"},
+  required = { "name", "tests" },
   properties = {
-    name = {type = "string"},
-    timestamp = {type = "string", optional = true},
-    tests = {type = "number", minimum = 0},
-    failures = {type = "number", minimum = 0, optional = true},
-    errors = {type = "number", minimum = 0, optional = true},
-    skipped = {type = "number", minimum = 0, optional = true},
-    time = {type = "number", minimum = 0, optional = true},
+    name = { type = "string" },
+    timestamp = { type = "string", optional = true },
+    tests = { type = "number", minimum = 0 },
+    failures = { type = "number", minimum = 0, optional = true },
+    errors = { type = "number", minimum = 0, optional = true },
+    skipped = { type = "number", minimum = 0, optional = true },
+    time = { type = "number", minimum = 0, optional = true },
     test_cases = {
       type = "table",
       optional = true,
       array_of = {
         type = "table",
-        required = {"name"},
+        required = { "name" },
         properties = {
-          name = {type = "string"},
-          classname = {type = "string", optional = true},
-          time = {type = "number", minimum = 0, optional = true},
+          name = { type = "string" },
+          classname = { type = "string", optional = true },
+          time = { type = "number", minimum = 0, optional = true },
           status = {
             type = "string",
-            enum = {"pass", "fail", "error", "skipped", "pending"},
-            optional = true
+            enum = { "pass", "fail", "error", "skipped", "pending" },
+            optional = true,
           },
           failure = {
             type = "table",
             optional = true,
             properties = {
-              message = {type = "string", optional = true},
-              type = {type = "string", optional = true},
-              details = {type = "string", optional = true}
-            }
+              message = { type = "string", optional = true },
+              type = { type = "string", optional = true },
+              details = { type = "string", optional = true },
+            },
           },
           error = {
             type = "table",
             optional = true,
             properties = {
-              message = {type = "string", optional = true},
-              type = {type = "string", optional = true},
-              details = {type = "string", optional = true}
-            }
-          }
-        }
-      }
-    }
-  }
+              message = { type = "string", optional = true },
+              type = { type = "string", optional = true },
+              details = { type = "string", optional = true },
+            },
+          },
+        },
+      },
+    },
+  },
 }
 
 -- Schema for quality data structure
 M.QUALITY_SCHEMA = {
   type = "table",
-  required = {"level", "summary"},
+  required = { "level", "summary" },
   properties = {
-    level = {type = "number", minimum = 0, maximum = 5},
-    level_name = {type = "string", optional = true},
+    level = { type = "number", minimum = 0, maximum = 5 },
+    level_name = { type = "string", optional = true },
     tests = {
       type = "table",
       optional = true,
       dynamic_properties = {
         type = "table",
         properties = {
-          assertions = {type = "number", minimum = 0, optional = true},
-          quality_score = {type = "number", minimum = 0, maximum = 100, optional = true},
-          patterns = {type = "table", optional = true},
-          issues = {type = "table", optional = true}
-        }
-      }
+          assertions = { type = "number", minimum = 0, optional = true },
+          quality_score = { type = "number", minimum = 0, maximum = 100, optional = true },
+          patterns = { type = "table", optional = true },
+          issues = { type = "table", optional = true },
+        },
+      },
     },
     summary = {
       type = "table",
-      required = {"tests_analyzed", "quality_percent"},
+      required = { "tests_analyzed", "quality_percent" },
       properties = {
-        tests_analyzed = {type = "number", minimum = 0},
-        tests_passing_quality = {type = "number", minimum = 0},
-        quality_percent = {type = "number", minimum = 0, maximum = 100},
-        assertions_total = {type = "number", minimum = 0, optional = true},
-        assertions_per_test_avg = {type = "number", minimum = 0, optional = true},
-        issues = {type = "table", optional = true}
-      }
-    }
-  }
+        tests_analyzed = { type = "number", minimum = 0 },
+        tests_passing_quality = { type = "number", minimum = 0 },
+        quality_percent = { type = "number", minimum = 0, maximum = 100 },
+        assertions_total = { type = "number", minimum = 0, optional = true },
+        assertions_per_test_avg = { type = "number", minimum = 0, optional = true },
+        issues = { type = "table", optional = true },
+      },
+    },
+  },
 }
 
 -- Schema for HTML coverage format
 M.HTML_COVERAGE_SCHEMA = {
   type = "string",
-  pattern = "^<!DOCTYPE html>"
+  pattern = "^<!DOCTYPE html>",
 }
 
 -- Schema for JSON coverage format
 M.JSON_COVERAGE_SCHEMA = {
   type = "table",
-  required = {"files", "summary"},
+  required = { "files", "summary" },
   -- Same structure as COVERAGE_SCHEMA
 }
 
 -- Schema for LCOV coverage format
 M.LCOV_COVERAGE_SCHEMA = {
   type = "string",
-  pattern = "^TN:"
+  pattern = "^TN:",
 }
 
 -- Schema for Cobertura XML coverage format
 M.COBERTURA_COVERAGE_SCHEMA = {
   type = "string",
-  pattern = "^<%?xml"
+  pattern = "^<%?xml",
 }
 
 -- Schema for TAP test results format
 M.TAP_RESULTS_SCHEMA = {
   type = "string",
-  pattern = "^TAP version "
+  pattern = "^TAP version ",
 }
 
 -- Schema for JUnit XML test results format
 M.JUNIT_RESULTS_SCHEMA = {
   type = "string",
-  pattern = "^<%?xml"
+  pattern = "^<%?xml",
 }
 
 -- Schema for CSV test results format
 M.CSV_RESULTS_SCHEMA = {
   type = "string",
-  pattern = "^[\"']?test[\"']?,"
+  pattern = "^[\"']?test[\"']?,",
 }
 
 -- Utility functions for schema validation
@@ -237,7 +237,7 @@ local function validate_type(value, schema)
       return false, "Value is nil but required"
     end
   end
-  
+
   -- Check type
   if schema.type == "any" then
     return true
@@ -246,7 +246,7 @@ local function validate_type(value, schema)
     if schema.pattern and not value:match(schema.pattern) then
       return false, "String does not match required pattern: " .. schema.pattern
     end
-    
+
     -- Check enum if specified
     if schema.enum then
       local found = false
@@ -260,7 +260,7 @@ local function validate_type(value, schema)
         return false, "String is not one of the allowed values: " .. table.concat(schema.enum, ", ")
       end
     end
-    
+
     return true
   elseif schema.type == "number" and type(value) == "number" then
     -- Check number constraints
@@ -291,18 +291,18 @@ end
 ---@return string? error_message Error message if validation failed, including the path to the failure point
 local function validate_schema(value, schema, path)
   path = path or ""
-  
+
   -- Type validation is the first step
   local valid, err = validate_type(value, schema)
   if not valid then
     return false, path .. ": " .. err
   end
-  
+
   -- If it's optional and nil, no further validation needed
   if value == nil and schema.optional then
     return true
   end
-  
+
   -- For tables, validate properties
   if schema.type == "table" and type(value) == "table" then
     -- Check required properties
@@ -313,7 +313,7 @@ local function validate_schema(value, schema, path)
         end
       end
     end
-    
+
     -- Check properties
     if schema.properties then
       for prop_name, prop_schema in pairs(schema.properties) do
@@ -326,7 +326,7 @@ local function validate_schema(value, schema, path)
         end
       end
     end
-    
+
     -- Check array items
     if schema.array_of and #value > 0 then
       for i, item in ipairs(value) do
@@ -337,7 +337,7 @@ local function validate_schema(value, schema, path)
         end
       end
     end
-    
+
     -- Handle dynamic properties (like files table where keys are file paths)
     if schema.dynamic_properties then
       for key, val in pairs(value) do
@@ -351,7 +351,7 @@ local function validate_schema(value, schema, path)
       end
     end
   end
-  
+
   return true
 end
 
@@ -360,39 +360,39 @@ end
 ---@return boolean success Whether the data is valid
 ---@return string? error_message Error message if validation failed
 function M.validate(data, schema_name)
-  logger.debug("Validating data against schema", {schema = schema_name})
-  
+  logger.debug("Validating data against schema", { schema = schema_name })
+
   local schema = M[schema_name]
   if not schema then
-    logger.error("Schema not found", {schema_name = schema_name})
+    logger.error("Schema not found", { schema_name = schema_name })
     return false, "Schema not found: " .. schema_name
   end
-  
+
   -- For string validation that needs to test file contents
   if schema.type == "string" and type(data) == "string" then
     if schema.pattern and not data:sub(1, 50):match(schema.pattern) then
       logger.warn("String validation failed", {
-        schema = schema_name, 
+        schema = schema_name,
         pattern = schema.pattern,
-        data_sample = data:sub(1, 50) .. "..."
+        data_sample = data:sub(1, 50) .. "...",
       })
       return false, "String content does not match required pattern"
     end
     return true
   end
-  
+
   -- For regular schema validation
   local is_valid, err = validate_schema(data, schema)
-  
+
   if not is_valid then
     logger.warn("Schema validation failed", {
       schema = schema_name,
-      error = err
+      error = err,
     })
     return false, err
   end
-  
-  logger.debug("Schema validation successful", {schema = schema_name})
+
+  logger.debug("Schema validation successful", { schema = schema_name })
   return true
 end
 
@@ -400,20 +400,20 @@ end
 ---@return string? schema_name The detected schema name or nil if no match
 function M.detect_schema(data)
   logger.debug("Detecting schema for data")
-  
+
   if type(data) == "table" then
     -- Check for coverage data
     if data.files and data.summary then
       logger.debug("Detected coverage data")
       return "COVERAGE_SCHEMA"
     end
-    
+
     -- Check for test results data
     if data.name and data.tests then
       logger.debug("Detected test results data")
       return "TEST_RESULTS_SCHEMA"
     end
-    
+
     -- Check for quality data
     if data.level and data.summary and data.summary.quality_percent then
       logger.debug("Detected quality data")
@@ -422,7 +422,7 @@ function M.detect_schema(data)
   elseif type(data) == "string" then
     -- Check string formats
     local first_line = data:match("^([^\n]+)")
-    
+
     if first_line:match("^<!DOCTYPE html") then
       logger.debug("Detected HTML format")
       return "HTML_COVERAGE_SCHEMA"
@@ -446,7 +446,7 @@ function M.detect_schema(data)
       return "CSV_RESULTS_SCHEMA"
     end
   end
-  
+
   logger.warn("Unable to detect schema for data")
   return nil
 end
@@ -456,8 +456,8 @@ end
 ---@return boolean success Whether the data is valid for the given format
 ---@return string? error_message Error message if validation failed
 function M.validate_format(data, format)
-  logger.debug("Validating format", {format = format})
-  
+  logger.debug("Validating format", { format = format })
+
   -- Map format names to schemas
   local format_schema_map = {
     html = "HTML_COVERAGE_SCHEMA",
@@ -466,20 +466,20 @@ function M.validate_format(data, format)
     cobertura = "COBERTURA_COVERAGE_SCHEMA",
     tap = "TAP_RESULTS_SCHEMA",
     junit = "JUNIT_RESULTS_SCHEMA",
-    csv = "CSV_RESULTS_SCHEMA"
+    csv = "CSV_RESULTS_SCHEMA",
   }
-  
+
   local schema_name = format_schema_map[format]
   if not schema_name then
     -- Try to detect schema based on data
     schema_name = M.detect_schema(data)
-    
+
     if not schema_name then
-      logger.warn("Unknown format", {format = format})
+      logger.warn("Unknown format", { format = format })
       return false, "Unknown format: " .. format
     end
   end
-  
+
   return M.validate(data, schema_name)
 end
 

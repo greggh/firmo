@@ -296,20 +296,14 @@ function coverage.save_stats()
     return false, "Stats file path not configured"
   end
 
-  -- Create temp file for atomic write
-  local temp_stats = temp_file.create_temp_file("coverage-stats")
-  if not temp_stats then
-    return false, "Failed to create temporary stats file"
-  end
+  -- Use temp file for atomic write with automatic cleanup
+  local result, err = temp_file.with_temp_file("", function(temp_stats)
+    -- Write file header
+    local ok, write_err = filesystem.write_file(temp_stats, STATS_FILE_HEADER)
+    if not ok then
+      return false, write_err
+    end
 
-  -- Write file header
-  local ok, write_err = filesystem.write_file(temp_stats, STATS_FILE_HEADER)
-  if not ok then
-    temp_file.remove(temp_stats)
-    return false, write_err
-  end
-
-  local success, err = error_handler.try(function()
     -- Load existing stats if they exist
     local old_stats = coverage.load_stats() or {}
 
@@ -352,27 +346,25 @@ function coverage.save_stats()
     -- Write to temp file
     local ok, write_err = filesystem.write_file(temp_stats, table.concat(content))
     if not ok then
-      return nil, write_err
+      return false, write_err
     end
 
     -- Move temp file to final location
     local move_ok, move_err = filesystem.move_file(temp_stats, statsfile)
     if not move_ok then
-      -- Try to clean up temp file
-      temp_file.remove(temp_stats)
-      return nil, move_err
+      return false, move_err
     end
+    
+    return true
+  end, "coverage-stats")
 
-    -- Clear current data
-    state.data = {}
-  end)
+  if not result then
+    return false, err or "Failed to save coverage stats"
+  end
+  -- Clear current data
+  state.data = {}
 
-  if not success then
-    error_handler.throw("Failed to save coverage stats: " .. err.message,
-      error_handler.CATEGORY.IO,
-      error_handler.SEVERITY.ERROR,
-      {error = err}
-    )
+  return true
   end
 end
 

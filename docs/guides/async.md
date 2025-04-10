@@ -13,6 +13,7 @@ This guide explains how to write effective asynchronous tests, handle common asy
 The async module uses the concept of an "async context" to manage asynchronous test execution. An async context is an execution environment where async operations can be performed safely with appropriate timeout handling and error propagation.
 
 Key points about async context:
+
 - Created implicitly when using `it_async()` or explicitly with `async()`
 - Required for using `await()`, `wait_until()`, and other async operations
 - Tracks the execution state and provides proper error handling
@@ -44,10 +45,10 @@ describe("User Service", function()
     start_fetch_user(function(data)
       user_data = data
     end)
-    
+
     -- Wait for operation to complete
     firmo.wait_until(function() return user_data ~= nil end)
-    
+
     -- Assert on the results
     expect(user_data).to.exist()
     expect(user_data.id).to.be.a("number")
@@ -64,10 +65,10 @@ When you need to wait for a specific amount of time:
 it_async("processes data after a delay", function()
   -- Start operation
   start_delayed_process()
-  
+
   -- Wait for 100ms
   firmo.await(100)
-  
+
   -- Check result (should be ready after 100ms)
   expect(get_process_result()).to.exist()
 end)
@@ -81,12 +82,12 @@ For more precise control, use `wait_until()` to wait for a specific condition:
 it_async("waits for a specific condition", function()
   -- Start process that takes variable time
   start_variable_process()
-  
+
   -- Wait for specific condition rather than fixed time
-  firmo.wait_until(function() 
-    return get_process_state() == "completed" 
+  firmo.wait_until(function()
+    return get_process_state() == "completed"
   end, 1000) -- 1 second timeout
-  
+
   -- Now safe to check results
   expect(get_process_result()).to.equal("success")
 end)
@@ -101,12 +102,12 @@ Async tests have timeouts to prevent hanging. You can customize these timeouts:
 it_async("completes a long operation", function()
   -- Start long operation
   start_long_operation()
-  
+
   -- Wait with longer timeout
-  firmo.wait_until(function() 
-    return operation_complete() 
+  firmo.wait_until(function()
+    return operation_complete()
   end, 5000) -- 5 second timeout
-  
+
   expect(get_operation_result()).to.exist()
 end, 6000) -- 6 second test timeout
 
@@ -130,15 +131,15 @@ it_async("handles multiple concurrent operations", function()
     firmo.await(50)
     return { {id = 1, name = "User 1"}, {id = 2, name = "User 2"} }
   end
-  
+
   local fetch_posts = function()
     firmo.await(70)
     return { {id = 1, title = "Post 1"}, {id = 2, title = "Post 2"} }
   end
-  
+
   -- Run both in parallel (completes in ~70ms, not 120ms)
   local results = firmo.parallel_async({fetch_users, fetch_posts})
-  
+
   -- Check results (returned in same order as functions)
   expect(#results[1]).to.equal(2) -- Two users
   expect(#results[2]).to.equal(2) -- Two posts
@@ -152,7 +153,7 @@ Many async APIs use callbacks. Here's how to test them:
 ```lua
 it_async("tests callback-based API", function()
   local result = nil
-  
+
   -- Call function that accepts callback
   api.fetch_data(function(data, error)
     if error then
@@ -161,10 +162,10 @@ it_async("tests callback-based API", function()
       result = {success = true, data = data}
     end
   end)
-  
+
   -- Wait for callback to be called
   firmo.wait_until(function() return result ~= nil end)
-  
+
   -- Check results
   expect(result.success).to.be_truthy()
   expect(result.data).to.exist()
@@ -178,7 +179,7 @@ For APIs with promise-like patterns:
 ```lua
 it_async("tests promise-like API", function()
   let result = nil
-  
+
   -- Start promise-based operation
   api.fetch_data()
     .then(function(data)
@@ -187,10 +188,10 @@ it_async("tests promise-like API", function()
     .catch(function(error)
       result = {success = false, error = error}
     end)
-  
+
   -- Wait for promise to resolve
   firmo.wait_until(function() return result ~= nil end)
-  
+
   -- Check results
   expect(result.success).to.be_truthy()
   expect(result.data).to.exist()
@@ -209,10 +210,10 @@ it_async("handles async errors correctly", { expect_error = true }, function()
       firmo.await(10)
       error("Operation failed")
     end
-    
+
     firmo.parallel_async({ fail_operation })
   end)
-  
+
   -- Verify error was thrown
   expect(result).to.equal(false)
   expect(error).to.match("Operation failed")
@@ -229,27 +230,27 @@ Combining async testing with mocking:
 it_async("tests async function with mocked dependencies", function()
   -- Create mock with spy
   local api_mock = firmo.mock({
-    fetch_data = function(callback) 
+    fetch_data = function(callback)
       -- Mock will call callback after delay
       firmo.set_timeout(function()
         callback({success = true, data = "mocked data"})
       end, 10)
     end
   })
-  
+
   -- Call code that uses the mocked API
   local result = nil
-  my_service.get_data(api_mock, function(data) 
+  my_service.get_data(api_mock, function(data)
     result = data
   end)
-  
+
   -- Wait for operation to complete
   firmo.wait_until(function() return result ~= nil end)
-  
+
   -- Verify results
   expect(result.success).to.be_truthy()
   expect(result.data).to.equal("mocked data")
-  
+
   -- Verify mock was called correctly
   expect(api_mock.fetch_data.called).to.be_truthy()
   expect(api_mock.fetch_data.calls[1]).to.exist()
@@ -264,21 +265,21 @@ For testing async filesystem operations:
 it_async("tests async file operations", function()
   -- Create temporary file
   local path = "/tmp/test-" .. os.time()
-  
+
   -- Write to file asynchronously
   fs.write_file_async(path, "test data", function(success)
     expect(success).to.be_truthy()
   end)
-  
+
   -- Wait for file to exist
-  firmo.wait_until(function() 
-    return fs.file_exists(path) 
+  firmo.wait_until(function()
+    return fs.file_exists(path)
   end)
-  
+
   -- Read file
   local content = fs.read_file(path)
   expect(content).to.equal("test data")
-  
+
   -- Clean up
   fs.delete_file(path)
 end)
@@ -292,7 +293,7 @@ When using callback-style async tests, always call `done()` or ensure your test 
 
 ```lua
 it_async("always completes test flow", function(done)
-  start_operation(function() 
+  start_operation(function()
     -- Always call done() in each code path
     expect(true).to.be_truthy()
     done()
@@ -322,18 +323,18 @@ Always clean up resources created during async tests:
 ```lua
 it_async("cleans up resources", function()
   local resources = {}
-  
+
   -- Register cleanup function
   after(function()
     for _, resource in pairs(resources) do
       resource:cleanup()
     end
   end)
-  
+
   -- Create resource
   local resource = create_resource()
   table.insert(resources, resource)
-  
+
   -- Use resource in test...
 end)
 ```
@@ -360,7 +361,7 @@ it_async("handles both success and error", function()
   let success_result = get_async_success()
   firmo.wait_until(function() return success_result.complete end)
   expect(success_result.value).to.exist()
-  
+
   -- Test error case
   let error_result = get_async_error()
   firmo.wait_until(function() return error_result.complete end)
@@ -390,17 +391,17 @@ it_async("uses sequential async flow", function()
   local result1 = nil
   operation1(function(res) { result1 = res })
   firmo.wait_until(function() return result1 ~= nil end)
-  
+
   -- Run second operation
   local result2 = nil
   operation2(result1, function(res) { result2 = res })
   firmo.wait_until(function() return result2 ~= nil end)
-  
+
   -- Run third operation
   local result3 = nil
   operation3(result2, function(res) { result3 = res })
   firmo.wait_until(function() return result3 ~= nil end)
-  
+
   -- Verify final result
   expect(result3).to.exist()
 end)
@@ -412,12 +413,12 @@ Make sure each async test is independent and doesn't rely on state from other te
 
 ```lua
 -- Each test initializes its own state
-before_each(function()
+before(function()
   test_state = create_clean_state()
 })
 
 -- Each test cleans up afterward
-after_each(function()
+after(function()
   test_state:cleanup()
 })
 ```
@@ -473,7 +474,7 @@ it_async("properly cleans up", function()
   after(function()
     cleanup_resources()
   end)
-  
+
   -- Test code...
 })
 ```
@@ -488,14 +489,14 @@ it_async("properly cleans up", function()
 it_async("cleans up ongoing operations", function()
   -- Store reference
   local operation = start_async_operation()
-  
+
   -- Clean up even if test fails
   after(function()
     if operation then
       operation:cancel()
     }
   })
-  
+
   -- Test code...
 })
 ```
@@ -540,8 +541,8 @@ firmo.wait_until(function() return user.email ~= nil end)
 expect(user.email).to.be.a("string")
 
 -- More efficient: single wait for all data
-firmo.wait_until(function() 
-  return user.name ~= nil and user.email ~= nil 
+firmo.wait_until(function()
+  return user.name ~= nil and user.email ~= nil
 end)
 expect(user.name).to.be.a("string")
 expect(user.email).to.be.a("string")
@@ -552,6 +553,7 @@ expect(user.email).to.be.a("string")
 Asynchronous testing is essential for validating code with delayed execution or callbacks. The Firmo async module provides powerful tools for writing clear, reliable async tests.
 
 Key takeaways:
+
 - Use `it_async()` for simple async tests
 - Use `wait_until()` for conditional waiting
 - Use `parallel_async()` for concurrent operations
@@ -562,3 +564,4 @@ Key takeaways:
 For complete API details, refer to the [Async Module API Reference](/docs/api/async.md).
 
 For practical examples, see the [Async Examples](/examples/async_examples.md).
+

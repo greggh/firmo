@@ -1,11 +1,11 @@
 --[[
     Centralized Logging System for the Firmo Framework
-    
+
     This module provides a comprehensive, structured logging system with support
     for multiple output formats, log levels, and context-enriched messages. It
     integrates with the central configuration system and supports both global
     and per-module logging configuration.
-    
+
     Features:
     - Named logger instances with independent configuration
     - Hierarchical log levels (DEBUG, INFO, WARN, ERROR, FATAL)
@@ -19,11 +19,11 @@
     - Source location tracking
     - Performance-optimized logging
     - Test-aware log suppression
-    
+
     The logging system serves as a foundation for debugging, monitoring, and
     diagnostics throughout the framework, providing consistent log formatting
     and centralized control over verbosity.
-    
+
     @module logging
     @author Firmo Team
     @license MIT
@@ -38,9 +38,10 @@
 ---@field WARN number Warning log level
 ---@field ERROR number Error log level (least verbose)
 ---@field get_logger fun(name: string): logger_instance Create a named logger instance
+---@field get_logger fun(name: string): logger_instance Create a named logger instance
+---@field get_configured_logger fun(name: string): logger_instance Create and configure a named logger instance
 ---@field configure fun(options: {level?: number|string, file?: string, format?: string, console?: boolean, max_file_size?: number, include_source?: boolean, include_timestamp?: boolean, include_level?: boolean, include_colors?: boolean, colors?: table<string, string>}): logging Configure the logging system
 ---@field configure_from_config fun(config_key: string): logging Configure logging from central config
----@field set_level fun(level: number|string): logging Set global log level
 ---@field reset fun(): logging Reset logging to defaults
 ---@field disable fun(): logging Disable all logging
 ---@field enable fun(): logging Re-enable logging
@@ -147,6 +148,26 @@ local function get_formatter_integration()
   return formatter_integration_module
 end
 
+--- Convert a log level from string or number to its numeric value
+--- @param level string|number The log level to normalize
+--- @return number|nil The numeric log level value, or nil if invalid
+local function normalize_log_level(level)
+  if type(level) == "number" then
+    -- Verify it's a valid level number
+    for _, num_level in pairs(M.LEVELS) do
+      if level == num_level then
+        return level
+      end
+    end
+    return nil
+  elseif type(level) == "string" then
+    -- Convert string level (e.g. "INFO") to number
+    local upper_level = level:upper()
+    return M.LEVELS[upper_level]
+  end
+  return nil
+end
+
 -- Log levels
 M.LEVELS = {
   FATAL = 0,
@@ -155,35 +176,35 @@ M.LEVELS = {
   INFO = 3,
   DEBUG = 4,
   TRACE = 5,
-  VERBOSE = 5  -- for backward compatibility
+  VERBOSE = 5, -- for backward compatibility
 }
 
 -- Default configuration
 local config = {
-  global_level = M.LEVELS.INFO,  -- Default global level
-  module_levels = {},            -- Per-module log levels
-  timestamps = true,             -- Enable/disable timestamps
-  use_colors = true,             -- Enable/disable colors
-  output_file = nil,             -- Log to file (nil = console only)
-  log_dir = "logs",              -- Directory to store log files
-  silent = false,                -- Suppress all output when true
-  max_file_size = 50 * 1024,     -- 50KB default size limit per log file (small for testing)
-  max_log_files = 5,             -- Number of rotated log files to keep
-  date_pattern = "%Y-%m-%d",     -- Date pattern for log filenames
-  format = "text",               -- Default log format: "text" or "json"
-  json_file = nil,               -- Separate JSON structured log file
-  module_filter = nil,           -- Filter logs to specific modules (nil = all)
-  module_blacklist = {},         -- List of modules to exclude from logging
-  buffer_size = 0,               -- Buffer size (0 = no buffering)
-  buffer_flush_interval = 5,     -- Seconds between auto-flush (if buffering)
-  standard_metadata = {},        -- Standard metadata fields to include in all logs
+  global_level = M.LEVELS.INFO, -- Default global level
+  module_levels = {}, -- Per-module log levels
+  timestamps = true, -- Enable/disable timestamps
+  use_colors = true, -- Enable/disable colors
+  output_file = nil, -- Log to file (nil = console only)
+  log_dir = "logs", -- Directory to store log files
+  silent = false, -- Suppress all output when true
+  max_file_size = 50 * 1024, -- 50KB default size limit per log file (small for testing)
+  max_log_files = 5, -- Number of rotated log files to keep
+  date_pattern = "%Y-%m-%d", -- Date pattern for log filenames
+  format = "text", -- Default log format: "text" or "json"
+  json_file = nil, -- Separate JSON structured log file
+  module_filter = nil, -- Filter logs to specific modules (nil = all)
+  module_blacklist = {}, -- List of modules to exclude from logging
+  buffer_size = 0, -- Buffer size (0 = no buffering)
+  buffer_flush_interval = 5, -- Seconds between auto-flush (if buffering)
+  standard_metadata = {}, -- Standard metadata fields to include in all logs
 }
 
 -- ANSI color codes
 local COLORS = {
   RESET = "\27[0m",
   RED = "\27[31m",
-  BRIGHT_RED = "\27[91m",  
+  BRIGHT_RED = "\27[91m",
   GREEN = "\27[32m",
   YELLOW = "\27[33m",
   BLUE = "\27[34m",
@@ -235,12 +256,12 @@ local function is_enabled(level, module_name)
   if config.silent then
     return false
   end
-  
+
   -- Ensure level is a number
   if type(level) ~= "number" then
     return false
   end
-  
+
   -- Check module filter/blacklist
   if module_name then
     -- Skip if module is blacklisted
@@ -248,7 +269,7 @@ local function is_enabled(level, module_name)
       if module_name == blacklisted then
         return false
       end
-      
+
       -- Support wildcard patterns at the end
       if type(blacklisted) == "string" and blacklisted:match("%*$") then
         local prefix = blacklisted:gsub("%*$", "")
@@ -257,11 +278,11 @@ local function is_enabled(level, module_name)
         end
       end
     end
-    
+
     -- If a module filter is specified, only allow matching modules
     if config.module_filter then
       local match = false
-      
+
       -- Handle array of filters
       if type(config.module_filter) == "table" then
         for _, filter in ipairs(config.module_filter) do
@@ -270,7 +291,7 @@ local function is_enabled(level, module_name)
             match = true
             break
           end
-          
+
           -- Support wildcard patterns at the end
           if type(filter) == "string" and filter:match("%*$") then
             local prefix = filter:gsub("%*$", "")
@@ -286,7 +307,7 @@ local function is_enabled(level, module_name)
         if module_name == config.module_filter then
           match = true
         end
-        
+
         -- Support wildcard pattern at the end
         if config.module_filter:match("%*$") then
           local prefix = config.module_filter:gsub("%*$", "")
@@ -295,24 +316,33 @@ local function is_enabled(level, module_name)
           end
         end
       end
-      
+
       if not match then
         return false
       end
     end
   end
-  
-  -- Check module-specific level
-  if module_name and config.module_levels[module_name] then
+
+  -- Check module-specific level first, if module is specified
+  if module_name then
     local module_level = config.module_levels[module_name]
-    -- Ensure module_level is a number
-    if type(module_level) == "number" then
-      return level <= module_level
+    if module_level then
+      -- Normalize string levels like "INFO" to numbers
+      local numeric_level = normalize_log_level(module_level)
+      if numeric_level then
+        return level <= numeric_level
+      end
     end
   end
-  
-  -- Fall back to global level
-  return level <= config.global_level
+
+  -- Fall back to global level if no module level found
+  local global_level = config.global_level
+  if type(global_level) ~= "number" then
+    -- Handle case where global level is a string
+    global_level = normalize_log_level(global_level) or M.LEVELS.INFO
+  end
+
+  return level <= global_level
 end
 
 --- Format a log message for text output
@@ -323,19 +353,19 @@ end
 ---@return string The formatted log message
 local function format_log(level, module_name, message, params)
   local parts = {}
-  
+
   -- Add timestamp if enabled
   if config.timestamps then
     table.insert(parts, get_timestamp())
   end
-  
+
   -- Add level with color if enabled
   local level_str = LEVEL_NAMES[level] or "UNKNOWN"
   if config.use_colors then
     level_str = (LEVEL_COLORS[level] or "") .. level_str .. COLORS.RESET
   end
   table.insert(parts, level_str)
-  
+
   -- Add module name if provided
   if module_name then
     if config.use_colors then
@@ -344,30 +374,30 @@ local function format_log(level, module_name, message, params)
       table.insert(parts, module_name)
     end
   end
-  
+
   -- Add the message
   table.insert(parts, message or "")
-  
+
   -- Add parameters as a formatted string if provided
   if params and type(params) == "table" and next(params) ~= nil then
     local param_parts = {}
     for k, v in pairs(params) do
       local val_str
       if type(v) == "table" then
-        val_str = "{...}"  -- Simplify table display in text format
+        val_str = "{...}" -- Simplify table display in text format
       else
         val_str = tostring(v)
       end
       table.insert(param_parts, k .. "=" .. val_str)
     end
-    
+
     local param_str = table.concat(param_parts, ", ")
     if config.use_colors then
       param_str = COLORS.CYAN .. param_str .. COLORS.RESET
     end
     table.insert(parts, "(" .. param_str .. ")")
   end
-  
+
   -- Join all parts with separators
   return table.concat(parts, " | ")
 end
@@ -400,13 +430,15 @@ end
 --- @private
 --- @return string|nil The full path to the log file or nil if not configured
 local function get_log_file_path()
-  if not config.output_file then return nil end
-  
+  if not config.output_file then
+    return nil
+  end
+
   -- If output_file is an absolute path, use it directly
   if config.output_file:sub(1, 1) == "/" then
     return config.output_file
   end
-  
+
   -- Otherwise, construct path within log directory
   return config.log_dir .. "/" .. config.output_file
 end
@@ -429,14 +461,20 @@ end
 local function rotate_log_files()
   local fs = get_fs()
   local log_path = get_log_file_path()
-  if not log_path then return false end
-  
+  if not log_path then
+    return false
+  end
+
   -- Check if we need to rotate
-  if not fs.file_exists(log_path) then return false end
-  
+  if not fs.file_exists(log_path) then
+    return false
+  end
+
   local size = fs.get_file_size(log_path)
-  if not size or size < config.max_file_size then return false end
-  
+  if not size or size < config.max_file_size then
+    return false
+  end
+
   -- Rotate files (move existing rotated logs)
   for i = config.max_log_files - 1, 1, -1 do
     local old_file = log_path .. "." .. i
@@ -445,7 +483,7 @@ local function rotate_log_files()
       fs.move_file(old_file, new_file)
     end
   end
-  
+
   -- Move current log to .1
   return fs.move_file(log_path, log_path .. ".1")
 end
@@ -464,20 +502,23 @@ local function json_encode_value(val)
   local json_type = type(val)
   if json_type == "string" then
     -- Escape special characters in strings
-    return '"' .. val:gsub('\\', '\\\\')
-                  :gsub('"', '\\"')
-                  :gsub('\n', '\\n')
-                  :gsub('\r', '\\r')
-                  :gsub('\t', '\\t')
-                  :gsub('\b', '\\b')
-                  :gsub('\f', '\\f') .. '"'
+    return '"'
+      .. val
+        :gsub("\\", "\\\\")
+        :gsub('"', '\\"')
+        :gsub("\n", "\\n")
+        :gsub("\r", "\\r")
+        :gsub("\t", "\\t")
+        :gsub("\b", "\\b")
+        :gsub("\f", "\\f")
+      .. '"'
   elseif json_type == "number" then
     -- Handle NaN and infinity which have no direct JSON representation
     if val ~= val then
       return '"NaN"'
-    elseif val == 1/0 then
+    elseif val == 1 / 0 then
       return '"Infinity"'
-    elseif val == -1/0 then
+    elseif val == -1 / 0 then
       return '"-Infinity"'
     else
       return tostring(val)
@@ -495,14 +536,14 @@ local function json_encode_value(val)
         break
       end
     end
-    
+
     local result = is_array and "[" or "{"
     local first = true
-    
+
     -- Avoid processing tables that are too large
     local count = 0
     local max_items = 100
-    
+
     if is_array then
       for _, v in ipairs(val) do
         count = count + 1
@@ -510,8 +551,10 @@ local function json_encode_value(val)
           result = result .. (first and "" or ",") .. '"..."'
           break
         end
-        
-        if not first then result = result .. "," end
+
+        if not first then
+          result = result .. ","
+        end
         result = result .. json_encode_value(v)
         first = false
       end
@@ -523,14 +566,16 @@ local function json_encode_value(val)
           result = result .. (first and "" or ",") .. '"...":"..."'
           break
         end
-        
-        if not first then result = result .. "," end
+
+        if not first then
+          result = result .. ","
+        end
         result = result .. '"' .. tostring(k):gsub('"', '\\"') .. '":' .. json_encode_value(v)
         first = false
       end
       result = result .. "}"
     end
-    
+
     return result
   elseif json_type == "nil" then
     return "null"
@@ -556,20 +601,20 @@ local function format_json(level, module_name, message, params)
   -- Use ISO8601-like timestamp format for JSON logs
   local timestamp = os.date("%Y-%m-%dT%H:%M:%S")
   local level_name = LEVEL_NAMES[level] or "UNKNOWN"
-  
+
   -- Start with standard fields
   local json_parts = {
     '"timestamp":"' .. timestamp .. '"',
     '"level":"' .. level_name .. '"',
     '"module":"' .. (module_name or ""):gsub('"', '\\"') .. '"',
-    '"message":"' .. (message or ""):gsub('"', '\\"') .. '"'
+    '"message":"' .. (message or ""):gsub('"', '\\"') .. '"',
   }
-  
+
   -- Add standard metadata fields from configuration
   for key, value in pairs(config.standard_metadata) do
     table.insert(json_parts, '"' .. key .. '":' .. json_encode_value(value))
   end
-  
+
   -- Add parameters if provided
   if params and type(params) == "table" then
     for key, value in pairs(params) do
@@ -579,7 +624,7 @@ local function format_json(level, module_name, message, params)
       end
     end
   end
-  
+
   return "{" .. table.concat(json_parts, ",") .. "}"
 end
 
@@ -591,20 +636,22 @@ end
 --- @private
 --- @return string|nil The full path to the JSON log file or nil if not configured
 local function get_json_log_file_path()
-  if not config.json_file then return nil end
-  
+  if not config.json_file then
+    return nil
+  end
+
   -- If json_file is an absolute path, use it directly
   if config.json_file:sub(1, 1) == "/" then
     return config.json_file
   end
-  
+
   -- Otherwise, construct path within log directory
   return config.log_dir .. "/" .. config.json_file
 end
 
 --- Rotate JSON log files when they exceed the configured maximum size
 --- This helper function implements log rotation for JSON-formatted log files,
---- which prevents them from growing too large. It works similarly to 
+--- which prevents them from growing too large. It works similarly to
 --- rotate_log_files() but specifically for structured JSON logs.
 ---
 --- @private
@@ -612,14 +659,20 @@ end
 local function rotate_json_log_files()
   local fs = get_fs()
   local log_path = get_json_log_file_path()
-  if not log_path then return false end
-  
+  if not log_path then
+    return false
+  end
+
   -- Check if we need to rotate
-  if not fs.file_exists(log_path) then return false end
-  
+  if not fs.file_exists(log_path) then
+    return false
+  end
+
   local size = fs.get_file_size(log_path)
-  if not size or size < config.max_file_size then return false end
-  
+  if not size or size < config.max_file_size then
+    return false
+  end
+
   -- Rotate files
   for i = config.max_log_files - 1, 1, -1 do
     local old_file = log_path .. "." .. i
@@ -628,7 +681,7 @@ local function rotate_json_log_files()
       fs.move_file(old_file, new_file)
     end
   end
-  
+
   -- Move current log to .1
   return fs.move_file(log_path, log_path .. ".1")
 end
@@ -643,22 +696,22 @@ end
 --- @return boolean Whether the flush operation was successful
 local function flush_buffer()
   if buffer.count == 0 then
-    return true  -- Nothing to flush is considered successful
+    return true -- Nothing to flush is considered successful
   end
-  
+
   local fs = get_fs()
   local success = true
-  
+
   -- Regular log file
   if config.output_file then
     local log_path = get_log_file_path()
-    
+
     -- Build content string
     local content = ""
     for _, entry in ipairs(buffer.entries) do
       content = content .. entry.text .. "\n"
     end
-    
+
     -- Append to log file
     local file_success, err = fs.append_file(log_path, content)
     if not file_success then
@@ -666,17 +719,17 @@ local function flush_buffer()
       success = false
     end
   end
-  
+
   -- JSON log file
   if config.json_file then
     local json_log_path = get_json_log_file_path()
-    
+
     -- Build JSON content string
     local json_content = ""
     for _, entry in ipairs(buffer.entries) do
       json_content = json_content .. entry.json .. "\n"
     end
-    
+
     -- Append to JSON log file
     local json_success, err = fs.append_file(json_log_path, json_content)
     if not json_success then
@@ -684,12 +737,12 @@ local function flush_buffer()
       success = false
     end
   end
-  
+
   -- Reset buffer
   buffer.entries = {}
   buffer.count = 0
   buffer.last_flush_time = os.time()
-  
+
   return success
 end
 
@@ -722,12 +775,12 @@ end
 --- @return boolean Whether the current test expects errors
 local function current_test_expects_errors()
   local error_handler = get_error_handler()
-  
+
   -- If error_handler is loaded and has the function, call it
   if error_handler and error_handler.current_test_expects_errors then
     return error_handler.current_test_expects_errors()
   end
-  
+
   -- Default to false if we couldn't determine
   return false
 end
@@ -736,7 +789,7 @@ end
 -- This is only done once when the module loads
 if not _G._firmo_debug_mode then
   _G._firmo_debug_mode = false
-  
+
   -- Detect debug mode from command line arguments
   if arg then
     for _, v in ipairs(arg) do
@@ -766,7 +819,7 @@ local function log(level, module_name, message, params)
     if current_test_expects_errors() then
       -- Prefix message to indicate this is an expected error
       message = "[EXPECTED] " .. message
-      
+
       -- Store the error in the global error repository for potential debugging
       local error_handler = get_error_handler()
       if error_handler then
@@ -776,10 +829,10 @@ local function log(level, module_name, message, params)
           module = module_name,
           message = message,
           params = params,
-          timestamp = os.time()
+          timestamp = os.time(),
         })
       end
-      
+
       -- In debug mode (--debug flag), make all expected errors visible regardless of module
       if _G._firmo_debug_mode then
         -- Override the level check below for expected errors
@@ -793,68 +846,68 @@ local function log(level, module_name, message, params)
       end
     end
   end
-  
+
   -- Check if this log should be shown (unless it's an expected error with debug override)
   local has_debug_override = params and params._expected_debug_override
   if not has_debug_override and not is_enabled(level, module_name) then
     return false
   end
-  
+
   -- Remove internal flag from params if it exists
   if params and params._expected_debug_override then
     params._expected_debug_override = nil
   end
-  
+
   -- In silent mode, don't output anything
   if config.silent then
     return false
   end
-  
+
   -- Format as text for console and regular log file
   local formatted_text = format_log(level, module_name, message, params)
-  
+
   -- Format as JSON for structured logging
   local formatted_json = format_json(level, module_name, message, params)
-  
-  -- Output to console 
+
+  -- Output to console
   print(formatted_text)
-  
+
   -- If we're buffering, add to buffer
   if config.buffer_size > 0 then
     -- Check if we need to auto-flush due to time
     if os.time() - buffer.last_flush_time >= config.buffer_flush_interval then
       flush_buffer()
     end
-    
+
     -- Add to buffer
-    table.insert(buffer.entries, { 
-      text = formatted_text, 
+    table.insert(buffer.entries, {
+      text = formatted_text,
       json = formatted_json,
       level = level,
       module = module_name,
       message = message,
-      params = params
+      params = params,
     })
     buffer.count = buffer.count + 1
-    
+
     -- Flush if buffer is full
     if buffer.count >= config.buffer_size then
       flush_buffer()
     end
-    
+
     return true
   end
-  
+
   -- Direct file output (no buffering)
   local fs = get_fs()
-  
+
   -- Output to regular text log file if configured
   if config.output_file then
     local log_path = get_log_file_path()
-    
+
     -- Ensure log directory exists
     ensure_log_dir()
-    
+
     -- Check if we need to rotate the log file
     if config.max_file_size and config.max_file_size > 0 then
       local size = fs.file_exists(log_path) and fs.get_file_size(log_path) or 0
@@ -862,21 +915,21 @@ local function log(level, module_name, message, params)
         rotate_log_files()
       end
     end
-    
+
     -- Append to the log file
     local success, err = fs.append_file(log_path, formatted_text .. "\n")
     if not success then
       print("Warning: Failed to write to log file: " .. (err or "unknown error"))
     end
   end
-  
+
   -- Output to JSON log file if configured
   if config.json_file then
     local json_log_path = get_json_log_file_path()
-    
+
     -- Ensure log directory exists
     ensure_log_dir()
-    
+
     -- Check if we need to rotate the JSON log file
     if config.max_file_size and config.max_file_size > 0 then
       local size = fs.file_exists(json_log_path) and fs.get_file_size(json_log_path) or 0
@@ -884,14 +937,14 @@ local function log(level, module_name, message, params)
         rotate_json_log_files()
       end
     end
-    
+
     -- Append to the JSON log file
     local success, err = fs.append_file(json_log_path, formatted_json .. "\n")
     if not success then
       print("Warning: Failed to write to JSON log file: " .. (err or "unknown error"))
     end
   end
-  
+
   return true
 end
 
@@ -900,8 +953,8 @@ end
 --- formatting options, log levels, and filtering. This is typically called
 --- once at application startup to establish logging behavior.
 ---
---- @param options? {level?: number|string, file?: string, format?: string, console?: boolean, 
----                  max_file_size?: number, include_source?: boolean, include_timestamp?: boolean, 
+--- @param options? {level?: number|string, file?: string, format?: string, console?: boolean,
+---                  max_file_size?: number, include_source?: boolean, include_timestamp?: boolean,
 ---                  include_level?: boolean, include_colors?: boolean, colors?: table<string, string>,
 ---                  module_levels?: table<string, number>, module_filter?: string|string[],
 ---                  silent?: boolean, buffer_size?: number, json_logs?: boolean} Configuration options
@@ -929,68 +982,68 @@ end
 --- })
 function M.configure(options)
   options = options or {}
-  
+
   -- Apply configuration options
   if options.level ~= nil then
     config.global_level = options.level
   end
-  
+
   if options.module_levels then
     for module, level in pairs(options.module_levels) do
       config.module_levels[module] = level
     end
   end
-  
+
   if options.timestamps ~= nil then
     config.timestamps = options.timestamps
   end
-  
+
   if options.use_colors ~= nil then
     config.use_colors = options.use_colors
   end
-  
+
   if options.output_file ~= nil then
     config.output_file = options.output_file
   end
-  
+
   if options.log_dir ~= nil then
     config.log_dir = options.log_dir
   end
-  
+
   if options.silent ~= nil then
     config.silent = options.silent
   end
-  
+
   if options.max_file_size ~= nil then
     config.max_file_size = options.max_file_size
   end
-  
+
   if options.max_log_files ~= nil then
     config.max_log_files = options.max_log_files
   end
-  
+
   if options.date_pattern ~= nil then
     config.date_pattern = options.date_pattern
   end
-  
+
   -- JSON format options
   if options.format ~= nil then
     config.format = options.format
   end
-  
+
   if options.json_file ~= nil then
     config.json_file = options.json_file
   end
-  
+
   -- Module filtering options
   if options.module_filter ~= nil then
     config.module_filter = options.module_filter
   end
-  
+
   if options.module_blacklist ~= nil then
     config.module_blacklist = options.module_blacklist
   end
-  
+
   -- Buffering options
   if options.buffer_size ~= nil then
     config.buffer_size = options.buffer_size
@@ -999,21 +1052,21 @@ function M.configure(options)
     buffer.count = 0
     buffer.last_flush_time = os.time()
   end
-  
+
   if options.buffer_flush_interval ~= nil then
     config.buffer_flush_interval = options.buffer_flush_interval
   end
-  
+
   -- Standard metadata
   if options.standard_metadata ~= nil then
     config.standard_metadata = options.standard_metadata
   end
-  
+
   -- If log file is configured, ensure the directory exists
   if config.output_file or config.json_file then
     ensure_log_dir()
   end
-  
+
   return M
 end
 
@@ -1028,7 +1081,7 @@ end
 --- @usage
 --- -- Create a logger for a specific module
 --- local logger = logging.get_logger("Database")
---- 
+---
 --- -- Use the logger with different log levels
 --- logger.debug("Connection established", {host = "localhost", port = 5432})
 --- logger.info("Query executed successfully")
@@ -1042,8 +1095,11 @@ end
 ---   logger.debug("Performance statistics", stats)
 --- end
 function M.get_logger(module_name)
+  -- First configure the logger from central config
+  M.configure_from_config(module_name)
+
   local logger = {}
-  
+
   --- Log a fatal level message through this logger
   --- @param message string The message to log
   --- @param params? table Additional context parameters to include
@@ -1051,7 +1107,7 @@ function M.get_logger(module_name)
   logger.fatal = function(message, params)
     log(M.LEVELS.FATAL, module_name, message, params)
   end
-  
+
   --- Log an error level message through this logger
   --- @param message string The message to log
   --- @param params? table Additional context parameters to include
@@ -1059,7 +1115,7 @@ function M.get_logger(module_name)
   logger.error = function(message, params)
     log(M.LEVELS.ERROR, module_name, message, params)
   end
-  
+
   --- Log a warning level message through this logger
   --- @param message string The message to log
   --- @param params? table Additional context parameters to include
@@ -1067,7 +1123,7 @@ function M.get_logger(module_name)
   logger.warn = function(message, params)
     log(M.LEVELS.WARN, module_name, message, params)
   end
-  
+
   --- Log an info level message through this logger
   --- @param message string The message to log
   --- @param params? table Additional context parameters to include
@@ -1075,7 +1131,7 @@ function M.get_logger(module_name)
   logger.info = function(message, params)
     log(M.LEVELS.INFO, module_name, message, params)
   end
-  
+
   --- Log a debug level message through this logger
   --- @param message string The message to log
   --- @param params? table Additional context parameters to include
@@ -1083,7 +1139,7 @@ function M.get_logger(module_name)
   logger.debug = function(message, params)
     log(M.LEVELS.DEBUG, module_name, message, params)
   end
-  
+
   --- Log a trace level message through this logger
   --- @param message string The message to log
   --- @param params? table Additional context parameters to include
@@ -1091,7 +1147,7 @@ function M.get_logger(module_name)
   logger.trace = function(message, params)
     log(M.LEVELS.TRACE, module_name, message, params)
   end
-  
+
   --- Log a verbose level message through this logger (for backward compatibility)
   --- @param message string The message to log
   --- @param params? table Additional context parameters to include
@@ -1099,7 +1155,7 @@ function M.get_logger(module_name)
   logger.verbose = function(message, params)
     log(M.LEVELS.VERBOSE, module_name, message, params)
   end
-  
+
   --- Log a message with a specific level through this logger
   --- @param level number The log level to use
   --- @param message string The message to log
@@ -1108,7 +1164,7 @@ function M.get_logger(module_name)
   logger.log = function(level, message, params)
     log(level, module_name, message, params)
   end
-  
+
   --- Check if a message at the specified level would be logged
   --- @param level string|number The log level to check (can be name or number)
   --- @return boolean Whether logging is enabled for this level and module
@@ -1127,25 +1183,25 @@ function M.get_logger(module_name)
       return false
     end
   end
-  
+
   --- Check if debug level logging is enabled for this module
   --- @return boolean Whether debug logging is enabled
   logger.is_debug_enabled = function()
     return is_enabled(M.LEVELS.DEBUG, module_name)
   end
-  
+
   --- Check if trace level logging is enabled for this module
   --- @return boolean Whether trace logging is enabled
   logger.is_trace_enabled = function()
     return is_enabled(M.LEVELS.TRACE, module_name)
   end
-  
+
   --- Check if verbose level logging is enabled for this module (for backward compatibility)
   --- @return boolean Whether verbose logging is enabled
   logger.is_verbose_enabled = function()
     return is_enabled(M.LEVELS.VERBOSE, module_name)
   end
-  
+
   --- Get the current log level for this module
   --- @return number The current log level
   logger.get_level = function()
@@ -1154,15 +1210,34 @@ function M.get_logger(module_name)
     end
     return config.global_level
   end
-  
+
   return logger
+end
+
+--- Get a configured logger instance for a module, automatically applying configuration
+--- This helper function creates a logger for the specified module and automatically
+--- applies any relevant configuration from .firmo-config.lua. This ensures consistent
+--- logging behavior across all modules.
+---
+--- @param module_name string The name of the module this logger is for
+--- @return logger_instance A configured logger instance bound to the specified module
+---
+--- @usage
+--- -- Get a configured logger for a module
+--- local logger = logging.get_configured_logger("Database")
+---
+--- -- Logger is already configured with correct level and settings
+--- logger.info("Connection established")
+--- logger.debug("Query details") -- Will respect configured level
+function M.get_configured_logger(module_name)
+  -- Simple alias to get_logger which now does configuration automatically
+  return M.get_logger(module_name)
 end
 
 --- Direct module-level logging functions
 --- These functions provide a convenient way to log messages without
 --- needing to create a logger instance first. They're useful for global
 --- logging or for quick/temporary logs.
-
 --- Log a fatal level message globally without module association
 --- Fatal messages indicate a critical error that prevents the application
 --- from continuing operation. Fatal logs are always recorded regardless of
@@ -1355,7 +1430,7 @@ end
 --- end)
 function M.with_level(module_name, level, func)
   local original_level = config.module_levels[module_name]
-  
+
   -- Set temporary level
   if type(level) == "string" then
     local level_name = level:upper()
@@ -1368,22 +1443,22 @@ function M.with_level(module_name, level, func)
   else
     M.set_module_level(module_name, level)
   end
-  
+
   -- Run the function
   local success, result = pcall(func)
-  
+
   -- Restore original level
   if original_level then
     M.set_module_level(module_name, original_level)
   else
     config.module_levels[module_name] = nil
   end
-  
+
   -- Handle errors
   if not success then
     error(result)
   end
-  
+
   return result
 end
 
@@ -1408,7 +1483,10 @@ end
 ---   .set_module_level("UI", logging.LEVELS.INFO)
 ---   .set_module_level("Storage", logging.LEVELS.ERROR)
 function M.set_module_level(module_name, level)
-  config.module_levels[module_name] = level
+  local numeric_level = normalize_log_level(level)
+  if numeric_level then
+    config.module_levels[module_name] = numeric_level
+  end
   return M
 end
 
@@ -1438,6 +1516,129 @@ function M.set_level(level)
   return M
 end
 
+--- Configure logging from central configuration
+--- This function loads logging configuration from the central configuration system,
+--- applying global and module-specific settings. It automatically retrieves the
+--- appropriate configuration based on the module name provided.
+---
+--- @param module_name string The module name to configure logging for
+--- @return number The configured log level
+---
+--- @usage
+--- -- Configure logging from central config
+--- local level = logging.configure_from_config("Database")
+--- print("Configured log level from central config: " .. level)
+---
+--- -- Use with get_logger
+--- local logger = logging.get_logger("API")
+--- -- logger is already configured from central_config
+function M.configure_from_config(module_name)
+  -- First try to load the global config
+  local log_level = M.LEVELS.INFO -- default level
+  local config_obj
+
+  -- Try to load central_config module and get config
+  local success, central_config = pcall(require, "lib.core.central_config")
+  if success and central_config then
+    config_obj = central_config.get()
+
+    -- Check for logging configuration
+    if config_obj and config_obj.logging then
+      -- Global logging configuration - must be set first
+      if config_obj.logging.level then
+        local numeric_level = normalize_log_level(config_obj.logging.level)
+        if numeric_level then
+          config.global_level = numeric_level
+          log_level = numeric_level
+        end
+      -- If no explicit level, check debug/verbose flags
+      else
+        if config_obj.debug then
+          log_level = M.LEVELS.DEBUG
+          config.global_level = M.LEVELS.DEBUG
+        elseif config_obj.verbose then
+          log_level = M.LEVELS.VERBOSE
+          config.global_level = M.LEVELS.VERBOSE
+        end
+      end
+
+      -- Module-specific log levels
+      if config_obj.logging.modules then
+        -- Process all module levels to ensure they're normalized
+        for mod, level in pairs(config_obj.logging.modules) do
+          local numeric_level = normalize_log_level(level)
+          if numeric_level then
+            config.module_levels[mod] = numeric_level
+            -- If this is our module, set its level
+            if mod == module_name then
+              log_level = numeric_level
+            end
+          end
+        end
+      end
+
+      -- Configure logging output options
+      if config_obj.logging.output_file then
+        config.output_file = config_obj.logging.output_file
+      end
+
+      if config_obj.logging.log_dir then
+        config.log_dir = config_obj.logging.log_dir
+      end
+
+      if config_obj.logging.timestamps ~= nil then
+        config.timestamps = config_obj.logging.timestamps
+      end
+
+      if config_obj.logging.use_colors ~= nil then
+        config.use_colors = config_obj.logging.use_colors
+      end
+
+      -- Configure log rotation options
+      if config_obj.logging.max_file_size then
+        config.max_file_size = config_obj.logging.max_file_size
+      end
+
+      if config_obj.logging.max_log_files then
+        config.max_log_files = config_obj.logging.max_log_files
+      end
+
+      if config_obj.logging.date_pattern then
+        config.date_pattern = config_obj.logging.date_pattern
+      end
+
+      -- JSON format options
+      if config_obj.logging.format then
+        config.format = config_obj.logging.format
+      end
+
+      if config_obj.logging.json_file then
+        config.json_file = config_obj.logging.json_file
+      end
+
+      -- Module filtering options
+      if config_obj.logging.module_filter then
+        config.module_filter = config_obj.logging.module_filter
+      end
+
+      if config_obj.logging.module_blacklist then
+        config.module_blacklist = config_obj.logging.module_blacklist
+      end
+
+      -- Ensure log directory exists if output file is configured
+      if config.output_file or config.json_file then
+        ensure_log_dir()
+      end
+    end
+  end
+
+  -- Apply the log level if a module name was provided
+  if module_name then
+    M.set_module_level(module_name, log_level)
+  end
+  return log_level
+end
+
 --- Configure module log level based on debug/verbose settings from an options object
 --- This function provides a convenient way to configure a module's log level
 --- based on standard debug/verbose flags commonly used in command-line options
@@ -1457,126 +1658,30 @@ end
 --- local level = logging.configure_from_options("DataProcessor", options)
 --- print("Configured log level: " .. level)  -- Will be VERBOSE level
 function M.configure_from_options(module_name, options)
-  local log_level = M.LEVELS.INFO
-  if options.debug then
-    log_level = M.LEVELS.DEBUG
-  elseif options.verbose then
-    log_level = M.LEVELS.VERBOSE
+  if not module_name or not options then
+    return M.LEVELS.INFO -- default if missing arguments
   end
-  M.set_module_level(module_name, log_level)
-  return log_level
-end
 
---- Configure logging for a module using the global configuration system
---- This function integrates with the central configuration system to apply
---- logging settings from a centralized configuration store. It automatically
---- discovers and applies module-specific settings as well as global logging
---- preferences.
----
---- @param module_name string The module name to configure
---- @return number The configured log level
----
---- @usage
---- -- Configure logging for a module from central config
---- local level = logging.configure_from_config("Database")
----
---- -- central_config.json might contain:
---- -- {
---- --   "logging": {
---- --     "level": "INFO",
---- --     "modules": {
---- --       "Database": "DEBUG"
---- --     },
---- --     "output_file": "app.log",
---- --     "use_colors": true
---- --   }
---- -- }
-function M.configure_from_config(module_name)
-  -- First try to load the global config
-  local log_level = M.LEVELS.INFO
-  local config_obj
-  
-  -- Try to load central_config module and get config
-  local success, central_config = pcall(require, "lib.core.central_config")
-  if success and central_config then
-    config_obj = central_config.get()
-    
-    -- Set log level based on global debug/verbose settings
-    if config_obj and config_obj.debug then
+  local log_level = M.LEVELS.INFO -- default level
+
+  -- Check explicit level setting first
+  if options.level then
+    local numeric_level = normalize_log_level(options.level)
+    if numeric_level then
+      log_level = numeric_level
+    end
+  -- Otherwise check debug/verbose flags
+  else
+    if options.debug then
       log_level = M.LEVELS.DEBUG
-    elseif config_obj and config_obj.verbose then
+    elseif options.verbose then
       log_level = M.LEVELS.VERBOSE
     end
-    
-    -- Check for logging configuration
-    if config_obj and config_obj.logging then
-      -- Global logging configuration
-      if config_obj.logging.level then
-        config.global_level = config_obj.logging.level
-      end
-      
-      -- Module-specific log levels
-      if config_obj.logging.modules and config_obj.logging.modules[module_name] then
-        log_level = config_obj.logging.modules[module_name]
-      end
-      
-      -- Configure logging output options
-      if config_obj.logging.output_file then
-        config.output_file = config_obj.logging.output_file
-      end
-      
-      if config_obj.logging.log_dir then
-        config.log_dir = config_obj.logging.log_dir
-      end
-      
-      if config_obj.logging.timestamps ~= nil then
-        config.timestamps = config_obj.logging.timestamps
-      end
-      
-      if config_obj.logging.use_colors ~= nil then
-        config.use_colors = config_obj.logging.use_colors
-      end
-      
-      -- Configure log rotation options
-      if config_obj.logging.max_file_size then
-        config.max_file_size = config_obj.logging.max_file_size
-      end
-      
-      if config_obj.logging.max_log_files then
-        config.max_log_files = config_obj.logging.max_log_files
-      end
-      
-      if config_obj.logging.date_pattern then
-        config.date_pattern = config_obj.logging.date_pattern
-      end
-      
-      -- JSON format options
-      if config_obj.logging.format then
-        config.format = config_obj.logging.format
-      end
-      
-      if config_obj.logging.json_file then
-        config.json_file = config_obj.logging.json_file
-      end
-      
-      -- Module filtering options
-      if config_obj.logging.module_filter then
-        config.module_filter = config_obj.logging.module_filter
-      end
-      
-      if config_obj.logging.module_blacklist then
-        config.module_blacklist = config_obj.logging.module_blacklist
-      end
-      
-      -- Ensure log directory exists if output file is configured
-      if config.output_file or config.json_file then
-        ensure_log_dir()
-      end
-    end
   end
-  
-  -- Apply the log level
+
+  -- Set the module's log level
   M.set_module_level(module_name, log_level)
+
   return log_level
 end
 
@@ -1603,19 +1708,19 @@ function M.filter_module(module_pattern)
   if not config.module_filter then
     config.module_filter = {}
   end
-  
+
   if type(config.module_filter) == "string" then
     -- Convert to table if currently a string
-    config.module_filter = {config.module_filter}
+    config.module_filter = { config.module_filter }
   end
-  
+
   -- Add to filter if not already present
   for _, pattern in ipairs(config.module_filter) do
     if pattern == module_pattern then
       return M -- Already filtered
     end
   end
-  
+
   table.insert(config.module_filter, module_pattern)
   return M
 end
@@ -1656,14 +1761,14 @@ function M.blacklist_module(module_pattern)
   if not config.module_blacklist then
     config.module_blacklist = {}
   end
-  
+
   -- Add to blacklist if not already present
   for _, pattern in ipairs(config.module_blacklist) do
     if pattern == module_pattern then
       return M -- Already blacklisted
     end
   end
-  
+
   table.insert(config.module_blacklist, module_pattern)
   return M
 end
@@ -1890,41 +1995,41 @@ end
 --- metrics_logger.flush()
 function M.create_buffered_logger(module_name, options)
   options = options or {}
-  
+
   -- Apply buffering configuration
   local buffer_size = options.buffer_size or 100
   local flush_interval = options.flush_interval or 5 -- seconds
-  
+
   -- Configure a buffered logger
   local buffered_config = {
     buffer_size = buffer_size,
-    buffer_flush_interval = flush_interval
+    buffer_flush_interval = flush_interval,
   }
-  
+
   -- If output_file specified, use it
   if options.output_file then
     buffered_config.output_file = options.output_file
   end
-  
+
   -- Apply the configuration
   M.configure(buffered_config)
-  
+
   -- Create a logger with the specified module name
   local logger = M.get_logger(module_name)
-  
+
   -- Add flush method to this logger instance
   logger.flush = function()
     M.flush()
     return logger
   end
-  
+
   -- Add auto-flush on shutdown
   local mt = getmetatable(logger) or {}
   mt.__gc = function()
     logger.flush()
   end
   setmetatable(logger, mt)
-  
+
   return logger
 end
 

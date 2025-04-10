@@ -1,46 +1,76 @@
-# HTML Formatter Configuration
+# HTML Coverage Formatter
 
-This document describes how to configure the HTML formatter in firmo. The HTML formatter generates visually rich coverage reports with syntax highlighting, code state visualization, execution counts, and block coverage indicators.
+The HTML formatter generates interactive, visual coverage reports using a class-based architecture. It provides detailed line-by-line coverage information with syntax highlighting, file navigation, summary statistics, and theme support.
+## Class Usage
 
-## Configuration Options
-
-The HTML formatter can be configured both programmatically and through the configuration file. Here are the available options:
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `theme` | string | `"dark"` | Visual theme for the report. Options: `"dark"`, `"light"` |
-| `show_line_numbers` | boolean | `true` | Whether to display line numbers in the code view |
-| `collapsible_sections` | boolean | `true` | Makes file sections collapsible for easier navigation |
-| `highlight_syntax` | boolean | `true` | Enables syntax highlighting for code |
-| `asset_base_path` | string | `nil` | Base path for assets (CSS, JS); useful when hosted on a subdirectory |
-| `include_legend` | boolean | `true` | Whether to include the coverage legend in the report |
-| `display_execution_counts` | boolean | `true` | Show execution counts on hover |
-| `max_execution_count` | number | `nil` | If set, caps displayed execution counts at this value |
-| `display_block_coverage` | boolean | `true` | Highlights code blocks (functions, if statements, loops) |
-| `enhance_tooltips` | boolean | `true` | Shows detailed information in tooltips |
-
-## Configuration in .firmo-config.lua
-
-You can configure the HTML formatter in your `.firmo-config.lua` file:
+The HTML formatter can be used directly as a class for more control:
 
 ```lua
+local HTMLFormatter = require('lib.reporting.formatters.html')
+
+-- Create a formatter instance with options
+local formatter = HTMLFormatter.new({
+  theme = "dark",
+  show_line_numbers = true,
+  syntax_highlighting = true
+})
+
+-- Generate a report in one step
+local success, result = formatter:generate(
+  coverage_data,
+  "coverage/index.html"
+)
+
+if success then
+  print("Report generated at: " .. result)
+else
+  print("Failed to generate report: " .. result.message)
+end
+```
+
+## Configuration
+
+The HTML formatter can be customized through the `.firmo-config.lua` file:
+
+```lua
+-- In .firmo-config.lua
 return {
   reporting = {
     formatters = {
       html = {
-        theme = "dark",
-        show_line_numbers = true,
-        collapsible_sections = true,
-        highlight_syntax = true,
-        asset_base_path = nil,
-        include_legend = true,
-        display_execution_counts = true,
-        display_block_coverage = true,
-        enhance_tooltips = true
+        -- Output path for the HTML report
+        output_path = "coverage/index.html",
+        
+        -- Visual customization
+        theme = "dark",              -- "dark" or "light"
+        show_line_numbers = true,    -- Show line numbers in source code
+        syntax_highlighting = true,  -- Enable syntax highlighting (can impact performance)
+        
+        -- Performance options
+        simplified_large_files = true,  -- Use simplified view for large files (>1000 lines)
+        max_lines_display = 200,        -- Maximum lines to display per file
+        simplified_rendering = false,    -- Force simplified rendering for all files
+        
+        -- Content customization
+        show_execution_counts = true,   -- Show execution counts for each line
+        show_uncovered_files = true,    -- Include files with 0% coverage
+        show_full_path = true,          -- Show full file paths (vs. short names)
+        sort_files_by = "coverage",     -- "coverage", "name", or "path"
+        
+        -- Custom titles and metadata
+        title = "Coverage Report",      -- Report title
+        project_name = null,            -- Optional project name
+        include_timestamp = true,       -- Include generation timestamp
+        
+        -- Advanced options
+        custom_css = null,              -- Path to custom CSS file to include
+        custom_js = null,               -- Path to custom JavaScript file to include
+        inline_assets = true            -- Embed all CSS/JS in HTML
       }
     }
   }
 }
+```
 ```
 
 ## Using HTML Formatter Programmatically
@@ -92,17 +122,61 @@ When hovering over lines, you can see:
 - For blocks, how many times the block executed
 - For conditions, whether they evaluated as true, false, or both
 
-## Theme Configuration
+## Configuration Options Reference
 
-The HTML formatter supports both light and dark themes. The theme affects the color scheme of the entire report.
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `output_path` | string | `"coverage-report.html"` | Path where the HTML report will be saved |
+| `theme` | string | `"dark"` | Color theme: "dark" or "light" |
+| `show_line_numbers` | boolean | `true` | Display line numbers in source code |
+| `syntax_highlighting` | boolean | `true` | Enable syntax highlighting for source code |
+| `simplified_large_files` | boolean | `true` | Use simplified view for files over 1000 lines |
+| `max_lines_display` | number | `200` | Maximum number of lines to display per file |
+| `simplified_rendering` | boolean | `false` | Use simplified rendering for all files |
+| `show_execution_counts` | boolean | `true` | Show execution counts for each line |
+| `show_uncovered_files` | boolean | `true` | Include files with 0% coverage |
+| `show_full_path` | boolean | `true` | Show full file paths instead of just file names |
+| `sort_files_by` | string | `"coverage"` | How to sort files: "coverage", "name", or "path" |
+| `title` | string | `"Coverage Report"` | Report title displayed in the header |
+| `project_name` | string | `null` | Optional project name displayed in the header |
+| `include_timestamp` | boolean | `true` | Include generation timestamp in the report |
+| `custom_css` | string | `null` | Path to custom CSS file to include |
+| `custom_js` | string | `null` | Path to custom JavaScript file to include |
+| `inline_assets` | boolean | `true` | Embed all CSS/JS in the HTML file |
 
-### Dark Theme (Default)
+## Theme System
 
-The dark theme uses a dark background with high-contrast colors for coverage states:
+The HTML formatter features a built-in theme system with light and dark themes. The theme can be selected in three ways:
 
-- Dark green for covered lines
-- Amber for executed-but-not-covered lines
-- Dark red for uncovered lines
+1. Configuration option `theme` (default is "dark")
+2. User preference toggle in the UI (persisted in localStorage)
+3. System preference via `prefers-color-scheme` media query
+
+### Dark Theme
+
+The dark theme uses a dark background with light text and is optimized for low-light environments.
+
+```
+Background: #1a1a1a
+Text: #e0e0e0
+Card Background: #242424
+Covered Lines: rgba(76, 175, 80, 0.4)
+Executed Lines: rgba(255, 152, 0, 0.4)
+Not Covered Lines: rgba(244, 67, 54, 0.4)
+```
+
+### Light Theme
+
+The light theme uses a light background with dark text, optimized for readability and printing.
+
+```
+Background: #f5f5f5
+Text: #333
+Card Background: #fff
+Covered Lines: rgba(76, 175, 80, 0.3)
+Executed Lines: rgba(255, 152, 0, 0.3)
+Not Covered Lines: rgba(244, 67, 54, 0.3)
+```
 - Dark gray for non-executable lines
 
 ### Light Theme

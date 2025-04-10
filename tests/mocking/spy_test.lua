@@ -231,5 +231,150 @@ describe("Spy Module", function()
     expect(spy_module.is_spy(not_spy)).to_not.be_truthy()
   end)
 
+  -- Add more tests for error handling
+  describe("Error handling", function()
+    it("handles invalid spy creation scenarios", { expect_error = true }, function()
+      -- Try to spy on a non-function
+      local result, err = test_helper.expect_error(function()
+        spy_module.new("not a function")
+      end)
+      
+      expect(result).to_not.exist("Should fail with non-function")
+      expect(err).to.exist("Error object should be returned")
+      expect(err.message).to.match("Expected a function", "Error message should indicate the issue")
+      
+      -- Try to spy on a non-table object
+      local result2, err2 = test_helper.expect_error(function()
+        spy_module.on("not a table", "method")
+      end)
+      
+      expect(result2).to_not.exist("Should fail with non-table")
+      expect(err2).to.exist("Error object should be returned")
+      expect(err2.message).to.match("Expected an object", "Error message should indicate the issue")
+      
+      -- Try to spy on a non-existing method
+      local obj = { method = function() end }
+      local result3, err3 = test_helper.expect_error(function()
+        spy_module.on(obj, "non_existent_method")
+      end)
+      
+      expect(result3).to_not.exist("Should fail with non-existent method")
+      expect(err3).to.exist("Error object should be returned")
+      expect(err3.message).to.match("Method does not exist", "Error message should indicate the issue")
+      
+      -- Try to spy on a non-function property
+      local obj2 = { property = "string value" }
+      local result4, err4 = test_helper.expect_error(function()
+        spy_module.on(obj2, "property")
+      end)
+      
+      expect(result4).to_not.exist("Should fail with non-function property")
+      expect(err4).to.exist("Error object should be returned")
+      expect(err4.message).to.match("Property is not a function", "Error message should indicate the issue")
+    end)
+    
+    it("handles error during spy reset", { expect_error = true }, function()
+      -- Create a spy
+      local spy = spy_module.new()
+      
+      -- Intentionally corrupt the spy by removing a required field
+      spy.calls = nil
+      
+      -- Attempt to reset the corrupted spy
+      local result, err = test_helper.expect_error(function()
+        spy:reset()
+      end)
+      
+      expect(result).to_not.exist("Should fail with corrupted spy")
+      expect(err).to.exist("Error object should be returned")
+      expect(err.message).to.match("Invalid spy state", "Error message should indicate the issue")
+    end)
+    
+    it("handles error cases for argument access", { expect_error = true }, function()
+      local spy = spy_module.new()
+      
+      -- Call once
+      spy("first_call")
+      
+      -- Try to access non-existent call
+      local result, err = test_helper.expect_error(function()
+        spy:arg(99, 1) -- Call 99 doesn't exist
+      end)
+      
+      expect(result).to_not.exist("Should fail with non-existent call")
+      expect(err).to.exist("Error object should be returned")
+      expect(err.message).to.match("Call index out of bounds", "Error message should indicate the issue")
+      
+      -- Try to access non-existent argument
+      local result2, err2 = test_helper.expect_error(function()
+        spy:arg(1, 99) -- Argument 99 doesn't exist in call 1
+      end)
+      
+      expect(result2).to_not.exist("Should fail with non-existent argument")
+      expect(err2).to.exist("Error object should be returned")
+      expect(err2.message).to.match("Argument index out of bounds", "Error message should indicate the issue")
+      
+      -- Try to access lastArg when no calls made
+      spy:reset() -- Clear calls
+      local result3, err3 = test_helper.expect_error(function()
+        spy:lastArg(1)
+      end)
+      
+      expect(result3).to_not.exist("Should fail with no calls")
+      expect(err3).to.exist("Error object should be returned")
+      expect(err3.message).to.match("No calls recorded", "Error message should indicate the issue")
+    end)
+    
+    it("handles invalid spy restoration", { expect_error = true }, function()
+      local obj = {
+        method = function() return "original" end
+      }
+      
+      -- Create a spy
+      local spy = spy_module.on(obj, "method")
+      
+      -- Verify spy is working
+      local result = obj.method()
+      expect(result).to.equal("original")
+      expect(spy.called).to.be_truthy()
+      
+      -- Intentionally corrupt the spy by removing the original function reference
+      spy.original = nil
+      
+      -- Try to restore the corrupted spy
+      local restore_result, restore_err = test_helper.expect_error(function()
+        spy:restore()
+      end)
+      
+      expect(restore_result).to_not.exist("Should fail with corrupted spy")
+      expect(restore_err).to.exist("Error object should be returned")
+      expect(restore_err.message).to.match("Cannot restore", "Error message should indicate the issue")
+    end)
+    
+    it("validates arguments to CallPattern functions", { expect_error = true }, function()
+      local spy = spy_module.new()
+      
+      -- Call the spy
+      spy("arg1", "arg2")
+      
+      -- Try to use a non-existent call pattern function
+      local result, err = test_helper.expect_error(function()
+        spy:non_existent_function()
+      end)
+      
+      expect(result).to_not.exist("Should fail with non-existent function")
+      expect(err).to.exist("Error object should be returned")
+      
+      -- Try to use calledWith with no arguments
+      local result2, err2 = test_helper.expect_error(function()
+        spy:calledWith()
+      end)
+      
+      expect(result2).to_not.exist("Should fail with missing arguments")
+      expect(err2).to.exist("Error object should be returned")
+      expect(err2.message).to.match("Missing expected arguments", "Error message should indicate the issue")
+    end)
+  end)
+  
   -- Add more tests for other spy functionality
 end)

@@ -2,6 +2,7 @@
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+local test_helper = require("lib.tools.test_helper")
 
 describe("Truthy and Falsey Assertions", function()
   describe("expect(value).to.be_truthy()", function()
@@ -14,18 +15,22 @@ describe("Truthy and Falsey Assertions", function()
       expect("").to.be_truthy()
     end)
 
-    it("correctly identifies non-truthy values", function()
-      local success, err = pcall(function()
+    it("correctly identifies non-truthy values", { expect_error = true }, function()
+      -- Using expect_error for more concise error testing
+      local err = test_helper.expect_error(function()
         expect(false).to.be_truthy()
-      end)
-      expect(success).to_not.be_truthy()
-      expect(err).to.match("Expected value to be truthy")
+      end, "Expected value to be truthy")
 
-      success, err = pcall(function()
+      expect(err).to.exist("Error object should be returned")
+      expect(err.message).to.match("Expected.*false.*to be truthy", "Error message should include the actual value")
+
+      -- Test the nil case
+      err = test_helper.expect_error(function()
         expect(nil).to.be_truthy()
-      end)
-      expect(success).to_not.be_truthy()
-      expect(err).to.match("Expected value to be truthy")
+      end, "Expected value to be truthy")
+
+      expect(err).to.exist("Error object should be returned")
+      expect(err.message).to.match("Expected.*nil.*to be truthy", "Error message should include the actual value")
     end)
   end)
 
@@ -35,18 +40,22 @@ describe("Truthy and Falsey Assertions", function()
       expect(nil).to_not.be_truthy()
     end)
 
-    it("correctly identifies non-falsey values", function()
-      local success, err = pcall(function()
+    it("correctly identifies non-falsey values", { expect_error = true }, function()
+      -- Using expect_error for more concise error testing
+      local err = test_helper.expect_error(function()
         expect(true).to_not.be_truthy()
-      end)
-      expect(success).to_not.be_truthy()
-      expect(err).to.match("Expected value to not be truthy")
+      end, "Expected value to not be truthy")
 
-      success, err = pcall(function()
+      expect(err).to.exist("Error object should be returned")
+      expect(err.message).to.match("Expected.*true.*to not be truthy", "Error message should include the actual value")
+
+      -- Test the string case
+      err = test_helper.expect_error(function()
         expect("hello").to_not.be_truthy()
-      end)
-      expect(success).to_not.be_truthy()
-      expect(err).to.match("Expected value to not be truthy")
+      end, "Expected value to not be truthy")
+
+      expect(err).to.exist("Error object should be returned")
+      expect(err.message).to.match("Expected.*hello.*to not be truthy", "Error message should include the actual value")
     end)
   end)
 end)

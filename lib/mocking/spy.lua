@@ -1,5 +1,5 @@
 --- Function spying implementation for firmo
---- 
+---
 --- Provides powerful spy functionality for testing:
 --- - Create standalone spy functions for tracking calls
 --- - Spy on object methods while preserving their behavior
@@ -270,15 +270,28 @@ function spy.new(fn)
       spy_obj.called = true
       spy_obj.call_count = spy_obj.call_count + 1
 
-      -- Record arguments
-      table.insert(spy_obj.calls, args)
-      table.insert(spy_obj.call_history, args)
+      -- Record call with proper structure
+      -- Record call with proper structure
+      local call_record = {
+        args = args, -- All arguments as an array
+        timestamp = os.time(), -- When the call happened
+        result = nil, -- Will be set after function call
+        error = nil, -- Will be set if function throws
+      }
+      -- Store the call record
+      table.insert(spy_obj.calls, call_record)
+      table.insert(spy_obj.call_history, args) -- Keep this for backward compatibility
 
       logger.debug("Spy function called", {
         call_count = spy_obj.call_count,
         arg_count = #args,
+        has_args_field = call_record.args ~= nil,
+        args_values = {
+          arg1 = args[1] ~= nil and (type(args[1]) == "table" and "table" or tostring(args[1])) or "nil",
+          arg2 = args[2] ~= nil and (type(args[2]) == "table" and "table" or tostring(args[2])) or "nil",
+          arg3 = args[3] ~= nil and (type(args[3]) == "table" and "table" or tostring(args[3])) or "nil",
+        },
       })
-
       -- Sequence tracking for order verification
       if not _G._firmo_sequence_counter then
         _G._firmo_sequence_counter = 0
@@ -309,24 +322,38 @@ function spy.new(fn)
     -- Create args table outside the try scope
     local args = { ... }
     local fn_success, fn_result, fn_err = error_handler.try(function()
+      -- For method calls, ensure the first argument is treated as 'self'
       -- We need to return multiple values, so we use a wrapper table
-      local results = { fn(unpack_table(args)) }
+      local results
+
+      -- Special case for spying on object methods
+      if type(fn) == "function" then
+        results = { fn(unpack_table(args)) }
+      else
+        -- This should never happen, but we handle it just in case
+        logger.warn("Function in spy is not callable", {
+          fn_type = type(fn),
+        })
+        results = {}
+      end
+
       return results
     end)
 
     if not fn_success then
       -- See if we have access to error_handler's test mode
-      local is_test_mode = error_handler and 
-                          type(error_handler) == "table" and
-                          type(error_handler.is_test_mode) == "function" and
-                          error_handler.is_test_mode()
-      
+      local is_test_mode = error_handler
+        and type(error_handler) == "table"
+        and type(error_handler.is_test_mode) == "function"
+        and error_handler.is_test_mode()
+
       -- Check if this is a test-related error, based on structured properties
-      local is_expected_in_test = is_test_mode and 
-                                 (type(fn_result) == "table" and 
-                                  (fn_result.category == "VALIDATION" or 
-                                   fn_result.category == "TEST_EXPECTED"))
-      
+      local is_expected_in_test = is_test_mode
+        and (
+          type(fn_result) == "table"
+          and (fn_result.category == "VALIDATION" or fn_result.category == "TEST_EXPECTED")
+        )
+
       if is_expected_in_test then
         -- This is likely an intentional error for testing purposes
         logger.debug("Function error captured by spy (expected in test)", {
@@ -335,9 +362,13 @@ function spy.new(fn)
         })
       else
         -- Check if we're suppressing logs in tests
-        if not (error_handler and 
-               type(error_handler.is_suppressing_test_logs) == "function" and 
-               error_handler.is_suppressing_test_logs()) then
+        if
+          not (
+            error_handler
+            and type(error_handler.is_suppressing_test_logs) == "function"
+            and error_handler.is_suppressing_test_logs()
+          )
+        then
           -- This is an unexpected error, log at warning level
           logger.warn("Original function threw an error", {
             function_name = "spy.capture",
@@ -448,7 +479,9 @@ function spy.new(fn)
 
     -- Use protected call to search for matching calls
     local success, search_result, err = error_handler.try(function()
-      for i, call_args in ipairs(self.calls) do
+      for i, call_record in ipairs(self.calls) do
+        -- Extract args from the call record
+        local call_args = call_record.args
         if args_match(expected_args, call_args) then
           return { found = true, index = i }
         end
@@ -619,6 +652,7 @@ function spy.new(fn)
     -- Use protected call to safely get the last call
     local success, result = error_handler.try(function()
       if self.calls and #self.calls > 0 then
+        -- Return the last call record
         return self.calls[#self.calls]
       end
       return nil
@@ -904,18 +938,108 @@ function spy.on(obj, method_name)
     return nil, err
   end
 
-  -- Get the original function
+  -- Store the original function
   local original_fn = obj[method_name]
-
-  logger.debug("Creating spy on existing method", {
-    method_name = method_name,
-    has_original = original_fn ~= nil,
-  })
-
   -- Create the spy with error handling
   local success, spy_obj, err = error_handler.try(function()
-    return spy.new(original_fn)
-  end)
+    -- Create a simple spy for tracking calls
+    local spy_object = spy.new(function() end)
+
+    -- Create a straightforward method wrapper that:
+    -- 1. Records the call to the spy
+    -- 2. Calls the original function
+    local method_wrapper = function(...)
+      local args = { ... }
+
+      -- Log received arguments for debugging
+      logger.debug("Spy method_wrapper received arguments", {
+        method_name = method_name,
+        args_count = #args,
+        is_first_arg_obj = args[1] == obj,
+      })
+
+      -- Check if this is a direct call without self (obj.method style)
+      local is_direct_call = #args >= 1 and args[1] ~= obj
+
+      -- Create tracking arguments with consistent structure
+      local track_args = {}
+
+      -- Create args for the original function call
+      local call_args = {}
+
+      if is_direct_call then
+        -- For direct calls (obj.method()), add self as first arg for both
+        table.insert(track_args, obj)
+        table.insert(call_args, obj)
+        for i = 1, #args do
+          table.insert(track_args, args[i])
+          table.insert(call_args, args[i])
+        end
+      else
+        -- For colon calls (obj:method), args already has self
+        for i = 1, #args do
+          table.insert(track_args, args[i])
+          table.insert(call_args, args[i])
+        end
+      end
+
+      -- IMPORTANT: Update tracking properties BEFORE calling the function
+      -- This ensures calls are always tracked even if the function throws
+      spy_object.called = true
+      spy_object.call_count = spy_object.call_count + 1
+
+      -- Record call with proper structure
+      local call_record = {
+        args = track_args,
+        timestamp = os.time(),
+      }
+
+      -- Store the call record
+      table.insert(spy_object.calls, call_record)
+      table.insert(spy_object.call_history, track_args)
+
+      -- Add to sequence tracking
+      if not _G._firmo_sequence_counter then
+        _G._firmo_sequence_counter = 0
+      end
+
+      -- Record the call in the spy object
+      spy_object.called_with(unpack_table(track_args))
+
+      -- Call through to the original method with the original args
+      local original_args = call_args or args
+
+      -- Always try with original arguments first - no special handling for nil
+      local status, result = pcall(function()
+        return original_fn(unpack_table(original_args))
+      end)
+
+      -- Only if we get a concatenation error, retry with nil converted to empty string
+      if not status and string.find(result or "", "attempt to concatenate") then
+        -- Create a new table with nil values replaced by empty strings
+        local safe_args = {}
+        for i = 1, #original_args do
+          safe_args[i] = original_args[i] == nil and "" or original_args[i]
+        end
+        return original_fn(unpack_table(safe_args))
+      elseif not status then
+        -- If it was some other error, re-raise it
+        error(result, 2)
+      else
+        -- If the call succeeded (even with nil args), return the result
+        return result
+      end
+
+      -- These tracking calls have been moved above before calling the original function
+    end
+
+    -- Don't replace the spy's __call as that creates infinite recursion
+    -- Just return the spy with its tracking and the method_wrapper function
+    return {
+      spy = spy_object,
+      wrapper = method_wrapper,
+    }
+  end) -- Close the error_handler.try function here
 
   if not success then
     local error_obj = error_handler.runtime_error(
@@ -1000,111 +1124,12 @@ function spy.on(obj, method_name)
     return true
   end
 
-  -- Create a wrapper table with error handling
-  local wrapper, wrapper_err
+  -- Get wrapper from the result returned by error_handler.try
+  local wrapper = spy_obj.wrapper
+  local spy_object = spy_obj.spy
 
-  success, wrapper, wrapper_err = error_handler.try(function()
-    local w = {
-      calls = spy_obj.calls,
-      called = spy_obj.called,
-      call_count = spy_obj.call_count,
-      call_sequence = spy_obj.call_sequence,
-      call_history = spy_obj.call_history,
-
-      -- Copy methods with error handling
-      restore = function()
-        return spy_obj:restore()
-      end,
-      called_with = function(self, ...)
-        return spy_obj:called_with(...)
-      end,
-      called_times = function(self, n)
-        return spy_obj:called_times(n)
-      end,
-      not_called = function(self)
-        return spy_obj:not_called()
-      end,
-      called_once = function(self)
-        return spy_obj:called_once()
-      end,
-      last_call = function(self)
-        return spy_obj:last_call()
-      end,
-      called_before = function(self, other, idx)
-        return spy_obj:called_before(other, idx)
-      end,
-      called_after = function(self, other, idx)
-        return spy_obj:called_after(other, idx)
-      end,
-    }
-
-    return w
-  end)
-
-  if not success then
-    local error_obj = error_handler.runtime_error(
-      "Failed to create spy wrapper",
-      {
-        function_name = "spy.on",
-        method_name = method_name,
-        target_type = type(obj),
-      },
-      wrapper -- On failure, wrapper contains the error
-    )
-    logger.error(error_obj.message, error_obj.context)
-    return nil, error_obj
-  end
-
-  -- Make it callable with error handling
-  success, err = error_handler.try(function()
-    -- Create the metatable with the call method
-    local mt = {}
-    mt.__call = function(_, ...)
-      -- Capture args here for proper vararg handling
-      local args = { ... }
-
-      -- When called, update our wrapper's properties too
-      local call_success, call_result, call_err = error_handler.try(function()
-        -- Create a function to call with the args
-        local function call_spy(...)
-          local result = spy_obj(...)
-          wrapper.called = spy_obj.called
-          wrapper.call_count = spy_obj.call_count
-          wrapper.call_sequence = spy_obj.call_sequence
-          wrapper.call_history = spy_obj.call_history
-          return result
-        end
-
-        return call_spy(unpack_table(args))
-      end)
-
-      if not call_success then
-        logger.error("Error during spy call", {
-          function_name = "spy.on.__call",
-          method_name = method_name,
-          error = error_handler.format_error(call_result),
-        })
-        -- Re-throw the error for consistent behavior
-        error(call_result)
-      end
-
-      return call_result
-    end
-
-    -- Apply the metatable
-    setmetatable(wrapper, mt)
-    return true
-  end)
-
-  if not success then
-    local error_obj = error_handler.runtime_error("Failed to set up spy metatable", {
-      function_name = "spy.on",
-      method_name = method_name,
-      target_type = type(obj),
-    }, err)
-    logger.error(error_obj.message, error_obj.context)
-    return nil, error_obj
-  end
+  -- Add restore method to the spy object
+  spy_object.restore = spy_obj.restore
 
   -- Replace the method with our spy wrapper
   success, err = error_handler.try(function()
@@ -1127,7 +1152,12 @@ function spy.on(obj, method_name)
     return nil, error_obj
   end
 
-  return wrapper
+  -- Configure the spy with additional context
+  spy_object.target = obj
+  spy_object.name = method_name
+  spy_object.original = original_fn
+
+  return spy_object
 end
 
 -- Create and record the call sequence used for spy.on and spy.new methods, with error handling

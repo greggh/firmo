@@ -4,6 +4,7 @@ local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 
 -- Import filesystem module
 local fs = require("lib.tools.filesystem")
+local test_helper = require("lib.tools.test_helper")
 
 -- Try to load benchmark module
 local benchmark_loaded, benchmark = pcall(require, "lib.tools.benchmark")
@@ -71,12 +72,14 @@ describe("Performance Tests", function()
           return ]] .. name .. [[
         ]]
         
-        local success, err = fs.write_file(path, module_content)
+        local success, err = test_helper.with_error_capture(function()
+          return fs.write_file(path, module_content)
+        end)()
+        
         if not success then
           firmo.log.error({ message = "Failed to create test module", module = name, path = path, error = err })
           return
         end
-        
         table.insert(modules, {name = name, path = path})
       end
       
@@ -179,13 +182,14 @@ describe("Performance Tests", function()
         
         -- Get test files
         local files = {}
-        local all_files, err = fs.list_files(suite_dir)
+        local all_files, err = test_helper.with_error_capture(function()
+          return fs.list_files(suite_dir)
+        end)()
         
         if not all_files then
           firmo.log.error({ message = "Failed to list test files", directory = suite_dir, error = err })
           return
         end
-        
         -- Filter to only Lua files
         for _, file in ipairs(all_files) do
           if file:match("%.lua$") then
@@ -251,11 +255,11 @@ describe("Performance Tests", function()
   end)
   
   describe("Error handling performance", function()
-    it("should measure error handling performance", function()
+    it("should measure error handling performance", { expect_error = true }, function()
       -- Only run if fixtures are available
       if not fixtures_loaded then return end
       
-      -- Test error handling speed
+      -- Test error handling speed with proper error capture
       local function handle_errors()
         -- Try various error types
         local error_types = {
@@ -267,11 +271,14 @@ describe("Performance Tests", function()
         }
         
         for _, error_type in ipairs(error_types) do
-          local success, result = pcall(fixtures[error_type])
-          -- We don't care about the result, just that the error is caught
+          local result, err = test_helper.with_error_capture(function()
+            return fixtures[error_type]()
+          end)()
+          
+          -- Verify error was caught
+          expect(err).to.exist()
         end
       end
-      
       -- Measure error handling performance
       local error_perf = firmo.benchmark.measure(
         handle_errors, 

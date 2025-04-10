@@ -1,6 +1,5 @@
 ---@class TempFileModule
 ---@field _VERSION string Module version (following semantic versioning)
----@field create_temp_file fun(extension?: string): string|nil, table? Create a temporary file with optional extension (.txt by default)
 ---@field create_with_content fun(content: string, extension?: string): string|nil, table? Create a temporary file with specified content and register for automatic cleanup
 ---@field create_temp_directory fun(): string|nil, table? Create a temporary directory and register for automatic cleanup
 ---@field get_temp_dir fun(): string Get the base temporary directory path used by the module
@@ -24,7 +23,6 @@
 ---@field get_context_for_file fun(file_path: string): string|nil Get the context a specific file was registered with
 ---@field get_current_test_context fun(): string|table|nil Get the current test context being used for file registration
 ---@field copy_to_temp fun(source_path: string, extension?: string): string|nil, table? Copy an existing file to a temporary location
----@field create_temp_files fun(count: number, content?: string, extension?: string): table|nil, table? Create multiple temporary files at once
 ---@field find_orphans fun(): table Find orphaned temporary files not properly registered or cleaned
 
 --[[
@@ -492,4 +490,3 @@ function M.clear_current_test_context()
 end
 
 return M
-

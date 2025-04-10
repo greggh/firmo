@@ -77,6 +77,26 @@ describe('Expect Assertion System', function()
       expect(nil).to.be.falsey()
       expect(false).to.be.falsey()
     end)
+    
+    it('fails when values are not equal', { expect_error = true }, function()
+      local result, err = test_helper.with_error_capture(function()
+        expect(5).to.equal(6)
+      end)()
+      
+      expect(result).to_not.exist()
+      expect(err).to.exist()
+      expect(err.message).to.match("expected.*to equal")
+    end)
+
+    it('fails when checking existence of nil', { expect_error = true }, function()
+      local result, err = test_helper.with_error_capture(function()
+        expect(nil).to.exist()
+      end)()
+      
+      expect(result).to_not.exist()
+      expect(err).to.exist()
+      expect(err.message).to.match("expected.*to exist")
+    end)
   end)
   
   describe('Negative Assertions', function()
@@ -177,8 +197,27 @@ describe('Expect Assertion System', function()
       expect({}).to.be.a("table")
       expect(function() end).to.be.a("function")
     end)
+    
+    it('fails when string does not match pattern', { expect_error = true }, function()
+      local result, err = test_helper.with_error_capture(function()
+        expect("hello world").to.match("universe")
+      end)()
+      
+      expect(result).to_not.exist()
+      expect(err).to.exist()
+      expect(err.message).to.match("expected.*to match")
+    end)
+
+    it('fails when type does not match', { expect_error = true }, function()
+      local result, err = test_helper.with_error_capture(function()
+        expect(5).to.be.a("string")
+      end)()
+      
+      expect(result).to_not.exist()
+      expect(err).to.exist()
+      expect(err.message).to.match("expected.*to be a")
+    end)
   end)
-  
   describe('Reset Function', function()
     if log then log.debug("Testing reset functionality") end
     

@@ -441,16 +441,16 @@ describe("Quality Module", function()
     expect(load_error).to_not.exist("Failed to load quality module: " .. tostring(load_error))
     
     -- Try to check a non-existent file
-    local result, err = test_helper.with_error_capture(function()
+    local result, err = test_helper.expect_error(function()
       return quality.check_file("non_existent_file.lua", 1)
-    end)()
+    end)
     
     -- The check should either return false or an error
     if result ~= nil then
       expect(result).to.equal(false, "check_file should return false for non-existent files")
     else
       expect(err).to.exist("check_file should error for non-existent files")
-      -- Additional checks on the error object could be added here
+      expect(err.message or tostring(err)).to.match("non_existent_file", "Error should reference the missing file")
     end
   end)
   
@@ -577,27 +577,29 @@ describe("Quality Module", function()
     expect(load_error).to_not.exist("Failed to load quality module: " .. tostring(load_error))
     
     -- Test with an invalid quality level (negative)
-    local result, err = test_helper.with_error_capture(function()
+    local result, err = test_helper.expect_error(function()
       return quality.check_file(test_files[1], -1)
-    end)()
+    end)
     
     -- The check should either return false or an error
     if result ~= nil then
       expect(result).to.equal(false, "check_file should return false for invalid quality level")
     else
       expect(err).to.exist("check_file should error for invalid quality level")
+      expect(err.message or tostring(err)).to.match("level", "Error should reference invalid level")
     end
     
     -- Test with an invalid quality level (too high)
-    local result2, err2 = test_helper.with_error_capture(function()
+    local result2, err2 = test_helper.expect_error(function()
       return quality.check_file(test_files[1], 999)
-    end)()
+    end)
     
     -- The check should either return false or an error
     if result2 ~= nil then
       expect(result2).to.equal(false, "check_file should return false for invalid quality level")
     else
       expect(err2).to.exist("check_file should error for invalid quality level")
+      expect(err2.message or tostring(err2)).to.match("level", "Error should reference invalid level")
     end
   end)
   

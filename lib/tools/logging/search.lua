@@ -123,6 +123,7 @@ function M.search_logs(options)
   -- Initialize results
   local results = {}
   local count = 0
+  local total = 0
 
   -- Process log file line by line (split content into lines)
   for line in content:gmatch("([^\r\n]+)[\r\n]*") do
@@ -137,6 +138,7 @@ function M.search_logs(options)
 
     -- Apply filters to parsed entry
     if log_entry then
+      total = total + 1
       local include = true
 
       -- Filter by timestamp/date if specified
@@ -164,9 +166,9 @@ function M.search_logs(options)
         end
       end
 
-      -- Filter by message content
+      -- Filter by message content - make it case-insensitive
       if include and message_pattern and log_entry.message then
-        include = log_entry.message:match(message_pattern) ~= nil
+        include = log_entry.message:lower():find(message_pattern:lower()) ~= nil
       end
 
       -- Add to results if passes all filters
@@ -185,7 +187,9 @@ function M.search_logs(options)
   -- Return results
   return {
     entries = results,
-    count = count,
+    total = total,       -- Total entries processed
+    matched = count,     -- Number of entries that matched filters
+    count = count,       -- For backward compatibility
     truncated = count >= limit,
   }
 end
@@ -267,6 +271,7 @@ function M.get_log_stats(log_file, options)
   -- Add file size information
   stats.file_size = fs.get_file_size(log_file)
 
+  -- Always return a valid stats object even if there are no entries
   return stats
 end
 

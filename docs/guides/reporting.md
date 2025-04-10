@@ -8,10 +8,21 @@ The reporting module centralizes all reporting functionality in the firmo framew
 
 - A unified interface for generating different types of reports
 - Support for multiple output formats (HTML, JSON, XML, CSV, TAP, etc.)
+- Class-based formatter system with inheritance and extensibility
 - File I/O operations with robust error handling
 - Automatic directory creation and management
 - Integration with the central configuration system
-- Validation of report data and formatted output
+- Data normalization and validation
+
+## Architecture Overview
+
+The reporting module uses an object-oriented architecture with class inheritance:
+
+- **Base Formatter**: All formatters extend from a common base `Formatter` class
+- **Formatter Registry**: Formatters register themselves via a `register` method
+- **Normalized Data**: Input data is automatically normalized for consistent processing
+- **Central Configuration**: Formatters read configuration from the central config system
+- **Inheritance**: Custom formatters can extend built-in ones to add functionality
 
 ## Basic Usage
 
@@ -35,6 +46,38 @@ local html_report = reporting.format_coverage(coverage_data, "html")
 
 -- Save the report to a file
 reporting.write_file("./reports/coverage-report.html", html_report)
+```
+
+You can also use the more direct formatter API for greater control:
+
+```lua
+local firmo = require('firmo')
+local html_formatter = require('lib.reporting.formatters.html')
+
+-- Run tests with coverage
+firmo.coverage_options.enabled = true
+firmo.run_discovered('./tests')
+
+-- Get coverage data
+local coverage_data = firmo.get_coverage_data()
+
+-- Create formatter instance with options
+local formatter = html_formatter.new({
+  theme = "dark",
+  show_line_numbers = true
+})
+
+-- Format and generate report in one step
+local success, result = formatter:generate(
+  coverage_data,
+  "./reports/coverage-report.html"
+)
+
+if success then
+  print("Report generated successfully at: " .. result)
+else
+  print("Failed to generate report: " .. result.message)
+end
 ```
 
 From the command line:
@@ -149,6 +192,44 @@ reporting.auto_save_reports(
     timestamp_format = "%Y-%m-%d",
     verbose = true
   }
+)
+```
+
+Path templates support the following placeholders:
+- `{format}`: Output format (html, json, lcov, etc.)
+- `{type}`: Report type (coverage, quality, results)
+- `{date}`: Current date using timestamp format
+- `{datetime}`: Current date and time (%Y-%m-%d_%H-%M-%S)
+- `{suffix}`: The report suffix if specified
+
+### Using Formatter Classes Directly
+
+Each formatter can be used directly for more control:
+
+```lua
+local summary_formatter = require('lib.reporting.formatters.summary')
+local json_formatter = require('lib.reporting.formatters.json')
+
+-- Create formatter instances
+local summary = summary_formatter.new({
+  colorize = true,
+  detailed = true
+})
+
+local json = json_formatter.new({
+  pretty_print = true,
+  indent_size = 4
+})
+
+-- Generate reports
+local success1, path1 = summary:generate(
+  coverage_data, 
+  "./reports/coverage-summary.txt"
+)
+
+local success2, path2 = json:generate(
+  coverage_data, 
+  "./reports/coverage-data.json"
 )
 ```
 
@@ -376,42 +457,118 @@ lua test.lua --coverage --verbose-reports tests/
 
 ## Custom Formatters
 
-You can register custom formatters for specialized reporting needs:
+### Creating Custom Formatters with Class Inheritance
+
+The new reporting system uses a class-based approach for formatters. You can create custom formatters by extending the base formatter class:
 
 ```lua
-local reporting = require('lib.reporting')
+local Formatter = require('lib.reporting.formatters.base')
+local error_handler = require('lib.tools.error_handler')
 
--- Register a custom Markdown formatter
-reporting.register_coverage_formatter("markdown", function(coverage_data)
+-- Create a custom Markdown formatter by extending the base formatter
+local MarkdownFormatter = Formatter.extend("markdown", "md")
+
+-- Set version
+MarkdownFormatter._VERSION = "1.0.0"
+
+-- Implement the format method (required)
+function MarkdownFormatter:format(coverage_data, options)
+  -- Normalize data for consistent structure
+  local data = self:normalize_coverage_data(coverage_data)
+  
+  -- Build markdown content
   local md = "# Coverage Report\n\n"
   md = md .. "## Summary\n\n"
-  md = md .. "- Files: " .. coverage_data.summary.total_files .. "\n"
-  md = md .. "- Line Coverage: " .. coverage_data.summary.line_coverage_percent .. "%\n"
+  md = md .. "- Files: " .. data.summary.total_files .. "\n"
+  md = md .. "- Line Coverage: " .. string.format("%.2f", data.summary.coverage_percent) .. "%\n"
   
   md = md .. "\n## Files\n\n"
-  for path, file_data in pairs(coverage_data.files) do
-    local coverage = 0
-    if file_data.executable_lines > 0 then
-      coverage = (file_data.covered_lines / file_data.executable_lines) * 100
-    end
-    md = md .. "- **" .. path .. "**: " .. string.format("%.2f", coverage) .. "%\n"
+  
+  -- Sort files by path for consistent output
+  local file_paths = {}
+  for path, _ in pairs(data.files) do
+    table.insert(file_paths, path)
+  end
+  table.sort(file_paths)
+  
+  -- Add each file's coverage info
+  for _, path in ipairs(file_paths) do
+    local file_data = data.files[path]
+    md = md .. "- **" .. path .. "**: " 
+       .. string.format("%.2f", file_data.summary.coverage_percent) .. "%\n"
   end
   
   return md
-end)
+end
+
+-- Register the formatter
+function MarkdownFormatter.register(formatters)
+  -- Validate formatters parameter
+  if not formatters or type(formatters) ~= "table" then
+    return false, error_handler.validation_error(
+      "Invalid formatters registry", 
+      {formatter = "markdown"}
+    )
+  end
+  
+  -- Create an instance of the formatter
+  local formatter = MarkdownFormatter.new()
+  
+  -- Register with the formatters registry
+  formatters.coverage = formatters.coverage or {}
+  formatters.coverage.markdown = function(data, options)
+    return formatter:format(data, options)
+  end
+  
+  return true
+end
+
+return MarkdownFormatter
+```
+
+### Registering and Using Custom Formatters
+
+Register and use your custom formatter:
+
+```lua
+local reporting = require('lib.reporting')
+local markdown_formatter = require('path.to.markdown_formatter')
+
+-- Register the custom formatter
+reporting.register_formatter(markdown_formatter)
 
 -- Use the custom formatter
 local markdown_report = reporting.format_coverage(coverage_data, "markdown")
 reporting.write_file("./reports/coverage.md", markdown_report)
 ```
 
+### Simple Custom Formatters
+
+For simple cases, you can still use the function-based approach:
+
+```lua
+local reporting = require('lib.reporting')
+
+-- Register a simple custom formatter function
+reporting.register_coverage_formatter("simple", function(coverage_data)
+  -- Simple text formatter that just shows overall percentage
+  return "Overall coverage: " .. 
+    string.format("%.2f%%", coverage_data.summary.coverage_percent)
+end)
+
+-- Use the custom formatter
+local simple_report = reporting.format_coverage(coverage_data, "simple")
+print(simple_report)
+```
+
 ## Best Practices
 
 ### Error Handling
 
-Always check for errors when using the reporting module:
+The reporting module provides comprehensive error handling using the error_handler system:
 
 ```lua
+-- Using the reporting module functions
 local success, err = reporting.save_coverage_report(
   "./reports/coverage.html", 
   coverage_data, 
@@ -420,26 +577,91 @@ local success, err = reporting.save_coverage_report(
 
 if not success then
   print("Failed to save report: " .. err.message)
+  if err.context then
+    print("Error details: " .. require('lib.tools.error_handler').format_error(err))
+  end
   -- Handle the error appropriately
+end
+
+-- Using formatter objects directly
+local html_formatter = require('lib.reporting.formatters.html')
+local formatter = html_formatter.new()
+
+-- Validate data
+local is_valid, validation_err = formatter:validate(coverage_data)
+if not is_valid then
+  print("Validation failed: " .. validation_err.message)
+  return
+end
+
+-- Format the data
+local formatted_data, format_err = formatter:format(coverage_data)
+if not formatted_data then
+  print("Formatting failed: " .. format_err.message)
+  return
+end
+
+-- Write the formatted data
+local write_success, write_err = formatter:write(
+  formatted_data, 
+  "./reports/coverage.html"
+)
+
+if not write_success then
+  print("Write failed: " .. write_err.message)
+  return
+end
+
+-- Or use generate() for all steps in one call with comprehensive error handling
+local gen_success, result_or_err = formatter:generate(
+  coverage_data, 
+  "./reports/coverage.html"
+)
+
+if not gen_success then
+  print("Report generation failed: " .. result_or_err.message)
 end
 ```
 
-### Report Organization
+### Data Normalization and Validation
 
-Organize your reports with a consistent directory structure:
+Formatters automatically normalize data to ensure consistent structure:
 
 ```lua
--- Create a timestamp-based directory structure
-local timestamp = os.date("%Y-%m-%d_%H-%M-%S")
-local base_dir = "./reports/" .. timestamp
+local formatter = require('lib.reporting.formatters.html').new()
 
--- Save reports with appropriate naming
-reporting.write_file(base_dir .. "/coverage/html/index.html", html_report)
-reporting.write_file(base_dir .. "/coverage/json/data.json", json_report)
-reporting.write_file(base_dir .. "/coverage/lcov/coverage.lcov", lcov_report)
+-- Normalize data (this happens automatically in format/generate)
+local normalized_data = formatter:normalize_coverage_data(coverage_data)
+
+-- Check if file paths use consistent format
+for file_path, _ in pairs(normalized_data.files) do
+  if not file_path:match("^/") then
+    print("Warning: Relative path found: " .. file_path)
+  end
+end
+
+-- Validate data explicitly
+local is_valid, validation_error = formatter:validate(coverage_data)
+if not is_valid then
+  print("Validation error: " .. validation_error.message)
+  if validation_error.context then
+    for k, v in pairs(validation_error.context) do
+      print("  " .. k .. ": " .. tostring(v))
+    end
+  end
+end
+
+-- Run comprehensive validation via the reporting module
+local validation_result = reporting.validate_report(coverage_data)
+
+if not validation_result.validation.is_valid then
+  print("Report validation failed:")
+  for _, issue in ipairs(validation_result.validation.issues) do
+    print("- " .. issue.message)
+  end
+  -- Handle validation issues
+end
 ```
-
-### Continuous Integration
 
 For CI integration, use the LCOV or Cobertura formats:
 
@@ -468,17 +690,6 @@ if not validation_result.validation.is_valid then
 end
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-1. **Directory creation failures**:
-   ```lua
-   -- Ensure directory exists manually if needed
-   local fs = require("lib.tools.filesystem")
-   local dir_exists = fs.ensure_directory_exists("./reports")
-   if not dir_exists then
-     print("Failed to create report directory")
    end
    ```
 

@@ -748,22 +748,21 @@ end
 ---@param fn function Hook function to execute after each test
 ---
 ---@usage
---- -- Basic teardown hook
+--- -- Basic temporary file usage with automatic cleanup
 --- describe("File operations", function()
----   local temp_file
+---   local temp_file = require("lib.tools.temp_file")
 ---
----   before(function()
----     temp_file = create_temp_file()
----   end)
----
----   after(function()
----     -- Cleanup after each test
----     delete_file(temp_file)
----   end)
----
----   it("should write to file", function()
----     write_to_file(temp_file, "content")
----     expect(read_file(temp_file)).to.equal("content")
+---   it("should write to file with automatic cleanup", function()
+---     temp_file.with_temp_file("initial content", function(file_path)
+---       -- File is automatically created with content and cleaned up after this function
+---       local content = read_file(file_path)
+---       expect(content).to.equal("initial content")
+---       
+---       -- Modify the file
+---       write_to_file(file_path, "updated content")
+---       expect(read_file(file_path)).to.equal("updated content")
+---     end)
+---     -- No manual cleanup needed - temp file is automatically removed
 ---   end)
 --- end)
 ---

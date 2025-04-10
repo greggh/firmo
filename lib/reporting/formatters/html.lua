@@ -33,7 +33,7 @@ local SIMPLE_CSS = [[
   --hover-bg-light: #f9f9f9;
   --td-border-light: #e1e1e1;
   --target-highlight-light: #fffde7;
-  
+
   /* Dark Theme */
   --bg-color-dark: #1a1a1a;
   --text-color-dark: #e0e0e0;
@@ -50,28 +50,28 @@ local SIMPLE_CSS = [[
   --hover-bg-dark: #2d2d2d;
   --td-border-dark: #3a3a3a;
   --target-highlight-dark: #3a3600;
-  
+
   /* Shared Colors */
   --high-color: #4caf50;
   --medium-color: #ff9800;
   --low-color: #f44336;
-  
+
   /* Coverage Status Colors - Higher contrast for better visibility */
   --covered-bg-dark: rgba(76, 175, 80, 0.4);     /* Green with more opacity */
   --executed-bg-dark: rgba(255, 152, 0, 0.4);    /* Orange with more opacity */
   --not-covered-bg-dark: rgba(244, 67, 54, 0.4); /* Red with more opacity */
-  
+
   --covered-bg-light: rgba(76, 175, 80, 0.3);    /* Green for light theme */
   --executed-bg-light: rgba(255, 152, 0, 0.3);   /* Orange for light theme */
   --not-covered-bg-light: rgba(244, 67, 54, 0.3); /* Red for light theme */
-  
+
   /* Dark Theme Syntax Highlighting */
   --keyword-dark: #ff79c6;
   --string-dark: #9ccc65;
   --comment-dark: #7e7e7e;
   --number-dark: #bd93f9;
   --function-dark: #8be9fd;
-  
+
   /* Light Theme Syntax Highlighting */
   --keyword-light: #0033b3;
   --string-light: #067d17;
@@ -423,7 +423,7 @@ tr:target {
 }
 
 .light-theme .summary,
-.light-theme .file-list, 
+.light-theme .file-list,
 .light-theme .source-section {
   background-color: var(--card-bg-light);
   border-color: var(--card-border-light);
@@ -537,18 +537,22 @@ tr:target {
 
 -- HTML escaping
 local function escape_html(text)
-  if not text then return "" end
+  if not text then
+    return ""
+  end
   return text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"):gsub("'", "&#39;")
 end
 
 -- Server-side syntax highlighting for Lua - SIMPLIFIED VERSION FOR PERFORMANCE
 local function highlight_lua(code)
-  if not code then return "" end
-  
+  if not code then
+    return ""
+  end
+
   -- PERFORMANCE OPTIMIZATION: Just return escaped code without syntax highlighting
   -- This dramatically improves HTML generation performance
   return escape_html(code)
-  
+
   -- The full syntax highlighting has been removed for performance reasons
   -- The current implementation was causing timeouts in test runs
 end
@@ -575,10 +579,10 @@ local function format_percent(percent)
   if not percent or type(percent) ~= "number" then
     return "0%"
   end
-  
+
   -- Round to nearest whole number
   percent = round(percent, 0)
-  
+
   -- Return as string with % sign
   return tostring(percent) .. "%"
 end
@@ -591,7 +595,7 @@ local function generate_overview_html(coverage_data)
   local total_executable_lines = 0
   local total_executed_functions = 0
   local total_functions = 0
-  
+
   for _, file_data in pairs(coverage_data.files) do
     total_files = total_files + 1
     total_covered_lines = total_covered_lines + (file_data.covered_lines or 0)
@@ -599,25 +603,25 @@ local function generate_overview_html(coverage_data)
     total_executed_functions = total_executed_functions + (file_data.executed_functions or 0)
     total_functions = total_functions + (file_data.total_functions or 0)
   end
-  
+
   local line_coverage_percent = 0
   if total_executable_lines > 0 then
     line_coverage_percent = (total_covered_lines / total_executable_lines) * 100
   end
-  
+
   local function_coverage_percent = 0
   if total_functions > 0 then
     function_coverage_percent = (total_executed_functions / total_functions) * 100
   end
-  
+
   local line_class = get_coverage_class(line_coverage_percent)
   local function_class = get_coverage_class(function_coverage_percent)
-  
+
   -- Create HTML
   local html = [[
   <div class="summary">
     <h2>Coverage Summary</h2>
-    
+
     <div class="stats">
       <div class="stat-box">
         <div class="stat-label">Line Coverage</div>
@@ -627,16 +631,19 @@ local function generate_overview_html(coverage_data)
         </div>
         <div style="font-size: 12px; margin-top: 5px;">]] .. total_covered_lines .. [[ of ]] .. total_executable_lines .. [[ lines</div>
       </div>
-      
+
       <div class="stat-box">
         <div class="stat-label">Function Coverage</div>
         <div class="stat-value ]] .. function_class .. [[">]] .. format_percent(function_coverage_percent) .. [[</div>
         <div class="progress-bar">
-          <div class="progress-value ]] .. function_class .. [[" style="width: ]] .. math.min(100, function_coverage_percent) .. [[%;"></div>
+          <div class="progress-value ]] .. function_class .. [[" style="width: ]] .. math.min(
+    100,
+    function_coverage_percent
+  ) .. [[%;"></div>
         </div>
         <div style="font-size: 12px; margin-top: 5px;">]] .. total_executed_functions .. [[ of ]] .. total_functions .. [[ functions</div>
       </div>
-      
+
       <div class="stat-box">
         <div class="stat-label">Total Files</div>
         <div class="stat-value">]] .. total_files .. [[</div>
@@ -644,7 +651,7 @@ local function generate_overview_html(coverage_data)
     </div>
   </div>
   ]]
-  
+
   return html
 end
 
@@ -656,7 +663,7 @@ local function generate_file_list_html(coverage_data)
     table.insert(file_paths, path)
   end
   table.sort(file_paths)
-  
+
   -- Start HTML
   local html = [[
   <div class="file-list">
@@ -672,52 +679,75 @@ local function generate_file_list_html(coverage_data)
       </thead>
       <tbody>
   ]]
-  
+
   -- Add each file
   for _, path in ipairs(file_paths) do
     local file_data = coverage_data.files[path]
     local file_id = path:gsub("[^%w]", "-")
     local line_coverage_percent = 0
     local function_coverage_percent = 0
-    
+
     if file_data.executable_lines and file_data.executable_lines > 0 then
       line_coverage_percent = (file_data.covered_lines / file_data.executable_lines) * 100
     end
-    
+
     if file_data.total_functions and file_data.total_functions > 0 then
       function_coverage_percent = (file_data.executed_functions / file_data.total_functions) * 100
     end
-    
+
     local line_class = get_coverage_class(line_coverage_percent)
     local function_class = get_coverage_class(function_coverage_percent)
-    
-    html = html .. [[
+
+    html = html
+      .. [[
       <tr>
-        <td><a href="#file-]] .. file_id .. [[">]] .. path .. [[</a></td>
+        <td><a href="#file-]]
+      .. file_id
+      .. [[">]]
+      .. path
+      .. [[</a></td>
         <td>
-          <div class="]] .. line_class .. [[">]] .. format_percent(line_coverage_percent) .. [[</div>
+          <div class="]]
+      .. line_class
+      .. [[">]]
+      .. format_percent(line_coverage_percent)
+      .. [[</div>
           <div class="progress-bar">
-            <div class="progress-value ]] .. line_class .. [[" style="width: ]] .. math.min(100, line_coverage_percent) .. [[%;"></div>
+            <div class="progress-value ]]
+      .. line_class
+      .. [[" style="width: ]]
+      .. math.min(100, line_coverage_percent)
+      .. [[%;"></div>
           </div>
         </td>
         <td>
-          <div class="]] .. function_class .. [[">]] .. format_percent(function_coverage_percent) .. [[</div>
+          <div class="]]
+      .. function_class
+      .. [[">]]
+      .. format_percent(function_coverage_percent)
+      .. [[</div>
           <div class="progress-bar">
-            <div class="progress-value ]] .. function_class .. [[" style="width: ]] .. math.min(100, function_coverage_percent) .. [[%;"></div>
+            <div class="progress-value ]]
+      .. function_class
+      .. [[" style="width: ]]
+      .. math.min(100, function_coverage_percent)
+      .. [[%;"></div>
           </div>
         </td>
-        <td>]] .. file_data.total_lines .. [[</td>
+        <td>]]
+      .. file_data.total_lines
+      .. [[</td>
       </tr>
     ]]
   end
-  
+
   -- Close HTML
   html = html .. [[
       </tbody>
     </table>
   </div>
   ]]
-  
+
   return html
 end
 
@@ -731,15 +761,19 @@ local function generate_file_source_html(file_data, file_id)
         <div class="file-header">
           <div class="file-path">]] .. file_data.path .. [[</div>
         </div>
-        
+
         <div class="file-stats">
           <div>
             <span>Line Coverage: </span>
-            <span class="]] .. get_coverage_class(file_data.line_coverage_percent) .. [[">]] .. format_percent(file_data.line_coverage_percent) .. [[</span>
+            <span class="]] .. get_coverage_class(file_data.line_coverage_percent) .. [[">]] .. format_percent(
+      file_data.line_coverage_percent
+    ) .. [[</span>
             <span>(]] .. file_data.covered_lines .. [[/]] .. file_data.executable_lines .. [[)</span>
-            
+
             <span style="margin-left: 15px;">Function Coverage: </span>
-            <span class="]] .. get_coverage_class(file_data.function_coverage_percent) .. [[">]] .. format_percent(file_data.function_coverage_percent) .. [[</span>
+            <span class="]] .. get_coverage_class(file_data.function_coverage_percent) .. [[">]] .. format_percent(
+      file_data.function_coverage_percent
+    ) .. [[</span>
             <span>(]] .. file_data.executed_functions .. [[/]] .. file_data.total_functions .. [[)</span>
           </div>
         </div>
@@ -757,48 +791,52 @@ local function generate_file_source_html(file_data, file_id)
     table.insert(line_numbers, line_num)
   end
   table.sort(line_numbers)
-  
+
   -- Create HTML for file
   local html = [[
   <div class="source-section" id="file-]] .. file_id .. [[">
     <div class="file-header">
       <div class="file-path">]] .. file_data.path .. [[</div>
     </div>
-    
+
     <div class="file-stats">
       <div>
         <span>Line Coverage: </span>
-        <span class="]] .. get_coverage_class(file_data.line_coverage_percent) .. [[">]] .. format_percent(file_data.line_coverage_percent) .. [[</span>
+        <span class="]] .. get_coverage_class(file_data.line_coverage_percent) .. [[">]] .. format_percent(
+    file_data.line_coverage_percent
+  ) .. [[</span>
         <span>(]] .. file_data.covered_lines .. [[/]] .. file_data.executable_lines .. [[)</span>
-        
+
         <span style="margin-left: 15px;">Function Coverage: </span>
-        <span class="]] .. get_coverage_class(file_data.function_coverage_percent) .. [[">]] .. format_percent(file_data.function_coverage_percent) .. [[</span>
+        <span class="]] .. get_coverage_class(file_data.function_coverage_percent) .. [[">]] .. format_percent(
+    file_data.function_coverage_percent
+  ) .. [[</span>
         <span>(]] .. file_data.executed_functions .. [[/]] .. file_data.total_functions .. [[)</span>
       </div>
     </div>
-    
+
     <div class="source-code">
       <table class="code-table">
         <tbody>
   ]]
-  
+
   -- Performance optimization: limit number of displayed lines for all files
   local max_lines_to_display = 200
   local line_display_limit = math.min(#line_numbers, max_lines_to_display)
-  
+
   for i = 1, line_display_limit do
     local line_num = line_numbers[i]
     local line_data = file_data.lines[line_num]
     local line_content = line_data.content or ""
     local line_class = ""
     local exec_count = ""
-    
+
     if line_data.executable then
       exec_count = tostring(line_data.execution_count)
       if line_data.execution_count > 0 then
         -- Apply three-state visualization
         if line_data.covered then
-          line_class = "covered"  -- Green - tested and verified
+          line_class = "covered" -- Green - tested and verified
         else
           line_class = "executed" -- Orange - executed but not verified
         end
@@ -808,23 +846,39 @@ local function generate_file_source_html(file_data, file_id)
     elseif line_data.line_type == "comment" or line_data.line_type == "blank" then
       line_class = "not-executable"
     end
-    
+
     -- Create a table row with line number, execution count and code content
-    html = html .. [[
-          <tr id="L]] .. line_num .. [[" class="code-line ]] .. line_class .. [[">
-            <td class="line-number">]] .. line_num .. [[</td>
-            <td class="exec-count">]] .. exec_count .. [[</td>
-            <td class="code-content">]] .. highlight_lua(line_content) .. [[</td>
+    html = html
+      .. [[
+          <tr id="L]]
+      .. line_num
+      .. [[" class="code-line ]]
+      .. line_class
+      .. [[">
+            <td class="line-number">]]
+      .. line_num
+      .. [[</td>
+            <td class="exec-count">]]
+      .. exec_count
+      .. [[</td>
+            <td class="code-content">]]
+      .. highlight_lua(line_content)
+      .. [[</td>
           </tr>
     ]]
   end
-  
+
   -- Add a note if we truncated the display
   if #line_numbers > max_lines_to_display then
-    html = html .. [[
+    html = html
+      .. [[
           <tr>
             <td colspan="3" style="padding: 10px; text-align: center; font-style: italic;">
-              (File truncated to ]] .. max_lines_to_display .. [[ lines. ]] .. (#line_numbers - max_lines_to_display) .. [[ additional lines not shown for performance.)
+              (File truncated to ]]
+      .. max_lines_to_display
+      .. [[ lines. ]]
+      .. (#line_numbers - max_lines_to_display)
+      .. [[ additional lines not shown for performance.)
             </td>
           </tr>
     ]]
@@ -837,7 +891,7 @@ local function generate_file_source_html(file_data, file_id)
     </div>
   </div>
   ]]
-  
+
   return html
 end
 
@@ -846,7 +900,7 @@ function M.format_coverage(coverage_data)
   -- Generate report sections
   local overview_html = generate_overview_html(coverage_data)
   local file_list_html = generate_file_list_html(coverage_data)
-  
+
   -- Generate source code sections for each file, but skip large files
   local source_sections = ""
   for path, file_data in pairs(coverage_data.files) do
@@ -857,18 +911,29 @@ function M.format_coverage(coverage_data)
     else
       -- Just add a placeholder for large files to avoid performance issues
       local file_id = path:gsub("[^%w]", "-")
-      source_sections = source_sections .. [[
-        <div id="file-]] .. file_id .. [[" class="file-section">
-          <h2 class="file-heading">]] .. path .. [[</h2>
+      source_sections = source_sections
+        .. [[
+        <div id="file-]]
+        .. file_id
+        .. [[" class="file-section">
+          <h2 class="file-heading">]]
+        .. path
+        .. [[</h2>
           <div class="file-info">
-            <p><strong>Large file (]] .. file_data.total_lines .. [[ lines) - source view skipped for performance reasons</strong></p>
-            <p>Coverage: ]] .. file_data.covered_lines .. [[ covered of ]] .. file_data.executable_lines .. [[ executable lines</p>
+            <p><strong>Large file (]]
+        .. file_data.total_lines
+        .. [[ lines) - source view skipped for performance reasons</strong></p>
+            <p>Coverage: ]]
+        .. file_data.covered_lines
+        .. [[ covered of ]]
+        .. file_data.executable_lines
+        .. [[ executable lines</p>
           </div>
         </div>
       ]]
     end
   end
-  
+
   -- Generate complete HTML document
   local html = [[<!DOCTYPE html>
 <html lang="en">
@@ -889,7 +954,7 @@ function M.format_coverage(coverage_data)
           // Save preference
           localStorage.setItem('theme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
         });
-        
+
         // Check for saved preference
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme === 'light') {
@@ -930,7 +995,7 @@ function M.format_coverage(coverage_data)
     <div id="overview">
       ]] .. overview_html .. [[
     </div>
-    
+
     <div class="summary" style="margin-bottom: 20px;">
       <h2>Legend</h2>
       <ul style="list-style-type: none; padding-left: 0;">
@@ -944,12 +1009,12 @@ function M.format_coverage(coverage_data)
     <div id="files">
       ]] .. file_list_html .. [[
     </div>
-    
+
     <div id="source-sections">
       ]] .. source_sections .. [[
     </div>
   </div>
-  
+
   <footer>
     <div class="container">
       Coverage report generated by Firmo Coverage v]] .. M._VERSION .. [[
@@ -964,14 +1029,18 @@ end
 -- Generate HTML report with performance optimizations
 function M.generate(coverage_data, output_path)
   -- Parameter validation
-  error_handler.assert(type(coverage_data) == "table", "coverage_data must be a table", error_handler.CATEGORY.VALIDATION)
+  error_handler.assert(
+    type(coverage_data) == "table",
+    "coverage_data must be a table",
+    error_handler.CATEGORY.VALIDATION
+  )
   error_handler.assert(type(output_path) == "string", "output_path must be a string", error_handler.CATEGORY.VALIDATION)
-  
+
   -- If output_path is a directory, add a filename
   if output_path:sub(-1) == "/" then
     output_path = output_path .. "coverage-report.html"
   end
-  
+
   -- Try to ensure the directory exists
   local dir_path = output_path:match("(.+)/[^/]+$")
   if dir_path then
@@ -979,24 +1048,24 @@ function M.generate(coverage_data, output_path)
     if not mkdir_success then
       logger.warn("Failed to ensure directory exists, but will try to write anyway", {
         directory = dir_path,
-        error = mkdir_err and error_handler.format_error(mkdir_err) or "Unknown error"
+        error = mkdir_err and error_handler.format_error(mkdir_err) or "Unknown error",
       })
     end
   end
-  
+
   -- PERFORMANCE OPTIMIZATION: Filter large files to improve report generation speed
   -- This applies universally to all files based only on their size characteristics
   local filtered_coverage_data = {
     summary = coverage_data.summary,
     files = {},
     executed_lines = coverage_data.executed_lines,
-    covered_lines = coverage_data.covered_lines
+    covered_lines = coverage_data.covered_lines,
   }
-  
+
   -- Set maximum file size for full inclusion - anything larger will be represented
   -- by a summary only. This is a performance constraint, not a special case.
   local max_lines_for_full_inclusion = 1000
-  
+
   -- Process files based on size thresholds (applies to ALL files equally)
   local file_count = 0
   local skipped_count = 0
@@ -1012,37 +1081,33 @@ function M.generate(coverage_data, output_path)
     end
     file_count = file_count + 1
   end
-  
+
   logger.info("Generating report with performance optimization", {
     total_files = file_count,
-    max_lines_threshold = max_lines_for_full_inclusion
+    max_lines_threshold = max_lines_for_full_inclusion,
   })
-  
+
   -- Generate the HTML content using the filtered data
   local html = M.format_coverage(filtered_coverage_data)
-  
+
   -- Write the report to the output file
-  local success, err = error_handler.safe_io_operation(
-    function() 
-      return fs.write_file(output_path, html)
-    end,
-    output_path,
-    {operation = "write_coverage_report"}
-  )
-  
+  local success, err = error_handler.safe_io_operation(function()
+    return fs.write_file(output_path, html)
+  end, output_path, { operation = "write_coverage_report" })
+
   if not success then
     logger.error("Failed to write HTML coverage report", {
       file_path = output_path,
-      error = error_handler.format_error(err)
+      error = error_handler.format_error(err),
     })
     return false, err
   end
-  
+
   logger.info("Successfully wrote HTML coverage report", {
     file_path = output_path,
-    report_size = #html
+    report_size = #html,
   })
-  
+
   return true
 end
 

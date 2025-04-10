@@ -344,14 +344,181 @@ describe("Calculator", function()
     step_logger.info("Addition test passed")
   end)
 end)
+end)
 ```
 
 This creates logs with rich context:
 - `[INFO] [test.Calculator_Test] Initializing calculator test (component=math, type=unit)`
 - `[DEBUG] [test.Calculator_Test] Testing addition (component=math, type=unit, step=Addition Test, a=2, b=3, expected=5)`
 
-## Best Practices
+### Test Error Visibility
 
+When writing tests that expect errors, the logging system has special behavior to help with debugging:
+
+1. **Debug override for expected errors**: When a test uses the `{ expect_error = true }` flag, DEBUG level messages are shown for that test even if the module's configured log level is higher (e.g., WARN).
+
+```lua
+-- This test will show DEBUG messages even if the module is configured at WARN level
+it("handles file operation errors", { expect_error = true }, function()
+  -- Test code that expects errors
+  -- DEBUG messages will be visible during this test
+end)
+```
+
+2. **Selective use of expect_error**: Only use `expect_error = true` when you need visibility into debug messages during error conditions:
+
+```lua
+-- Good: Use expect_error when you need DEBUG visibility into error handling
+it("recovers from database corruption", { expect_error = true }, function()
+  -- Complex error recovery that needs DEBUG message visibility
+end)
+
+-- Better: For simple error expectations, use expect_error() helper instead
+it("validates input parameters", function()
+  local err = test_helper.expect_error(function()
+    process_input(nil)  -- Should throw error
+  end)
+  expect(err).to.exist()
+  -- No DEBUG message flooding here
+end)
+```
+
+3. **Log level precedence**: The precedence for determining the effective log level is:
+   - Debug mode flag (`--debug` command line option)
+   - Test expect_error flag (temporarily lowers threshold for specific tests)
+   - Module-specific configured level
+   - Global default log level
+
+4. **Real-world examples from the coverage module**:
+
+```lua
+-- Coverage initialization errors need detailed DEBUG output
+-- The expect_error flag temporarily enables DEBUG messages
+it("handles initialization errors gracefully", { expect_error = true }, function()
+  -- Mock debug.sethook to generate an error
+  local original_sethook = debug.sethook
+  debug.sethook = function()
+    error("Simulated sethook error")
+  end
+  
+  -- This will fail, but all DEBUG messages will be visible
+  local err = test_helper.expect_error(function()
+    coverage.init()
+  end)
+  
+  expect(err).to.exist("Should get initialization error")
+  
+  -- Restore original function
+  debug.sethook = original_sethook
+end)
+
+-- Pattern compilation doesn't need DEBUG visibility
+-- Use regular expect_error() without the flag
+it("handles invalid include patterns", function()
+  local err = test_helper.expect_error(function()
+    central_config.set("coverage", {
+      include = {"[invalid regexp"}
+    })
+    coverage.init()
+  end)
+  
+  if err then
+    expect(err.message).to.match("pattern")
+  end
+end)
+```
+
+This behavior ensures that when testing error conditions, you have appropriate visibility into the system's internal state without modifying the code or changing configuration.
+
+## Troubleshooting Logging Issues
+
+### Common Problems and Solutions
+
+1. **Too many DEBUG messages in test output**
+
+   *Problem*: Tests using `{ expect_error = true }` show excessive DEBUG messages.
+   
+   *Solution*: Only use `expect_error = true` for tests that need detailed error diagnostics. For simple error checks, use the helper instead:
+   
+   ```lua
+   -- BEFORE: Shows all DEBUG messages
+   it("validates input", { expect_error = true }, function()
+     local result = validate(bad_input)
+   end)
+   
+   -- AFTER: Only shows proper log levels
+   it("validates input", function()
+     local err = test_helper.expect_error(function()
+       validate(bad_input)
+     end)
+     expect(err).to.exist()
+   end)
+   ```
+
+2. **Coverage module generating unexpected debug output**
+
+   *Problem*: Even with `coverage = 2` in config, some tests still show DEBUG (level 4) messages.
+   
+   *Solution*: Check for `expect_error = true` in test definitions:
+   
+   ```lua
+   -- In .firmo-config.lua
+   logging = {
+     level = 3, -- INFO level globally
+     modules = {
+       coverage = 2, -- WARN level for coverage
+     }
+   }
+   
+   -- In tests/coverage/coverage_test.lua
+   -- This test will still show DEBUG messages despite config
+   it("handles file errors", { expect_error = true }, function()
+     -- Test code...
+   end)
+   ```
+
+3. **Inconsistent log levels across environments**
+
+   *Problem*: Log levels change when running in different environments.
+   
+   *Solution*: Explicitly configure logging at the start of execution:
+   
+   ```lua
+   local central_config = require("lib.core.central_config")
+   local logging = require("lib.tools.logging")
+   
+   -- Set explicit configuration
+   central_config.set("logging.modules.coverage", 2) -- WARN
+   logging.configure_from_config()
+   ```
+
+4. **Log messages missing during error conditions**
+
+   *Problem*: Important diagnostic messages aren't visible during failures.
+   
+   *Solution*: Use the `debug_temporary` helper for specific code sections:
+   
+   ```lua
+   local logging = require("lib.tools.logging")
+   
+   -- Temporarily enable debug logs for a specific section
+   logging.debug_temporary("coverage", function()
+     -- Code that needs diagnostic visibility
+     complex_operation()
+   end)
+   ```
+
+### Debug Mode Override
+
+The `--debug` command-line flag will force all logs to be visible, regardless of configuration:
+
+```bash
+lua test.lua --debug tests/coverage/
+```
+
+This is useful for troubleshooting but can generate a large volume of output.
+
+## Best Practices
 1. **Use module-specific loggers**: Create a separate logger for each module
    ```lua
    local logger = logging.get_logger("module_name")
@@ -429,6 +596,13 @@ This creates logs with rich context:
     logger.info("Database query completed", {duration_ms = time_taken})
     logger.info("API request completed", {duration_ms = time_taken})
     ```
+
+## See Also
+
+- [Coverage System Guide](./coverage.md) - Explains how coverage interacts with logging
+- [Central Configuration](./central_config.md) - Configuration system used for logging
+- [Error Handling](./error_handling.md) - Error integration with logging system
+- [Test Helper](./test_helper.md) - Utilities for test error handling
 
 ## Message Style Guide
 

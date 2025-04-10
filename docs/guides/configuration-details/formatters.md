@@ -1,23 +1,26 @@
 # Coverage Report Formatters
 
-Firmo supports multiple output formats for coverage reports. Each formatter has specific configuration options and capabilities. This guide covers all available formatters and their configuration settings.
+Firmo supports multiple output formats for coverage reports through a class-based architecture. Each formatter extends from a base Formatter class and has specific configuration options and capabilities. This guide covers all available formatters, their configuration settings, and how to create custom formatters.
 
 > 📌 **Note:** All formatters use the central configuration system. Configuration should always be applied through the `central_config` module, command-line flags, or the `.firmo-config.lua` file.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Formatter Architecture](#formatter-architecture)
+- [Base Formatter Configuration](#base-formatter-configuration)
 - [Formatter Configuration](#formatter-configuration)
 - [HTML Formatter](#html-formatter)
 - [JSON Formatter](#json-formatter)
 - [LCOV Formatter](#lcov-formatter)
 - [Cobertura Formatter](#cobertura-formatter)
-- [HTML Simple Formatter](#html-simple-formatter)
 - [Summary Formatter](#summary-formatter)
 - [JUnit Formatter](#junit-formatter)
 - [TAP Formatter](#tap-formatter)
 - [CSV Formatter](#csv-formatter)
 - [Multiple Formatters](#multiple-formatters)
+- [Creating Custom Formatters](#creating-custom-formatters)
+- [Formatter Inheritance](#formatter-inheritance)
 
 ## Overview
 
@@ -29,11 +32,47 @@ Firmo provides the following coverage report formatters:
 | JSON          | Machine-readable JSON report                                         | Integration with other tools, data processing |
 | LCOV          | LCOV format for integration with lcov tools                           | Integration with standard coverage tools     |
 | Cobertura     | XML-based Cobertura format                                            | CI/CD integration, standard reporting        |
-| HTML Simple   | Simplified HTML report with reduced resource usage                    | Basic visualization, lightweight reporting   |
 | Summary       | Plain text summary of coverage statistics                             | Command-line output, basic overview          |
 | JUnit         | XML format compatible with JUnit-style test reports                   | CI/CD integration, test reporting            |
 | TAP           | Test Anything Protocol format                                         | Integration with TAP consumers               |
 | CSV           | Comma-separated values format                                         | Data export, spreadsheet import              |
+
+## Formatter Architecture
+
+Firmo uses a class-based architecture for all formatters:
+
+- All formatters extend a base `Formatter` class
+- Each formatter implements specific methods for its format
+- Formatters use inheritance for shared functionality
+- Configuration is centralized but can be overridden per formatter
+- Formatters provide both validation and formatting capabilities
+
+### Formatter Inheritance Hierarchy
+
+```
+Formatter (Base Class)
+├── HTMLFormatter
+├── JSONFormatter
+├── LCOVFormatter
+├── CoberturaFormatter
+├── SummaryFormatter
+├── JUnitFormatter
+├── TAPFormatter
+└── CSVFormatter
+```
+
+## Base Formatter Configuration
+
+All formatters inherit these common configuration options from the base formatter:
+
+| Option                  | Type    | Default         | Description                                        |
+|-------------------------|---------|----------------|----------------------------------------------------|
+| `output_path`           | string  | `nil`          | Path where the report should be saved             |
+| `validate`              | boolean | `true`         | Validate data before formatting                    |
+| `normalize_data`        | boolean | `true`         | Normalize data structure before formatting        |
+| `validate_output`       | boolean | `false`        | Validate formatted output                         |
+| `verbose`               | boolean | `false`        | Enable verbose logging                            |
+| `strict_mode`           | boolean | `false`        | Strict mode for validations                       |
 
 ## Formatter Configuration
 
@@ -218,27 +257,6 @@ return {
 </coverage>
 ```
 
-## HTML Simple Formatter
-
-The HTML Simple formatter provides a lightweight HTML report with basic coverage information, using less memory and processing time than the full HTML formatter.
-
-### Configuration Options
-
-```lua
--- In .firmo-config.lua
-return {
-  reporting = {
-    formatters = {
-      html_simple = {
-        output_path = "coverage-reports/coverage-report-simple.html", -- Custom output path
-        show_line_numbers = true, -- Show line numbers
-        syntax_highlighting = false, -- Disable syntax highlighting for performance
-        max_lines_display = 100, -- Maximum lines to display per file
-      }
-    }
-  }
-}
-```
 
 ## Summary Formatter
 
@@ -348,6 +366,116 @@ return {
     }
   }
 }
+```
+
+## Creating Custom Formatters
+
+You can create custom formatters by extending the base Formatter class:
+
+```lua
+local Formatter = require('lib.reporting.formatters.base')
+local error_handler = require('lib.tools.error_handler')
+
+-- Create a custom formatter by extending the base formatter
+local CustomFormatter = Formatter.extend("custom", "cst")
+
+-- Set version
+CustomFormatter._VERSION = "1.0.0"
+
+-- Implement the format method (required)
+function CustomFormatter:format(coverage_data, options)
+  -- Normalize data for consistent structure
+  local data = self:normalize_coverage_data(coverage_data)
+  
+  -- Format data according to your needs
+  local output = "# Custom Coverage Report\n\n"
+  output = output .. "Total files: " .. data.summary.total_files .. "\n"
+  output = output .. "Coverage: " .. string.format("%.2f%%", data.summary.coverage_percent) .. "\n"
+  
+  -- Return formatted string
+  return output
+end
+
+-- Register the formatter
+function CustomFormatter.register(formatters)
+  -- Create an instance of the formatter
+  local formatter = CustomFormatter.new()
+  
+  -- Register with the formatters registry
+  formatters.coverage = formatters.coverage or {}
+  formatters.coverage.custom = function(data, options)
+    return formatter:format(data, options)
+  end
+  
+  return true
+end
+
+return CustomFormatter
+```
+
+To use your custom formatter:
+
+```lua
+local reporting = require('lib.reporting')
+local custom_formatter = require('path.to.custom_formatter')
+
+-- Register the custom formatter
+reporting.register_formatter(custom_formatter)
+
+-- Use the custom formatter
+local report = reporting.format_coverage(coverage_data, "custom")
+reporting.write_file("./reports/custom-report.cst", report)
+```
+
+## Formatter Inheritance
+
+You can extend existing formatters to customize their behavior:
+
+```lua
+local JSONFormatter = require('lib.reporting.formatters.json')
+local error_handler = require('lib.tools.error_handler')
+
+-- Create extended JSON formatter
+local EnhancedJSON = {}
+setmetatable(EnhancedJSON, {__index = JSONFormatter})
+
+-- Override the format method to customize output
+function EnhancedJSON:format(coverage_data, options)
+  -- Call the parent formatter's format method
+  local json_data = JSONFormatter.format(self, coverage_data, options)
+  
+  -- Parse JSON to add custom fields
+  local success, parsed = pcall(require('cjson').decode, json_data)
+  if success then
+    -- Add custom fields
+    parsed.custom = {
+      timestamp = os.time(),
+      environment = os.getenv("ENV") or "development"
+    }
+    
+    -- Convert back to JSON
+    return require('cjson').encode(parsed)
+  end
+  
+  -- Return original if parsing failed
+  return json_data
+end
+
+-- Register the enhanced formatter
+function EnhancedJSON.register(formatters)
+  -- Create an instance
+  local formatter = EnhancedJSON.new()
+  
+  -- Register with the formatters registry
+  formatters.coverage = formatters.coverage or {}
+  formatters.coverage.enhanced_json = function(data, options)
+    return formatter:format(data, options)
+  end
+  
+  return true
+end
+
+return EnhancedJSON
 ```
 
 ## Integrating with External Tools

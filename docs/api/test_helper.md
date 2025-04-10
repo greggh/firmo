@@ -145,63 +145,7 @@ restore()
 
 ## Temporary File Management
 
-### create_temp_file
-
-Creates a temporary file.
-
-```lua
-function test_helper.create_temp_file(extension)
-```
-
-**Parameters:**
-- `extension` (string, optional): File extension to use, defaults to "tmp"
-
-**Returns:**
-- (string|nil): Path to the created temporary file, or nil on error
-- (table, optional): Error object if operation failed
-
-**Example:**
-```lua
-local temp_file, err = test_helper.create_temp_file("lua")
-expect(err).to_not.exist()
-expect(temp_file).to.match("%.lua$")
-
--- File is automatically cleaned up after test completes
-```
-
-### create_temp_file_with_content
-
-Creates a temporary file with the specified content.
-
-```lua
-function test_helper.create_temp_file_with_content(content, extension)
-```
-
-**Parameters:**
-- `content` (string): Content to write to the file
-- `extension` (string, optional): File extension to use, defaults to "tmp"
-
-**Returns:**
-- (string|nil): Path to the created temporary file, or nil on error
-- (table, optional): Error object if operation failed
-
-**Example:**
-```lua
-local content = [[
-function test()
-  return true
-end
-]]
-
-local temp_file, err = test_helper.create_temp_file_with_content(content, "lua")
-expect(err).to_not.exist()
-
--- Use the file in tests
-local success = load_and_test_file(temp_file)
-expect(success).to.equal(true)
-
--- File is automatically cleaned up after test completes
-```
+The test_helper module integrates with the temp_file module to provide easy-to-use functions for managing temporary files and directories in tests. The following functions handle test-specific file operations with automatic tracking and cleanup.
 
 ### register_temp_file
 
@@ -284,9 +228,10 @@ fs.write_file(temp_dir .. "/config.json", '{"setting": "value"}')
 
 ### create_temp_test_directory
 
-Create a temporary test directory with utility functions.
+Creates a temporary test directory with utility functions for managing test files.
 
 ```lua
+---@return TestDirectory test_directory Directory object with helper methods
 function test_helper.create_temp_test_directory()
 ```
 
@@ -311,26 +256,31 @@ expect(fs.file_exists(config_path)).to.be_truthy()
 The `TestDirectory` object has the following methods and properties:
 
 - `path` (string): The absolute path to the test directory
-- `create_file(relative_path, content)` (function): Creates a file within the directory
-- `create_directory(relative_path)` (function): Creates a subdirectory
-- `file_path(relative_path)` (function): Gets the absolute path to a file
-- `read_file(relative_path)` (function): Reads a file within the directory
-- `cleanup()` (function): Manually cleanup the directory
+- `create_file(file_name, content)` (function): Creates a file within the directory, automatically creating parent directories as needed
+- `create_subdirectory(subdir_name)` (function): Creates a subdirectory
+- `file_exists(file_name)` (function): Checks if a file exists in the test directory
+- `read_file(file_name)` (function): Reads a file within the directory
+- `unique_filename(prefix, extension)` (function): Generates a unique filename in the directory
+- `create_numbered_files(basename, content_pattern, count)` (function): Creates multiple numbered files
+- `write_file(filename, content)` (function): Writes a file and registers it for cleanup
 
 ### with_temp_test_directory
 
-Create directory with files and run callback.
+Creates a temporary directory with specified files and executes a callback function with that directory.
 
 ```lua
-function test_helper.with_temp_test_directory(files_content, callback)
+---@param files_map table<string, string> Map of file paths to their content
+---@param callback fun(dir_path: string, files: string[], test_dir: TestDirectory): any Function to call with created directory
+---@return any Results from the callback function
+function test_helper.with_temp_test_directory(files_map, callback)
 ```
 
 **Parameters:**
-- `files_content` (table): A table of file paths to content
+- `files_map` (table): A table mapping file paths to their content
 - `callback` (function): Function to call with the created directory
 
 **Returns:**
-- (any): The return value from the callback
+- (any): The return values from the callback function
 
 **Example:**
 ```lua
@@ -340,15 +290,21 @@ test_helper.with_temp_test_directory({
   ["README.md"] = "# Test Project"
 }, function(dir_path, files, test_dir)
   -- dir_path is the absolute path to the test directory
-  -- files is a table of created file paths
-  -- test_dir is the TestDirectory object
+  -- files is an array of created file paths
+  -- test_dir is the TestDirectory object with helper methods
   
+  -- Verify files were created correctly
   expect(fs.file_exists(dir_path .. "/config.json")).to.be_truthy()
   expect(#files).to.equal(3)
   
   -- Test code using these files
-  local config = load_config(files["config.json"])
+  local config = load_config(dir_path .. "/config.json")
   expect(config.setting).to.equal("value")
+  
+  -- Add more files if needed during the test
+  test_dir.create_file("data.txt", "Some test data")
+  
+  -- All files are automatically cleaned up after the callback returns
 end)
 ```
 

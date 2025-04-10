@@ -207,11 +207,11 @@ describe("Configuration Module", function()
     expect(err.category).to.exist() -- Verify it has a proper error category
   end)
 
-  it("should support schema validation for configuration values", function()
+  it("should support correct schema validation for configuration values", function()
     -- Reset before test
     central_config.reset()
 
-    -- Try to set an invalid value type
+    -- Register module with schema validation
     central_config.register_module("test_module", {
       field_types = {
         number_field = "number",
@@ -236,16 +236,54 @@ describe("Configuration Module", function()
 
     central_config.set("test_module.boolean_field", false)
     expect(central_config.get("test_module.boolean_field")).to.equal(false)
+  end)
 
-    -- Note: In the current implementation, central_config.set doesn't validate value types against schema
-    -- This is a feature that would need to be implemented if desired
+  it("should handle invalid type assignments in configuration", { expect_error = true }, function()
+    -- Reset before test
+    central_config.reset()
+    local test_helper = require("lib.tools.test_helper")
 
-    -- Set an invalid type and verify it works (current behavior allows this)
-    central_config.set("test_module.number_field", "not a number")
+    -- Register module with schema validation - capture any potential errors
+    local register_result, register_err = test_helper.with_error_capture(function()
+      return central_config.register_module("test_module", {
+        field_types = {
+          number_field = "number",
+          string_field = "string",
+          boolean_field = "boolean",
+        },
+      }, {
+        number_field = 123,
+        string_field = "test",
+        boolean_field = true,
+      })
+    end)()
+    
+    -- Verify registration was successful
+    expect(register_err).to_not.exist("Module registration should not produce errors")
+    expect(register_result).to.be_truthy()
 
-    -- Verify the value was set despite schema validation (current behavior)
-    expect(central_config.get("test_module.number_field")).to.equal("not a number")
+    -- Set an invalid type and verify current behavior (which allows this)
+    -- This reflects the current implementation which doesn't validate during set()
+    local set_result, set_err = test_helper.with_error_capture(function()
+      return central_config.set("test_module.number_field", "not a number")
+    end)()
+    
+    -- Current implementation doesn't validate types during set, so no error expected
+    expect(set_err).to_not.exist("Current implementation doesn't validate types during set()")
 
+    -- Get the value and verify it was set despite schema violation (current behavior)
+    local get_result, get_err = test_helper.with_error_capture(function()
+      return central_config.get("test_module.number_field")
+    end)()
+    
+    expect(get_err).to_not.exist("Getting the value should not produce errors")
+    expect(get_result).to.equal("not a number", "Value should be set despite type mismatch")
+    
+    -- Note: In a future enhancement, we could add schema validation during set()
+    -- This would cause this test to fail as the system would reject invalid type assignments.
+    -- When implementing type validation, this test should be updated to expect errors
+    -- when invalid types are assigned.
+  end)
     -- The test case was updated to match the current implementation
     -- In a future enhancement, we could add actual schema validation during set()
   end)

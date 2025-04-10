@@ -8,11 +8,27 @@ The reporting module handles the entire reporting pipeline from raw data to form
 
 - Unified interface for generating coverage, quality, and test results reports
 - Support for multiple output formats (HTML, JSON, XML, CSV, TAP, etc.)
-- Pluggable formatter system with customizable themes and options
+- Class-based formatter system with inheritance and extensibility
 - File saving with appropriate error handling and validation
 - Integration with central configuration system
 - Automatic directory creation and path management
-- Validation of report data and formatted output
+- Data normalization and validation
+
+## Architecture
+
+The reporting module uses a class-based arc#### `reporting.get_available_formatters(type)`
+
+Get list of available formatters for the specified type or all types.
+
+Parameters:
+- `type` (string, optional): Type of formatters to retrieve ("coverage", "quality", or "results")
+
+Returns:
+- `available_formatters` (table): Table with lists of formatters by type {coverage={}, quality={}, results={}} or a list of available formatters for the specified type
+ves with the registry for discovery
+- **Data Normalization**: Input data is normalized before formatting for consistent results
+- **Error Handling**: Robust error handling at all stages of the reporting pipeline
+- **Central Configuration**: Integration with the central configuration system for configuration
 
 ## Module Functions
 
@@ -186,41 +202,29 @@ Returns:
 
 ### Formatter Management Functions
 
-#### `reporting.register_coverage_formatter(name, formatter_fn)`
+#### `reporting.register_formatter(formatter)`
 
-Register a custom coverage report formatter.
+Register a custom formatter class or module.
 
 Parameters:
-- `name` (string): Name of the formatter to register
-- `formatter_fn` (function): Function to format coverage reports
+- `formatter` (table): A formatter class or module that implements the formatter interface
 
 Returns:
 - `success` (boolean): True if formatter was registered successfully
 - `error` (table, optional): Error object if registration failed
 
-#### `reporting.register_quality_formatter(name, formatter_fn)`
+#### `reporting.create_formatter(type, name, options)`
 
-Register a custom quality report formatter.
-
-Parameters:
-- `name` (string): Name of the formatter to register
-- `formatter_fn` (function): Function to format quality reports
-
-Returns:
-- `success` (boolean): True if formatter was registered successfully
-- `error` (table, optional): Error object if registration failed
-
-#### `reporting.register_results_formatter(name, formatter_fn)`
-
-Register a custom test results formatter.
+Create a new formatter instance of the specified type.
 
 Parameters:
-- `name` (string): Name of the formatter to register
-- `formatter_fn` (function): Function to format test results
+- `type` (string): Type of formatter ("coverage", "quality", or "results")
+- `name` (string): Name of the formatter to create
+- `options` (table, optional): Options for the formatter
 
 Returns:
-- `success` (boolean): True if formatter was registered successfully
-- `error` (table, optional): Error object if registration failed
+- `formatter` (table): A formatter instance or nil if creation failed
+- `error` (table, optional): Error object if creation failed
 
 #### `reporting.load_formatters(formatter_module)`
 
@@ -305,62 +309,126 @@ Returns:
 ### Coverage Report Formatters
 
 - **HTML**: Interactive HTML report with syntax highlighting and file details
-- **HTML Simple**: Simplified HTML report for faster loading
 - **JSON**: Machine-readable format for CI integration
 - **LCOV**: Industry-standard format compatible with coverage tools
 - **Cobertura**: XML format compatible with Jenkins and other CI systems
-- **Summary**: Text-based overview of coverage results
+- **Summary**: Text-based overview of coverage results with colorization support
+- **CSV**: Tabular format for data a### Quality Data Structure
 
-### Quality Report Formatters
+```lua
+{
+  type = "quality",  -- Type identifier
+  level = 3,
+  level_name = "Comprehensive",
+  tests = {
+    ["path/to/test.lua"] = {
+      path = "path/to/test.lua### Test Results Data Structure
 
-- **HTML**: Visual quality assessment with detailed analysis
-- **JSON**: Machine-readable format for CI integration
-- **Summary**: Text-based quality evaluation
+```lua
+{
+  type = "results",  -- Type identifier 
+  name = "TestSuite",
+  timestamp = "2025-03-26T14:30:00",
+  tests = 100,
+  failures = 5,
+  errors = 2,
+  skipped = 3,
+  time = 1.234,
+  test_cases = {
+    {
+      name = "should add two numbers",
+      classname = "calculator_test",
+      time = 0.001,
+      status = "pass",
+      assertio## Formatter Class Architecture
 
-### Test Results Formatters
+### Base Formatter Class
 
-- **JUnit XML**: Standard XML format for CI/CD integration, compatible with most test runners
-- **TAP (Test Anything Protocol)**: Simple text-based format widely used in testing frameworks
-- **CSV (Comma-Separated Values)**: Tabular format for easy import into spreadsheets and data analysis tools
+The `Formatter` class is the foundation for all formatters:
+
+```lua
+-- Create a new formatter class
+local MyFormatter = Formatter.extend("myformat", "my")
+
+-- Implement format method
+function MyFormatter:format(data, options)
+  -- Format the data
+  return formatted_string
+end
+
+-- Register the formatter
+function MyFormatter.register(formatters)
+  local formatter = MyFormatter.new()
+  formatters.coverage.myformat = function(data, options)
+    return formatter:format(data, options)
+  end
+  return true
+end
+```
+
+### Formatter Methods
+
+All formatters inherit these methods:
+
+- `validate(data)`: Validates input data
+- `format(data, options)`: Formats data into output format
+- `write(formatted_data, output_path, options)`: Writes formatted data to a file
+- `generate(data, output_path, options)`: End-to-end report generation
+- `normalize_coverage_data(data)`: Normalizes coverage data structure
 
 ## Data Structures
 
-### Coverage Data Structure
+### Normalized Coverage Data Structure
 
 ```lua
 {
   files = {
     ["path/to/file.lua"] = {
       path = "path/to/file.lua",
-      total_lines = 100,
-      executable_lines = 80,
-      covered_lines = 65,
-      executed_lines = 75,
-      total_functions = 10,
-      executed_functions = 8,
-      line_coverage_percent = 81.25,
-      function_coverage_percent = 80.0,
+      summary = {
+        total_lines = 100,
+        covered_lines = 65,
+        executed_lines = 10,
+        not_covered_lines = 25,
+        coverage_percent = 65.0,
+        execution_percent = 75.0
+      },
       lines = {
-        [1] = { line_type = "code", executable = true, execution_count = 5, covered = true, content = "function add(a, b)" },
-        [2] = { line_type = "code", executable = true, execution_count = 5, covered = true, content = "  return a + b" },
-        [3] = { line_type = "code", executable = true, execution_count = 5, covered = true, content = "end" },
+        [1] = { 
+          line_number = 1,
+          executed = true, 
+          covered = true, 
+          execution_count = 5, 
+          content = "function add(a, b)",
+          assertions = { -- Optional assertions that covered this line
+            { id = "test1", count = 2 },
+            { id = "test2", count = 3 }
+          }
+        },
         -- more lines...
+      },
+      functions = {
+        ["add"] = {
+          name = "add",
+          start_line = 1,
+          end_line = 3,
+          executed = true,
+          covered = true,
+          execution_count = 5
+        },
+        -- more functions...
       }
     },
     -- more files...
   },
   summary = {
     total_files = 10,
-    covered_files = 9,
     total_lines = 1000,
-    executable_lines = 800,
     covered_lines = 650,
-    executed_lines = 720,
-    total_functions = 100,
-    executed_functions = 85,
-    line_coverage_percent = 81.25,
-    function_coverage_percent = 85.0,
-    overall_percent = 83.13
+    executed_lines = 100,
+    not_covered_lines = 250,
+    coverage_percent = 65.0,
+    execution_percent = 75.0
   }
 }
 ```

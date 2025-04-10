@@ -90,77 +90,77 @@ local DEFAULT_CONFIG = {
       asset_base_path = nil,
       include_legend = true,
       max_file_size = 10 * 1024 * 1024, -- 10MB max file size for HTML report
-      template_path = nil,               -- Custom template path
-      stylesheet_path = nil,             -- Custom stylesheet path
-      enable_dark_mode = true,           -- Support dark mode toggle
-      inline_source = true,              -- Include source code inline
-      line_number_anchors = true,        -- Enable line number anchors
+      template_path = nil, -- Custom template path
+      stylesheet_path = nil, -- Custom stylesheet path
+      enable_dark_mode = true, -- Support dark mode toggle
+      inline_source = true, -- Include source code inline
+      line_number_anchors = true, -- Enable line number anchors
     },
     summary = {
       detailed = false,
       show_files = true,
       colorize = true,
-      show_function_coverage = true,     -- Show function coverage
-      sort_by = "coverage",              -- Sort by coverage percentage
-      max_files = 100,                   -- Maximum files to show in summary
+      show_function_coverage = true, -- Show function coverage
+      sort_by = "coverage", -- Sort by coverage percentage
+      max_files = 100, -- Maximum files to show in summary
     },
     json = {
       pretty = false,
       schema_version = "1.0",
-      indentation = 2,                   -- Indentation level when pretty-printing
-      enable_streaming = true,           -- Enable streaming for large files
-      chunk_size = 1024 * 1024,          -- 1MB chunks for streaming
-      omit_source_code = false,          -- Whether to include source code
+      indentation = 2, -- Indentation level when pretty-printing
+      enable_streaming = true, -- Enable streaming for large files
+      chunk_size = 1024 * 1024, -- 1MB chunks for streaming
+      omit_source_code = false, -- Whether to include source code
     },
     lcov = {
       absolute_paths = false,
-      include_function_coverage = true,  -- Include function coverage data
-      include_branch_coverage = false,   -- Include branch coverage data
-      normalize_paths = true,            -- Normalize paths for cross-platform compatibility
+      include_function_coverage = true, -- Include function coverage data
+      include_branch_coverage = false, -- Include branch coverage data
+      normalize_paths = true, -- Normalize paths for cross-platform compatibility
     },
     cobertura = {
       schema_version = "4.0",
       include_packages = true,
-      include_source = true,             -- Include source in report
-      include_methods = true,            -- Include methods in report
-      include_conditions = false,        -- Include conditions in report
+      include_source = true, -- Include source in report
+      include_methods = true, -- Include methods in report
+      include_conditions = false, -- Include conditions in report
     },
     junit = {
       schema_version = "2.0",
       include_timestamps = true,
       include_hostname = true,
-      include_properties = true,         -- Include properties in report
-      format_stack_traces = true,        -- Format stack traces for readability
-      use_cdata = true,                  -- Use CDATA sections for message content
+      include_properties = true, -- Include properties in report
+      format_stack_traces = true, -- Format stack traces for readability
+      use_cdata = true, -- Use CDATA sections for message content
     },
     tap = {
       version = 13,
       verbose = true,
-      include_yaml_diagnostics = true,   -- Include YAML diagnostics
-      include_summary = true,            -- Include summary comments
-      include_stack_traces = true,       -- Include stack traces in diagnostics
-      include_uncovered_list = false,    -- List uncovered items
+      include_yaml_diagnostics = true, -- Include YAML diagnostics
+      include_summary = true, -- Include summary comments
+      include_stack_traces = true, -- Include stack traces in diagnostics
+      include_uncovered_list = false, -- List uncovered items
     },
     csv = {
       delimiter = ",",
       quote = '"',
       include_header = true,
-      columns = nil,                     -- Custom columns specification
-      escape_special_chars = true,       -- Properly escape special characters
-      include_line_data = false,         -- Include per-line data
+      columns = nil, -- Custom columns specification
+      escape_special_chars = true, -- Properly escape special characters
+      include_line_data = false, -- Include per-line data
     },
   },
   lazy_loading = {
-    enabled = true,                      -- Enable lazy loading of formatters
-    formatters_path = "lib.reporting.formatters",  -- Base path for formatters
-    load_on_demand = true,               -- Load formatters only when needed
+    enabled = true, -- Enable lazy loading of formatters
+    formatters_path = "lib.reporting.formatters", -- Base path for formatters
+    load_on_demand = true, -- Load formatters only when needed
   },
   validation = {
-    validate_config = true,              -- Validate formatter configurations
-    validate_data = true,                -- Validate data before formatting
-    validate_output = true,              -- Validate output after formatting
-    strict = false,                      -- Whether to fail on validation errors
-  }
+    validate_config = true, -- Validate formatter configurations
+    validate_data = true, -- Validate data before formatting
+    validate_output = true, -- Validate output after formatting
+    strict = false, -- Whether to fail on validation errors
+  },
 }
 
 -- Current configuration (will be synchronized with central config)
@@ -620,38 +620,38 @@ local formatters = {
 -- Load and register all formatter modules with improved error handling
 local function load_formatter_registry()
   logger.debug("Loading formatter registry")
-  
+
   -- Use error_handler.try for better error handling
   local success, result, err = error_handler.try(function()
     return require("lib.reporting.formatters.init")
   end)
-  
+
   if success and result then
     logger.debug("Successfully loaded formatter registry")
-    
+
     -- Register formatters with error handling
     local register_success, register_result, register_err = error_handler.try(function()
       return result.register_all(formatters)
     end)
-    
+
     if register_success then
       logger.debug("Successfully registered all formatters", {
         coverage_count = formatters.coverage and #formatters.coverage or 0,
         quality_count = formatters.quality and #formatters.quality or 0,
-        results_count = formatters.results and #formatters.results or 0
+        results_count = formatters.results and #formatters.results or 0,
       })
       return true
     else
       logger.warn("Failed to register formatters", {
         error = error_handler.format_error(register_result),
-        module = "reporting"
+        module = "reporting",
       })
       return false
     end
   else
     logger.warn("Failed to load formatter registry", {
       error = error_handler.format_error(result),
-      module = "reporting"
+      module = "reporting",
     })
     return false
   end
@@ -660,13 +660,13 @@ end
 -- Attempt to load formatter registry
 if not load_formatter_registry() then
   logger.warn("Using fallback formatters due to registry loading failure")
-  
+
   -- Fallback formatters with proper error handling
   -- Summary formatter
   if not formatters.coverage.summary then
     formatters.coverage.summary = function(coverage_data, options)
       options = options or {}
-      
+
       -- Use error handler to safely process data
       local success, result, err = error_handler.try(function()
         return {
@@ -677,16 +677,16 @@ if not load_formatter_registry() then
           total_lines = coverage_data and coverage_data.summary and coverage_data.summary.total_lines or 0,
           covered_lines = coverage_data and coverage_data.summary and coverage_data.summary.covered_lines or 0,
           lines_pct = coverage_data and coverage_data.summary and coverage_data.summary.coverage_percent or 0,
-          overall_pct = coverage_data and coverage_data.summary and coverage_data.summary.coverage_percent or 0
+          overall_pct = coverage_data and coverage_data.summary and coverage_data.summary.coverage_percent or 0,
         }
       end)
-      
+
       if success then
         return result
       else
         logger.error("Summary formatter processing error", {
           error = error_handler.format_error(result),
-          module = "reporting.summary"
+          module = "reporting.summary",
         })
         return {
           files = {},
@@ -696,7 +696,7 @@ if not load_formatter_registry() then
           total_lines = 0,
           covered_lines = 0,
           lines_pct = 0,
-          overall_pct = 0
+          overall_pct = 0,
         }
       end
     end
@@ -1529,21 +1529,18 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
 
   -- CRITICAL FIX: Check for minimal valid data structure before proceeding
   if not coverage_data.files or not coverage_data.summary then
-    local err = error_handler.validation_error(
-      "Invalid coverage data structure: missing required fields",
-      {
-        file_path = file_path,
-        format = format,
-        operation = "save_coverage_report",
-        module = "reporting",
-        missing_files = coverage_data.files == nil,
-        missing_summary = coverage_data.summary == nil
-      }
-    )
+    local err = error_handler.validation_error("Invalid coverage data structure: missing required fields", {
+      file_path = file_path,
+      format = format,
+      operation = "save_coverage_report",
+      module = "reporting",
+      missing_files = coverage_data.files == nil,
+      missing_summary = coverage_data.summary == nil,
+    })
     logger.error(err.message, err.context)
     return nil, err
   end
-  
+
   -- Count files in the coverage data - an empty report is invalid
   local file_count = 0
   if coverage_data.files then
@@ -1551,27 +1548,24 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
       file_count = file_count + 1
     end
   end
-  
+
   -- CRITICAL FIX: Fail if there are no files in the coverage data
   if file_count == 0 then
-    local err = error_handler.validation_error(
-      "Invalid coverage data: no files found in coverage data",
-      {
-        file_path = file_path,
-        format = format,
-        operation = "save_coverage_report",
-        module = "reporting",
-        file_count = file_count
-      }
-    )
+    local err = error_handler.validation_error("Invalid coverage data: no files found in coverage data", {
+      file_path = file_path,
+      format = format,
+      operation = "save_coverage_report",
+      module = "reporting",
+      file_count = file_count,
+    })
     logger.error(err.message, err.context)
     return nil, err
   end
-  
+
   -- Log file count for debugging
   logger.debug("Coverage file count validation", {
     file_count = file_count,
-    files_valid = file_count > 0
+    files_valid = file_count > 0,
   })
 
   -- Validate coverage data before saving if not disabled
@@ -1717,34 +1711,30 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
   logger.debug("Writing coverage report file", {
     file_path = file_path,
     format = format,
-    content_length = #content
+    content_length = #content,
   })
-  
+
   ---@diagnostic disable-next-line: unused-local
   local write_success, write_err = error_handler.try(function()
     return M.write_file(file_path, content)
   end)
-  
+
   if not write_success then
-    local err = error_handler.io_error(
-      "Failed to write coverage report to file",
-      {
-        file_path = file_path,
-        format = format,
-        operation = "save_coverage_report",
-        module = "reporting",
-      },
-      write_err
-    )
+    local err = error_handler.io_error("Failed to write coverage report to file", {
+      file_path = file_path,
+      format = format,
+      operation = "save_coverage_report",
+      module = "reporting",
+    }, write_err)
     logger.error(err.message, err.context)
     return nil, err
   end
-  
+
   logger.debug("Successfully saved coverage report", {
     file_path = file_path,
     format = format,
   })
-  
+
   return true
 end
 
@@ -2125,22 +2115,22 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
       directory = base_dir,
       error = "Invalid directory path: path cannot be empty",
     })
-    
+
     -- Return empty results but don't fail
     return {}
   end
-  
+
   -- Check for invalid characters in directory path
   if base_dir:match("[*?<>|]") then
     logger.error("Failed to create report directory", {
       directory = base_dir,
       error = "Invalid directory path: contains invalid characters",
     })
-    
+
     -- Return empty results but don't fail
     return {}
   end
-  
+
   -- Create the directory if it doesn't exist
   local dir_ok, dir_err = fs.ensure_directory_exists(base_dir)
 
@@ -2149,7 +2139,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
       directory = base_dir,
       error = tostring(dir_err),
     })
-    
+
     -- Return empty results table
     return {}
   else

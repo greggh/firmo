@@ -88,16 +88,15 @@ describe("Asynchronous Testing", function()
       expect(value).to.equal(42)
     end)
 
-    it_async("times out if condition never becomes true", { expect_error = true }, function()
-      local result, err = test_helper.with_error_capture(function()
+    it_async("should fail with timeout when condition never becomes true", { expect_error = true }, function()
+      local err = test_helper.expect_error(function()
         ---@diagnostic disable-next-line: redundant-parameter
-        wait_until(function()
+        return wait_until(function()
           return false
           ---@diagnostic disable-next-line: redundant-parameter
         end, 50, 5)
-      end)()
+      end)
       
-      expect(result).to_not.exist()
       expect(err).to.exist()
       expect(err.message).to.match("timed out")
     end)
@@ -159,7 +158,7 @@ describe("Asynchronous Testing", function()
       expect(elapsed).to.be_less_than(250) -- Allow overhead but should be less than sum of all operations
     end)
 
-    it_async("handles errors in parallel operations", { expect_error = true }, function()
+    it_async("should fail when any parallel operation throws an error", { expect_error = true }, function()
       local op1 = function()
         ---@diagnostic disable-next-line: redundant-parameter
         await(20)
@@ -178,13 +177,12 @@ describe("Asynchronous Testing", function()
         return "op3 done"
       end
 
-      -- Run operations and expect an error
-      local result, err = test_helper.with_error_capture(function()
+      -- Run operations and expect an error using test_helper.expect_error
+      local err = test_helper.expect_error(function()
         ---@diagnostic disable-next-line: redundant-parameter
-        parallel_async({ op1, op2, op3 })
-      end)()
+        return parallel_async({ op1, op2, op3 })
+      end)
       
-      expect(result).to_not.exist()
       expect(err).to.exist()
       expect(err.message).to.match("One or more parallel operations failed")
       -- Only check for partial match because line numbers may vary
