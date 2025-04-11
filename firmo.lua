@@ -305,6 +305,7 @@ end
 if async_module then
   -- Import core async functions with type annotations
   firmo.async = async_module.async
+  firmo.it_async = async_module.it_async
   firmo.await = async_module.await
   firmo.wait_until = async_module.wait_until
   firmo.parallel_async = async_module.parallel_async
@@ -322,6 +323,7 @@ else
   end
 
   firmo.async = async_error
+  firmo.it_async = async_error
   firmo.await = async_error
   firmo.wait_until = async_error
   firmo.parallel_async = async_error
@@ -392,6 +394,7 @@ local module = setmetatable({
 
   -- Export async functions
   async = firmo.async,
+  it_async = firmo.it_async,
   await = firmo.await,
   wait_until = firmo.wait_until,
 
@@ -431,6 +434,7 @@ local module = setmetatable({
     -- Async testing utilities
     if async_module then
       _G.async = firmo.async
+      _G.it_async = firmo.it_async
       _G.await = firmo.await
       _G.wait_until = firmo.wait_until
     end
