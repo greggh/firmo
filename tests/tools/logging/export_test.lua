@@ -50,7 +50,6 @@ describe("Logging Export Module", function()
     log_file_path = test_dir.create_file("sample.log", log_content)
   end)
 
-
   it("lists supported platforms", function()
     local platforms = log_export.get_supported_platforms()
 
@@ -112,7 +111,7 @@ describe("Logging Export Module", function()
     -- Check content
     local content = fs.read_file(config_file)
     expect(content).to.be.a("string")
-    expect(content).to.match("elasticsearch")
+    expect(content).to.match("index_patterns") -- Should include our index
   end)
 
   it("converts log files to platform formats", function()

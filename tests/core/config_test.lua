@@ -14,7 +14,7 @@ local function try_load_logger()
     local log_module, err = test_helper.with_error_capture(function()
       return require("lib.tools.logging")
     end)()
-    
+
     if log_module then
       logging = log_module
       logger = logging.get_logger("test.config")
@@ -114,7 +114,7 @@ describe("Configuration Module", function()
 
   it("should apply configurations from a config file", { expect_error = true }, function()
     local test_helper = require("lib.tools.test_helper")
-    
+
     -- Reset central_config before test
     test_helper.with_error_capture(function()
       central_config.reset()
@@ -135,7 +135,7 @@ describe("Configuration Module", function()
     local write_result, write_err = test_helper.with_error_capture(function()
       return fs.write_file(temp_config_path, config_content)
     end)()
-    
+
     expect(write_err).to_not.exist()
     expect(write_result).to.be_truthy()
 
@@ -143,9 +143,9 @@ describe("Configuration Module", function()
     local user_config, load_err = test_helper.with_error_capture(function()
       return central_config.load_from_file(temp_config_path)
     end)()
-    
+
     expect(load_err).to_not.exist()
-    
+
     -- Check that the config was loaded correctly
     expect(user_config).to.exist()
     expect(central_config.get("coverage")).to.exist()
@@ -161,7 +161,7 @@ describe("Configuration Module", function()
     local value, get_err = test_helper.with_error_capture(function()
       return central_config.get("coverage.threshold")
     end)()
-    
+
     expect(get_err).to_not.exist()
     expect(value).to.equal(85)
   end)
@@ -257,7 +257,7 @@ describe("Configuration Module", function()
         boolean_field = true,
       })
     end)()
-    
+
     -- Verify registration was successful
     expect(register_err).to_not.exist("Module registration should not produce errors")
     expect(register_result).to.be_truthy()
@@ -267,7 +267,7 @@ describe("Configuration Module", function()
     local set_result, set_err = test_helper.with_error_capture(function()
       return central_config.set("test_module.number_field", "not a number")
     end)()
-    
+
     -- Current implementation doesn't validate types during set, so no error expected
     expect(set_err).to_not.exist("Current implementation doesn't validate types during set()")
 
@@ -275,17 +275,14 @@ describe("Configuration Module", function()
     local get_result, get_err = test_helper.with_error_capture(function()
       return central_config.get("test_module.number_field")
     end)()
-    
+
     expect(get_err).to_not.exist("Getting the value should not produce errors")
     expect(get_result).to.equal("not a number", "Value should be set despite type mismatch")
-    
+
     -- Note: In a future enhancement, we could add schema validation during set()
     -- This would cause this test to fail as the system would reject invalid type assignments.
     -- When implementing type validation, this test should be updated to expect errors
     -- when invalid types are assigned.
-  end)
-    -- The test case was updated to match the current implementation
-    -- In a future enhancement, we could add actual schema validation during set()
   end)
 
   it("should support change listeners for configuration changes", function()
@@ -329,6 +326,3 @@ describe("Configuration Module", function()
     })
   end
 end)
-
--- Tests are run by run_all_tests.lua or scripts/runner.lua
--- No need to call firmo() explicitly here

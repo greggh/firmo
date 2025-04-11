@@ -264,6 +264,7 @@ function spy.new(fn)
   -- Function that captures all calls
   local function capture(...)
     -- Use protected call to track the call
+    -- Use protected call to track the call
     local args = { ... } -- Capture args here before the protected call
     local call_success, _, call_err = error_handler.try(function()
       -- Update call tracking state
@@ -271,17 +272,28 @@ function spy.new(fn)
       spy_obj.call_count = spy_obj.call_count + 1
 
       -- Record call with proper structure
-      -- Record call with proper structure
       local call_record = {
         args = args, -- All arguments as an array
         timestamp = os.time(), -- When the call happened
         result = nil, -- Will be set after function call
         error = nil, -- Will be set if function throws
       }
+      
+      -- Set up metatable to support direct argument access via numeric indices
+      setmetatable(call_record, {
+        __index = function(t, k)
+          -- If key is a number, delegate to args array
+          if type(k) == "number" then
+            return t.args[k]
+          end
+          -- Otherwise use normal table access
+          return rawget(t, k)
+        end
+      })
+      
       -- Store the call record
       table.insert(spy_obj.calls, call_record)
       table.insert(spy_obj.call_history, args) -- Keep this for backward compatibility
-
       logger.debug("Spy function called", {
         call_count = spy_obj.call_count,
         arg_count = #args,

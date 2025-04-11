@@ -427,6 +427,12 @@ function M.it(name, options_or_fn, fn)
     timeout = nil,
   })
 
+  -- Set error handler metadata for the test
+  error_handler.set_current_test_metadata({
+    expect_error = options.expect_error,
+    name = name
+  })
+
   -- Determine if test should be skipped based on focus mode
   local should_skip = false
 
@@ -537,6 +543,9 @@ function M.it(name, options_or_fn, fn)
       temp_file.set_current_test_context(nil)
     end
 
+    -- Clear error handler metadata
+    error_handler.set_current_test_metadata(nil)
+
     -- Create a test pass result
     local result = M.add_test_result({
       status = TEST_STATUS.PASS,
@@ -555,6 +564,9 @@ function M.it(name, options_or_fn, fn)
       test_result = result,
     })
   end)
+
+  -- Ensure error handler metadata is cleared even if test failed
+  error_handler.set_current_test_metadata(nil)
 
   -- Handle test errors
   if not success then

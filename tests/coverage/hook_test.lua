@@ -1,3 +1,4 @@
+local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
 local coverage = require("lib.coverage")
@@ -16,7 +17,7 @@ describe("coverage module", function()
     local dir_result, dir_err = test_helper.with_error_capture(function()
       return temp_file.create_temp_directory()
     end)()
-    
+
     expect(dir_err).to_not.exist("Error creating temp directory")
     test_dir = dir_result
     expect(test_dir).to.exist("Failed to create test directory")
@@ -26,14 +27,14 @@ describe("coverage module", function()
       central_config.set("coverage", {
         enabled = true,
         statsfile = filesystem.join_paths(test_dir, "coverage.stats"),
-        include = {".*%.lua$"},
+        include = { ".*%.lua$" },
         exclude = {},
         savestepsize = 100,
-        tick = false
+        tick = false,
       })
       return true
     end)()
-    
+
     expect(config_err).to_not.exist("Error configuring coverage")
     expect(config_result).to.be_truthy()
 
@@ -42,7 +43,7 @@ describe("coverage module", function()
       coverage.shutdown()
       return true
     end)()
-    
+
     expect(shutdown_err).to_not.exist("Error shutting down coverage")
   end)
 
@@ -52,17 +53,17 @@ describe("coverage module", function()
       coverage.shutdown()
       return true
     end)()
-    
+
     if test_dir then
       local remove_result, remove_err = test_helper.with_error_capture(function()
         return temp_file.remove_directory(test_dir)
       end)()
-      
+
       if remove_err then
         print("Warning: Failed to remove test directory: " .. (remove_err.message or "unknown error"))
       end
     end
-    
+
     test_helper.with_error_capture(function()
       central_config.reset("coverage")
       return true
@@ -74,7 +75,7 @@ describe("coverage module", function()
       coverage.init()
       return true
     end)()
-    
+
     expect(init_err).to_not.exist("Error initializing coverage")
     expect(init_result).to.be_truthy()
     expect(coverage).to.exist()
@@ -114,7 +115,7 @@ describe("coverage module", function()
       coverage.init()
       return true
     end)()
-    
+
     expect(init_err).to_not.exist("Error initializing coverage")
 
     -- Execute code to generate coverage data
@@ -128,19 +129,19 @@ describe("coverage module", function()
         coverage.save_stats()
         return true
       end)()
-      
+
       expect(save_err).to_not.exist("Error saving stats")
-      
+
       -- Verify stats file exists and is readable
       local statsfile = central_config.get("coverage.statsfile")
-      
+
       local exists_result, exists_err = test_helper.with_error_capture(function()
         return filesystem.file_exists(statsfile)
       end)()
-      
+
       expect(exists_err).to_not.exist("Error checking if file exists")
       expect(exists_result).to.be_truthy("Stats file does not exist")
-      
+
       -- Execute more code
       z = z + i
     end
@@ -149,7 +150,7 @@ describe("coverage module", function()
     local stats_result, stats_err = test_helper.with_error_capture(function()
       return coverage.load_stats()
     end)()
-    
+
     expect(stats_err).to_not.exist("Error loading stats")
     expect(stats_result).to.exist("Stats should exist")
   end)
@@ -159,7 +160,7 @@ describe("coverage module", function()
       coverage.init()
       return true
     end)()
-    
+
     expect(init_err).to_not.exist("Error initializing coverage")
 
     -- Execute some code
@@ -171,7 +172,7 @@ describe("coverage module", function()
       coverage.save_stats()
       return true
     end)()
-    
+
     expect(save_err).to_not.exist("Error saving stats")
 
     -- Corrupt the stats file
@@ -179,7 +180,7 @@ describe("coverage module", function()
     local write_result, write_err = test_helper.with_error_capture(function()
       return filesystem.write_file(statsfile, "corrupted content")
     end)()
-    
+
     expect(write_err).to_not.exist("Error writing corrupted content")
     expect(write_result).to.be_truthy("Failed to write corrupted content")
 
@@ -187,22 +188,22 @@ describe("coverage module", function()
     local stats_result, stats_err = test_helper.with_error_capture(function()
       return coverage.load_stats()
     end)()
-    
+
     -- The coverage module should handle corrupted files gracefully without error
     expect(stats_err).to_not.exist("Loading corrupted stats should not throw error")
-    expect(stats_result).to.exist("Stats should exist even if empty") 
+    expect(stats_result).to.exist("Stats should exist even if empty")
     expect(next(stats_result)).to_not.exist("Stats should be empty table")
-    
+
     -- Test with severely damaged file (directory instead of file)
     local severe_corruption = test_helper.expect_error(function()
       -- Create a directory with the same name as the stats file to simulate severe corruption
       local dir_path = statsfile .. "_dir"
       filesystem.create_directory(dir_path)
-      
+
       -- Try to write to a directory as if it were a file
       return filesystem.write_file(dir_path, "test")
     end)
-    
+
     expect(severe_corruption).to.exist("Should get error when writing to directory as file")
   end)
 
@@ -236,8 +237,8 @@ describe("coverage module", function()
   it("respects include/exclude patterns", function()
     -- Configure coverage to only include specific patterns
     central_config.set("coverage", {
-      include = {"hook_test.lua$"},
-      exclude = {"excluded_file.lua$"}
+      include = { "hook_test.lua$" },
+      exclude = { "excluded_file.lua$" },
     })
 
     coverage.init()
@@ -294,7 +295,7 @@ describe("coverage module", function()
       coverage.init()
       return true
     end)()
-    
+
     expect(init_err).to_not.exist("Error initializing coverage")
 
     -- Create coroutines that execute code
@@ -310,7 +311,7 @@ describe("coverage module", function()
       local thread, create_err = test_helper.with_error_capture(function()
         return coroutine.create(coro_func)
       end)()
-      
+
       expect(create_err).to_not.exist("Error creating coroutine " .. i)
       threads[i] = thread
     end
@@ -320,7 +321,7 @@ describe("coverage module", function()
       local result, resume_err = test_helper.with_error_capture(function()
         return coroutine.resume(thread)
       end)()
-      
+
       expect(resume_err).to_not.exist("Error resuming coroutine " .. i)
       expect(result).to.be_truthy("Coroutine " .. i .. " failed")
     end
@@ -329,7 +330,7 @@ describe("coverage module", function()
     local err = test_helper.expect_error(function()
       return coroutine.resume("not a coroutine")
     end)
-    
+
     expect(err).to.exist("Should get error when resuming invalid coroutine")
     expect(err.message).to.match("bad argument")
 
@@ -338,13 +339,13 @@ describe("coverage module", function()
       coverage.save_stats()
       return true
     end)()
-    
+
     expect(save_err).to_not.exist("Error saving stats after coroutines")
 
     local stats_result, stats_err = test_helper.with_error_capture(function()
       return coverage.load_stats()
     end)()
-    
+
     expect(stats_err).to_not.exist("Error loading stats after coroutines")
     expect(stats_result).to.exist("Stats should exist after coroutines")
 
@@ -353,9 +354,9 @@ describe("coverage module", function()
     if filename then
       filename = filesystem.normalize_path(filename)
       local file_stats = stats_result[filename]
-      
+
       expect(file_stats).to.exist("Stats for coroutine function file should exist")
-      
+
       -- Should have 3 hits for each line (one per coroutine)
       for line_nr, hits in pairs(file_stats) do
         if type(line_nr) == "number" then
@@ -363,13 +364,13 @@ describe("coverage module", function()
         end
       end
     end
-    
+
     -- Proper shutdown with error handling
     local shutdown_result, shutdown_err = test_helper.with_error_capture(function()
       coverage.shutdown()
       return true
     end)()
-    
+
     expect(shutdown_err).to_not.exist("Error shutting down coverage after coroutines")
   end)
 
@@ -379,39 +380,39 @@ describe("coverage module", function()
       coverage.init()
       return true
     end)()
-    
+
     expect(init_err).to_not.exist("Error initializing coverage")
-    
+
     -- Test pause with error handling
     local pause_result, pause_err = test_helper.with_error_capture(function()
       coverage.pause()
       return true
     end)()
-    
+
     expect(pause_err).to_not.exist("Error pausing coverage")
-    
+
     -- Execute test function while paused
     local test_function = function()
       local x = 1
       return x
     end
     test_function()
-    
+
     -- Save and check stats while paused
     local save_paused_result, save_paused_err = test_helper.with_error_capture(function()
       coverage.save_stats()
       return true
     end)()
-    
+
     expect(save_paused_err).to_not.exist("Error saving stats while paused")
-    
+
     -- Verify no coverage data was collected while paused
     local stats_paused_result, stats_paused_err = test_helper.with_error_capture(function()
       return coverage.load_stats()
     end)()
-    
+
     expect(stats_paused_err).to_not.exist("Error loading stats while paused")
-    
+
     -- Test invalid pause (already paused)
     local double_pause_err = test_helper.expect_error(function()
       -- This may or may not error depending on implementation
@@ -419,18 +420,18 @@ describe("coverage module", function()
       coverage.pause()
       return true
     end)
-    
+
     -- Resume with error handling
     local resume_result, resume_err = test_helper.with_error_capture(function()
       coverage.resume()
       return true
     end)()
-    
+
     expect(resume_err).to_not.exist("Error resuming coverage")
-    
+
     -- Now execute function when not paused
     test_function()
-    
+
     -- Test invalid resume (already resumed)
     local double_resume_err = test_helper.expect_error(function()
       -- This may or may not error depending on implementation
@@ -438,29 +439,29 @@ describe("coverage module", function()
       coverage.resume()
       return true
     end)
-    
+
     -- Save and check stats after resume
     local save_resumed_result, save_resumed_err = test_helper.with_error_capture(function()
       coverage.save_stats()
       return true
     end)()
-    
+
     expect(save_resumed_err).to_not.exist("Error saving stats after resume")
-    
+
     -- Load stats and verify coverage data was collected after resume
     local stats_resumed_result, stats_resumed_err = test_helper.with_error_capture(function()
       return coverage.load_stats()
     end)()
-    
+
     expect(stats_resumed_err).to_not.exist("Error loading stats after resume")
     expect(stats_resumed_result).to.exist("Stats should exist after resume")
-    
+
     -- Proper shutdown with error handling
     local shutdown_result, shutdown_err = test_helper.with_error_capture(function()
       coverage.shutdown()
       return true
     end)()
-    
+
     expect(shutdown_err).to_not.exist("Error shutting down coverage after pause/resume")
   end)
 end)

@@ -8,7 +8,7 @@ local test_helper = require("lib.tools.test_helper")
 
 describe("Error Handler Module", function()
   it("creates structured error objects", function()
-    local err = error_handler.create("Test error message", "TEST_CATEGORY", {
+    local err = error_handler.create("Test error message", "TEST_CATEGORY", error_handler.SEVERITY.ERROR, {
       context_value = 123,
     })
 
@@ -20,7 +20,7 @@ describe("Error Handler Module", function()
   end)
 
   it("formats errors correctly", function()
-    local err = error_handler.create("Test error", "TEST", { param = "value" })
+    local err = error_handler.create("Test error", "TEST", error_handler.SEVERITY.ERROR, { param = "value" })
     local formatted = error_handler.format_error(err)
 
     expect(formatted).to.be.a("string")

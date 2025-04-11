@@ -17,11 +17,11 @@
 ---@field rethrow fun(err: table|string, context?: table): nil Rethrow an error with proper error level
 --[[
     Structured Error Handling Module for the Firmo Framework
-    
-    This module provides a comprehensive error handling system with standardized 
-    error objects, contextual information, and integrated logging. It's designed 
+
+    This module provides a comprehensive error handling system with standardized
+    error objects, contextual information, and integrated logging. It's designed
     to create consistent, informative error handling throughout the codebase.
-    
+
     Features:
     - Structured error objects with categories, severity, and context
     - Specialized error creators for common error types (validation, IO, runtime)
@@ -32,11 +32,11 @@
     - Stack trace capture and formatting
     - Error assertion mechanism with clean syntax
     - Error rethrowing with context preservation
-    
+
     The module serves as the foundation for error handling across the Firmo
     framework, ensuring that errors are consistently created, propagated,
     and reported with appropriate context information.
-    
+
     @module error_handler
     @author Firmo Team
     @license MIT
@@ -217,14 +217,14 @@ M.format_error = format_error
 function M.rethrow(err, context)
   -- Create a copy of the error to avoid modifying the original
   local error_to_throw
-  
+
   if type(err) == "table" and err.message then
     -- Make a shallow copy of the original error keeping all fields
     error_to_throw = {}
     for k, v in pairs(err) do
       error_to_throw[k] = v
     end
-    
+
     -- If there's context in the original error and it's a table, make a copy of that too
     if type(err.context) == "table" then
       error_to_throw.context = {}
@@ -232,7 +232,7 @@ function M.rethrow(err, context)
         error_to_throw.context[k] = v
       end
     end
-    
+
     -- If additional context was provided, merge it
     if context and type(context) == "table" then
       -- Initialize context table if needed
@@ -242,39 +242,29 @@ function M.rethrow(err, context)
         error_to_throw.context[k] = v
       end
     end
-    
+
     -- Log the enhanced error
     M.log_error(error_to_throw)
-    
+
     -- Then throw it
     error(error_to_throw.message, 2)
   elseif type(err) == "string" then
     -- For string errors, create a new error object with the message and context
-    error_to_throw = create_error(
-      err,
-      M.CATEGORY.RUNTIME,
-      M.SEVERITY.ERROR,
-      context
-    )
-    
+    error_to_throw = create_error(err, M.CATEGORY.RUNTIME, M.SEVERITY.ERROR, context)
+
     -- Log the error
     M.log_error(error_to_throw)
-    
+
     -- Throw the error
     error(err, 2)
   else
     -- Fallback for other types
     local err_str = tostring(err)
-    error_to_throw = create_error(
-      err_str,
-      M.CATEGORY.UNKNOWN,
-      M.SEVERITY.ERROR,
-      context
-    )
-    
+    error_to_throw = create_error(err_str, M.CATEGORY.UNKNOWN, M.SEVERITY.ERROR, context)
+
     -- Log the error
     M.log_error(error_to_throw)
-    
+
     -- Throw it
     error(err_str, 2)
   end
@@ -332,7 +322,7 @@ local function log_error(err)
   local log_level = "error"
   local suppress_logging = false
   local completely_skip_logging = false
-  
+
   -- In test mode, we may suppress certain categories of errors
   -- This is the proper approach instead of unreliable pattern matching
   if config.in_test_run then
@@ -347,19 +337,19 @@ local function log_error(err)
       end
     end
   end
-  
+
   -- When in a test with expect_error flag, handle errors specially
   if completely_skip_logging then
     -- Store the error in a global table for potential debugging if needed
     _G._firmo_test_errors = _G._firmo_test_errors or {}
     table.insert(_G._firmo_test_errors, err)
-    
+
     -- Don't skip all logging - only downgrade ERROR and WARNING logs to DEBUG
     -- This allows explicit debug logging to still work
     if err.severity == M.SEVERITY.ERROR or err.severity == M.SEVERITY.WARNING then
       log_level = "debug"
     end
-    
+
     -- Additionally check if debug logs are explicitly enabled
     local debug_enabled = logger.is_debug_enabled and logger.is_debug_enabled()
     if not debug_enabled then
@@ -368,7 +358,7 @@ local function log_error(err)
     end
     -- Otherwise, continue with debug-level logging
   end
-  
+
   -- Choose appropriate log level
   if err.severity == M.SEVERITY.FATAL then
     log_level = "error" -- Fatal errors are always logged at error level
@@ -379,7 +369,7 @@ local function log_error(err)
   else
     log_level = suppress_logging and "debug" or "info"
   end
-  
+
   -- Log at the appropriate level
   if err.severity == M.SEVERITY.FATAL then
     logger.error("FATAL: " .. err.message, log_params)
@@ -436,7 +426,7 @@ function M.configure(options)
         capture_backtraces = "boolean",
         in_test_run = "boolean",
         suppress_test_assertions = "boolean",
-      }
+      },
     }, {
       -- Default values (matching our local config)
       use_assertions = config.use_assertions,
@@ -448,7 +438,7 @@ function M.configure(options)
       in_test_run = config.in_test_run,
       suppress_test_assertions = config.suppress_test_assertions,
     })
-    
+
     -- Now get configuration (will include our defaults if not yet set)
     local error_handler_config = central_config.get("error_handler")
     if error_handler_config then
@@ -458,14 +448,14 @@ function M.configure(options)
     end
   end
 
---- Create a not found error object
----@param message string The error message
----@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return table The not found error object
-function M.not_found_error(message, context, cause)
-  return create_error(message, M.CATEGORY.VALIDATION, M.SEVERITY.ERROR, context, cause)
-end
+  --- Create a not found error object
+  ---@param message string The error message
+  ---@param context? table Additional context for the error
+  ---@param cause? table|string The cause of the error
+  ---@return table The not found error object
+  function M.not_found_error(message, context, cause)
+    return create_error(message, M.CATEGORY.VALIDATION, M.SEVERITY.ERROR, context, cause)
+  end
 
   return M
 end
@@ -589,7 +579,7 @@ end
 --- -- Basic validation error
 --- if type(filename) ~= "string" then
 ---   return nil, error_handler.validation_error(
----     "Filename must be a string", 
+---     "Filename must be a string",
 ---     {parameter_name = "filename", provided_type = type(filename)}
 ---   )
 --- end
@@ -678,13 +668,13 @@ end
 ---   "config.json",
 ---   {operation = "read_config"}
 --- )
---- 
+---
 --- if not content then
 ---   -- Handle error
 ---   print("Failed to read config: " .. err.message)
 ---   return nil, err
 --- end
---- 
+---
 --- -- With result transformation
 --- local data, err = error_handler.safe_io_operation(
 ---   function() return fs.read_file("config.json") end,
@@ -732,7 +722,7 @@ local mt = {
     else
       return tostring(err)
     end
-  end
+  end,
 }
 
 -- Update the create_error function to set metatable
@@ -810,7 +800,7 @@ function M.configure_from_config()
         capture_backtraces = "boolean",
         in_test_run = "boolean",
         suppress_test_assertions = "boolean",
-      }
+      },
     }, {
       -- Default values (matching our local config)
       use_assertions = config.use_assertions,
@@ -822,21 +812,21 @@ function M.configure_from_config()
       in_test_run = config.in_test_run,
       suppress_test_assertions = config.suppress_test_assertions,
     })
-    
+
     -- Get the centralized configuration
     local error_handler_config = central_config.get("error_handler")
     if error_handler_config then
       M.configure(error_handler_config)
     end
   end
---- Create a not found error object
----@param message string The error message
----@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return table The not found error object
-function M.not_found_error(message, context, cause)
-  return create_error(message, M.CATEGORY.VALIDATION, M.SEVERITY.ERROR, context, cause)
-end
+  --- Create a not found error object
+  ---@param message string The error message
+  ---@param context? table Additional context for the error
+  ---@param cause? table|string The cause of the error
+  ---@return table The not found error object
+  function M.not_found_error(message, context, cause)
+    return create_error(message, M.CATEGORY.VALIDATION, M.SEVERITY.ERROR, context, cause)
+  end
 
   return M
 end
@@ -846,18 +836,18 @@ end
 ---@return boolean The current test mode state
 function M.set_test_mode(enabled)
   config.in_test_run = enabled and true or false
-  
+
   -- Update central_config if available
   local ok, central_config = pcall(require, "lib.core.central_config")
   if ok and central_config then
     central_config.set("error_handler.in_test_run", config.in_test_run)
-    
+
     -- We'll handle logging suppression locally through our module
   end
-  
+
   -- Don't try to configure logging directly - use its own methods
   -- This can cause circular dependencies and type issues
-  
+
   return config.in_test_run
 end
 
@@ -880,11 +870,10 @@ function M.is_expected_test_error(err)
   if not M.is_error(err) then
     return false
   end
-  
+
   -- Expected test errors are VALIDATION errors or explicitly marked TEST_EXPECTED errors
-  local is_expected_category = err.category == M.CATEGORY.VALIDATION or 
-                              err.category == M.CATEGORY.TEST_EXPECTED
-  
+  local is_expected_category = err.category == M.CATEGORY.VALIDATION or err.category == M.CATEGORY.TEST_EXPECTED
+
   -- Check for test metadata with expect_error flag
   -- Tests with { expect_error = true } flag have ALL error logging completely suppressed
   -- This is different from tests that lack the flag, where only validation/test_expected errors are suppressed
@@ -892,11 +881,11 @@ function M.is_expected_test_error(err)
     logger.debug("Expected test error detected via test metadata", {
       error_category = err.category,
       metadata_name = config.current_test_metadata.name,
-      expect_error = true
+      expect_error = true,
     })
     return true
   end
-  
+
   return is_expected_category
 end
 
@@ -913,28 +902,32 @@ function M.set_current_test_metadata(metadata)
   else
     logger.debug("Clearing test metadata")
   end
-  
+
   config.current_test_metadata = metadata
-  
+
   -- Update central_config if available
   local ok, central_config = pcall(require, "lib.core.central_config")
   if ok and central_config then
     central_config.set("error_handler.current_test_metadata", config.current_test_metadata)
   end
-  
+
   return config.current_test_metadata
 end
 
 --- Get the current test metadata
----@return table|nil The current test metadata
+---@return table The current test metadata (with defaults if none is set)
 function M.get_current_test_metadata()
-  return config.current_test_metadata
+  -- Return the current metadata or default with expect_error=false
+  return config.current_test_metadata or {
+    expect_error = false,
+    name = "(no active test)"
+  }
 end
 
 --- Check if current test expects errors
 ---@return boolean Whether the current test expects errors
 function M.current_test_expects_errors()
-  return config.current_test_metadata and config.current_test_metadata.expect_error == true
+  return config.current_test_metadata ~= nil and config.current_test_metadata.expect_error == true or false
 end
 
 --- Retrieve expected errors captured during tests

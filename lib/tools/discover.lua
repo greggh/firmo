@@ -106,6 +106,11 @@ function M.add_exclude_pattern(pattern)
   table.insert(config.exclude, pattern)
   return M
 end
+-- Convert glob pattern to Lua pattern
+local function glob_to_pattern(glob)
+  return glob:gsub("([%^%$%(%)%%%.%[%]%+%-%?])", "%%%1") -- Escape special chars
+            :gsub("%*", ".*") -- Convert * to .*
+end
 
 --- Check if a file should be excluded based on patterns
 ---@param path string File path to check
@@ -122,7 +127,8 @@ local function should_exclude(path)
 
   -- Check exclusion patterns
   for _, pattern in ipairs(config.exclude) do
-    if path:match(pattern) then
+    local lua_pattern = glob_to_pattern(pattern)
+    if path:match(lua_pattern) then
       return true
     end
   end
@@ -151,7 +157,8 @@ local function matches_include_pattern(path)
   end
 
   for _, pattern in ipairs(config.include) do
-    if path:match(pattern) then
+    local lua_pattern = glob_to_pattern(pattern)
+    if path:match(lua_pattern) then
       return true
     end
   end
@@ -256,7 +263,7 @@ function M.discover(dir, pattern)
       test_count = test_count + 1
       
       -- Apply pattern filter if specified
-      if not pattern or file:match(pattern) then
+      if not pattern or file:match(glob_to_pattern(pattern)) then
         table.insert(test_files, file)
       end
     end
@@ -277,7 +284,7 @@ function M.discover(dir, pattern)
   return {
     files = test_files,
     matched = #test_files,
-    total = test_count
+    total = #test_files  -- Use the actual count of matched files after filtering
   }
 end
 
