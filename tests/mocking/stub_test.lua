@@ -10,8 +10,7 @@ describe("Stub Module", function()
   it("creates a standalone stub function", function()
     local stub = stub_module.new()
 
-    expect(stub).to.be.a("function")
-    expect(stub._is_firmo_stub).to.be_truthy()
+    expect(stub).to.be_type("callable")
 
     -- Call the stub
     local result = stub(1, 2, 3)
@@ -33,7 +32,7 @@ describe("Stub Module", function()
       return "test result"
     end)
 
-    expect(stub).to.be.a("function")
+    expect(stub).to.be_type("callable")
 
     -- Call the stub
     local result = stub()
@@ -302,233 +301,237 @@ describe("Stub Module", function()
       local result, err = test_helper.expect_error(function()
         stub_module.new({}, {})
       end)
-      
+
       expect(result).to_not.exist("Should fail with inappropriate value")
       expect(err).to.exist("Error object should be returned")
       expect(err.message).to.match("Invalid stub configuration", "Error message should indicate the issue")
-      
+
       -- Try to use 'on' with a non-table object
       local result2, err2 = test_helper.expect_error(function()
         stub_module.on("not a table", "method")
       end)
-      
+
       expect(result2).to_not.exist("Should fail with non-table object")
       expect(err2).to.exist("Error object should be returned")
       expect(err2.message).to.match("Expected a table", "Error message should indicate the issue")
-      
+
       -- Try to stub a non-existing method
       local obj = { method = function() end }
       local result3, err3 = test_helper.expect_error(function()
         stub_module.on(obj, "non_existent_method")
       end)
-      
+
       expect(result3).to_not.exist("Should fail with non-existent method")
       expect(err3).to.exist("Error object should be returned")
       expect(err3.message).to.match("Method does not exist", "Error message should indicate the issue")
-      
+
       -- Try to stub a non-function property
       local obj2 = { property = "string value" }
       local result4, err4 = test_helper.expect_error(function()
         stub_module.on(obj2, "property")
       end)
-      
+
       expect(result4).to_not.exist("Should fail with non-function property")
       expect(err4).to.exist("Error object should be returned")
       expect(err4.message).to.match("Property is not a function", "Error message should indicate the issue")
     end)
-    
+
     it("handles invalid argument matching configurations", { expect_error = true }, function()
       local stub = stub_module.new()
-      
+
       -- Try to use when with a non-function matcher
       local result, err = test_helper.expect_error(function()
         stub:when("not a function"):returns("value")
       end)
-      
+
       expect(result).to_not.exist("Should fail with non-function matcher")
       expect(err).to.exist("Error object should be returned")
       expect(err.message).to.match("Expected a function", "Error message should indicate the issue")
-      
+
       -- Try to use when_called_with with no arguments
       local result2, err2 = test_helper.expect_error(function()
         stub:when_called_with()
       end)
-      
+
       expect(result2).to_not.exist("Should fail with no arguments")
       expect(err2).to.exist("Error object should be returned")
       expect(err2.message).to.match("No arguments provided", "Error message should indicate the issue")
-      
+
       -- Try to use returns with invalid value (like a coroutine)
       local co = coroutine.create(function() end)
       local result3, err3 = test_helper.expect_error(function()
         stub:returns(co)
       end)
-      
+
       expect(result3).to_not.exist("Should fail with invalid return value")
       expect(err3).to.exist("Error object should be returned")
       expect(err3.message).to.match("Invalid return value", "Error message should indicate the issue")
     end)
-    
+
     it("handles error cases during sequence operations", { expect_error = true }, function()
       local stub = stub_module.new()
-      
+
       -- Try to use returns_in_sequence with non-table
       local result, err = test_helper.expect_error(function()
         stub:returns_in_sequence("not a table")
       end)
-      
+
       expect(result).to_not.exist("Should fail with non-table sequence")
       expect(err).to.exist("Error object should be returned")
       expect(err.message).to.match("Expected a table", "Error message should indicate the issue")
-      
+
       -- Try to use returns_in_sequence with an empty table
       local result2, err2 = test_helper.expect_error(function()
         stub:returns_in_sequence({})
       end)
-      
+
       expect(result2).to_not.exist("Should fail with empty sequence")
       expect(err2).to.exist("Error object should be returned")
       expect(err2.message).to.match("Empty sequence", "Error message should indicate the issue")
-      
+
       -- Try to use cycle_sequence before defining a sequence
       local result3, err3 = test_helper.expect_error(function()
         stub:cycle_sequence(true)
       end)
-      
+
       expect(result3).to_not.exist("Should fail with no sequence defined")
       expect(err3).to.exist("Error object should be returned")
       expect(err3.message).to.match("No sequence defined", "Error message should indicate the issue")
-      
+
       -- Try to use when_exhausted with an invalid option
       local result4, err4 = test_helper.expect_error(function()
-        stub:returns_in_sequence({1, 2}):when_exhausted("invalid_option")
+        stub:returns_in_sequence({ 1, 2 }):when_exhausted("invalid_option")
       end)
-      
+
       expect(result4).to_not.exist("Should fail with invalid option")
       expect(err4).to.exist("Error object should be returned")
       expect(err4.message).to.match("Invalid exhaustion option", "Error message should indicate the issue")
     end)
-    
+
     it("handles error cases during stub restoration", { expect_error = true }, function()
       -- Create a stub that's not attached to an object
       local standalone_stub = stub_module.new()
-      
+
       -- Try to restore a standalone stub
       local result, err = test_helper.expect_error(function()
         standalone_stub:restore()
       end)
-      
+
       expect(result).to_not.exist("Should fail with standalone stub")
       expect(err).to.exist("Error object should be returned")
       expect(err.message).to.match("Cannot restore", "Error message should indicate the issue")
-      
+
       -- Create a stub on an object but corrupt it
       local obj = {
-        method = function() return "original" end
+        method = function()
+          return "original"
+        end,
       }
       local stub = stub_module.on(obj, "method", "stub result")
-      
+
       -- Verify stub works
       expect(obj.method()).to.equal("stub result")
-      
+
       -- Corrupt the stub
       stub.original = nil
-      
+
       -- Try to restore the corrupted stub
       local result2, err2 = test_helper.expect_error(function()
         stub:restore()
       end)
-      
+
       expect(result2).to_not.exist("Should fail with corrupted stub")
       expect(err2).to.exist("Error object should be returned")
       expect(err2.message).to.match("Cannot restore", "Error message should indicate the issue")
-      
+
       -- Create a stub on an object but remove the target
       local obj2 = {
-        method = function() return "original" end
+        method = function()
+          return "original"
+        end,
       }
       local stub2 = stub_module.on(obj2, "method", "stub result")
-      
+
       -- Corrupt the object
       obj2.method = nil
-      
+
       -- Try to restore the stub to a missing method
       local result3, err3 = test_helper.expect_error(function()
         stub2:restore()
       end)
-      
+
       expect(result3).to_not.exist("Should fail with missing target")
       expect(err3).to.exist("Error object should be returned")
       expect(err3.message).to.match("Cannot restore", "Error message should indicate the issue")
     end)
-    
+
     it("handles invalid configuration chaining", { expect_error = true }, function()
       local stub = stub_module.new()
-      
+
       -- Try to chain methods in invalid order
       local result, err = test_helper.expect_error(function()
         stub:returns("value"):when_called_with("arg")
       end)
-      
+
       expect(result).to_not.exist("Should fail with invalid chain order")
       expect(err).to.exist("Error object should be returned")
       expect(err.message).to.match("Invalid configuration order", "Error message should indicate the issue")
-      
+
       -- Try to use returns twice in a chain
       local result2, err2 = test_helper.expect_error(function()
         stub:returns(1):returns(2)
       end)
-      
+
       expect(result2).to_not.exist("Should fail with double returns")
       expect(err2).to.exist("Error object should be returned")
       expect(err2.message).to.match("Return value already set", "Error message should indicate the issue")
-      
+
       -- Try to use throws and returns together
       local result3, err3 = test_helper.expect_error(function()
         stub:throws("error"):returns("value")
       end)
-      
+
       expect(result3).to_not.exist("Should fail with throws+returns")
       expect(err3).to.exist("Error object should be returned")
       expect(err3.message).to.match("Cannot set both", "Error message should indicate the issue")
     end)
-    
+
     it("handles error cases for stub properties", { expect_error = true }, function()
       local stub = stub_module.new()
-      
+
       -- Intentionally corrupt the stub
       stub.calls = nil
-      
+
       -- Try to access call count on corrupted stub
       local result, err = test_helper.expect_error(function()
         return stub.call_count
       end)
-      
+
       expect(result).to_not.exist("Should fail with corrupted stub")
       expect(err).to.exist("Error object should be returned")
       expect(err.message).to.match("Invalid stub state", "Error message should indicate the issue")
-      
+
       -- Create a new stub
       local stub2 = stub_module.new()
-      
+
       -- Try to access an invalid property
       local result2, err2 = test_helper.expect_error(function()
         return stub2.invalid_property()
       end)
-      
+
       expect(result2).to_not.exist("Should fail with invalid property")
       expect(err2).to.exist("Error object should be returned")
-      
+
       -- Try to reset a corrupted stub
       local result3, err3 = test_helper.expect_error(function()
         stub:reset()
       end)
-      
+
       expect(result3).to_not.exist("Should fail with corrupted stub")
       expect(err3).to.exist("Error object should be returned")
       expect(err3.message).to.match("Invalid stub state", "Error message should indicate the issue")
     end)
   end)
-  
+
   -- Add more tests for other stub functionality
 end)

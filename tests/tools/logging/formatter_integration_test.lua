@@ -8,41 +8,96 @@ local logging = require("lib.tools.logging")
 
 describe("Logging Formatter Integration Module", function()
   it("enhances formatters with logging capabilities", function()
-    -- Create a mock formatters module
+    -- Create a local logger for debugging
+    local test_logger = logging.get_logger("test.formatter_integration")
+    -- Set log level to debug to ensure we see all messages
+    if test_logger.set_level then
+      test_logger.set_level("debug")
+    elseif test_logger.level then
+      test_logger.level = "debug"
+    end
+    test_logger.info("Created test logger with debug level")
+
+    -- Create a mock formatters module that matches the real structure
     local formatters = {
-      available_formatters = {
+      -- Registry for each type of formatter
+      coverage = {
         test = {
-          type = "test",
+          type = "coverage",
           name = "test",
         },
       },
+      quality = {
+        test_quality = {
+          type = "quality",
+          name = "test_quality",
+        },
+      },
+      results = {},
       init = function()
         return true
       end,
     }
 
+    if formatters.coverage then
+      test_logger.info("- coverage registry content:")
+      for name, formatter in pairs(formatters.coverage) do
+        test_logger.info("  - formatter: " .. name .. ", type: " .. type(formatter))
+        if formatter.type then
+          test_logger.info("    - formatter.type: " .. formatter.type)
+        end
+        if formatter.name then
+          test_logger.info("    - formatter.name: " .. formatter.name)
+        end
+      end
+    end
     -- Mock the try_require function to return our mock formatters
     local original_try_require = _G.try_require
     _G.try_require = function(name)
+      test_logger.info("try_require called with name: " .. name)
+
       if name == "lib.reporting.formatters" then
+        test_logger.info("Returning mock formatters object")
+
+        -- Additional verification before returning
+        test_logger.info("- Before return: has coverage? " .. tostring(formatters.coverage ~= nil))
+        test_logger.info(
+          "- Before return: has test in coverage? " .. tostring(formatters.coverage and formatters.coverage.test ~= nil)
+        )
+
         return formatters
       end
+
+      test_logger.info("Returning nil for module: " .. name)
       return nil
     end
 
     -- Test enhancement
-    local result, err = formatter_integration.enhance_formatters()
+    local enhanced_formatters, err = formatter_integration.enhance_formatters()
+
+    -- If we have a coverage registry but no test formatter, log the keys that exist
+    if enhanced_formatters and enhanced_formatters.coverage and not enhanced_formatters.coverage.test then
+      test_logger.info("Available keys in coverage registry:")
+      for k, _ in pairs(enhanced_formatters.coverage) do
+        test_logger.info("- Key: " .. tostring(k))
+      end
+    end
 
     -- Restore original function
     _G.try_require = original_try_require
-
     -- Verify enhancement
     expect(err).to_not.exist()
-    expect(result).to.exist()
-    expect(formatters.available_formatters.test._logger).to.exist()
-    expect(formatters.available_formatters.test.log_debug).to.be.a("function")
-    expect(formatters.available_formatters.test.log_info).to.be.a("function")
-    expect(formatters.available_formatters.test.log_error).to.be.a("function")
+    expect(enhanced_formatters).to.exist()
+
+    -- Check the returned object has been enhanced in each registry
+    expect(enhanced_formatters.coverage.test._logger).to.exist()
+    expect(enhanced_formatters.coverage.test.log_debug).to.be.a("function")
+    expect(enhanced_formatters.coverage.test.log_info).to.be.a("function")
+    expect(enhanced_formatters.coverage.test.log_error).to.be.a("function")
+
+    -- Check the quality formatter was also enhanced
+    expect(enhanced_formatters.quality.test_quality._logger).to.exist()
+    expect(enhanced_formatters.quality.test_quality.log_debug).to.be.a("function")
   end)
 
   it("creates test-specific loggers", function()
@@ -81,6 +136,7 @@ describe("Logging Formatter Integration Module", function()
     expect(log_formatter.format_json).to.be.a("function")
     expect(log_formatter.format_text).to.be.a("function")
   end)
+
   it("integrates with the reporting system", function()
     -- Skip test if reporting module is not available
     if not pcall(require, "lib.reporting") then
