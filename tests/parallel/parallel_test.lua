@@ -59,7 +59,9 @@ describe("Parallel Execution Module", function()
     expect(dir_err).to_not.exist("Failed to create test directory")
 
     -- Create test files with error handling
-    local passing_path, passing_err = create_test_file("passing_test", [[
+    local passing_path, passing_err = create_test_file(
+      "passing_test",
+      [[
       local firmo = require("firmo")
       local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 
@@ -81,9 +83,12 @@ describe("Parallel Execution Module", function()
           expect(false).to.be_truthy()
         end)
       end)
-    ]])
+    ]]
+    )
 
-    create_test_file("slow_test", [[
+    create_test_file(
+      "slow_test",
+      [[
       local firmo = require("firmo")
       local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 
@@ -96,7 +101,8 @@ describe("Parallel Execution Module", function()
           expect(true).to.be_truthy()
         end)
       end)
-    ]])
+    ]]
+    )
 
     expect(slow_err).to_not.exist("Failed to create slow test file")
     expect(slow_path).to.exist()
@@ -110,8 +116,8 @@ describe("Parallel Execution Module", function()
         verbose = false,
         show_worker_output = false, -- Don't show output during tests
         fail_fast = false,
-        aggregate_coverage = true
-      }
+        aggregate_coverage = true,
+      })
       return true
     end)()
 
@@ -152,13 +158,13 @@ describe("Parallel Execution Module", function()
       timeout = 5,
       verbose = false,
       show_worker_output = false,
-      fail_fast = false
+      fail_fast = false,
     }
 
     -- Run the passing and slow tests in parallel
     local results = parallel.run_files({
       fs.join_paths(TEST_DIR, "passing_test.lua"),
-      fs.join_paths(TEST_DIR, "slow_test.lua")
+      fs.join_paths(TEST_DIR, "slow_test.lua"),
     }, options)
 
     -- Validate the results
@@ -178,13 +184,13 @@ describe("Parallel Execution Module", function()
       timeout = 5,
       verbose = false,
       show_worker_output = false,
-      fail_fast = false
+      fail_fast = false,
     }
 
     -- Run the passing and failing tests in parallel
     local results = parallel.run_files({
       fs.join_paths(TEST_DIR, "passing_test.lua"),
-      fs.join_paths(TEST_DIR, "failing_test.lua")
+      fs.join_paths(TEST_DIR, "failing_test.lua"),
     }, options)
 
     -- Validate the results
@@ -201,10 +207,12 @@ describe("Parallel Execution Module", function()
       timeout = 5,
       verbose = false,
       show_worker_output = false,
-      fail_fast = true
+      fail_fast = true,
     }
     -- Create an additional test file that would run if fail_fast didn't work
-    local very_slow_path, very_slow_err = create_test_file("very_slow_test", [[
+    local very_slow_path, very_slow_err = create_test_file(
+      "very_slow_test",
+      [[
       local firmo = require("firmo")
       local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 
@@ -217,12 +225,13 @@ describe("Parallel Execution Module", function()
           expect(true).to.be_truthy()
         end)
       end)
-    ]])
+    ]]
+    )
 
     -- Run a failing test first (which should trigger fail_fast) and then the very slow test
     local results = parallel.run_files({
       fs.join_paths(TEST_DIR, "failing_test.lua"),
-      fs.join_paths(TEST_DIR, "very_slow_test.lua")
+      fs.join_paths(TEST_DIR, "very_slow_test.lua"),
     }, options)
 
     -- Validate the results - fail_fast should prevent the very slow test from completing
@@ -239,12 +248,12 @@ describe("Parallel Execution Module", function()
       timeout = 1, -- 1 second timeout (our slow test takes 2 seconds)
       verbose = false,
       show_worker_output = false,
-      fail_fast = false
+      fail_fast = false,
     }
 
     -- Run the slow test with a short timeout
     local results = parallel.run_files({
-      fs.join_paths(TEST_DIR, "slow_test.lua")
+      fs.join_paths(TEST_DIR, "slow_test.lua"),
     }, options)
 
     -- Validate the results - the test should timeout and be considered a failure

@@ -25,42 +25,44 @@ central_config.register_module("coverage", {
     statsfile = "string",
     savestepsize = "number",
     tick = "boolean",
-    codefromstrings = "boolean"
-  }
+    codefromstrings = "boolean",
+  },
 }, {
   -- Default values
   enabled = true,
-  include = {".*%.lua$"},  -- Include all Lua files by default
-  exclude = {},            -- No excludes by default
+  include = { ".*%.lua$" }, -- Include all Lua files by default
+  exclude = {}, -- No excludes by default
   statsfile = ".coverage-stats",
-  savestepsize = 100,     -- Save stats every 100 lines
-  tick = false,           -- Don't use tick-based saving by default
-  codefromstrings = false -- Don't track code loaded from strings
+  savestepsize = 100, -- Save stats every 100 lines
+  tick = false, -- Don't use tick-based saving by default
+  codefromstrings = false, -- Don't track code loaded from strings
 })
 
 -- Module state with optimized structure
 local state = {
   initialized = false,
-  data = {},      -- Coverage data by filename
-  paused = true,  -- Start paused
-  buffer = {      -- Performance optimization buffer
+  data = {}, -- Coverage data by filename
+  paused = true, -- Start paused
+  buffer = { -- Performance optimization buffer
     size = 0,
     changes = 0,
-    last_save = os.time()
-  }
+    last_save = os.time(),
+  },
 }
 
 -- Fast lookup tables for better performance
 local ignored_files = {}
 local file_patterns = {
   include = {},
-  exclude = {}
+  exclude = {},
 }
 
 -- Precompile patterns for better performance
 local function compile_patterns()
   local config = central_config.get("coverage")
-  if not config then return end
+  if not config then
+    return
+  end
 
   -- Clear existing patterns
   file_patterns.include = {}
@@ -70,7 +72,7 @@ local function compile_patterns()
   for _, pattern in ipairs(config.include or {}) do
     table.insert(file_patterns.include, {
       raw = pattern,
-      compiled = pattern
+      compiled = pattern,
     })
   end
 
@@ -78,7 +80,7 @@ local function compile_patterns()
   for _, pattern in ipairs(config.exclude or {}) do
     table.insert(file_patterns.exclude, {
       raw = pattern,
-      compiled = pattern
+      compiled = pattern,
     })
   end
 end
@@ -123,7 +125,9 @@ local function debug_hook(_, line_nr, level)
 
   -- Get source file info
   local info = debug.getinfo(level, "S")
-  if not info then return end
+  if not info then
+    return
+  end
 
   local name = info.source
   local prefixed_name = name:match("^@(.*)")
@@ -145,7 +149,7 @@ local function debug_hook(_, line_nr, level)
 
     file = {
       max = 0,
-      max_hits = 0
+      max_hits = 0,
     }
     state.data[name] = file
     state.buffer.changes = state.buffer.changes + 1
@@ -187,7 +191,7 @@ function coverage.init()
 
   local success, err = error_handler.try(function()
     -- Set debug hook
-    debug.sethook(debug_hook, "l")
+    debug.sethook(debug_hook, "l", 0)
 
     -- Handle hook per thread if needed
     if coverage.has_hook_per_thread() then
@@ -195,7 +199,7 @@ function coverage.init()
       local raw_create = coroutine.create
       coroutine.create = function(...)
         local co = raw_create(...)
-        debug.sethook(co, debug_hook, "l")
+        debug.sethook(co, debug_hook, "l", 0)
         return co
       end
 
@@ -203,7 +207,7 @@ function coverage.init()
       local raw_wrap = coroutine.wrap
       coroutine.wrap = function(...)
         local co = raw_create(...)
-        debug.sethook(co, debug_hook, "l")
+        debug.sethook(co, debug_hook, "l", 0)
         return function(...)
           local success, result = coroutine.resume(co, ...)
           if not success then
@@ -221,7 +225,7 @@ function coverage.init()
     state.buffer = {
       size = 0,
       changes = 0,
-      last_save = os.time()
+      last_save = os.time(),
     }
 
     -- Clear lookup tables
@@ -234,10 +238,11 @@ function coverage.init()
   end)
 
   if not success then
-    error_handler.throw("Failed to initialize coverage system: " .. err.message,
+    error_handler.throw(
+      "Failed to initialize coverage system: " .. err.message,
       error_handler.CATEGORY.RUNTIME,
       error_handler.SEVERITY.ERROR,
-      {error = err}
+      { error = err }
     )
     return false
   end
@@ -247,20 +252,24 @@ end
 
 -- Check if debug hooks are per-thread
 function coverage.has_hook_per_thread()
-  -- Get current hook
-  local old_hook = debug.gethook()
+  -- Get current hook with all parameters
+  local old_hook, old_mask, old_count = debug.gethook()
 
   -- Set a test hook
   local test_hook = function() end
-  debug.sethook(test_hook, "l")
+  debug.sethook(test_hook, "l", 0)
 
   -- Check if hook is same in new thread
   local thread_hook = coroutine.wrap(function()
     return debug.gethook()
   end)()
 
-  -- Restore original hook
-  debug.sethook(old_hook)
+  -- Restore original hook with proper parameters
+  if old_hook then
+    debug.sethook(old_hook, old_mask or "", old_count or 0)
+  else
+    debug.sethook()
+  end
 
   -- Different hooks means per-thread hooks
   return thread_hook ~= test_hook
@@ -311,11 +320,11 @@ function coverage.save_stats()
     for name, data in pairs(state.data) do
       old_stats[name] = old_stats[name] or {}
       local file_data = old_stats[name]
-      
+
       -- Update file stats
       file_data.max = math.max(file_data.max or 0, data.max or 0)
       file_data.max_hits = math.max(file_data.max_hits or 0, data.max_hits or 0)
-      
+
       -- Merge line hits
       for line, hits in pairs(data) do
         if type(line) == "number" then
@@ -354,7 +363,7 @@ function coverage.save_stats()
     if not move_ok then
       return false, move_err
     end
-    
+
     return true
   end, "coverage-stats")
 
@@ -365,7 +374,6 @@ function coverage.save_stats()
   state.data = {}
 
   return true
-  end
 end
 
 -- Load coverage stats from file
@@ -380,7 +388,8 @@ function coverage.load_stats()
   -- Read stats file content
   local content, read_err = filesystem.read_file(statsfile)
   if not content then
-    error_handler.throw("Failed to read coverage stats: " .. (read_err or "unknown error"),
+    error_handler.throw(
+      "Failed to read coverage stats: " .. (read_err or "unknown error"),
       error_handler.CATEGORY.IO,
       error_handler.SEVERITY.ERROR
     )
@@ -406,12 +415,14 @@ function coverage.load_stats()
 
     -- Move to data line
     i = i + 1
-    if i > #lines then break end
+    if i > #lines then
+      break
+    end
 
     -- Initialize file stats
     stats[filename] = {
       max = max,
-      max_hits = 0
+      max_hits = 0,
     }
 
     -- Parse line hits
@@ -445,4 +456,3 @@ function coverage.shutdown()
 end
 
 return coverage
-

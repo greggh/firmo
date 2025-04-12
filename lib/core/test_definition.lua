@@ -427,10 +427,13 @@ function M.it(name, options_or_fn, fn)
     timeout = nil,
   })
 
+  -- Always clear any existing metadata before setting new metadata
+  error_handler.set_current_test_metadata(nil)
+
   -- Set error handler metadata for the test
   error_handler.set_current_test_metadata({
     expect_error = options.expect_error,
-    name = name
+    name = name,
   })
 
   -- Determine if test should be skipped based on focus mode
@@ -511,6 +514,12 @@ function M.it(name, options_or_fn, fn)
 
   -- Run test with proper error handling
   local test_start_time = os.clock()
+
+  -- Always ensure metadata is cleared after the test, regardless of outcome
+  local cleanup = function()
+    error_handler.set_current_test_metadata(nil)
+  end
+
   local success, err = error_handler.try(function()
     -- Set temporary file context if available
     if temp_file and temp_file.set_current_test_context then
@@ -543,8 +552,8 @@ function M.it(name, options_or_fn, fn)
       temp_file.set_current_test_context(nil)
     end
 
-    -- Clear error handler metadata
-    error_handler.set_current_test_metadata(nil)
+    -- Run cleanup to clear metadata
+    cleanup()
 
     -- Create a test pass result
     local result = M.add_test_result({
@@ -565,8 +574,8 @@ function M.it(name, options_or_fn, fn)
     })
   end)
 
-  -- Ensure error handler metadata is cleared even if test failed
-  error_handler.set_current_test_metadata(nil)
+  -- Run cleanup to clear metadata
+  cleanup()
 
   -- Handle test errors
   if not success then
@@ -769,7 +778,7 @@ end
 ---       -- File is automatically created with content and cleaned up after this function
 ---       local content = read_file(file_path)
 ---       expect(content).to.equal("initial content")
----       
+---
 ---       -- Modify the file
 ---       write_to_file(file_path, "updated content")
 ---       expect(read_file(file_path)).to.equal("updated content")
@@ -987,4 +996,3 @@ end
 
 -- Initialize and return the module
 return M
-
