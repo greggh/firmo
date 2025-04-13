@@ -22,9 +22,23 @@ To enable quality validation for your tests:
 
 ```lua
 -- In your test file or setup module
-local firmo = require("firmo")
-firmo.quality_options.enabled = true
-firmo.quality_options.level = 3 -- Comprehensive level
+local quality = require("lib.quality")
+quality.init({
+  enabled = true,
+  level = 3 -- Comprehensive level
+})
+```
+
+Using the central configuration system:
+
+```lua
+-- In your .firmo-config.lua file
+return {
+  quality = {
+    enabled = true,
+    level = 3
+  }
+}
 ```
 
 From the command line:
@@ -61,277 +75,59 @@ Firmo's quality validation provides five progressive quality levels:
    - Performance validation where applicable
 
 5. **Complete (Level 5)**
-   - High branch coverage
+   - High branch coverage (90% threshold)
    - Security validation
    - Comprehensive API contract testing
    - Multiple assertion types (at least 5 different types)
+   - Performance testing requirements
 
 ### Configuring Quality Options
 
-You can configure quality validation through the `firmo.quality_options` table:
+You can configure quality validation through the central configuration system:
 
 ```lua
-firmo.quality_options = {
-  enabled = true,                -- Enable quality validation
-  level = 3,                     -- Quality level to enforce (1-5)
-  format = "html",               -- Default format for reports
-  output = "./quality-reports",  -- Default output location for reports
-  strict = false,                -- Fail on first issue
-  custom_rules = {               -- Custom quality rules
-    require_describe_block = true,
-    min_assertions_per_test = 3
+-- In .firmo-config.lua
+return {
+  quality = {
+    enabled = true,                -- Enable quality validation
+    level = 3,                     -- Quality level to enforce (1-5)
+    strict = false,                -- Fail on first issue
+    custom_rules = {               -- Custom quality rules
+      require_describe_block = true,
+      min_assertions_per_test = 3
+    }
+  },
+  reporting = {
+    formats = {
+      quality = {
+        default = "html"           -- Default format for quality reports
+      }
+    },
+    templates = {
+      quality = "./reports/quality-{timestamp}.{format}"  -- Report path template
+    }
   }
 }
 ```
 
-## Writing Tests that Meet Quality Standards
-
-### Level 1: Basic Quality
-
-At this level, ensure each test has at least one assertion:
+Or directly in your code:
 
 ```lua
-describe("Calculator", function()
-  it("should add two numbers", function()
-    expect(add(2, 3)).to.equal(5)
-  end)
-  
-  it("should subtract numbers", function()
-    expect(subtract(5, 3)).to.equal(2)
-  end)
-end)
+local quality = require("lib.quality")
+local central_config = require("lib.core.central_config")
+
+-- Update config settings
+central_config.set("quality.enabled", true)
+central_config.set("quality.level", 3)
+
+-- Or initialize directly
+quality.init({
+  enabled = true,
+  level = 3,
+  strict = false
+})
 ```
 
-### Level 2: Standard Quality
-
-At this level, use multiple assertion types and better test organization:
-
-```lua
-describe("Calculator", function()
-  it("should add two positive numbers correctly", function()
-    -- Multiple assertions of different types
-    expect(add(2, 3)).to.equal(5)       -- Equality assertion
-    expect(add(2, 3)).to.be.a("number") -- Type checking
-    expect(add(0, 0)).to.equal(0)       -- Edge case
-  end)
-  
-  it("should handle subtraction properly", function()
-    expect(subtract(5, 3)).to.equal(2)
-    expect(subtract(3, 5)).to.equal(-2)  -- Testing negative result
-  end)
-end)
-```
-
-### Level 3: Comprehensive Quality
-
-At this level, add setup/teardown, edge cases, and context nesting:
-
-```lua
-describe("Calculator", function()
-  local calculator = nil
-  
-  -- Setup and teardown
-  before(function()
-    calculator = Calculator.new()
-  end)
-  
-  after(function()
-    calculator = nil
-  end)
-  
-  -- Context nesting
-  describe("when performing addition", function()
-    it("should add two numbers correctly", function()
-      expect(calculator.add(2, 3)).to.equal(5)
-      expect(calculator.add(0, 5)).to.equal(5)
-      expect(calculator.add(-2, 2)).to.equal(0)  -- Edge case
-    end)
-  end)
-  
-  describe("when performing division", function()
-    it("should divide numbers correctly", function()
-      expect(calculator.divide(6, 2)).to.equal(3)
-      expect(calculator.divide(5, 2)).to.equal(2.5)
-    end)
-    
-    it("should handle division by zero", { expect_error = true }, function()
-      local result, err = test_helper.with_error_capture(function()
-        return calculator.divide(5, 0)
-      end)()
-      
-      expect(result).to_not.exist()
-      expect(err).to.exist()
-      expect(err.message).to.match("division by zero")
-    end)
-  end)
-end)
-```
-
-### Level 4: Advanced Quality
-
-At this level, include boundary testing, extensive mocking, and performance checks:
-
-```lua
-describe("UserService", function()
-  local user_service, db_mock
-  
-  before(function()
-    -- Create a mock database
-    db_mock = firmo.mock("DatabaseClient")
-    
-    -- Configure the mock
-    db_mock:when("get_user", "123").returns({ id = "123", name = "Test User" })
-    db_mock:when("get_user", "999").returns(nil)
-    
-    -- Initialize service with mock
-    user_service = UserService.new(db_mock)
-  end)
-  
-  describe("when fetching users", function()
-    it("should return user data for valid id", function()
-      local user = user_service.get_user("123")
-      
-      expect(user).to.exist()
-      expect(user.id).to.equal("123")
-      expect(user.name).to.equal("Test User")
-      
-      -- Verify mock was called correctly
-      expect(db_mock:called_with("get_user", "123")).to.be_truthy()
-    end)
-    
-    it("should handle non-existent users", function()
-      local user = user_service.get_user("999")
-      
-      expect(user).to_not.exist()
-      expect(db_mock:called_with("get_user", "999")).to.be_truthy()
-    end)
-    
-    -- Boundary testing
-    it("should validate user id format", function()
-      -- Test minimum length
-      expect(user_service.is_valid_id("1")).to.equal(false)
-      
-      -- Test boundary case
-      expect(user_service.is_valid_id("12")).to.equal(false)
-      expect(user_service.is_valid_id("123")).to.equal(true)
-      
-      -- Test maximum length
-      expect(user_service.is_valid_id("12345678901234567890")).to.equal(true)
-      expect(user_service.is_valid_id("123456789012345678901")).to.equal(false)
-    end)
-    
-    -- Performance testing
-    it("should fetch users efficiently", function()
-      local start_time = os.clock()
-      user_service.get_user("123")
-      local end_time = os.clock()
-      
-      expect(end_time - start_time).to.be_less_than(0.01)
-    end)
-  end)
-end)
-```
-
-### Level 5: Complete Quality
-
-At this level, add security testing, complete API contract testing, and comprehensive edge cases:
-
-```lua
-describe("AuthenticationService", function()
-  local auth_service, user_db, logger_mock
-  
-  before(function()
-    -- Set up mocks
-    user_db = firmo.mock("UserDatabase")
-    logger_mock = firmo.mock("Logger") 
-    
-    -- Configure mock behavior
-    user_db:when("find_by_username", "test_user").returns({
-      id = "123",
-      username = "test_user",
-      password_hash = "$2a$10$...", -- Bcrypt hash for "password123"
-      roles = {"user"}
-    })
-    
-    -- Initialize service with mocks
-    auth_service = AuthenticationService.new(user_db, logger_mock)
-  end)
-  
-  describe("when authenticating users", function()
-    it("should authenticate valid credentials", function()
-      local result = auth_service.authenticate("test_user", "password123")
-      
-      expect(result.success).to.be_truthy()
-      expect(result.user.id).to.equal("123")
-      expect(result.user.roles).to.include("user")
-      expect(result.token).to.be.a("string")
-      expect(#result.token).to.be_greater_than(20)
-    end)
-    
-    it("should reject invalid credentials", function()
-      local result = auth_service.authenticate("test_user", "wrong_password")
-      
-      expect(result.success).to.equal(false)
-      expect(result.user).to_not.exist()
-      expect(result.token).to_not.exist()
-      expect(result.error).to.match("Invalid credentials")
-      
-      -- Verify proper logging of security events
-      expect(logger_mock:called_with("warn", "Failed login attempt")).to.be_truthy()
-    end)
-    
-    -- Security testing
-    describe("security requirements", function()
-      it("should prevent timing attacks", function()
-        -- Measure timing for both valid and invalid username
-        local start1 = os.clock()
-        auth_service.authenticate("test_user", "wrong_password")
-        local time1 = os.clock() - start1
-        
-        local start2 = os.clock()
-        auth_service.authenticate("invalid_user", "wrong_password")
-        local time2 = os.clock() - start2
-        
-        -- Timing should be similar regardless of whether user exists
-        expect(math.abs(time1 - time2)).to.be_less_than(0.01)
-      end)
-      
-      it("should rate limit authentication attempts", function()
-        -- Try multiple failed logins
-        for i = 1, 10 do
-          auth_service.authenticate("test_user", "wrong_password" .. i)
-        end
-        
-        -- Next attempt should be rate limited
-        local result = auth_service.authenticate("test_user", "wrong_password")
-        
-        expect(result.success).to.equal(false)
-        expect(result.error).to.match("rate limited")
-        expect(logger_mock:called_with("warn", "Rate limit applied")).to.be_truthy()
-      end)
-      
-      it("should sanitize inputs for SQL injection", function()
-        -- Attempt SQL injection in username
-        local result = auth_service.authenticate("admin' --", "anything")
-        
-        expect(result.success).to.equal(false)
-        expect(result.error).to.match("Invalid input")
-        expect(logger_mock:called_with("warn", "Potential SQL injection")).to.be_truthy()
-      end)
-    end)
-  end)
-end)
-```
-
-## Generating Quality Reports
-
-### Basic Report Generation
-
-To generate a quality report:
-
-```lua
--- Generate an HTML report
-firmo.generate_quality_report("html", "./quality-report.html")
 
 -- Generate a JSON report
 firmo.generate_quality_report("json", "./quality-report.json")

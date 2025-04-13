@@ -131,14 +131,11 @@ local test_definition = try_require("lib.core.test_definition")
 local cli_module = try_require("lib.tools.cli")
 local discover_module = try_require("lib.tools.discover")
 local runner_module = try_require("lib.core.runner")
-
--- Optional modules for advanced features
 local coverage = try_require("lib.coverage")
 local quality = try_require("lib.quality")
 local codefix = try_require("lib.tools.codefix")
 local reporting = try_require("lib.reporting")
 local watcher = try_require("lib.tools.watcher")
----@diagnostic disable-next-line: unused-local
 local json = try_require("lib.reporting.json")
 local type_checking = try_require("lib.core.type_checking")
 local async_module = try_require("lib.async")
@@ -172,10 +169,10 @@ end
 logger.debug("Logging system initialized", {
   module = "firmo-core",
   modules_loaded = {
-    error_handler = true, -- Always true as this is now required
-    filesystem = fs ~= nil, -- Always true as this is now required
-    logging = true, -- Always true as this is now required
-    assertion = true, -- Always true as this is now required
+    error_handler = error_handler ~= nil,
+    filesystem = fs ~= nil,
+    logging = logging ~= nil,
+    assertion = assertion ~= nil,
     test_definition = test_definition ~= nil,
     cli = cli_module ~= nil,
     discover = discover_module ~= nil,
@@ -191,6 +188,8 @@ logger.debug("Logging system initialized", {
     mocking = mocking_module ~= nil,
     central_config = central_config ~= nil,
     module_reset = module_reset_module ~= nil,
+    type_checking = type_checking ~= nil,
+    json = json ~= nil,
   },
 })
 
@@ -412,9 +411,7 @@ local module = setmetatable({
     _G.fit = firmo.fit
     _G.xit = firmo.xit
     _G.before = firmo.before
-    _G.before_each = firmo.before -- Alias for compatibility
     _G.after = firmo.after
-    _G.after_each = firmo.after -- Alias for compatibility
 
     -- Assertions
     _G.expect = firmo.expect

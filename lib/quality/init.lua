@@ -41,6 +41,9 @@
 -- Implementation of test quality analysis with level-based validation to ensure
 -- tests meet required standards for reliability, completeness, and maintainability
 
+-- Import modules
+local level_checkers = require("lib.quality.level_checkers")
+
 -- Lazy loading of dependencies to avoid circular references
 local _central_config
 ---@private
@@ -192,7 +195,9 @@ local patterns = {
     "assert%.truthy",
     "assert%.is_true",
     "expect%(.-%):to%.be%.true",
-    "expect%(.-%):to_be_true"
+    "expect%(.-%):to_be_true",
+    "expect%(.-%):to%.be%.truthy",
+    "expect%(.-%):to_be_truthy"
   },
   
   -- Error assertions
@@ -203,6 +208,8 @@ local patterns = {
     "assert%.has_error",
     "expect%(.-%):to%.throw",
     "expect%(.-%):to_throw",
+    "expect%(.-%):to%.fail",
+    "expect%(.-%):to_fail",
     "pcall",
     "xpcall",
     "try%s*{"
@@ -297,104 +304,32 @@ M.levels = {
   {
     level = 1,
     name = "basic",
-    requirements = {
-      min_assertions_per_test = 1,
-      assertion_types_required = {"equality", "truth"},
-      assertion_types_required_count = 1,
-      test_organization = {
-        require_describe_block = true,
-        require_it_block = true,
-        max_assertions_per_test = 15,
-        require_test_name = true
-      },
-      required_patterns = {},
-      forbidden_patterns = {"SKIP", "TODO", "FIXME"},
-    },
-    description = "Basic tests with at least one assertion per test and proper structure"
+    description = "Basic tests with at least one assertion per test and proper structure",
+    requirements = level_checkers.get_level_requirements(1)
   },
   {
     level = 2,
     name = "standard",
-    requirements = {
-      min_assertions_per_test = 2,
-      assertion_types_required = {"equality", "truth", "type_checking"},
-      assertion_types_required_count = 2,
-      test_organization = {
-        require_describe_block = true,
-        require_it_block = true,
-        max_assertions_per_test = 10,
-        require_test_name = true,
-        require_before_after = false
-      },
-      required_patterns = {"should"},
-      forbidden_patterns = {"SKIP", "TODO", "FIXME"},
-    },
-    description = "Standard tests with multiple assertions, proper naming, and error handling"
+    description = "Standard tests with multiple assertions, proper naming, and error handling",
+    requirements = level_checkers.get_level_requirements(2)
   },
   {
     level = 3,
     name = "comprehensive",
-    requirements = {
-      min_assertions_per_test = 3,
-      assertion_types_required = {"equality", "truth", "type_checking", "error_handling", "edge_cases"},
-      assertion_types_required_count = 3,
-      test_organization = {
-        require_describe_block = true,
-        require_it_block = true,
-        max_assertions_per_test = 8,
-        require_test_name = true,
-        require_before_after = true,
-        require_context_nesting = true
-      },
-      required_patterns = {"should", "when"},
-      forbidden_patterns = {"SKIP", "TODO", "FIXME"},
-    },
-    description = "Comprehensive tests with edge cases, type checking, and isolated setup"
+    description = "Comprehensive tests with edge cases, type checking, and isolated setup",
+    requirements = level_checkers.get_level_requirements(3)
   },
   {
     level = 4,
     name = "advanced",
-    requirements = {
-      min_assertions_per_test = 4,
-      assertion_types_required = {"equality", "truth", "type_checking", "error_handling", "mock_verification", "edge_cases", "boundary"},
-      assertion_types_required_count = 4,
-      test_organization = {
-        require_describe_block = true,
-        require_it_block = true,
-        max_assertions_per_test = 6,
-        require_test_name = true,
-        require_before_after = true,
-        require_context_nesting = true,
-        require_mock_verification = true
-      },
-      required_patterns = {"should", "when", "boundary"},
-      forbidden_patterns = {"SKIP", "TODO", "FIXME"},
-    },
-    description = "Advanced tests with boundary conditions, mock verification, and context organization"
+    description = "Advanced tests with boundary conditions, mock verification, and context organization",
+    requirements = level_checkers.get_level_requirements(4)
   },
   {
     level = 5,
     name = "complete",
-    requirements = {
-      min_assertions_per_test = 5,
-      assertion_types_required = {"equality", "truth", "type_checking", "error_handling", "mock_verification", "edge_cases", "boundary", "performance", "security"},
-      assertion_types_required_count = 5,
-      test_organization = {
-        require_describe_block = true,
-        require_it_block = true,
-        max_assertions_per_test = 5,
-        require_test_name = true,
-        require_before_after = true,
-        require_context_nesting = true,
-        require_mock_verification = true,
-        require_coverage_threshold = 90, -- Match our new standard threshold
-        require_performance_tests = true,
-        require_security_tests = true
-      },
-      required_patterns = {"should", "when", "boundary", "security", "performance"},
-      forbidden_patterns = {"SKIP", "TODO", "FIXME"},
-    },
-    description = "Complete tests with 100% branch coverage, security validation, and performance testing"
+    description = "Complete tests with 100% branch coverage, security validation, and performance testing",
+    requirements = level_checkers.get_level_requirements(5)
   }
 }
 
@@ -1258,8 +1193,25 @@ function M.get_report_data()
   return structured_data
 end
 
----@param format? "summary"|"json"|"html" The format for the report
----@return string|table report The formatted quality report
+--- Generate a quality report in the specified format
+--- This function generates a formatted quality report using the reporting module.
+--- If the reporting module is not available, it returns the raw quality data structure.
+---
+---@param format? "summary"|"json"|"html" The format for the report (default is based on central_config)
+---@return string|table report The formatted quality report, either as a string for text-based formats 
+--- or a structured table for data formats like JSON
+---
+---@usage
+--- -- Generate a summary report
+--- local summary = quality.report("summary")
+--- print(summary)
+---
+--- -- Generate a JSON report
+--- local json_data = quality.report("json")
+---
+--- -- Generate an HTML report
+--- local html = quality.report("html")
+--- fs.write_file("quality-report.html", html)
 function M.report(format)
   -- Get format from central_config if available
   local central_config = get_central_config()
@@ -1267,7 +1219,7 @@ function M.report(format)
   
   if central_config then
     -- Check for configured default format
-    local configured_format = central_config.get("formatters.quality")
+    local configured_format = central_config.get("reporting.formats.quality.default")
     if configured_format then
       default_format = configured_format
       logger.debug("Using format from central configuration", {format = default_format})
@@ -1279,186 +1231,77 @@ function M.report(format)
   
   local data = M.get_report_data()
   
-  -- Try to load the reporting module
-  local reporting_module = package.loaded["src.reporting"] or require("src.reporting")
+  -- Try to load the reporting module with proper error handling
+  local reporting_module
+  local success, result_or_err = pcall(function()
+    return require("lib.reporting")
+  end)
   
-  if reporting_module then
-    return reporting_module.format_quality(data, format)
+  if success then
+    reporting_module = result_or_err
+    logger.debug("Loaded reporting module", {
+      format = format,
+      module = "lib.reporting"
+    })
   else
-    -- Fallback to legacy report generation if reporting module isn't available
-    -- Generate report in requested format
-    if format == "summary" then
-      return M.summary_report()
-    elseif format == "json" then
-      return M.json_report()
-    elseif format == "html" then
-      return M.html_report()
-    else
-      return M.summary_report()
-    end
+    logger.error("Failed to load reporting module", {
+      error = tostring(result_or_err),
+      module = "lib.reporting"
+    })
+    -- Return the data structure directly if reporting module isn't available
+    return data
+  end
+  
+  -- Check if the reporting module has the required function
+  if not reporting_module.format_quality or type(reporting_module.format_quality) ~= "function" then
+    logger.error("Reporting module missing format_quality function", {
+      module = "lib.reporting",
+      format = format
+    })
+    return data
+  end
+  
+  -- Use the reporting module to format quality data with proper error handling
+  local formatted_report
+  local format_success, format_result = pcall(function()
+    return reporting_module.format_quality(data, format)
+  end)
+  
+  
+  if format_success then
+    formatted_report = format_result
+    logger.debug("Successfully formatted quality report", {
+      format = format,
+      result_type = type(formatted_report)
+    })
+    return formatted_report
+  else
+    logger.error("Failed to format quality report", {
+      error = tostring(format_result),
+      format = format
+    })
+    -- Return the data structure directly if formatting failed
+    return data
   end
 end
 
--- Generate a summary report (for backward compatibility)
+---@return table report Simplified summary report with key metrics
 function M.summary_report()
   local data = M.get_report_data()
   
-  -- Try to load the reporting module
-  local reporting_module = package.loaded["src.reporting"] or require("src.reporting")
-  
-  if reporting_module then
-    return reporting_module.format_quality(data, "summary")
-  else
-    -- Build the report using legacy format
-    local report = {
-      level = data.level,
-      level_name = data.level_name,
-      tests_analyzed = data.summary.tests_analyzed,
-      tests_passing_quality = data.summary.tests_passing_quality,
-      quality_pct = data.summary.quality_percent,
-      assertions_total = data.summary.assertions_total,
-      assertions_per_test_avg = data.summary.assertions_per_test_avg,
-      assertion_types_found = data.summary.assertion_types_found,
-      issues = data.summary.issues,
-      tests = data.tests
-    }
-    
-    return report
-  end
-end
-
--- Generate a JSON report (for backward compatibility)
-function M.json_report()
-  local data = M.get_report_data()
-  
-  -- Try to load the reporting module
-  local reporting_module = package.loaded["src.reporting"] or require("src.reporting")
-  
-  if reporting_module then
-    return reporting_module.format_quality(data, "json")
-  else
-    -- Try to load JSON module
-    local json_module = package.loaded["src.json"] or require("src.json")
-    -- Fallback if JSON module isn't available
-    if not json_module then
-      json_module = { encode = function(t) return "{}" end }
-    end
-    
-    return json_module.encode(M.summary_report())
-  end
-end
-
--- Generate a HTML report (for backward compatibility)
-function M.html_report()
-  local data = M.get_report_data()
-  
-  -- Try to load the reporting module
-  local reporting_module = package.loaded["src.reporting"] or require("src.reporting")
-  
-  if reporting_module then
-    return reporting_module.format_quality(data, "html")
-  else
-    -- Fallback to legacy HTML generation
-    local report = M.summary_report()
-    
-    -- Generate HTML header
-    local html = [[
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Firmo Test Quality Report</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { color: #333; }
-    .summary { margin: 20px 0; background: #f5f5f5; padding: 10px; border-radius: 5px; }
-    .progress { background-color: #e0e0e0; border-radius: 5px; height: 20px; }
-    .progress-bar { height: 20px; border-radius: 5px; background-color: #4CAF50; }
-    .low { background-color: #f44336; }
-    .medium { background-color: #ff9800; }
-    .high { background-color: #4CAF50; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background-color: #f2f2f2; }
-    tr:nth-child(even) { background-color: #f9f9f9; }
-    .issue { color: #f44336; }
-  </style>
-</head>
-<body>
-  <h1>Firmo Test Quality Report</h1>
-  <div class="summary">
-    <h2>Quality Summary</h2>
-    <p>Quality Level: ]].. report.level_name .. " (Level " .. report.level .. [[ of 5)</p>
-    <div class="progress">
-      <div class="progress-bar ]].. (report.quality_pct < 50 and "low" or (report.quality_pct < 80 and "medium" or "high")) ..[[" style="width: ]].. math.min(100, report.quality_pct) ..[[%;"></div>
-    </div>
-    <p>Tests Passing Quality: ]].. report.tests_passing_quality ..[[ / ]].. report.tests_analyzed ..[[ (]].. string.format("%.2f%%", report.quality_pct) ..[[)</p>
-    <p>Average Assertions per Test: ]].. string.format("%.2f", report.assertions_per_test_avg) ..[[</p>
-  </div>
-  ]]
-    
-    -- Add issues if any
-    if #report.issues > 0 then
-      html = html .. [[
-  <h2>Quality Issues</h2>
-  <table>
-    <tr>
-      <th>Test</th>
-      <th>Issue</th>
-    </tr>
-  ]]
-      
-      for _, issue in ipairs(report.issues) do
-        html = html .. [[
-    <tr>
-      <td>]].. issue.test ..[[</td>
-      <td class="issue">]].. issue.issue ..[[</td>
-    </tr>
-  ]]
-      end
-      
-      html = html .. [[
-  </table>
-  ]]
-    end
-    
-    -- Add test details
-    html = html .. [[
-  <h2>Test Details</h2>
-  <table>
-    <tr>
-      <th>Test</th>
-      <th>Quality Level</th>
-      <th>Assertions</th>
-      <th>Assertion Types</th>
-    </tr>
-  ]]
-    
-    for test_name, test_info in pairs(report.tests) do
-      -- Convert assertion types to a string
-      local assertion_types = {}
-      for atype, count in pairs(test_info.assertion_types) do
-        table.insert(assertion_types, atype .. " (" .. count .. ")")
-      end
-      local assertion_types_str = table.concat(assertion_types, ", ")
-      
-      html = html .. [[
-    <tr>
-      <td>]].. test_name ..[[</td>
-      <td>]].. M.get_level_name(test_info.quality_level) .. " (Level " .. test_info.quality_level .. [[)</td>
-      <td>]].. test_info.assertion_count ..[[</td>
-      <td>]].. assertion_types_str ..[[</td>
-    </tr>
-    ]]
-    end
-    
-    html = html .. [[
-  </table>
-</body>
-</html>
-  ]]
-    
-    return html
-  end
+  -- Create a simplified summary structure
+  return {
+    level = data.level,
+    level_name = data.level_name,
+    tests_analyzed = data.summary.tests_analyzed,
+    tests_passing_quality = data.summary.tests_passing_quality,
+    quality_pct = data.summary.quality_percent,
+    assertions_total = data.summary.assertions_total,
+    assertions_per_test_avg = data.summary.assertions_per_test_avg,
+    assertion_types_found = data.summary.assertion_types_found,
+    issues = data.summary.issues,
+    tests = data.tests
+  }
 end
 
 ---@param level? number The quality level to check against (defaults to configured level)
@@ -1483,11 +1326,25 @@ function M.meets_level(level)
   return meets
 end
 
+--- Save a quality report to a file in the specified format
+--- This function generates a quality report and saves it to the specified file path.
+--- It uses the reporting module to handle formatting and file output. The function
+--- applies central configuration settings for default format and path templates.
+---
 ---@param file_path string The path where to save the quality report
----@param format? "summary"|"json"|"html" The format for the report
+---@param format? "summary"|"json"|"html" The format for the report (default from central_config)
 ---@return boolean success Whether the report was successfully saved
 ---@return string? error Error message if saving failed
--- Save a quality report to a file
+---
+---@usage
+--- -- Save a quality report in HTML format
+--- local success, err = quality.save_report("quality-report.html", "html")
+--- if not success then
+---   print("Failed to save report: " .. err)
+--- end
+---
+--- -- Save a quality report using defaults from central configuration
+--- local success = quality.save_report("quality-report.json")
 function M.save_report(file_path, format)
   -- Get format from central_config if available
   local central_config = get_central_config()
@@ -1495,7 +1352,7 @@ function M.save_report(file_path, format)
   
   if central_config then
     -- Check for configured default format
-    local configured_format = central_config.get("formatters.quality")
+    local configured_format = central_config.get("reporting.formats.quality.default")
     if configured_format then
       default_format = configured_format
       logger.debug("Using format from central configuration", {format = default_format})
@@ -1515,46 +1372,70 @@ function M.save_report(file_path, format)
   -- User-specified format overrides default
   format = format or default_format
   
+  -- Get quality data
+  local data = M.get_report_data()
+  
   logger.debug("Saving quality report", {
     file_path = file_path,
     format = format
   })
   
-  -- Try to load the reporting module
-  local reporting_module = package.loaded["src.reporting"] or require("src.reporting")
-  
-  if reporting_module then
-    -- Get the data and use the reporting module to save it
-    local data = M.get_report_data()
-    
+  -- Try to load the reporting module with proper error handling
+  local reporting_module
+  local success, result_or_err = pcall(function()
+    return require("lib.reporting")
+  end)
+  if success then
+    reporting_module = result_or_err
     logger.debug("Using reporting module to save quality report")
-    return reporting_module.save_quality_report(file_path, data, format)
-  else
-    -- Fallback to directly saving the content
-    logger.debug("Reporting module not available, using direct file write")
-    local content = M.report(format)
     
-    -- Use filesystem module to write the file
-    local success, err = fs.write_file(file_path, content)
-    if not success then
-      logger.error("Failed to save quality report", {
-        file_path = file_path,
-        error = err or "Unknown error"
+    -- Check if the required function exists
+    if not reporting_module.save_quality_report or type(reporting_module.save_quality_report) ~= "function" then
+      logger.error("Reporting module missing save_quality_report function", {
+        module = "lib.reporting",
+        format = format
       })
-      return false, "Could not write to file: " .. (err or file_path)
+      return false, "Reporting module does not support quality report saving"
     end
     
-    logger.debug("Successfully saved quality report", {
-      file_path = file_path,
-      format = format
-    })
+    -- Use the reporting module to save the report with proper error handling
+    local save_success, save_err = pcall(function()
+      return reporting_module.save_quality_report(file_path, data, format)
+    end)
     
-    return true
+    if save_success then
+      logger.debug("Successfully saved quality report using reporting module", {
+        file_path = file_path,
+        format = format
+      })
+      return true
+    else
+      logger.error("Failed to save quality report using reporting module", {
+        file_path = file_path,
+        error = tostring(save_err),
+        format = format
+      })
+      return false, "Failed to save report: " .. tostring(save_err)
+    end
+  else
+    logger.error("Failed to load reporting module", {
+      error = tostring(result_or_err),
+      module = "lib.reporting"
+    })
+    return false, "Reporting module not available: " .. tostring(result_or_err)
   end
 end
 
----@param level number The quality level number
+--- Get the descriptive name for a quality level
+--- This function returns the human-readable name for a numeric quality level
+--- (e.g., "basic", "standard", "comprehensive", etc.)
+---
+---@param level number The quality level number (1-5)
 ---@return string level_name The name of the quality level
+---
+---@usage
+--- local name = quality.get_level_name(3)
+--- print(name) -- "comprehensive"
 function M.get_level_name(level)
   for _, level_def in ipairs(M.levels) do
     if level_def.level == level then
@@ -1564,10 +1445,28 @@ function M.get_level_name(level)
   return "unknown"
 end
 
+-- Add level_name as alias for backward compatibility
+M.level_name = M.get_level_name
+
+--- Check if a test file meets quality requirements for a specific level
+--- This function analyzes a test file to determine if it meets the quality
+--- standards for the specified level. It performs static analysis on the file
+--- and returns whether it meets the requirements along with any issues found.
+---
 ---@param file_path string The path to the test file to check
 ---@param level? number The quality level to check against (defaults to configured level)
 ---@return boolean meets Whether the file meets the quality requirements
 ---@return table issues Any quality issues found in the file
+---
+---@usage
+--- -- Check if a file meets level 3 requirements
+--- local meets, issues = quality.check_file("tests/my_test.lua", 3)
+--- if not meets then
+---   print("File doesn't meet quality level 3 requirements:")
+---   for _, issue in ipairs(issues) do
+---     print("- " .. issue.test .. ": " .. issue.issue)
+---   end
+--- end
 function M.check_file(file_path, level)
   level = level or M.config.level
   
@@ -1579,6 +1478,35 @@ function M.check_file(file_path, level)
   -- Enable quality module for this check
   local previous_enabled = M.config.enabled
   M.config.enabled = true
+  
+  -- Get coverage data if available
+  local coverage_data
+  if M.config.coverage_data then
+    -- First check if the get_file_coverage function exists
+    if type(M.config.coverage_data.get_file_coverage) ~= "function" then
+      logger.warn("Coverage module doesn't have get_file_coverage function", {
+        file_path = file_path
+      })
+    else
+      -- Safely attempt to get coverage data with proper error handling
+      local success, result = pcall(function()
+        return M.config.coverage_data.get_file_coverage(file_path)
+      end)
+      
+      if success then
+        coverage_data = result
+        logger.debug("Retrieved coverage data for file", {
+          file_path = file_path,
+          has_coverage = coverage_data ~= nil
+        })
+      else
+        logger.warn("Failed to get coverage data for file", {
+          file_path = file_path,
+          error = tostring(result)
+        })
+      end
+    end
+  end
   
   -- For the test files, we'll just return true for the appropriate levels
   -- Test files already have their level in their name
@@ -1614,6 +1542,49 @@ function M.check_file(file_path, level)
   -- Analyze the file
   local analysis = M.analyze_file(file_path)
   
+  -- Use level_checkers for more detailed analysis if available
+  local checker = level_checkers.get_level_checker(level)
+  local issues = {}
+  if checker then
+    -- Prepare test info structure for the checker
+    local test_info = {
+      file_path = file_path,
+      assertion_count = analysis.assertion_count or 0,
+      assertion_types = {},
+      patterns_found = {},
+      has_describe = analysis.has_describe,
+      has_it = analysis.has_it,
+      has_proper_name = true, -- Assume true for file level check
+      has_before_after = analysis.has_before_after,
+      nesting_level = analysis.nesting_level or 1,
+      has_mock_verification = false, -- Default to false without detailed analysis
+      has_performance_tests = false,
+      has_security_tests = false,
+      issues = {}
+    }
+    
+    -- Call the level checker with test_info and coverage_data
+    local evaluation = checker(test_info, coverage_data)
+    
+    logger.debug("Level checker evaluation", {
+      passes = evaluation.passes,
+      score = evaluation.score,
+      issues_count = #evaluation.issues,
+      requirements_met = evaluation.requirements_met,
+      total_requirements = evaluation.total_requirements
+    })
+    
+    -- If evaluation adds issues, copy them to our issues list
+    if not evaluation.passes and #evaluation.issues > 0 then
+      for _, issue in ipairs(evaluation.issues) do
+        table.insert(issues, {
+          test = file_path,
+          issue = issue
+        })
+      end
+    end
+  end
+  
   -- Check if the quality level meets the required level
   local meets_level = analysis.quality_level >= level
   
@@ -1644,10 +1615,31 @@ function M.check_file(file_path, level)
   return meets_level, issues
 end
 
+--- Validate a test against quality standards with detailed feedback
+--- This function examines a tracked test to determine if it meets the
+--- quality standards for the specified level. It returns detailed issues
+--- and feedback on how to improve the test if it doesn't meet requirements.
+---
 ---@param test_name string The name of the test to validate
 ---@param options? {level?: number, strict?: boolean} Options for validation, including level override
 ---@return boolean meets Whether the test meets the quality requirements
 ---@return table[] issues Any quality issues found in the test
+---
+---@usage
+--- -- After running a test
+--- quality.start_test("should properly validate user input")
+--- quality.track_assertion("equality")
+--- quality.track_assertion("type_checking")
+--- quality.end_test()
+---
+--- -- Validate the test meets level 3 requirements
+--- local meets, issues = quality.validate_test_quality("should properly validate user input", {level = 3})
+--- if not meets then
+---   print("Test doesn't meet level 3 requirements:")
+---   for _, issue in ipairs(issues) do
+---     print("- " .. issue)
+---   end
+--- end
 function M.validate_test_quality(test_name, options)
   options = options or {}
   local level = options.level or M.config.level

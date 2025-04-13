@@ -1,3 +1,471 @@
+# Quality Configuration Reference
+
+This document provides detailed configuration options for Firmo's quality validation system. Use these options to customize quality validation according to your project's needs.
+
+## Central Configuration Schema
+
+The quality module is configured through the central configuration system, which can be set in `.firmo-config.lua` or programmatically through the `central_config` module.
+
+### Core Quality Options
+
+```lua
+-- In .firmo-config.lua
+return {
+  quality = {
+    -- Basic settings
+    enabled = true,                -- Whether quality validation is enabled
+    level = 3,                     -- Required quality level (1-5)
+    strict = false,                -- Strict mode (fail on first issue)
+    
+    -- Custom rules (optional)
+    custom_rules = {
+      require_describe_block = true,
+      min_assertions_per_test = 3
+    },
+    
+    -- Integration options
+    coverage_data = nil,           -- Will be populated by runner with coverage module instance
+  }
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable quality validation |
+| `level` | number | `1` | Quality level to enforce (1-5) |
+| `strict` | boolean | `false` | Fail on first quality issue |
+| `custom_rules` | table | `{}` | Custom quality validation rules |
+| `coverage_data` | table | `nil` | Reference to coverage module (set automatically) |
+
+### Integration with Reporting Configuration
+
+```lua
+-- In .firmo-config.lua
+return {
+  quality = {
+    -- Quality settings as above
+  },
+  
+  reporting = {
+    -- Quality report format settings
+    formats = {
+      quality = {
+        default = "html"           -- Default format for quality reports
+      }
+    },
+    
+    -- Quality report path templates
+    templates = {
+      quality = "./reports/quality-{timestamp}.{format}"
+    },
+    
+    -- Formatter-specific options
+    formatters = {
+      html = {
+        theme = "dark",
+        show_line_numbers = true,
+        highlight_syntax = true
+      },
+      json = {
+        pretty = true,
+        indent = 2
+      }
+    }
+  }
+}
+```
+
+### Coverage Integration Settings
+
+The quality module integrates with the coverage module to validate test coverage thresholds:
+
+```lua
+-- In .firmo-config.lua
+return {
+  quality = {
+    enabled = true,
+    level = 5  -- Level 5 requires 90% coverage threshold
+  },
+  
+  coverage = {
+    enabled = true,
+    threshold = 90  -- This threshold will be checked by quality validation
+  }
+}
+```
+
+## Detailed Level Requirements
+
+The quality module defines five progressive quality levels, each with specific requirements:
+
+### Level 1: Basic
+
+```lua
+{
+  min_assertions_per_test = 1,
+  assertion_types_required = {"equality", "truth"},
+  assertion_types_required_count = 1,
+  test_organization = {
+    require_describe_block = true,
+    require_it_block = true,
+    max_assertions_per_test = 15,
+    require_test_name = true
+  },
+  required_patterns = {},
+  forbidden_patterns = {"SKIP", "TODO", "FIXME"},
+}
+```
+
+### Level 2: Standard
+
+```lua
+{
+  min_assertions_per_test = 2,
+  assertion_types_required = {"equality", "truth", "type_checking"},
+  assertion_types_required_count = 2,
+  test_organization = {
+    require_describe_block = true,
+    require_it_block = true,
+    max_assertions_per_test = 10,
+    require_test_name = true,
+    require_before_after = false
+  },
+  required_patterns = {"should"},
+  forbidden_patterns = {"SKIP", "TODO", "FIXME"},
+}
+```
+
+### Level 3: Comprehensive
+
+```lua
+{
+  min_assertions_per_test = 3,
+  assertion_types_required = {"equality", "truth", "type_checking", "error_handling", "edge_cases"},
+  assertion_types_required_count = 3,
+  test_organization = {
+    require_describe_block = true,
+    require_it_block = true,
+    max_assertions_per_test = 8,
+    require_test_name = true,
+    require_before_after = true,
+    require_context_nesting = true
+  },
+  required_patterns = {"should", "when"},
+  forbidden_patterns = {"SKIP", "TODO", "FIXME"},
+}
+```
+
+### Level 4: Advanced
+
+```lua
+{
+  min_assertions_per_test = 4,
+  assertion_types_required = {"equality", "truth", "type_checking", "error_handling", "mock_verification", "edge_cases", "boundary"},
+  assertion_types_required_count = 4,
+  test_organization = {
+    require_describe_block = true,
+    require_it_block = true,
+    max_assertions_per_test = 6,
+    require_test_name = true,
+    require_before_after = true,
+    require_context_nesting = true,
+    require_mock_verification = true
+  },
+  required_patterns = {"should", "when", "boundary"},
+  forbidden_patterns = {"SKIP", "TODO", "FIXME"},
+}
+```
+
+### Level 5: Complete
+
+```lua
+{
+  min_assertions_per_test = 5,
+  assertion_types_required = {"equality", "truth", "type_checking", "error_handling", "mock_verification", "edge_cases", "boundary", "performance", "security"},
+  assertion_types_required_count = 5,
+  test_organization = {
+    require_describe_block = true,
+    require_it_block = true,
+    max_assertions_per_test = 5,
+    require_test_name = true,
+    require_before_after = true,
+    require_context_nesting = true,
+    require_mock_verification = true,
+    require_coverage_threshold = 90, -- 90% coverage requirement
+    require_performance_tests = true,
+    require_security_tests = true
+  },
+  required_patterns = {"should", "when", "boundary", "security", "performance"},
+  forbidden_patterns = {"SKIP", "TODO", "FIXME"},
+}
+```
+
+## Assertion Type Requirements
+
+The quality module can recognize and validate the following assertion types:
+
+| Assertion Type | Example Patterns | Description |
+|----------------|------------------|-------------|
+| `equality` | `expect().to.equal()`, `assert.equals()`, `==` | Equality comparisons |
+| `truth` | `expect().to.be.truthy()`, `assert.is_true()` | Truth value assertions |
+| `type_checking` | `expect().to.be.a()`, `assert.is_string()` | Type checking |
+| `error_handling` | `expect().to.fail()`, `assert.error()` | Error validation |
+| `mock_verification` | `expect().to.have.been.called()`, `assert.spy()` | Mock verification |
+| `edge_cases` | Tests with `nil`, `empty`, bounds | Edge case testing |
+| `boundary` | Tests with `boundary`, `limit`, `edge` | Boundary condition testing |
+| `performance` | `benchmark`, `timing`, `speed` | Performance validation |
+| `security` | `security`, `injection`, `validation` | Security testing |
+
+## Report Configuration
+
+### Available Report Formats
+
+The quality module supports multiple report formats through the reporting module:
+
+| Format | Description | Extension |
+|--------|-------------|-----------|
+| `summary` | Text summary for console output | N/A |
+| `html` | Interactive HTML report with color coding | `.html` |
+| `json` | Structured JSON data for programmatic use | `.json` |
+
+### Report Path Templates
+
+Configure report paths using templates in the central configuration:
+
+```lua
+reporting = {
+  templates = {
+    quality = "./reports/quality-{timestamp}.{format}"
+  }
+}
+```
+
+Available template variables:
+- `{timestamp}` - Current date/time (format configurable)
+- `{format}` - Report format (html, json, etc.)
+- `{date}` - Current date only
+
+### Format-Specific Options
+
+#### HTML Format Options
+
+```lua
+reporting = {
+  formatters = {
+    html = {
+      theme = "dark",              -- "dark" or "light"
+      show_line_numbers = true,    -- Show line numbers in code samples
+      collapsible_sections = true, -- Allow sections to be collapsed
+      highlight_syntax = true,     -- Syntax highlighting for code
+      asset_base_path = nil,       -- Path to assets (CSS, JS)
+      include_legend = true,       -- Include color coding legend
+      enable_dark_mode = true,     -- Support dark mode toggle
+      inline_source = true,        -- Include source code inline
+    }
+  }
+}
+```
+
+#### JSON Format Options
+
+```lua
+reporting = {
+  formatters = {
+    json = {
+      pretty = false,               -- Pretty-print JSON output
+      schema_version = "1.0",       -- Schema version to include
+      indentation = 2,              -- Indentation level when pretty-printing
+      enable_streaming = true,      -- Enable streaming for large files
+      chunk_size = 1024 * 1024,     -- 1MB chunks for streaming
+      omit_source_code = false,     -- Whether to include source code
+    }
+  }
+}
+```
+
+#### Summary Format Options
+
+```lua
+reporting = {
+  formatters = {
+    summary = {
+      detailed = false,            -- Show detailed information
+      show_files = true,           -- Show file list
+      colorize = true,             -- Use ANSI colors in terminal output
+      show_function_coverage = true, -- Show function coverage
+      sort_by = "coverage",        -- Sort by coverage percentage
+      max_files = 100,             -- Maximum files to show in summary
+    }
+  }
+}
+```
+
+## Integration Configuration
+
+### Coverage Integration
+
+The quality module integration with the coverage system is configured automatically by the runner, but can be manually configured:
+
+```lua
+local quality = require("lib.quality")
+local coverage = require("lib.coverage")
+
+-- Initialize quality with coverage
+quality.init({
+  enabled = true,
+  level = 5,  -- Level 5 requires coverage check
+  coverage_data = coverage -- Pass the coverage module
+})
+
+-- Run tests
+-- ...
+
+-- Check if quality meets requirements including coverage
+local meets, issues = quality.check_file("tests/my_test.lua", 5)
+```
+
+### Reporting Integration
+
+Configure the quality module to use the reporting system:
+
+```lua
+local quality = require("lib.quality")
+local reporting = require("lib.reporting")
+
+-- Generate a quality report
+local report_data = quality.get_report_data()
+local html_report = reporting.format_quality(report_data, "html")
+
+-- Save the report
+reporting.save_quality_report("quality-report.html", report_data, "html")
+
+-- Or use quality's direct methods which use reporting under the hood
+quality.report("html")  -- Returns the formatted report
+quality.save_report("quality-report.html", "html")  -- Saves the report to a file
+```
+
+### Test Runner Integration
+
+The quality module is integrated with the test runner by default:
+
+```bash
+# Run tests with quality validation
+lua test.lua --quality --quality-level=3 tests/
+
+# Run with quality and generate reports
+lua test.lua --quality --quality-level=3 --report-dir=./reports tests/
+
+# Run with both quality and coverage
+lua test.lua --quality --coverage tests/
+```
+
+Or programmatically:
+
+```lua
+local runner = require("lib.core.runner")
+local result = runner.run_all("tests/", {
+  quality = true,
+  quality_level = 3,
+  coverage = true,
+  report_dir = "./reports"
+})
+
+if not result then
+  print("Tests or quality validation failed")
+  os.exit(1)
+end
+```
+
+## Examples
+
+### Complete Configuration with All Options
+
+```lua
+-- In .firmo-config.lua
+return {
+  quality = {
+    enabled = true,
+    level = 3,
+    strict = false,
+    custom_rules = {
+      require_describe_block = true,
+      min_assertions_per_test = 3
+    }
+  },
+  
+  reporting = {
+    formats = {
+      quality = {
+        default = "html"
+      }
+    },
+    templates = {
+      quality = "./reports/quality-{timestamp}.{format}"
+    },
+    formatters = {
+      html = {
+        theme = "dark",
+        show_line_numbers = true,
+        highlight_syntax = true
+      },
+      json = {
+        pretty = true
+      },
+      summary = {
+        detailed = true,
+        colorize = true
+      }
+    }
+  },
+  
+  coverage = {
+    enabled = true,
+    threshold = 90
+  }
+}
+```
+
+### Direct Configuration in Code
+
+```lua
+-- file: tests/setup.lua
+local quality = require("lib.quality")
+local central_config = require("lib.core.central_config")
+local coverage = require("lib.coverage")
+
+-- Configure quality module
+quality.init({
+  enabled = true,
+  level = 4,
+  strict = false,
+  coverage_data = coverage
+})
+
+-- Configure via central_config
+central_config.set("reporting.formats.quality.default", "html")
+central_config.set("reporting.templates.quality", "./reports/quality-{timestamp}.{format}")
+
+-- Configure reporting formatters
+central_config.set("reporting.formatters.html", {
+  theme = "dark",
+  show_line_numbers = true,
+  highlight_syntax = true
+})
+
+-- Run tests with quality validation
+-- (usually done by the test runner, shown here for completeness)
+local meet_quality = quality.check_file("tests/my_test.lua", 4)
+if not meet_quality then
+  print("Test file does not meet quality level 4 requirements")
+end
+
+-- Generate and save quality report
+local success, err = quality.save_report("quality-report.html", "html")
+if not success then
+  print("Failed to save quality report: " .. err)
+end
+```
+
 # Quality Validation Configuration
 
 This document describes the comprehensive configuration options for the firmo quality validation system, which ensures tests meet required standards for reliability, completeness, and maintainability.
