@@ -183,6 +183,55 @@ Registers a module with the configuration system, providing its schema and defau
 
 **Examples:**
 ```lua
+-- Register coverage module with schema and defaults
+central_config.register_module("coverage", {
+  -- Schema definition for coverage
+  field_types = {
+    enabled = "boolean",
+    include_patterns = "table",
+    exclude_patterns = "table",
+    statsfile = "string",
+    thresholds = "table"
+  },
+  field_types_nested = {
+    ["thresholds.line"] = "number",
+    ["thresholds.function"] = "number",
+    ["thresholds.fail_on_threshold"] = "boolean"
+  },
+  validators = {
+    include_patterns = function(value)
+      if type(value) ~= "table" then return false, "Must be a table of patterns" end
+      for i, pattern in ipairs(value) do
+        if type(pattern) ~= "string" then
+          return false, "Pattern at index " .. i .. " must be a string"
+        end
+      end
+      return true
+    end,
+    thresholds = function(value)
+      if type(value) ~= "table" then return true end -- Optional field
+      if type(value.line) ~= "nil" and (value.line < 0 or value.line > 100) then
+        return false, "Line threshold must be between 0 and 100"
+      end
+      if type(value.function) ~= "nil" and (value.function < 0 or value.function > 100) then
+        return false, "Function threshold must be between 0 and 100"
+      end
+      return true
+    end
+  }
+}, {
+  -- Default values for coverage
+  enabled = true,
+  include_patterns = {".*%.lua$"},
+  exclude_patterns = {"tests/.*", "lib/vendor/.*"},
+  statsfile = "./.coverage-stats",
+  thresholds = {
+    line = 75,
+    function = 80,
+    fail_on_threshold = false
+  }
+})
+
 -- Register a module with schema and defaults
 central_config.register_module("logging", {
   -- Schema definition
@@ -215,6 +264,7 @@ A schema is a table with the following fields:
 
 - `required_fields` (table): Array of field names that must be present.
 - `field_types` (table): Mapping of field names to expected types.
+- `field_types_nested` (table): Mapping of nested field paths to expected types.
 - `field_ranges` (table): Mapping of numeric fields to their valid ranges.
 - `field_patterns` (table): Mapping of string fields to pattern validation.
 - `field_values` (table): Mapping of fields to their allowed values (enum-like).
@@ -252,6 +302,30 @@ A schema is a table with the following fields:
         return false, "Value must be >= some_threshold"
       end
     end
+  }
+}
+```
+
+### Coverage Configuration Schema Example
+
+The coverage module uses a comprehensive schema for validation:
+
+```lua
+{
+  field_types = {
+    enabled = "boolean",
+    include_patterns = "table",  -- Array of Lua patterns to include
+    exclude_patterns = "table",  -- Array of Lua patterns to exclude
+    statsfile = "string",        -- Path to save coverage statistics
+    thresholds = "table"         -- Coverage thresholds configuration
+  },
+  field_types_nested = {
+    ["thresholds.line"] = "number",           -- Line coverage threshold (0-100)
+    ["thresholds.function"] = "number",       -- Function coverage threshold (0-100)
+    ["thresholds.fail_on_threshold"] = "boolean" -- Whether to fail tests when thresholds aren't met
+  },
+  validators = {
+    -- Custom validators for complex validation logic
   }
 }
 ```
@@ -359,12 +433,11 @@ end
 ## Reset Functions
 
 ### Resetting Configuration
-
 ```lua
 central_config.reset(module_name)
 ```
 
-Resets configuration values to their defaults.
+Resets configuration values to their defaults. The system includes recursive reset protection to prevent infinite loops when configurations reference each other.
 
 **Parameters:**
 - `module_name` (string|nil, optional): The name of the module to reset. If nil, resets all configuration.
@@ -379,6 +452,23 @@ central_config.reset("coverage")
 
 -- Reset all configuration
 central_config.reset()
+
+-- Reset protection example: prevent infinite reset loops
+-- This is handled automatically by the system
+central_config.on_change("module_a", function(path, old_value, new_value)
+  -- Without reset protection, this would cause an infinite loop
+  -- since resetting module_b would trigger the module_b listener,
+  -- which would reset module_a again, and so on.
+  central_config.reset("module_b")
+end)
+
+central_config.on_change("module_b", function(path, old_value, new_value)
+  central_config.reset("module_a")
+end)
+
+-- Safe to call, won't cause infinite recursion:
+central_config.reset("module_a")
+```
 ```
 
 ## Integration Functions
@@ -401,7 +491,11 @@ Configures the system from a table of options, typically from command-line argum
 ```lua
 -- Configure from command-line options
 local options = {
-  ["coverage.threshold"] = 95,
+  ["coverage.thresholds.line"] = 95,
+  ["coverage.thresholds.function"] = 90,
+  ["coverage.include_patterns[1]"] = "lib/.*%.lua$",
+  ["coverage.exclude_patterns[1]"] = "tests/.*",
+  ["coverage.statsfile"] = "./.coverage-stats",
   ["reporting.format"] = "html",
   debug = true
 }
@@ -424,12 +518,34 @@ Configures the system from a complete configuration object.
 
 **Examples:**
 ```lua
+```lua
 -- Configure from a complete configuration object
 local config = {
   debug = true,
   coverage = {
-    threshold = 95,
-    include = {"lib/**/*.lua"}
+    enabled = true,
+    -- Pattern-based include/exclude using Lua patterns
+    include_patterns = {
+      "lib/.*%.lua$",      -- All Lua files in lib directory
+      "src/.*%.lua$"       -- All Lua files in src directory
+    },
+    exclude_patterns = {
+      "tests/.*",          -- Exclude test files
+      "lib/vendor/.*",     -- Exclude vendor files
+      ".*_test%.lua$"      -- Exclude files ending with _test.lua
+    },
+    -- Debug hook system configuration
+    savestepsize = 100,    -- Save stats every 100 lines
+    tick = false,          -- Don't use tick-based saving
+    codefromstrings = false, -- Don't track code loaded from strings
+    -- Stats file configuration
+    statsfile = "./.coverage-stats",
+    -- Threshold configuration
+    thresholds = {
+      line = 85,             -- Minimum line coverage percentage
+      function = 90,         -- Minimum function coverage percentage
+      fail_on_threshold = true -- Fail tests if thresholds not met
+    }
   },
   reporting = {
     format = "html"
@@ -437,7 +553,6 @@ local config = {
 }
 central_config.configure_from_config(config)
 ```
-
 ## Utility Functions
 
 ### Serializing Objects

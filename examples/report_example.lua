@@ -1,6 +1,6 @@
 -- report_example.lua 
 -- Example demonstrating the reporting module in firmo
--- Updated to follow current best practices
+-- Updated for the new coverage debug hook system and all 8 formatters
 
 -- Import the firmo framework with proper function extraction
 local firmo = require("firmo")
@@ -12,8 +12,10 @@ local fs = require("lib.tools.filesystem")
 local test_helper = require("lib.tools.test_helper")
 local error_handler = require("lib.tools.error_handler")
 
--- Load reporting module directly
-local reporting_module = require("lib.reporting")
+-- Load required modules
+local reporting = require("lib.reporting")
+local coverage = require("lib.coverage")
+local central_config = require("lib.core.central_config")
 
 -- Some sample code to test coverage
 local calculator = {
@@ -117,80 +119,220 @@ end)
 
 -- Examples of how to work with the reporting module
 describe("Reporting Module Examples", function()
-  it("demonstrates how to generate various report formats", function()
-    -- Skip this test if the reporting module isn't available
-    if not reporting_module then
-      firmo.log.warn("Reporting module not available, skipping demonstration")
-      return
-    end
+  -- Configuration for examples
+  local temp_dir
+  local report_files = {}
 
-    -- Example of how to use reporting module with coverage data
-    -- In real usage, this would happen via command line: lua test.lua --coverage examples/report_example.lua
-    local coverage = package.loaded["lib.coverage"] or require("lib.coverage")
-    if coverage and coverage.get_report_data then
-      local coverage_data = coverage.get_report_data() or {}
+  -- Create a temp directory before tests
+  before(function()
+    temp_dir = test_helper.create_temp_test_directory()
+  end)
+
+  -- Clean up files after tests
+  after(function()
+    for _, file_path in ipairs(report_files) do
+      if fs.file_exists(file_path) then
+        fs.delete_file(file_path)
+      end
+    end
+    report_files = {}
+  end)
+
+  -- Example demonstrating all 8 formatters
+  it("demonstrates all 8 supported formatters", function()
+    -- Start coverage for this test
+    coverage.start()
+    
+    -- Run some code to generate coverage data
+    calculator.add(5, 10)
+    calculator.subtract(20, 5)
+    calculator.multiply(3, 4)
+    
+    -- Stop coverage and get data
+    coverage.stop()
+    local coverage_data = coverage.get_data()
+    
+    -- The 8 supported formatters
+    local formatters = {
+      "html",    -- Interactive HTML with syntax highlighting
+      "json",    -- Machine-readable JSON format
+      "lcov",    -- Standard LCOV format for CI tools
+      "tap",     -- Test Anything Protocol format
+      "csv",     -- Comma-separated values for data analysis
+      "junit",   -- JUnit XML format for CI systems
+      "cobertura", -- Cobertura XML format for CI/tools
+      "summary"  -- Text-based summary for terminal output
+    }
+    
+    -- Generate and verify reports for each formatter
+    for _, format in ipairs(formatters) do
+      -- Generate the report
+      local report = reporting.format_coverage(coverage_data, format)
+      expect(report).to.exist()
       
-      -- Example of getting different report formats
-      local html_report = reporting_module.format_coverage(coverage_data, "html") or ""
-      local json_report = reporting_module.format_coverage(coverage_data, "json") or ""
-      local lcov_report = reporting_module.format_coverage(coverage_data, "lcov") or ""
+      -- Save to file
+      local file_ext = format
+      if format == "cobertura" then file_ext = "xml" end
       
-      -- Create a temp directory for report output
-      local temp_dir = test_helper.create_temp_test_directory()
-      local report_path = temp_dir.path .. "/example-coverage.html"
+      local report_path = fs.join_paths(temp_dir.path, "coverage-" .. format .. "." .. file_ext)
+      local success, err = reporting.write_file(report_path, report)
       
-      -- Save a report if we got any data
-      if html_report and #html_report > 100 then
-        local success, err = fs.write_file(report_path, html_report)
-        if success then
-          table.insert(test_files, report_path)
-          firmo.log.info("Created coverage report", {
-            path = report_path,
-            size = #html_report
-          })
-        else
-          firmo.log.warn("Failed to write report", {
-            error = tostring(err)
-          })
-        end
+      -- Record for cleanup
+      if success then
+        table.insert(report_files, report_path)
+        firmo.log.info("Created " .. format .. " coverage report", {
+          path = report_path,
+          size = #report
+        })
       else
-        firmo.log.info("No meaningful coverage data available in this example run",
-          { note = "Run with --coverage flag to generate real data" })
+        firmo.log.warn("Failed to write " .. format .. " report", {
+          error = tostring(err.message)
+        })
       end
     end
   end)
   
-  it("shows advanced report configuration options", function()
-    -- Create a temp directory
-    local temp_dir = test_helper.create_temp_test_directory()
+  it("demonstrates formatter configuration via central_config", function()
+    -- Configure formatters using central_config
+    central_config.set("reporting.formatters.html", {
+      theme = "dark",
+      show_line_numbers = true,
+      syntax_highlighting = true,
+      simplified_large_files = true,
+      max_lines_display = 200
+    })
     
-    -- Example of structured configuration for reports
-    local config = {
-      report_dir = temp_dir.path,
-      formats = {"html", "json", "lcov"},
-      timestamp_format = "%Y-%m-%d",
-      coverage_path_template = "{format}/coverage-{timestamp}.{format}",
-      quality_path_template = "{format}/quality-{timestamp}.{format}",
-      results_path_template = "{format}/results-{timestamp}.{format}",
-    }
+    central_config.set("reporting.formatters.json", {
+      pretty = true,
+      indent = 2,
+      include_source = false
+    })
     
-    -- In a real scenario, you would:
-    -- 1. Run tests with coverage enabled
-    -- 2. Get coverage data using coverage.get_report_data()
-    -- 3. Configure the reporting module
-    -- 4. Generate and save reports
-    
-    firmo.log.info("Advanced reporting configuration ready", {
-      directory = temp_dir.path,
-      formats = table.concat(config.formats, ", "),
-      templates = {
-        coverage = config.coverage_path_template,
-        quality = config.quality_path_template
+    central_config.set("reporting.formatters.csv", {
+      include_header = true,
+      delimiter = ",",
+      columns = {
+        "path", "total_lines", "covered_lines", "coverage_percent"
       }
     })
+    
+    -- Test coverage with configured formatters
+    coverage.start()
+    calculator.divide(10, 2)
+    calculator.multiply(4, 4)
+    coverage.stop()
+    
+    -- Get coverage data
+    local data = coverage.get_data()
+    
+    -- Generate configured reports
+    local html_report = reporting.format_coverage(data, "html")
+    local json_report = reporting.format_coverage(data, "json")
+    local csv_report = reporting.format_coverage(data, "csv")
+    
+    -- Verify configuration was applied
+    expect(html_report).to.match("theme=\"dark\"")
+    expect(json_report).to.match("  ") -- Indentation implies pretty=true
+    expect(csv_report).to.match("path,total_lines,covered_lines,coverage_percent")
   end)
-end)
+  
+  it("demonstrates formatter registry and validation", function()
+    -- Import the formatter base class
+    local Formatter = require("lib.reporting.formatters.base")
+    
+    -- Create a custom formatter extending the base class
+    local MyFormatter = Formatter.extend("simple", "txt")
+    
+    -- Implement required methods with type annotations
+    ---@param data table Normalized coverage data
+    ---@param options table|nil Formatting options
+    ---@return string formatted_data The formatted report
+    ---@return table|nil error Error object if formatting failed
+    function MyFormatter:format(data, options)
+      options = options or {}
+      
+      -- Validate input data
+      local is_valid, issues = self:validate(data)
+      if not is_valid then
+        return nil, error_handler.validation_error("Invalid coverage data", {
+          issues = issues
+        })
+      end
+      
+      -- Create a simple text summary
+      local result = "Coverage Summary:\n"
+      result = result .. "Files: " .. data.summary.total_files .. "\n"
+      result = result .. "Coverage: " .. string.format("%.1f%%", data.summary.coverage_percent) .. "\n"
+      return result
+    end
+    
+    -- Add registration function
+    function MyFormatter.register(formatters)
+      local formatter = MyFormatter.new()
+      formatters.coverage = formatters.coverage or {}
+      formatters.coverage.simple = function(data, options)
+        return formatter:format(data, options)
+      end
+      return true
+    end
+    
+    -- Register the custom formatter
+    local success = reporting.register_formatter(MyFormatter)
+    expect(success).to.be_truthy()
+    
+    -- Get available formatters to confirm registration
+    local available = reporting.get_available_formatters()
+    expect(available.coverage).to.contain("simple")
+    
+    -- Generate coverage data and use the formatter
+    coverage.start()
+    calculator.add(1, 1)
+    coverage.stop()
+    
+    local data = coverage.get_data()
+    local simple_report = reporting.format_coverage(data, "simple")
+    
+    -- Verify the output
+    expect(simple_report).to.match("Coverage Summary:")
+    expect(simple_report).to.match("Files:")
+    expect(simple_report).to.match("Coverage:")
+  end)
 
--- NOTE: Do not include coverage.start() or quality.init() here
--- In a real scenario, you would run this with: 
--- env -C /path/to/firmo lua test.lua --coverage --quality examples/report_example.lua
+  it("demonstrates advanced report configuration and auto-saving", function()
+    -- Start coverage
+    coverage.start()
+    
+    -- Add some test coverage
+    calculator.add(5, 5)
+    calculator.subtract(10, 3)
+    calculator.multiply(2, 6)
+    calculator.divide(10, 2)
+    
+    -- Stop coverage
+    coverage.stop()
+    
+    -- Get the coverage data
+    local data = coverage.get_data()
+    
+    -- Example of advanced configuration with templates
+    local config = {
+      report_dir = temp_dir.path,
+      formats = {"html", "json", "lcov", "cobertura", "summary"},
+      timestamp_format = "%Y-%m-%d_%H-%M-%S",
+      report_suffix = "-full",
+      coverage_path_template = "{format}/coverage-{timestamp}{suffix}.{format}",
+      validate = true,
+      validate_output = true,
+      validation_report = true,
+      validation_report_path = fs.join_paths(temp_dir.path, "validation-report.json")
+    }
+    
+    -- Auto-save all reports
+    local results = reporting.auto_save_reports(data, nil, nil, config)
+    
+    -- Verify results
+    expect(results.html.success).to.be_truthy()
+    expect(results.json.success).to.be_truthy()
+    expect(results.lcov.success).to.be_truthy()
+    expect(results.cobertura.success).to.be_truthy()
+    expect(results.summary.success).to

@@ -1,1 +1,0 @@
-{"level":3,"level_name":"comprehensive","tests_analyzed":2,"tests_passing":1,"quality_pct":50,"issues":[{"test":"test2","issue":"Missing required assertion types: need 3 type(s), found 2"}]}

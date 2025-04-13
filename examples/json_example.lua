@@ -1,3 +1,179 @@
+--[[
+  json_example.lua
+  
+  Example demonstrating JSON coverage report generation with firmo.
+  
+  This example shows how to:
+  - Generate JSON coverage reports from coverage data
+  - Configure JSON-specific options like pretty printing
+  - Save reports to disk using the filesystem module
+  - Parse and work with the generated JSON data
+]]
+
+-- Import firmo (no direct coverage module usage per project rules)
+---@diagnostic disable-next-line: unused-local
+local firmo = require("firmo")
+
+-- Import required modules
+local reporting = require("lib.reporting")
+local fs = require("lib.tools.filesystem")
+local central_config = require("lib.core.central_config")
+local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+
+-- Create mock coverage data (similar to the cobertura example)
+local mock_coverage_data = {
+  files = {
+    ["src/calculator.lua"] = {
+      lines = {
+        [1] = true, -- This line was covered
+        [2] = true, -- This line was covered 
+        [3] = true, -- This line was covered
+        [5] = false, -- This line was not covered
+        [6] = true, -- This line was covered
+        [8] = false, -- This line was not covered
+        [9] = false, -- This line was not covered
+      },
+      functions = {
+        ["add"] = true, -- This function was covered
+        ["subtract"] = true, -- This function was covered
+        ["multiply"] = false, -- This function was not covered
+        ["divide"] = false, -- This function was not covered
+      },
+      total_lines = 10,
+      covered_lines = 4,
+      total_functions = 4,
+      covered_functions = 2,
+    },
+    ["src/utils.lua"] = {
+      lines = {
+        [1] = true, -- This line was covered
+        [2] = true, -- This line was covered
+        [4] = true, -- This line was covered
+        [5] = true, -- This line was covered
+        [7] = false, -- This line was not covered
+      },
+      functions = {
+        ["validate"] = true, -- This function was covered
+        ["format"] = false, -- This function was not covered
+      },
+      total_lines = 8,
+      covered_lines = 4,
+      total_functions = 2,
+      covered_functions = 1,
+    },
+  },
+  summary = {
+    total_files = 2,
+    covered_files = 2,
+    total_lines = 18,
+    covered_lines = 8,
+    total_functions = 6,
+    covered_functions = 3,
+    line_coverage_percent = 44.4, -- 8/18
+    function_coverage_percent = 50.0, -- 3/6
+    overall_percent = 47.2, -- (44.4 + 50.0) / 2
+  },
+}
+
+-- Create tests to demonstrate the JSON formatter
+describe("JSON Formatter Example", function()
+  -- Ensure the reports directory exists
+  local reports_dir = "coverage-reports"
+  fs.ensure_directory_exists(reports_dir)
+  
+  it("generates basic JSON coverage report", function()
+    -- Generate JSON report
+    print("Generating basic JSON coverage report...")
+    local json_report = reporting.format_coverage(mock_coverage_data, "json")
+    
+    -- Validate the report
+    expect(json_report).to.exist()
+    expect(json_report).to.be.a("string")
+    expect(json_report).to.match('"overall_percent":')
+    
+    -- Save to file
+    local file_path = fs.join_paths(reports_dir, "coverage-report.json")
+    local success, err = fs.write_file(file_path, json_report)
+    
+    -- Check if write was successful
+    expect(success).to.be_truthy()
+    
+    print("Basic JSON report saved to:", file_path)
+    print("Report size:", #json_report, "bytes")
+    
+    -- Preview a sample of the JSON output
+    print("\nJSON Preview (first 300 characters):")
+    print(json_report:sub(1, 300) .. "...\n")
+  end)
+  
+  it("demonstrates JSON formatter configuration options", function()
+    -- Configure JSON formatter options via central_config
+    central_config.set("reporting.formatters.json", {
+      pretty = true,           -- Enable pretty printing (formatted JSON)
+      indent = 2,              -- Number of spaces for indentation
+      include_source = false,  -- Don't include source code in the report
+      include_functions = true -- Include function coverage details
+    })
+    
+    -- Generate the report with configuration
+    print("Generating configured JSON coverage report...")
+    local json_report = reporting.format_coverage(mock_coverage_data, "json")
+    
+    -- Validate the report
+    expect(json_report).to.exist()
+    expect(json_report).to.match("\n  ")  -- Should have indentation due to pretty=true
+    
+    -- Save to file
+    local file_path = fs.join_paths(reports_dir, "coverage-report-pretty.json")
+    local success, err = fs.write_file(file_path, json_report)
+    
+    -- Check if write was successful
+    expect(success).to.be_truthy()
+    
+    print("Pretty-printed JSON report saved to:", file_path)
+    print("Report size:", #json_report, "bytes")
+    
+    -- Preview a sample of the pretty-printed JSON output
+    print("\nPretty JSON Preview (first 300 characters):")
+    print(json_report:sub(1, 300) .. "...\n")
+  end)
+  
+  it("demonstrates parsing and using the JSON data", function()
+    -- Generate JSON report
+    local json_report = reporting.format_coverage(mock_coverage_data, "json")
+    
+    -- Parse the JSON back to a Lua table (simulated)
+    -- In a real application, you would use a JSON parser like dkjson or lunajson
+    print("In a real application, you could parse the JSON back to a Lua table")
+    print("and perform further analysis or display it in a custom UI.")
+    
+    -- Example of how you might use the JSON data
+    print("\nExample use cases for JSON coverage data:")
+    print("1. Store in a database for historical tracking")
+    print("2. Create custom visualizations or dashboards")
+    print("3. Integration with third-party tools via API")
+    print("4. Generate delta reports to track coverage improvements")
+  end)
+end)
+
+print("\n=== JSON Formatter Example ===")
+print("This example demonstrates how to generate coverage reports in JSON format.")
+print("JSON is ideal for machine-readable output, API integrations, and custom tooling.")
+
+print("\nTo run this example directly:")
+print("  lua examples/json_example.lua")
+
+print("\nOr run it with firmo's test runner:")
+print("  lua test.lua examples/json_example.lua")
+
+print("\nCommon configurations for JSON reports:")
+print("- pretty: true|false - Enable/disable pretty printing")
+print("- indent: number - Spaces for indentation (default: 2)")
+print("- include_source: true|false - Include source code in output")
+print("- include_functions: true|false - Include function coverage details")
+
+print("\nExample complete!")
+
 -- JSON module example
 local json = require("lib.tools.json")
 local test_helper = require("lib.tools.test_helper")

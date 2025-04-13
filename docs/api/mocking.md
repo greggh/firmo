@@ -12,15 +12,46 @@ The Firmo mocking system offers comprehensive facilities for creating test doubl
 - **Sequential Values**: Configure functions to return different values on successive calls
 - **Context Management**: Automatically restore mocks after use
 - **Deep Integration**: Work seamlessly with the rest of the Firmo testing framework
+- **Enhanced Error Handling**: Robust error handling with detailed diagnostics
+- **Advanced Matchers**: Flexible argument matching for verifying calls
 
 ## Module Structure
 
-The mocking system consists of four main components:
+The mocking system consists of these active, core components that work together:
 
-- `firmo.spy`: Functions for creating spies to track calls
-- `firmo.stub`: Functions for replacing implementations
-- `firmo.mock`: Functions for creating complete mock objects
+- `firmo.spy`: Functions for creating spies to track calls (`lib/mocking/spy.lua`)
+- `firmo.stub`: Functions for replacing implementations (`lib/mocking/stub.lua`)
+- `firmo.mock`: Functions for creating complete mock objects (`lib/mocking/mock.lua`)
 - `firmo.with_mocks`: Context manager for automatic cleanup
+- `lib/tools/logging.lua`: Provides integrated logging support for mocking operations
+
+> 📌 **Note:** Both `mock.lua` and `logging.lua` are actively maintained, core modules that integrate closely with the stub system for comprehensive mocking capabilities.
+
+## Integration Architecture
+
+The mocking system uses a layered architecture with strong integration between components:
+
+```
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│ Mock Module   │────▶│ Stub System   │────▶│ Spy System    │
+│ (mock.lua)    │     │ (stub.lua)    │     │ (spy.lua)     │
+└───────┬───────┘     └───────┬───────┘     └───────────────┘
+        │                     │                     ▲
+        │                     │                     │
+        │                     │                     │
+        ▼                     ▼                     │
+┌───────────────┐     ┌───────────────┐             │
+│ Error Handler │◀────│ Logging       │─────────────┘
+│               │     │ (logging.lua) │
+└───────────────┘     └───────────────┘
+```
+
+This integration provides several benefits:
+
+- **Consistent Error Handling**: All components use the same error management
+- **Detailed Logging**: Comprehensive logging through the logging system
+- **Type Checking**: Consistent argument validation across components
+- **Shared Utilities**: Common functionality is shared between modules
 
 ## Spy Functions
 
@@ -240,24 +271,73 @@ local spy1 = firmo.spy(fn1)
 local spy2 = firmo.spy(fn2)
 spy1() -- Called first
 spy2() -- Called second
-expect(spy1:called_before(spy2)).to.be_truthy()
-expect(spy2:called_before(spy1)).to.equal(false)
+expect(spy2:called_after(spy1)).to.be_truthy()
+expect(spy1:called_after(spy2)).to.equal(false)
 ```
 
-### spy:called_after(other_spy, [call_index])
+### spy:restore()
 
-Checks whether this spy was called after another spy.
-
-**Parameters**:
-- `other_spy` (spy): Another spy to compare with
-- `call_index` (number, optional): The index of the call to check on the other spy (default: 1)
-
-**Returns**:
-- `true` if this spy was called after the other spy, `false` otherwise
+Restores the original function/method if the spy was created for an object method.
 
 **Example**:
 ```lua
-local fn1 = function() end
+local obj = { method = function() return "original" end }
+local spy_method = firmo.spy(obj, "method")
+expect(obj.method()).to.equal("original") -- Calls through to original
+spy_method:restore()
+expect(obj.method()).to.equal(obj.method) -- Original function is restored
+```
+
+### spy:args_match(call_index, match_pattern)
+
+Checks if the arguments of a specific call match a pattern.
+
+**Parameters**:
+- `call_index` (number): The index of the call to check
+- `match_pattern` (table): Pattern to match, using special matchers or direct values
+
+**Returns**:
+- `boolean`: Whether the arguments match the pattern
+
+**Example**:
+```lua
+local fn = function() end
+local spy_fn = firmo.spy(fn)
+spy_fn("test", 123, {key = "value"})
+
+-- Direct value matching
+expect(spy_fn:args_match(1, {"test", 123})).to.be_truthy()
+
+-- Using matchers
+expect(spy_fn:args_match(1, {firmo.spy.matchers.any_string, firmo.spy.matchers.any_number})).to.be_truthy()
+expect(spy_fn:args_match(1, {firmo.spy.matchers.matches("^t"), 123})).to.be_truthy()
+```
+
+### Argument Matchers
+
+The spy system includes advanced matchers for flexible argument verification:
+
+```lua
+-- Available matchers
+local matchers = firmo.spy.matchers
+
+matchers.any               -- Matches any value
+matchers.any_string        -- Matches any string
+matchers.any_number        -- Matches any number
+matchers.any_boolean       -- Matches any boolean
+matchers.any_table         -- Matches any table
+matchers.any_function      -- Matches any function
+matchers.matches(pattern)  -- Matches string against pattern
+matchers.greater_than(n)   -- Matches number > n
+matchers.less_than(n)      -- Matches number < n
+matchers.in_range(min, max) -- Matches number in range
+matchers.contains(key)     -- Matches table containing key
+matchers.contains_value(v) -- Matches table containing value
+matchers.has_keys(keys)    -- Matches table with all specified keys
+matchers.same_structure(t) -- Matches table with same structure
+```
+
+## Stub Functions
 local fn2 = function() end
 local spy1 = firmo.spy(fn1)
 local spy2 = firmo.spy(fn2)
@@ -284,10 +364,13 @@ expect(obj.method).to.equal(obj.method) -- Original function is restored
 
 ### firmo.stub(return_value_or_implementation)
 
-Creates a standalone stub function that returns a specific value or uses a custom implementation.
+Creates a standalone stub function that returns a specific value or uses a custom implementation. The stub system integrates with the logging system for detailed diagnostics and error handling.
 
 **Parameters**:
-- `return_value_or_implementation` (any|function): Value to return when stub is called, or function to use as implementation
+```lua
+---@param return_value_or_implementation any|function Value to return when stub is called, or function to use as implementation
+---@return Stub The created stub object
+```
 
 **Returns**:
 - A stub function that returns the specified value or executes the specified function
@@ -301,6 +384,16 @@ local config = get_config() -- Returns {debug = true, timeout = 1000}
 -- Stub with a function implementation
 local calculate = firmo.stub(function(a, b) return a * b end)
 local result = calculate(2, 3) -- Returns 6
+
+-- With logging integration for debugging
+local logger = require("lib.tools.logging").get_logger("mocking")
+local validate_user = firmo.stub(function(user_data)
+  logger.debug("Stub called with user data", {
+    user_id = user_data.id,
+    operation = "validate_user"
+  })
+  return true
+end)
 ```
 
 ### firmo.stub.new(return_value_or_implementation)
@@ -389,6 +482,33 @@ expect(stub()).to.equal("third")
 expect(stub()).to.equal(nil) -- Sequence exhausted
 ```
 
+### stub:matches(matcher_fn)
+
+Configure a stub to respond differently based on argument matching.
+
+**Parameters**:
+```lua
+---@param matcher_fn function Function that takes arguments and returns boolean
+---@return Stub The stub object for method chaining
+```
+
+**Returns**:
+- The stub object for method chaining
+
+**Example**:
+```lua
+local api_stub = firmo.stub()
+  :matches(function(id) 
+    return type(id) == "number" and id > 0 
+  end)
+  :returns({ status = "success", data = "valid id" })
+  :otherwise()
+  :returns({ status = "error", message = "invalid id" })
+
+expect(api_stub(123)).to.deep_equal({ status = "success", data = "valid id" })
+expect(api_stub("abc")).to.deep_equal({ status = "error", message = "invalid id" })
+```
+
 ### stub:cycle_sequence(enable)
 
 Configure whether the sequence of return values should cycle.
@@ -454,6 +574,41 @@ expect(stub()).to.equal(nil) -- Exhausted
 
 stub:reset_sequence() -- Reset to start
 expect(stub()).to.equal(1) -- Starts over
+```
+
+### stub:with_error_handling(options)
+
+Configure stub with enhanced error handling options.
+
+**Parameters**:
+```lua
+---@param options table
+---@field capture_stack boolean Whether to capture stack information
+---@field capture_args boolean Whether to capture arguments in errors
+---@field log_errors boolean Whether to log errors to the logging system
+---@field debug_mode boolean Whether to enable detailed debug information
+---@return Stub The stub object for method chaining
+```
+
+**Example**:
+```lua
+local error_handler = require("lib.tools.error_handler")
+local logging = require("lib.tools.logging")
+
+-- Create a stub with enhanced error handling
+local database_stub = firmo.stub()
+  :with_error_handling({
+    capture_stack = true,
+    capture_args = true,
+    log_errors = true
+  })
+  :throws(error_handler.runtime_error("Database connection failed", {
+    operation = "connect",
+    category = error_handler.CATEGORY.EXTERNAL_SERVICE
+  }))
+
+-- When the stub is called, it will throw a detailed error
+-- with stack info, arguments, and automatically log to the logging system
 ```
 
 ### stub:throws(error_message)
@@ -687,7 +842,9 @@ expect(spy_fn).to.be.called.with("test")
 expect(spy_fn).to.have.been.called.before(other_spy)
 ```
 
-## Constants
+## Type Annotations
+
+The mocking system includes comprehensive type annotations for IDE support (Lu
 
 ### firmo.mock._VERSION
 

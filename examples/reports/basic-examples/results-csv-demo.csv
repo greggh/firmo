@@ -1,4 +1,0 @@
-test_id,test_suite,test_name,status,duration,message,error_type,details,timestamp
-1,DemoTests,test_passing,pass,0.1,,,,2025-03-08T18:30:19
-2,DemoTests,test_failing,fail,0.3,Expected 5 to be 6,Assertion,test.lua:42: Expected 5 to be 6,2025-03-08T18:30:19
-3,DemoTests,test_another_passing,pass,0.02,,,,2025-03-08T18:30:19
