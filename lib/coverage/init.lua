@@ -26,6 +26,7 @@ central_config.register_module("coverage", {
     savestepsize = "number",
     tick = "boolean",
     codefromstrings = "boolean",
+    threshold = "number",
   },
 }, {
   -- Default values
@@ -36,6 +37,7 @@ central_config.register_module("coverage", {
   savestepsize = 100, -- Save stats every 100 lines
   tick = false, -- Don't use tick-based saving by default
   codefromstrings = false, -- Don't track code loaded from strings
+  threshold = 90, -- Default coverage threshold percentage
 })
 
 -- Module state with optimized structure
@@ -453,6 +455,32 @@ function coverage.shutdown()
     state.initialized = false
     state.paused = true
   end
+end
+
+-- Start coverage collection
+function coverage.start()
+  -- Initialize if not already done
+  if not coverage.init() then
+    return false
+  end
+  
+  -- Resume collection
+  coverage.resume()
+  return true
+end
+
+-- Stop coverage collection
+function coverage.stop()
+  -- Save any remaining stats
+  coverage.save_stats()
+  
+  -- Pause collection
+  coverage.pause()
+  
+  -- Perform full shutdown
+  coverage.shutdown()
+  
+  return true
 end
 
 return coverage

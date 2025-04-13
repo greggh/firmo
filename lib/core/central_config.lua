@@ -47,6 +47,7 @@ local config = {
   schemas = {}, -- Registered schemas by module
   listeners = {}, -- Change listeners by path
   defaults = {}, -- Default values by module
+  resetting = false, -- Flag to prevent recursive resets
 }
 
 ---@private
@@ -1679,6 +1680,14 @@ end
 ---   .set("database.timeout", 60)
 ---   .set("database.retries", 3)
 function M.reset(module_name)
+  -- Prevent recursive resets
+  if config.resetting then
+    return M
+  end
+  
+  -- Set resetting flag
+  config.resetting = true
+
   -- Parameter validation
   if module_name ~= nil and type(module_name) ~= "string" then
     local err = error_handler.validation_error("Module name must be a string or nil", {
@@ -1687,6 +1696,7 @@ function M.reset(module_name)
       operation = "reset",
     })
     log("warn", err.message, err.context)
+    config.resetting = false -- Clear flag before returning
     return M
   end
 
@@ -1695,12 +1705,16 @@ function M.reset(module_name)
     -- Reset everything for testing
     local old_values = deep_copy(config.values)
 
-    -- Clear all configuration data structures
-    init_config()
+    -- Clear all configuration data structures with a single operation
+    config.values = {}
+    config.schemas = {}
+    config.listeners = {}
+    config.defaults = {}
 
     log("info", "Reset entire configuration system for testing")
 
     -- No listeners to notify after full reset since they were cleared too
+    config.resetting = false -- Clear flag before returning
     return M
   end
 
@@ -1745,6 +1759,8 @@ function M.reset(module_name)
   -- Notify listeners of change
   M.notify_change(module_name, old_config, config.values[module_name])
 
+  -- Clear resetting flag before returning
+  config.resetting = false
   return M
 end
 

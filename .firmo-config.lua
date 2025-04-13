@@ -5,24 +5,18 @@ return {
   -- Coverage Configuration
   coverage = {
     enabled = false, -- Only enable with --coverage flag
-    debug = false, -- Disable debug mode to avoid excessive logging
-
-    -- Include/exclude function patterns
-    include = function(path)
-      -- Include all Lua files by default
-      if path:match("%.lua$") then
-        return true
-      end
-      return false
-    end,
-
-    exclude = function(path)
-      -- Exclude test files to avoid inflating coverage numbers
-      if path:match("tests/") or path:match("test%.lua$") then
-        return true
-      end
-      return false
-    end,
+    include = { "%.lua$" }, -- Include all Lua files by default
+    exclude = { 
+      "tests/", 
+      "test%.lua$",
+      "examples/",
+      "docs/"
+    }, -- Exclude test files, examples, and docs
+    statsfile = ".coverage-stats",
+    savestepsize = 100,
+    tick = false,
+    codefromstrings = false,
+    threshold = 90,
   },
 
   -- LuaCov debug hook options

@@ -37,7 +37,6 @@ local log = try_load_logger()
 describe("Configuration Module", function()
   local fs = require("lib.tools.filesystem")
   local central_config = require("lib.core.central_config")
-  local coverage_module = require("lib.coverage")
   local temp_config_path = "/tmp/test-firmo-config.lua"
 
   -- Store original configuration values
@@ -52,10 +51,7 @@ describe("Configuration Module", function()
     end
 
     -- Backup original coverage configuration
-    original_coverage_config = {}
-    for k, v in pairs(coverage_module.config) do
-      original_coverage_config[k] = v
-    end
+    original_coverage_config = central_config.get("coverage")
 
     -- Reset central_config between tests
     central_config.reset()
@@ -83,12 +79,11 @@ describe("Configuration Module", function()
     end
 
     -- Restore original coverage configuration
-    for k, v in pairs(original_coverage_config) do
-      coverage_module.config[k] = v
+    if original_coverage_config then
+      central_config.set("coverage", original_coverage_config)
     end
 
-    -- Reset central_config
-    central_config.reset()
+    -- No need to reset here as it's done in the before hook for each test
   end)
 
   it("should have a default coverage threshold of 90%", function()
@@ -98,16 +93,25 @@ describe("Configuration Module", function()
       })
     end
 
-    -- Check the default configuration in the coverage module
-    expect(coverage_module.config.threshold).to.equal(90)
 
-    -- The above check confirms our configuration code has been applied properly
-    -- and the default threshold is 90% as desired
+    -- Reset module cache (config reset already done in hooks)
+    package.loaded["lib.coverage"] = nil
+
+    -- Re-require and initialize coverage module
+    local coverage_module = require("lib.coverage")
+    expect(coverage_module.init()).to.be_truthy()
+    
+    -- Check the default configuration
+    local threshold = central_config.get("coverage.threshold")
+    expect(threshold).to.equal(90)
+
+    -- Cleanup
+    coverage_module.shutdown()
 
     if log then
       log.debug("Default threshold verification complete", {
         expected_threshold = 90,
-        actual_threshold = coverage_module.config.threshold,
+        actual_threshold = threshold,
       })
     end
   end)
@@ -115,11 +119,6 @@ describe("Configuration Module", function()
   it("should apply configurations from a config file", { expect_error = true }, function()
     local test_helper = require("lib.tools.test_helper")
 
-    -- Reset central_config before test
-    test_helper.with_error_capture(function()
-      central_config.reset()
-      return true
-    end)()
 
     -- Create a temporary config file
     local config_content = [[
@@ -167,8 +166,7 @@ describe("Configuration Module", function()
   end)
 
   it("should handle non-existent config files gracefully", { expect_error = true }, function()
-    -- Reset central_config before test
-    central_config.reset()
+    -- Configuration reset is handled by hooks
 
     -- Try to load a non-existent config file
     local non_existent_path = "/tmp/non-existent-config.lua"
@@ -182,8 +180,7 @@ describe("Configuration Module", function()
   end)
 
   it("should handle invalid config files gracefully", { expect_error = true }, function()
-    -- Reset central_config before test
-    central_config.reset()
+    -- Configuration reset is handled by hooks
 
     -- Create a temporary invalid config file (syntax error)
     local invalid_config_content = [[
@@ -208,8 +205,7 @@ describe("Configuration Module", function()
   end)
 
   it("should support correct schema validation for configuration values", function()
-    -- Reset before test
-    central_config.reset()
+    -- Configuration reset is handled by hooks
 
     -- Register module with schema validation
     central_config.register_module("test_module", {
@@ -239,8 +235,7 @@ describe("Configuration Module", function()
   end)
 
   it("should handle invalid type assignments in configuration", { expect_error = true }, function()
-    -- Reset before test
-    central_config.reset()
+    -- Configuration reset is handled by hooks
     local test_helper = require("lib.tools.test_helper")
 
     -- Register module with schema validation - capture any potential errors
@@ -286,8 +281,7 @@ describe("Configuration Module", function()
   end)
 
   it("should support change listeners for configuration changes", function()
-    -- Reset central_config before test
-    central_config.reset()
+    -- Configuration reset is handled by hooks
 
     -- Set up a test module
     central_config.register_module("listener_test", {
