@@ -21,7 +21,8 @@ local error_handler = require("lib.tools.error_handler")
 ---@field initial_state table<string, boolean>|nil Original snapshot of package.loaded on initialization
 ---@field protected_modules table<string, boolean> Registry of modules that should never be reset
 ---@field firmo table|nil Reference to the firmo instance for integration
----@field protect fun(modules: string|string[]): module_reset Add modules to the protected list to prevent resetting
+---@field protect fun(modules: string|string[]): module_reset Add modules to the protected list to prevent resettingmodule
+This sub-plan is documented in the docs/firmo/claude_document_update_plan.md
 ---@field count_protected_modules fun(): number Count the number of protected modules in the registry
 ---@field snapshot fun(): table<string, boolean>, number Take a snapshot of the current module state and return count
 ---@field init fun(): module_reset Initialize the module tracking system and capture initial state
@@ -111,7 +112,7 @@ local function init_logger()
 
   if not config_success then
     -- Log error but continue
-    print("[WARNING] Failed to configure module_reset logger: " 
+    print("[WARNING] Failed to configure module_reset logger: "
       .. error_handler.format_error(config_err))
   end
 
