@@ -1,10 +1,13 @@
 # HTML Formatter API Reference
 
+
 The HTML formatter generates rich, interactive coverage reports with syntax highlighting, line-by-line execution information, and visual tracking of coverage statistics.
 
 ## Overview
 
+
 The HTML formatter creates browser-viewable reports with these key features:
+
 
 - Interactive file navigation with collapsible tree view
 - Syntax highlighting for Lua source code
@@ -14,16 +17,24 @@ The HTML formatter creates browser-viewable reports with these key features:
 - Detailed statistics and summaries
 - Filter and sort capabilities
 
+
 ## Class Reference
+
 
 ### Inheritance
 
-```
+
+
+```text
 Formatter (Base)
   └── HTMLFormatter
 ```
 
+
+
 ### Class Definition
+
+
 
 ```lua
 ---@class HTMLFormatter : Formatter
@@ -31,11 +42,16 @@ Formatter (Base)
 local HTMLFormatter = Formatter.extend("html", "html")
 ```
 
+
+
 ## Core Methods
+
 
 ### format(data, options)
 
+
 Formats coverage data into HTML.
+
 
 ```lua
 ---@param data table Normalized coverage data
@@ -45,9 +61,13 @@ Formats coverage data into HTML.
 function HTMLFormatter:format(data, options)
 ```
 
+
+
 ### generate(data, output_path, options)
 
+
 Generate and save a complete HTML report.
+
 
 ```lua
 ---@param data table Coverage data
@@ -58,10 +78,12 @@ Generate and save a complete HTML report.
 function HTMLFormatter:generate(data, output_path, options)
 ```
 
+
+
 ## Configuration Options
 
-The HTML formatter supports these configuration options:
 
+The HTML formatter supports these configuration options:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `theme` | string | `"dark"` | Color theme (`"dark"` or `"light"`) |
@@ -83,6 +105,8 @@ The HTML formatter supports these configuration options:
 
 ### Configuration Example
 
+
+
 ```lua
 local reporting = require("lib.reporting")
 reporting.configure_formatter("html", {
@@ -95,9 +119,13 @@ reporting.configure_formatter("html", {
 })
 ```
 
+
+
 ## Syntax Highlighting
 
+
 The HTML formatter includes an integrated syntax highlighter for Lua code that supports:
+
 
 - Keywords, literals, and operators
 - Strings and comments
@@ -106,7 +134,10 @@ The HTML formatter includes an integrated syntax highlighter for Lua code that s
 - Proper handling of long strings and comments
 - Number literal highlighting
 
+
 ### Highlighting Configuration
+
+
 
 ```lua
 reporting.configure_formatter("html", {
@@ -120,63 +151,76 @@ reporting.configure_formatter("html", {
 })
 ```
 
+
+
 ## Interactive Features
+
 
 The HTML formatter includes several interactive features accessible through the browser:
 
 ### File Navigation
+
+
 
 - Collapsible file tree organized by directories
 - Breadcrumb navigation showing current location
 - Quick jump to files with search functionality
 - Sorting by name, path, or coverage percentage
 
+
 ### Coverage Visualization
+
+
 
 - Color-coded lines showing covered, executed, and uncovered code
 - Hover tooltips showing execution counts
 - Click to expand/collapse file sections
 - Toggle between full and summary views
 
+
 ### Theming
+
+
 
 - Support for light and dark themes
 - Automatic system preference detection via `prefers-color-scheme`
 - Theme toggle button in the UI
 - Persistent theme choice via localStorage
 
+
 ## Usage Example
+
+
 
 ```lua
 local reporting = require("lib.reporting")
 local coverage = require("lib.coverage")
-
 -- Configure the HTML formatter
 reporting.configure_formatter("html", {
   theme = "dark",
   show_line_numbers = true,
   title = "Project Coverage Report"
 })
-
 -- Run tests with coverage
 coverage.start()
 -- Run tests here...
 coverage.stop()
-
 -- Generate HTML report
 local data = coverage.get_data()
 local html_content = reporting.format_coverage(data, "html")
-
 -- Save the report
 reporting.write_file("coverage-report.html", html_content)
-
 -- Or in one step:
 reporting.save_coverage_report("coverage-report.html", data, "html")
 ```
 
+
+
 ## Error Handling
 
+
 The HTML formatter implements robust error handling for common issues:
+
 
 1. **Invalid Data Structure**: Reports detailed validation errors in the data 
 2. **File Access Issues**: Reports errors when files can't be read or written
@@ -184,7 +228,10 @@ The HTML formatter implements robust error handling for common issues:
 4. **Missing Source Files**: Reports warnings but continues to generate report
 5. **Template Rendering Issues**: Provides detailed error context for debugging
 
+
 ### Error Response Example
+
+
 
 ```lua
 local success, result_or_error = reporting.save_coverage_report("report.html", invalid_data, "html")
@@ -197,9 +244,13 @@ if not success then
 end
 ```
 
+
+
 ## Validation Rules
 
+
 The HTML formatter validates input data according to these rules:
+
 
 1. **Data Structure**: Must be a table with `files` and `summary` fields
 2. **File Entries**: Each file must have `path`, `lines`, and `summary` fields
@@ -207,12 +258,14 @@ The HTML formatter validates input data according to these rules:
 4. **Summary Information**: Must include coverage statistics fields
 5. **Coverage Integrity**: Line counts must match between summary and details
 
+
 ### Validation Example
+
+
 
 ```lua
 local HTMLFormatter = require("lib.reporting.formatters.html")
 local formatter = HTMLFormatter.new()
-
 -- Validate data before formatting
 local is_valid, validation_issues = formatter:validate(coverage_data)
 if not is_valid then
@@ -222,32 +275,44 @@ if not is_valid then
 end
 ```
 
+
+
 ## Integration Notes
+
 
 ### CI/CD Integration
 
+
 To use HTML reports in CI/CD environments:
+
 
 1. Generate reports with `inline_assets = true` to ensure all resources are bundled
 2. Use the `title` option to include build-specific information
 3. Consider using the light theme for better printing/screenshots
 4. Set `file_filter_pattern` to focus on relevant code paths
 
+
 ### Browser Compatibility
 
+
 The HTML formatter is tested and compatible with:
+
 
 - Chrome/Edge (Chromium-based browsers) 88+
 - Firefox 85+
 - Safari 14+
 
 For older browsers:
+
+
 - Set `simplified_rendering = true`
 - Disable `syntax_highlighting` for better performance
 
+
 ## See Also
+
+
 
 - [HTML Formatter Guide](../../guides/configuration-details/html_formatter.md)
 - [Reporting API](../reporting.md)
 - [Coverage API](../coverage.md)
-

@@ -1,14 +1,19 @@
 # Quality Knowledge
 
+
 ## Purpose
+
+
 Test quality validation system and enforce test standards.
 
 ## Quality Validation
+
+
+
 ```lua
 -- Enable quality validation
 firmo.quality_options.enabled = true
 firmo.quality_options.level = 3
-
 -- Run tests with quality checks
 firmo.run_discovered("tests/", "*_test.lua", {
   quality = {
@@ -18,7 +23,6 @@ firmo.run_discovered("tests/", "*_test.lua", {
     report = "quality-report.html"
   }
 })
-
 -- Configure quality rules
 quality.configure({
   assertion_count: {
@@ -36,7 +40,12 @@ quality.configure({
 })
 ```
 
+
+
 ## Quality Levels
+
+
+
 ```lua
 -- Level 1: Basic Syntax
 describe("Basic Quality", function()
@@ -44,7 +53,6 @@ describe("Basic Quality", function()
     expect(true).to.be_truthy()
   end)
 end)
-
 -- Level 2: Coverage
 describe("Coverage Quality", function()
   it("tests edge cases", function()
@@ -53,7 +61,6 @@ describe("Coverage Quality", function()
     expect(process_number(1)).to.equal(1)
   end)
 end)
-
 -- Level 3: Assertions
 describe("Assertion Quality", function()
   it("uses specific assertions", function()
@@ -63,7 +70,6 @@ describe("Assertion Quality", function()
     expect(result.data.id).to.be_greater_than(0)
   end)
 end)
-
 -- Level 4: Error Handling
 describe("Error Quality", function()
   it("verifies error conditions", { expect_error = true }, function()
@@ -74,7 +80,6 @@ describe("Error Quality", function()
     expect(err.category).to.equal("VALIDATION")
   end)
 end)
-
 -- Level 5: Documentation
 describe("Documentation Quality", function()
   -- @test Verifies user authentication process
@@ -86,30 +91,42 @@ describe("Documentation Quality", function()
 end)
 ```
 
+
+
 ## Quality Metrics
+
+
+
 ```lua
 -- Test coverage metrics
 local metrics = quality.get_metrics()
 expect(metrics.coverage.statements).to.be_greater_than(90)
 expect(metrics.coverage.branches).to.be_greater_than(85)
 expect(metrics.coverage.functions).to.equal(100)
-
 -- Assertion metrics
 expect(metrics.assertions.count).to.be_greater_than(0)
 expect(metrics.assertions.per_test).to.be_greater_than(1)
-
 -- Documentation metrics
 expect(metrics.documentation.coverage).to.be_greater_than(80)
 ```
 
+
+
 ## Critical Rules
+
+
+
 - Set appropriate quality level
 - Fix quality issues promptly
 - Document requirements
 - Use quality in CI
 - Monitor trends
 
+
 ## Best Practices
+
+
+
 - Test all quality levels
 - Check metrics regularly
 - Verify scoring
@@ -119,7 +136,11 @@ expect(metrics.documentation.coverage).to.be_greater_than(80)
 - Monitor trends
 - Fix issues early
 
+
 ## Performance Tips
+
+
+
 - Cache quality results
 - Run in CI pipeline
 - Monitor trends

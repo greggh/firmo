@@ -1,10 +1,13 @@
 # Watcher Module API Reference
 
+
 The watcher module provides functionality for monitoring filesystem changes to enable continuous test execution and automatic reloading capabilities.
 
 ## Overview
 
+
 The watcher module allows you to monitor files and directories for changes, enabling use cases such as:
+
 
 - Continuous test execution when source files change
 - Automatic reloading of configuration
@@ -15,15 +18,22 @@ The module tracks file modification timestamps and provides notifications when c
 
 ## Module Interface
 
+
+
 ```lua
 local watcher = require("lib.tools.watcher")
 ```
 
+
+
 ## Configuration Functions
+
 
 ### `watcher.configure(options)`
 
+
 Configure the watcher module with various options.
+
 
 ```lua
 watcher.configure({
@@ -38,7 +48,10 @@ watcher.configure({
 })
 ```
 
+
 **Parameters:**
+
+
 - `options` (table, optional): Configuration options
   - `check_interval` (number): Time in seconds between file checks
   - `watch_patterns` (string[]): Array of Lua patterns to match files to watch
@@ -47,67 +60,103 @@ watcher.configure({
   - `verbose` (boolean): Enable verbose logging
 
 **Returns:**
+
+
 - The watcher module instance for method chaining
+
 
 ### `watcher.set_check_interval(interval)`
 
+
 Set the time interval between file change checks.
+
 
 ```lua
 watcher.set_check_interval(0.5) -- Check every 0.5 seconds
 ```
 
+
 **Parameters:**
+
+
 - `interval` (number): Interval in seconds (must be greater than 0)
 
 **Returns:**
+
+
 - The watcher module instance for method chaining, or nil and error on failure
+
 
 ### `watcher.add_patterns(patterns)`
 
+
 Add patterns for files to watch.
+
 
 ```lua
 watcher.add_patterns({"%.css$", "%.html$"})
 ```
 
+
 **Parameters:**
+
+
 - `patterns` (string[]): Array of Lua patterns to add to watch list
 
 **Returns:**
+
+
 - The watcher module instance for method chaining, or nil and error on failure
+
 
 ### `watcher.reset()`
 
+
 Reset the module configuration to defaults.
+
 
 ```lua
 watcher.reset()
 ```
 
+
 **Returns:**
+
+
 - The watcher module instance for method chaining, or nil and error on failure
+
 
 ### `watcher.full_reset()`
 
+
 Fully reset both local and central configuration.
+
 
 ```lua
 watcher.full_reset()
 ```
 
+
 **Returns:**
+
+
 - The watcher module instance for method chaining, or nil and error on failure
+
 
 ### `watcher.debug_config()`
 
+
 Get detailed information about the current configuration.
+
 
 ```lua
 local config_info = watcher.debug_config()
 ```
 
+
 **Returns:**
+
+
 - `config_info` (table): Detailed information about the configuration
   - `local_config` (table): Local configuration values
   - `using_central_config` (boolean): Whether central configuration is in use
@@ -116,27 +165,39 @@ local config_info = watcher.debug_config()
   - `last_check_time` (number): Timestamp of last file check
   - `status` (string): Status of the watcher ("initialized", "uninitialized", or "error")
 
+
 ## Watcher Operation Functions
+
 
 ### `watcher.init(directories, exclude_patterns)`
 
+
 Initialize the watcher by scanning all files in the given directories.
+
 
 ```lua
 local success, err = watcher.init("./src", {"node_modules", "%.git"})
 ```
 
+
 **Parameters:**
+
+
 - `directories` (string|string[], optional): Directory or array of directories to scan (default: current directory)
 - `exclude_patterns` (string[], optional): Array of patterns to exclude from watching
 
 **Returns:**
+
+
 - `success` (boolean|nil): True if initialization succeeded, nil on failure
 - `error` (table|nil): Error object if operation failed
 
+
 ### `watcher.check_for_changes()`
 
+
 Check for file changes since the last check.
+
 
 ```lua
 local changed_files = watcher.check_for_changes()
@@ -148,55 +209,83 @@ if changed_files then
 end
 ```
 
+
 **Returns:**
+
+
 - `changed_files` (string[]|nil): Array of changed file paths, or nil if no changes detected
 - `error` (table|nil): Error object if operation failed
 
+
 ### `watcher.get_watched_files()`
 
+
 Get information about currently watched files.
+
 
 ```lua
 local watched_files = watcher.get_watched_files()
 ```
 
+
 **Returns:**
+
+
 - `watched_files` (table<string, {mtime: number, size: number}>): Table mapping file paths to metadata
+
 
 ### `watcher.add_directory(dir_path, recursive)`
 
+
 Add a directory to watch.
+
 
 ```lua
 local file_count = watcher.add_directory("./src", true)
 ```
 
+
 **Parameters:**
+
+
 - `dir_path` (string): Path to the directory to watch
 - `recursive` (boolean, optional): Whether to watch subdirectories recursively
 
 **Returns:**
+
+
 - `file_count` (number|nil): Number of files added for watching, or nil on failure
 - `error` (table|nil): Error object if operation failed
 
+
 ### `watcher.add_file(file_path)`
 
+
 Add a specific file to watch.
+
 
 ```lua
 local success, err = watcher.add_file("./config.json")
 ```
 
+
 **Parameters:**
+
+
 - `file_path` (string): Path to the file to watch
 
 **Returns:**
+
+
 - `success` (boolean|nil): True if the file was added successfully, nil on failure
 - `error` (table|nil): Error object if operation failed
 
+
 ### `watcher.is_watching()`
 
+
 Check if the watcher is currently active.
+
 
 ```lua
 if watcher.is_watching() then
@@ -204,29 +293,33 @@ if watcher.is_watching() then
 end
 ```
 
+
 **Returns:**
+
+
 - `is_active` (boolean): Whether the watcher is currently active
+
 
 ## Example Usage
 
+
 ### Basic Usage
+
+
 
 ```lua
 local watcher = require("lib.tools.watcher")
-
 -- Configure the watcher
 watcher.configure({
   check_interval = 0.5,
   watch_patterns = {"%.lua$", "%.json$"}
 })
-
 -- Initialize with directories to watch
 local success, err = watcher.init({"./src", "./tests"}, {"node_modules"})
 if not success then
   print("Failed to initialize watcher: " .. tostring(err))
   return
 end
-
 -- Continuously check for changes
 while true do
   local changed_files = watcher.check_for_changes()
@@ -236,54 +329,55 @@ while true do
       -- You could run tests, reload configuration, etc.
     end
   end
-  
+
   -- Sleep to avoid busy-waiting
   os.execute("sleep 0.1")
 end
 ```
 
+
+
 ### Integration with Central Configuration
+
+
 
 ```lua
 local watcher = require("lib.tools.watcher")
 local central_config = require("lib.core.central_config")
-
 -- Set configuration in central_config
 central_config.set("watcher", {
   check_interval = 1.0,
   watch_patterns = {"%.lua$", "%.json$"},
   default_directory = "./src"
 })
-
 -- Configure watcher (will use central_config values)
 watcher.configure()
-
 -- Initialize the watcher
 watcher.init()
-
 -- Check for changes
 local changed_files = watcher.check_for_changes()
 -- Process changed files...
 ```
 
+
+
 ### Handling Errors
+
+
 
 ```lua
 local watcher = require("lib.tools.watcher")
 local error_handler = require("lib.tools.error_handler")
-
 -- Initialize watcher with error handling
 local success, err = watcher.init("./src")
 if not success then
   print("Failed to initialize watcher: " .. error_handler.format_error(err))
   return
 end
-
 -- Check for changes with error handling
 local success, result, err = error_handler.try(function()
   return watcher.check_for_changes()
 end)
-
 if not success then
   print("Error checking for changes: " .. error_handler.format_error(result))
 else
@@ -296,13 +390,16 @@ else
 end
 ```
 
+
+
 ## Advanced Configuration
+
 
 The watcher module integrates with Firmo's central configuration system. You can set watcher configuration through the central configuration:
 
+
 ```lua
 local central_config = require("lib.core.central_config")
-
 central_config.set("watcher", {
   check_interval = 1.0,          -- Time between checks in seconds
   watch_patterns = {
@@ -315,5 +412,6 @@ central_config.set("watcher", {
   verbose = false                -- Enable verbose logging
 })
 ```
+
 
 Once set in central configuration, all components using the watcher will use these settings.

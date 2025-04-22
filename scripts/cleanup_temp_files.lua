@@ -4,7 +4,7 @@
 -- created by the Firmo testing framework and cleans them up.
 
 local fs = require("lib.tools.filesystem")
-local temp_file = require("lib.tools.temp_file")
+local temp_file = require("lib.tools.filesystem.temp_file")
 local logging = require("lib.tools.logging")
 
 local logger = logging.get_logger("temp_file_cleanup")

@@ -209,7 +209,7 @@ local function create_test_file(filename, quality_level)
   
   -- Try to load the temp_file module for proper temporary file creation
   local temp_file
-  local temp_file_loaded, temp_file_module = pcall(require, "lib.tools.temp_file")
+  local temp_file_loaded, temp_file_module = pcall(require, "lib.tools.filesystem.temp_file")
   
   if temp_file_loaded and temp_file_module then
     temp_file = temp_file_module

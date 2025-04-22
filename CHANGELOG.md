@@ -1,12 +1,16 @@
 # Changelog
 
+
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+
 ### Added
+
+
 
 - Comprehensive test coverage for all formatters:
   - Test suites for HTML, JSON, LCOV, TAP, CSV, and JUnit XML formatters
@@ -19,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Custom separators and column configuration
   - File operation error testing
   - Empty and malformed data handling
-
 - Advanced mock sequences:
   - Sequential returns with returns_in_sequence() for stubbed functions
   - Multiple return behaviors for sequence exhaustion:
@@ -69,7 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Expanded architectural principles documentation
   - Updated CI integration examples with modern practices
 
+
 ### Fixed
+
+
 
 - Expect assertion system now works consistently:
   - Fixed issues with chained assertions (to.be.truthy(), to_not.be.falsey(), etc.)
@@ -87,7 +93,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Robust fallback mechanisms for reliable report generation
   - Enhanced HTML reports with syntax highlighting and interactive features
 
+
 ### Fixed
+
+
 
 - Coverage data flow issues between modules
 - File operations with enhanced directory handling
@@ -96,7 +105,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-platform compatibility issues in file paths
 - Reset function for proper state management between test runs
 
+
 ### Improved
+
+
 
 - TAP formatter enhancements:
   - TAP v13 compliance verification
@@ -105,7 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Customizable indentation
   - Configurable thresholds
   - Function coverage reporting
-
 - CSV formatter enhancements:
   - Custom column definitions
   - Configurable separators
@@ -114,7 +125,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Summary row support
   - Optional headers
   - Nested field handling
-
 - Version bumped to 0.7.5
 - Coverage tracking with better source file detection
 - Input validation throughout the reporting process
@@ -123,9 +133,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File path normalization for better pattern matching
 - Command-line interface with more options and better help documentation
 
+
 ## [0.7.4] - 2025-03-18
 
+
 ### Added
+
+
 
 - Module management utilities:
   - `reset_module(module_name)` to reload modules and ensure a clean state
@@ -136,15 +150,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Return value from `wait_until()` for consistent API design
   - Better error handling in timeout scenarios
 
+
 ### Fixed
+
+
 
 - `wait_until()` error handling to properly throw errors on timeout
 - Reduced boilerplate in tests with proper module reset utilities
 - Improved async testing ergonomics with parallel execution support
 
+
 ## [0.7.0] - 2025-03-05
 
+
 ### Added
+
+
 
 - Enhanced mocking system with advanced verification options:
   - Argument matchers for flexible verification:
@@ -166,7 +187,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced error reporting for verification failures
   - New example file demonstrating all new mocking features
 
+
 ### Changed
+
+
 
 - Replaced timestamp-based call ordering with sequence-based tracking:
   - More deterministic verification of call order
@@ -174,15 +198,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Consistent behavior across different systems and speeds
   - Backward compatible with existing tests
 
+
 ### Fixed
+
+
 
 - Improved argument comparison for table values in mocking system
 - Better error messages for expectation failures with detailed diffs
 - Enhanced mock cleanup to prevent test cross-contamination
 
+
 ## [0.6.1] - 2025-03-05
 
+
 ### Fixed
+
+
 
 - Bug in excluded tests where test functions in `xit` were still being executed
 - Proper state reset between test files in CLI runner
@@ -190,9 +221,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Excluded test handling for both direct execution and CLI runner
 - More robust implementation for `xdescribe` to ensure excluded tests never run
 
+
 ## [0.6.0] - 2025-03-05
 
+
 ### Added
+
+
 
 - Focused and excluded test support:
   - `fdescribe` and `fit` for focused test blocks and tests
@@ -219,13 +254,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved help documentation and examples
   - Better visual separation for test runs
 
+
 ### Fixed
+
+
 
 - Improved error handling in describe blocks
 - Enhanced context display in test summaries
 - Better skipped test reporting with reasons
 
+
 ### Added
+
+
 
 - Fork from bjornbytes/firmo to enhance functionality
 - GitHub Actions CI workflow for testing on multiple Lua versions
@@ -283,16 +324,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Usage examples for all major features
   - Code examples for common use cases
 
+
 ## [0.2.0] - Original firmo
+
 
 This is where the fork begins. Original [lust project](https://github.com/bjornbytes/lust) features:
 
 ### Features
+
+
 
 - Nested describe/it blocks
 - Before/after handlers
 - Expect-style assertions
 - Function spies
 - Support for console and non-console environments
+
   [Unreleased]: https://github.com/greggh/firmo/compare/v0.2.0...HEAD
   [0.2.0]: https://github.com/bjornbytes/lust/tree/master

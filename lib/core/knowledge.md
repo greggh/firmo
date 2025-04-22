@@ -1,18 +1,22 @@
 # Core Knowledge
 
+
 ## Purpose
+
+
 Core utilities and foundational functionality for the framework.
 
 ## Configuration System
+
+
+
 ```lua
 -- Load config from file
 local config = require("lib.core.central_config")
 config.load_from_file(".firmo-config.lua")
-
 -- Get and set values
 local value = config.get("coverage.threshold")
 config.set("coverage.threshold", 90)
-
 -- Register module config
 config.register_module("my_module", {
   field_types = {
@@ -23,7 +27,6 @@ config.register_module("my_module", {
   timeout = 5000,
   debug = false
 })
-
 -- Complex configuration example
 local function setup_module_config()
   -- Define schema
@@ -42,7 +45,7 @@ local function setup_module_config()
       }
     }
   }
-  
+
   -- Define defaults
   local defaults = {
     database = {
@@ -57,10 +60,10 @@ local function setup_module_config()
       format = "json"
     }
   }
-  
+
   -- Register with validation
   config.register_module("my_module", schema, defaults)
-  
+
   -- Watch for changes
   config.on_change("my_module.database.timeout", function(path, old, new)
     logger.info("Timeout changed", {
@@ -71,17 +74,20 @@ local function setup_module_config()
 end
 ```
 
+
+
 ## Module Reset System
+
+
+
 ```lua
 -- Reset single module
 local fresh_module = firmo.reset_module("path.to.module")
-
 -- Reset with dependencies
 firmo.reset_module("my_module", {
   recursive = true,
   clear_cache = true
 })
-
 -- Complex module reset
 local function reset_module_group()
   -- Define module dependencies
@@ -90,14 +96,14 @@ local function reset_module_group()
     "module_b",
     "module_c"
   }
-  
+
   -- Define reset order
   local order = {
     "c", -- Must be reset first
     "b",
     "a"  -- Must be reset last
   }
-  
+
   -- Reset modules in order
   for _, name in ipairs(order) do
     local success, err = error_handler.try(function()
@@ -106,7 +112,7 @@ local function reset_module_group()
         clear_cache = true
       })
     end)
-    
+
     if not success then
       logger.error("Module reset failed", {
         module = name,
@@ -115,29 +121,31 @@ local function reset_module_group()
       return nil, err
     end
   end
-  
+
   return true
 end
 ```
 
+
+
 ## Type Validation
+
+
+
 ```lua
 -- Basic type checks
 expect(value).to.be.a("string")
 expect(value).to.be.a("number")
 expect(value).to.be.a("table")
 expect(value).to.be.a("function")
-
 -- Complex type validation
 expect(fn).to.be_type("callable")  -- Function or callable table
 expect(num).to.be_type("comparable")  -- Can use < operator
 expect(table).to.be_type("iterable")  -- Can iterate with pairs()
-
 -- Custom type validation
 type_checker.register_type("positive_number", function(value)
   return type(value) == "number" and value > 0
 end)
-
 -- Type validation with schema
 local schema = {
   name = "string",
@@ -148,7 +156,6 @@ local schema = {
     notifications = "boolean"
   }
 }
-
 local function validate_user(user)
   local valid, errors = type_checker.validate(user, schema)
   if not valid then
@@ -161,7 +168,12 @@ local function validate_user(user)
 end
 ```
 
+
+
 ## Critical Rules
+
+
+
 - ALWAYS use central_config
 - NEVER bypass type checks
 - ALWAYS handle module reset
@@ -171,7 +183,11 @@ end
 - ALWAYS clean up state
 - DOCUMENT public APIs
 
+
 ## Best Practices
+
+
+
 - Use type annotations
 - Document public APIs
 - Handle edge cases
@@ -183,7 +199,11 @@ end
 - Follow patterns
 - Keep focused
 
+
 ## Performance Tips
+
+
+
 - Cache config values
 - Minimize resets
 - Clean up promptly

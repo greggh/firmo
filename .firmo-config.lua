@@ -6,11 +6,11 @@ return {
   coverage = {
     enabled = false, -- Only enable with --coverage flag
     include = { "%.lua$" }, -- Include all Lua files by default
-    exclude = { 
-      "tests/", 
+    exclude = {
+      "tests/",
       "test%.lua$",
       "examples/",
-      "docs/"
+      "docs/",
     }, -- Exclude test files, examples, and docs
     statsfile = ".coverage-stats",
     savestepsize = 100,
@@ -90,8 +90,8 @@ return {
 
     -- Module-specific log levels
     modules = {
-      coverage = 2, -- WARN level for coverage module to reduce logging
-      runner = 3, -- INFO level for runner
+      coverage = 1, -- ERROR level for coverage module to minimize logging during tests
+      runner = 4, -- WARN level for runner
     },
   },
 

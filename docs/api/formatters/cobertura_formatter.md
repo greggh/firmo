@@ -1,10 +1,13 @@
 # Cobertura Formatter API Reference
 
+
 The Cobertura formatter generates XML coverage reports in the Cobertura format, providing detailed code coverage information compatible with many CI/CD systems and quality assessment tools.
 
 ## Overview
 
+
 The Cobertura formatter produces standards-compliant XML with these key features:
+
 
 - Full compliance with the Cobertura XML schema
 - Hierarchical package/class organization
@@ -15,16 +18,24 @@ The Cobertura formatter produces standards-compliant XML with these key features
 - Customizable structure and content
 - Path manipulation for cross-platform compatibility
 
+
 ## Class Reference
+
 
 ### Inheritance
 
-```
+
+
+```text
 Formatter (Base)
   └── CoberturaFormatter
 ```
 
+
+
 ### Class Definition
+
+
 
 ```lua
 ---@class CoberturaFormatter : Formatter
@@ -32,9 +43,13 @@ Formatter (Base)
 local CoberturaFormatter = Formatter.extend("cobertura", "xml")
 ```
 
+
+
 ## Cobertura XML Format Specification
 
+
 The Cobertura formatter produces XML conforming to the Cobertura schema:
+
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -72,7 +87,11 @@ The Cobertura formatter produces XML conforming to the Cobertura schema:
 </coverage>
 ```
 
+
+
 ### XML Schema Elements
+
+
 
 - `<coverage>`: Root element with summary statistics
 - `<sources>`: List of base source directories
@@ -85,11 +104,15 @@ The Cobertura formatter produces XML conforming to the Cobertura schema:
 - `<lines>`: Container for line-level coverage data
 - `<line>`: Individual line coverage information
 
+
 ## Core Methods
+
 
 ### format(data, options)
 
+
 Formats coverage data into Cobertura XML format.
+
 
 ```lua
 ---@param data table Normalized coverage data
@@ -99,9 +122,13 @@ Formats coverage data into Cobertura XML format.
 function CoberturaFormatter:format(data, options)
 ```
 
+
+
 ### generate(data, output_path, options)
 
+
 Generate and save a complete Cobertura XML report.
+
 
 ```lua
 ---@param data table Coverage data
@@ -112,10 +139,12 @@ Generate and save a complete Cobertura XML report.
 function CoberturaFormatter:generate(data, output_path, options)
 ```
 
+
+
 ## Configuration Options
 
-The Cobertura formatter supports these configuration options:
 
+The Cobertura formatter supports these configuration options:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `xml_version` | string | `"1.0"` | XML version declaration |
@@ -141,6 +170,8 @@ The Cobertura formatter supports these configuration options:
 
 ### Configuration Example
 
+
+
 ```lua
 local reporting = require("lib.reporting")
 reporting.configure_formatter("cobertura", {
@@ -157,17 +188,25 @@ reporting.configure_formatter("cobertura", {
 })
 ```
 
+
+
 ## Coverage Data Mapping
+
 
 ### Package/Class Organization
 
+
 The formatter organizes files hierarchically:
+
 
 1. **Package Level**: Directory structures become packages
 2. **Class Level**: Individual Lua files become classes
 3. **Method Level**: Functions within files become methods
 
+
 #### Directory Structure Style (Default)
+
+
 
 ```xml
 <packages>
@@ -183,9 +222,13 @@ The formatter organizes files hierarchically:
 </packages>
 ```
 
+
+
 #### Namespace Style
 
+
 With `structure_style = "namespace"`, paths are converted to namespaces:
+
 
 ```xml
 <packages>
@@ -200,23 +243,28 @@ With `structure_style = "namespace"`, paths are converted to namespaces:
 </packages>
 ```
 
+
+
 ### Line Coverage Details
 
+
 Each line in the source code is mapped to a `<line>` element with:
+
 
 - `number`: Line number in the source file
 - `hits`: Number of times the line was executed
 - `branch`: Whether the line contains a branch
 - `condition-coverage`: Branch coverage percentage (if branches enabled)
 
+
 ```xml
 <lines>
   <!-- Executed line -->
   <line number="10" hits="5" branch="false"/>
-  
+
   <!-- Non-executed line -->
   <line number="15" hits="0" branch="false"/>
-  
+
   <!-- Branch example -->
   <line number="20" hits="10" branch="true" condition-coverage="50% (1/2)">
     <conditions>
@@ -226,9 +274,13 @@ Each line in the source code is mapped to a `<line>` element with:
 </lines>
 ```
 
+
+
 ### Branch Coverage Support
 
+
 Branch coverage tracks conditional logic paths:
+
 
 ```xml
 <line number="25" hits="20" branch="true" condition-coverage="50% (1/2)">
@@ -238,7 +290,9 @@ Branch coverage tracks conditional logic paths:
 </line>
 ```
 
+
 Note: Branch coverage is currently experimental in firmo. Enable with:
+
 
 ```lua
 reporting.configure_formatter("cobertura", {
@@ -246,15 +300,21 @@ reporting.configure_formatter("cobertura", {
 })
 ```
 
+
+
 ## Integration with CI Tools
+
 
 ### Jenkins Integration
 
+
 Jenkins supports Cobertura reports through the Cobertura Plugin:
+
 
 1. Install the "Cobertura Plugin" in Jenkins
 2. Add a post-build action to "Publish Cobertura Coverage Report"
 3. Set the report path pattern (e.g., `**/coverage-report.cobertura`)
+
 
 ```groovy
 // Jenkinsfile
@@ -283,20 +343,30 @@ pipeline {
 }
 ```
 
+
+
 ### SonarQube Integration
 
+
 SonarQube can import Cobertura reports:
+
 
 1. Generate the Cobertura report
 2. Configure SonarQube to use the report:
 
+
 ```properties
+
 # sonar-project.properties
+
+
 sonar.language=lua
 sonar.lua.coverage.reportPaths=coverage-report.cobertura
 ```
 
+
 Or with the scanner:
+
 
 ```bash
 sonar-scanner \
@@ -305,51 +375,79 @@ sonar-scanner \
   -Dsonar.lua.coverage.reportPaths=coverage-report.cobertura
 ```
 
+
+
 ### GitHub Actions Integration
 
+
+
 ```yaml
+
 # .github/workflows/coverage.yml
+
+
 name: Coverage
 on: [push, pull_request]
-
 jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
+
+
       - uses: actions/checkout@v2
-      
+
       - name: Setup Lua
+
         uses: leafo/gh-actions-lua@v8
-      
+
       - name: Run tests with coverage
+
         run: lua test.lua --coverage --format=cobertura tests/
-      
+
       - name: Upload coverage report to Codecov
+
         uses: codecov/codecov-action@v2
         with:
           files: ./coverage-report.cobertura
           fail_ci_if_error: true
 ```
 
+
+
 ### GitLab CI Integration
 
+
+
 ```yaml
+
 # .gitlab-ci.yml
+
+
 test:
   script:
+
+
     - lua test.lua --coverage --format=cobertura tests/
+
   artifacts:
     paths:
+
+
       - coverage-report.cobertura
+
     reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage-report.cobertura
 ```
 
+
+
 ## XML Schema Validation
 
+
 The Cobertura formatter validates the generated XML against the Cobertura schema:
+
 
 ```lua
 -- Internally, the formatter validates the output structure
@@ -358,7 +456,7 @@ local function validate_xml_structure(xml_doc)
   if not xml_doc.name == "coverage" then
     return false, "Root element must be 'coverage'"
   end
-  
+
   -- Validate required attributes
   local required_attrs = {"line-rate", "branch-rate", "version", "timestamp"}
   for _, attr in ipairs(required_attrs) do
@@ -366,23 +464,25 @@ local function validate_xml_structure(xml_doc)
       return false, "Missing required attribute: " .. attr
     end
   end
-  
+
   -- Validate structure
   if not xml_doc.children.sources then
     return false, "Missing required element: sources"
   end
-  
+
   if not xml_doc.children.packages then
     return false, "Missing required element: packages"
   end
-  
+
   -- ...additional validation...
-  
+
   return true
 end
 ```
 
+
 To ensure schema compatibility, the formatter:
+
 
 1. Follows the Cobertura XML DTD structure
 2. Validates all required elements and attributes
@@ -390,12 +490,14 @@ To ensure schema compatibility, the formatter:
 4. Validates rate values are between 0.0 and 1.0
 5. Ensures XML is well-formed
 
+
 ## Usage Example
+
+
 
 ```lua
 local reporting = require("lib.reporting")
 local coverage = require("lib.coverage")
-
 -- Configure the Cobertura formatter
 reporting.configure_formatter("cobertura", {
   pretty = true,
@@ -403,26 +505,26 @@ reporting.configure_formatter("cobertura", {
   normalize_paths = true,
   include_methods = true
 })
-
 -- Run tests with coverage
 coverage.start()
 -- Run tests here...
 coverage.stop()
-
 -- Generate Cobertura report
 local data = coverage.get_data()
 local cobertura_content = reporting.format_coverage(data, "cobertura")
-
 -- Save the report
 reporting.write_file("coverage-report.cobertura", cobertura_content)
-
 -- Or in one step:
 reporting.save_coverage_report("coverage-report.cobertura", data, "cobertura")
 ```
 
+
+
 ## Custom Source Directories
 
+
 For projects with non-standard directory structures:
+
 
 ```lua
 -- Specify multiple source directories
@@ -435,7 +537,9 @@ reporting.configure_formatter("cobertura", {
 })
 ```
 
+
 This produces:
+
 
 ```xml
 <sources>
@@ -445,9 +549,13 @@ This produces:
 </sources>
 ```
 
+
+
 ## Handling Non-Standard Paths
 
+
 For Windows paths or other special cases:
+
 
 ```lua
 -- Configure path normalization
@@ -459,7 +567,11 @@ reporting.configure_formatter("cobertura", {
 })
 ```
 
+
+
 ## See Also
+
+
 
 - [Cobertura Coverage Tool](https://cobertura.github.io/cobertura/)
 - [Jenkins Cobertura Plugin](https://plugins.jenkins.io/cobertura/)
@@ -467,4 +579,3 @@ reporting.configure_formatter("cobertura", {
 - [Reporting API](../reporting.md)
 - [Coverage API](../coverage.md)
 - [LCOV Formatter](./lcov_formatter.md) - Alternative coverage format
-

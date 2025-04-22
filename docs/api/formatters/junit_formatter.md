@@ -1,10 +1,13 @@
 # JUnit Formatter API Reference
 
+
 The JUnit formatter produces XML reports in JUnit format, providing test and coverage results compatible with CI/CD systems, test runners, and reporting tools that support the JUnit XML standard.
 
 ## Overview
 
+
 The JUnit formatter generates reports with these key features:
+
 
 - Full compliance with JUnit XML schema
 - Seamless integration with CI/CD systems (Jenkins, GitHub Actions, GitLab CI)
@@ -15,16 +18,24 @@ The JUnit formatter generates reports with these key features:
 - Hierarchical test suite organization
 - Custom attribute support for extended information
 
+
 ## Class Reference
+
 
 ### Inheritance
 
-```
+
+
+```text
 Formatter (Base)
   └── JUnitFormatter
 ```
 
+
+
 ### Class Definition
+
+
 
 ```lua
 ---@class JUnitFormatter : Formatter
@@ -32,9 +43,13 @@ Formatter (Base)
 local JUnitFormatter = Formatter.extend("junit", "xml")
 ```
 
+
+
 ## JUnit XML Format Specification
 
+
 The JUnit formatter produces XML conforming to the JUnit XML schema:
+
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -63,7 +78,11 @@ The JUnit formatter produces XML conforming to the JUnit XML schema:
 </testsuites>
 ```
 
+
+
 ### XML Schema Elements
+
+
 
 - `<testsuites>`: Root element containing multiple test suites
 - `<testsuite>`: Container for test cases from a single test file or module
@@ -76,11 +95,15 @@ The JUnit formatter produces XML conforming to the JUnit XML schema:
 - `<system-out>`: Captured standard output (optional)
 - `<system-err>`: Captured standard error (optional)
 
+
 ## Core Methods
+
 
 ### format(data, options)
 
+
 Formats test results or coverage data into JUnit XML format.
+
 
 ```lua
 ---@param data table Normalized test results or coverage data
@@ -90,9 +113,13 @@ Formats test results or coverage data into JUnit XML format.
 function JUnitFormatter:format(data, options)
 ```
 
+
+
 ### format_results(data, options)
 
+
 Specialized method for formatting test results into JUnit XML.
+
 
 ```lua
 ---@param data table Normalized test results data
@@ -102,9 +129,13 @@ Specialized method for formatting test results into JUnit XML.
 function JUnitFormatter:format_results(data, options)
 ```
 
+
+
 ### format_coverage(data, options)
 
+
 Specialized method for formatting coverage data into JUnit XML.
+
 
 ```lua
 ---@param data table Normalized coverage data
@@ -114,9 +145,13 @@ Specialized method for formatting coverage data into JUnit XML.
 function JUnitFormatter:format_coverage(data, options)
 ```
 
+
+
 ### generate(data, output_path, options)
 
+
 Generate and save a complete JUnit XML report.
+
 
 ```lua
 ---@param data table Test results or coverage data
@@ -127,10 +162,12 @@ Generate and save a complete JUnit XML report.
 function JUnitFormatter:generate(data, output_path, options)
 ```
 
+
+
 ## Configuration Options
 
-The JUnit formatter supports these configuration options:
 
+The JUnit formatter supports these configuration options:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `xml_version` | string | `"1.0"` | XML version declaration |
@@ -156,6 +193,8 @@ The JUnit formatter supports these configuration options:
 
 ### Configuration Example
 
+
+
 ```lua
 local reporting = require("lib.reporting")
 reporting.configure_formatter("junit", {
@@ -172,11 +211,16 @@ reporting.configure_formatter("junit", {
 })
 ```
 
+
+
 ## CI/CD System Integration
+
 
 ### Jenkins Integration
 
+
 Jenkins natively supports JUnit XML reports:
+
 
 ```groovy
 // Jenkinsfile
@@ -197,31 +241,44 @@ pipeline {
 }
 ```
 
+
 Configure the JUnit Plugin in Jenkins:
+
+
 1. Ensure the JUnit plugin is installed (usually included by default)
 2. Add a post-build action to "Publish JUnit test result report"
 3. Set the "Test report XMLs" field to the path of your JUnit XML files (e.g., `**/junit-results.xml`)
 
+
 ### GitHub Actions Integration
 
+
+
 ```yaml
+
 # .github/workflows/test.yml
+
+
 name: Test
 on: [push, pull_request]
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+
+
       - uses: actions/checkout@v2
-      
+
       - name: Setup Lua
+
         uses: leafo/gh-actions-lua@v8
-      
+
       - name: Run tests
+
         run: lua test.lua --format=junit tests/
-      
+
       - name: Publish Test Report
+
         uses: mikepenz/action-junit-report@v2
         if: always() # always run even if tests fail
         with:
@@ -230,28 +287,50 @@ jobs:
           require_tests: true
 ```
 
+
+
 ### GitLab CI Integration
 
+
+
 ```yaml
+
 # .gitlab-ci.yml
+
+
 test:
   script:
+
+
     - lua test.lua --format=junit tests/
+
   artifacts:
     when: always
     reports:
       junit: junit-results.xml
 ```
 
+
+
 ### Azure DevOps Integration
 
+
+
 ```yaml
+
 # azure-pipelines.yml
+
+
 steps:
+
+
 - script: lua test.lua --format=junit tests/
+
   displayName: 'Run Tests'
 
+
 - task: PublishTestResults@2
+
   inputs:
     testResultsFormat: 'JUnit'
     testResultsFiles: '**/junit-results.xml'
@@ -260,30 +339,49 @@ steps:
   condition: succeededOrFailed()
 ```
 
+
+
 ### Circle CI Integration
 
+
+
 ```yaml
+
 # .circleci/config.yml
+
+
 version: 2.1
 jobs:
   test:
     docker:
+
+
       - image: cimg/base:2020.01
+
     steps:
+
+
       - checkout
       - run:
+
           name: Run tests
           command: lua test.lua --format=junit tests/
+
+
       - store_test_results:
+
           path: ./junit-results.xml
 ```
 
+
+
 ## Test Result Mapping
+
 
 ### Test Case Mapping
 
-The JUnit formatter maps test results to XML elements:
 
+The JUnit formatter maps test results to XML elements:
 | Test Result | XML Representation |
 |-------------|-------------------|
 | Passing test | `<testcase>` with no child elements |
@@ -294,7 +392,9 @@ The JUnit formatter maps test results to XML elements:
 
 ### Test Suite Organization
 
+
 Tests are organized into suites based on their source files or modules:
+
 
 ```xml
 <testsuites>
@@ -303,7 +403,7 @@ Tests are organized into suites based on their source files or modules:
     <testcase name="test_a1"/>
     <testcase name="test_a2"/>
   </testsuite>
-  
+
   <!-- Module B Tests -->
   <testsuite name="ModuleB">
     <testcase name="test_b1"/>
@@ -312,19 +412,28 @@ Tests are organized into suites based on their source files or modules:
 </testsuites>
 ```
 
+
+
 ### Hierarchical Test Names
 
+
 When using `test_naming = "hierarchical"`, nested describes are represented in test names:
+
 
 ```xml
 <testcase name="Database Connection when credentials are valid connects successfully"/>
 ```
 
+
+
 ## Coverage Data in JUnit Format
+
 
 Coverage data can be included in JUnit reports in two ways:
 
 ### 1. As Properties (Default)
+
+
 
 ```xml
 <testsuite name="AllTests">
@@ -340,9 +449,13 @@ Coverage data can be included in JUnit reports in two ways:
 </testsuite>
 ```
 
+
+
 ### 2. As Test Cases
 
+
 When using `coverage_as_testcases = true`:
+
 
 ```xml
 <testsuite name="Coverage">
@@ -350,12 +463,12 @@ When using `coverage_as_testcases = true`:
   <testcase name="Overall Coverage" classname="coverage">
     <system-out>Total Files: 10, Total Lines: 500, Covered: 350 (70.0%)</system-out>
   </testcase>
-  
+
   <!-- Each file as a test case - passing if above threshold -->
   <testcase name="lib/module.lua" classname="coverage">
     <system-out>Lines: 100, Covered: 85 (85.0%)</system-out>
   </testcase>
-  
+
   <!-- Failed coverage appears as test failure -->
   <testcase name="lib/other.lua" classname="coverage">
     <failure message="Coverage below threshold" type="CoverageFailure">
@@ -366,9 +479,13 @@ When using `coverage_as_testcases = true`:
 </testsuite>
 ```
 
+
+
 ## Custom Attributes Support
 
+
 Add custom attributes to XML elements:
+
 
 ```lua
 reporting.configure_formatter("junit", {
@@ -392,7 +509,9 @@ reporting.configure_formatter("junit", {
 })
 ```
 
+
 This produces XML with custom attributes:
+
 
 ```xml
 <testsuites project="Firmo" version="3.0.0" language="Lua">
@@ -402,11 +521,16 @@ This produces XML with custom attributes:
 </testsuites>
 ```
 
+
+
 ## Error and Failure Handling
+
 
 ### Failure Representation
 
+
 Test assertion failures are represented with the `<failure>` element:
+
 
 ```xml
 <testcase name="test_equals" classname="math_test">
@@ -417,9 +541,13 @@ Test assertion failures are represented with the `<failure>` element:
 </testcase>
 ```
 
+
+
 ### Error Representation
 
+
 Runtime errors use the `<error>` element:
+
 
 ```xml
 <testcase name="test_division" classname="math_test">
@@ -430,9 +558,13 @@ Runtime errors use the `<error>` element:
 </testcase>
 ```
 
+
+
 ### Stack Trace Inclusion
 
+
 Stack traces can be included in error and failure messages:
+
 
 ```lua
 reporting.configure_formatter("junit", {
@@ -442,7 +574,9 @@ reporting.configure_formatter("junit", {
 })
 ```
 
+
 This adds detailed stack information:
+
 
 ```xml
 <error message="Runtime error">
@@ -454,9 +588,14 @@ This adds detailed stack information:
 </error>
 ```
 
+
+
 ## Skipped Test Support
 
+
 ### Simple Skipped Tests
+
+
 
 ```xml
 <testcase name="test_feature" classname="feature_test">
@@ -464,7 +603,11 @@ This adds detailed stack information:
 </testcase>
 ```
 
+
+
 ### Pending Tests
+
+
 
 ```xml
 <testcase name="test_upcoming" classname="upcoming_test">
@@ -472,11 +615,14 @@ This adds detailed stack information:
 </testcase>
 ```
 
+
+
 ### Conditional Skips
+
+
 
 ```xml
 <testcase name="test_windows_only" classname="os_test">
   <skipped message="Skipped: Test only applicable on Windows"/>
 </testcase>
 ```
-

@@ -1,20 +1,24 @@
 # Configuration Details Knowledge
 
+
 ## Purpose
+
+
 Provide detailed configuration documentation for all Firmo modules and features.
 
 ## Configuration System
+
+
+
 ```lua
 -- Load configuration
 local config = require("lib.core.central_config")
 config.load_from_file(".firmo-config.lua")
-
 -- Module-specific configuration
 config.configure_module("module_name", {
   option1 = value1,
   option2 = value2
 })
-
 -- Complex configuration example
 local function setup_module_config()
   -- Define schema
@@ -38,13 +42,18 @@ local function setup_module_config()
       }
     }
   }
-  
+
   -- Register with validation
   config.register_module("my_module", schema, defaults)
 end
 ```
 
+
+
 ## Documentation Structure
+
+
+
 ```lua
 -- Standard documentation format
 local doc = {
@@ -83,13 +92,18 @@ local doc = {
 }
 ```
 
+
+
 ## Error Handling
+
+
+
 ```lua
 -- Configuration validation
 local function validate_config(config)
   local validator = require("lib.reporting.validation")
   local valid, errors = validator.validate(config)
-  
+
   if not valid then
     for _, err in ipairs(errors) do
       logger.error("Config validation error", {
@@ -99,16 +113,15 @@ local function validate_config(config)
     end
     return false
   end
-  
+
   return true
 end
-
 -- Safe configuration loading
 local function safe_load_config(path)
   local success, config = error_handler.try(function()
     return config.load_from_file(path)
   end)
-  
+
   if not success then
     logger.error("Failed to load config", {
       error = config,
@@ -116,12 +129,17 @@ local function safe_load_config(path)
     })
     return nil, config
   end
-  
+
   return config
 end
 ```
 
+
+
 ## Critical Rules
+
+
+
 - ALWAYS use central_config
 - NEVER hardcode configuration
 - ALWAYS validate config values
@@ -131,7 +149,11 @@ end
 - ALWAYS provide defaults
 - DOCUMENT all options
 
+
 ## Best Practices
+
+
+
 - Use clear option names
 - Document all options
 - Provide examples
@@ -143,7 +165,11 @@ end
 - Test thoroughly
 - Monitor usage
 
+
 ## Documentation Tips
+
+
+
 - Be concise
 - Use examples
 - Show defaults
@@ -155,7 +181,11 @@ end
 - Include errors
 - Show patterns
 
+
 ## Performance Tips
+
+
+
 - Cache config values
 - Validate efficiently
 - Handle large files

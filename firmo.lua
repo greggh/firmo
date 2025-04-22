@@ -478,7 +478,7 @@ if module_reset_module then
 end
 
 -- Try to load temp_file_integration if available
-local temp_file_integration_loaded, temp_file_integration = pcall(require, "lib.tools.temp_file_integration")
+local temp_file_integration_loaded, temp_file_integration = pcall(require, "lib.tools.filesystem.temp_file_integration")
 if temp_file_integration_loaded and temp_file_integration then
   -- Initialize the temp file integration system
   logger.info("Initializing temp file integration system")

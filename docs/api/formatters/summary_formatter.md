@@ -1,10 +1,13 @@
 # Summary Formatter API Reference
 
+
 The Summary formatter generates text-based coverage reports that provide a concise overview of coverage statistics, suitable for display in terminals, logs, and continuous integration output.
 
 ## Overview
 
+
 The Summary formatter produces text reports with these key features:
+
 
 - Compact, readable overview of coverage statistics
 - Terminal-friendly output with ANSI color support
@@ -15,16 +18,24 @@ The Summary formatter produces text reports with these key features:
 - Threshold-based highlighting
 - Direct terminal integration
 
+
 ## Class Reference
+
 
 ### Inheritance
 
-```
+
+
+```text
 Formatter (Base)
   └── SummaryFormatter
 ```
 
+
+
 ### Class Definition
+
+
 
 ```lua
 ---@class SummaryFormatter : Formatter
@@ -32,30 +43,37 @@ Formatter (Base)
 local SummaryFormatter = Formatter.extend("summary", "txt")
 ```
 
+
+
 ## Text-Based Summary Format
+
 
 The Summary formatter provides several output formats tailored for different use cases:
 
 ### Compact Format (Default)
 
-```
+
+
+```text
 Coverage Summary:
 Total Files:      25
 Total Lines:      2547
 Covered Lines:    1876
 Coverage:         73.7%
 Execution:        82.5%
-
 Files below threshold (<75%):
   lib/module.lua              64.3%  ████████████▒▒▒▒▒▒
   lib/other.lua               58.9%  ███████████▒▒▒▒▒▒▒
 ```
 
+
+
 ### Detailed Format
 
-```
-Coverage Summary (2025-04-12 21:45:14)
 
+
+```text
+Coverage Summary (2025-04-12 21:45:14)
 Overall Statistics:
   Files:               25
   Total Lines:         2547
@@ -63,24 +81,25 @@ Overall Statistics:
   Executed Lines:      2101 (82.5%)
   Uncovered Lines:     671 (26.3%)
   Function Coverage:   85.2%
-
 Files by Coverage:
   ✓ lib/core/utils.lua              95.2%  ███████████████████▒
   ✓ lib/reporting/format.lua        92.1%  ██████████████████▒▒
   ✓ lib/coverage/init.lua           88.4%  █████████████████▒▒▒
   ⚠ lib/module.lua                  64.3%  ████████████▒▒▒▒▒▒
   ✗ lib/other.lua                   58.9%  ███████████▒▒▒▒▒▒▒
-
 Performance:
   Execution Time: 1.23s
   Processed 2547 lines at 2070 lines/s
 ```
 
+
+
 ### Hierarchical Format
 
-```
-Coverage Summary:
 
+
+```text
+Coverage Summary:
 lib/ (75.2%)
   ├── core/ (89.4%)
   │   ├── utils.lua               95.2%  ███████████████████▒
@@ -93,11 +112,16 @@ lib/ (75.2%)
       └── format.lua              86.7%  █████████████████▒▒▒
 ```
 
+
+
 ## Core Methods
+
 
 ### format(data, options)
 
+
 Formats coverage data into text summary.
+
 
 ```lua
 ---@param data table Normalized coverage data
@@ -107,9 +131,13 @@ Formats coverage data into text summary.
 function SummaryFormatter:format(data, options)
 ```
 
+
+
 ### generate(data, output_path, options)
 
+
 Generate and save a complete text summary report.
+
 
 ```lua
 ---@param data table Coverage data
@@ -120,10 +148,12 @@ Generate and save a complete text summary report.
 function SummaryFormatter:generate(data, output_path, options)
 ```
 
+
+
 ## Configuration Options
 
-The Summary formatter supports these configuration options:
 
+The Summary formatter supports these configuration options:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `style` | string | `"compact"` | Output style ("compact", "detailed", "hierarchical") |
@@ -154,6 +184,8 @@ The Summary formatter supports these configuration options:
 
 ### Configuration Example
 
+
+
 ```lua
 local reporting = require("lib.reporting")
 reporting.configure_formatter("summary", {
@@ -174,9 +206,13 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
+
 ## Color and Formatting Support
 
+
 The Summary formatter supports ANSI color codes for terminal output:
+
 
 ```lua
 -- Configure with custom colors
@@ -195,9 +231,13 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
+
 ### Disabling Colors
 
+
 For environments that don't support ANSI codes:
+
 
 ```lua
 -- CI/CD environment with no color support
@@ -214,9 +254,14 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
+
 ## Output Customization
 
+
 ### Custom Progress Bars
+
+
 
 ```lua
 -- Custom progress bar appearance
@@ -230,9 +275,12 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
 Produces bars like: `[======    ]` instead of the default `██████▒▒▒▒`.
 
 ### Custom Thresholds
+
+
 
 ```lua
 -- Custom thresholds for coverage quality
@@ -250,7 +298,11 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
+
 ### Custom File Selection
+
+
 
 ```lua
 -- Show only specific files
@@ -262,76 +314,82 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
+
 ## Terminal Integration
 
+
 The Summary formatter is designed for direct terminal output:
+
 
 ```lua
 local reporting = require("lib.reporting")
 local coverage = require("lib.coverage")
-
 -- Run tests with coverage
 coverage.start()
 -- Run tests here...
 coverage.stop()
-
 -- Generate summary for terminal output
 local data = coverage.get_data()
 local summary = reporting.format_coverage(data, "summary")
-
 -- Print directly to terminal
 print(summary)
-
 -- For CI environments, save to file as well
 reporting.write_file("coverage-summary.txt", summary)
 ```
 
+
+
 ### Integration with Test Runner
+
+
 
 ```lua
 -- In runner.lua
 local function run_tests_with_coverage(args)
   -- Start coverage
   coverage.start()
-  
+
   -- Run tests
   local success = true
   for _, test_file in ipairs(args.files) do
     success = success and run_test_file(test_file)
   end
-  
+
   -- Stop coverage
   coverage.stop()
-  
+
   -- Print summary to terminal
   local summary_config = {
     color = args.color ~= false,
     style = args.verbose and "detailed" or "compact",
     max_files = args.verbose and 0 or 10
   }
-  
+
   local summary = reporting.format_coverage(
     coverage.get_data(), 
     "summary",
     summary_config
   )
-  
+
   print("\nCoverage Summary:")
   print(summary)
-  
+
   -- Save detailed reports if requested
   if args.save_reports then
     reporting.save_coverage_report("coverage-report.html", coverage.get_data(), "html")
   end
-  
+
   return success
 end
 ```
 
+
+
 ## Statistics Calculation
 
-The Summary formatter calculates these statistics:
 
+The Summary formatter calculates these statistics:
 | Statistic | Description | Calculation |
 |-----------|-------------|-------------|
 | Total Files | Number of files in coverage data | `#data.files` |
@@ -344,7 +402,9 @@ The Summary formatter calculates these statistics:
 
 ### Custom Statistics
 
+
 Add custom statistics to the summary:
+
 
 ```lua
 -- Add custom metrics
@@ -378,11 +438,16 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
+
 ## File Filtering
+
 
 The Summary formatter supports robust file filtering:
 
 ### Pattern-Based Filtering
+
+
 
 ```lua
 -- Include only specific files
@@ -392,7 +457,11 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
+
 ### Coverage-Based Filtering
+
+
 
 ```lua
 -- Show files needing attention
@@ -404,7 +473,11 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
+
 ### Combined Filtering
+
+
 
 ```lua
 -- Focused view of core modules needing work
@@ -418,11 +491,16 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
+
 ## Output Styles
+
 
 ### Compact Style
 
+
 The compact style focuses on a brief summary with minimal file details:
+
 
 ```lua
 reporting.configure_formatter("summary", {
@@ -434,20 +512,25 @@ reporting.configure_formatter("summary", {
 })
 ```
 
+
 Output example:
 
-```
+
+```text
 Coverage Summary:
 Files: 25 | Lines: 2547 | Covered: 73.7% | Executed: 82.5%
-
 Files below threshold (<75%):
   lib/module.lua              64.3%  █████████▒▒▒▒▒
   lib/other.lua               58.9%  ████████▒▒▒▒▒▒
 ```
 
+
+
 ### Detailed Style
 
+
 The detailed style provides comprehensive information:
+
 
 ```lua
 reporting.configure_formatter("summary", {
@@ -459,5 +542,5 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-Output example:
 
+Output example:

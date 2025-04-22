@@ -1,13 +1,18 @@
 # Watcher Knowledge
 
+
 ## Purpose
+
+
 File system watching for continuous test execution.
 
 ## Watcher Usage
+
+
+
 ```lua
 -- Basic file watching
 local watcher = require("lib.tools.watcher")
-
 -- Watch directory with options
 watcher.watch("src/", {
   patterns = { "*.lua" },
@@ -20,7 +25,6 @@ watcher.watch("src/", {
     end
   end
 })
-
 -- Watch multiple paths
 watcher.watch_paths({
   "src/",
@@ -28,7 +32,6 @@ watcher.watch_paths({
 }, {
   patterns = { "*.lua", "*.test.lua" }
 })
-
 -- Complex watching scenario
 local function setup_test_watcher()
   -- Configure watcher
@@ -48,29 +51,34 @@ local function setup_test_watcher()
       debounce = 100
     }
   }
-  
+
   -- Create watcher
   local watcher = require("lib.tools.watcher").new(config)
-  
+
   -- Add event handlers
   watcher.on("change", function(event)
     if event.type == "modified" then
       run_tests(event.path)
     end
   end)
-  
+
   watcher.on("error", function(err)
     logger.error("Watch error", {
       error = err,
       category = err.category
     })
   end)
-  
+
   return watcher
 end
 ```
 
+
+
 ## Error Handling
+
+
+
 ```lua
 -- Error handling pattern
 local success, err = watcher.start({
@@ -85,22 +93,20 @@ local success, err = watcher.start({
     return watcher.restart()
   end
 })
-
 -- Resource cleanup
 local function with_watcher(config, callback)
   local watcher = require("lib.tools.watcher").new(config)
   local result, err = error_handler.try(function()
     return callback(watcher)
   end)
-  
+
   watcher:stop()
-  
+
   if not result then
     return nil, err
   end
   return result
 end
-
 -- Handle watch errors
 watcher.on("error", function(err)
   if err.code == "ENOSPC" then
@@ -115,7 +121,12 @@ watcher.on("error", function(err)
 end)
 ```
 
+
+
 ## Critical Rules
+
+
+
 - Handle rapid changes
 - Clean up watchers
 - Limit watch paths
@@ -125,7 +136,11 @@ end)
 - Handle interrupts
 - Clean up properly
 
+
 ## Best Practices
+
+
+
 - Set debounce time
 - Filter file types
 - Handle recursion
@@ -137,7 +152,11 @@ end)
 - Check permissions
 - Use efficient patterns
 
+
 ## Performance Tips
+
+
+
 - Optimize patterns
 - Limit watch depth
 - Handle large dirs

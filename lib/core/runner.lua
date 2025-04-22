@@ -66,7 +66,7 @@ local discover_module = try_require("lib.tools.discover")
 local test_definition = try_require("lib.core.test_definition")
 local central_config = try_require("lib.core.central_config")
 local parallel_module = try_require("lib.tools.parallel")
-local temp_file = try_require("lib.tools.temp_file")
+local temp_file = try_require("lib.tools.filesystem.temp_file")
 
 --- Output formatting options for the test runner
 ---@class FormatOptions

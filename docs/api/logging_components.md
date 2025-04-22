@@ -1,8 +1,11 @@
 # Logging Module Components
 
+
 The firmo logging system consists of several integrated components that together provide a comprehensive, flexible, and performance-optimized logging solution. This document details the individual components and their APIs.
 
 ## Table of Contents
+
+
 
 1. [Core Logging Module](#core-logging-module)
 2. [Export Module](#export-module)
@@ -10,13 +13,16 @@ The firmo logging system consists of several integrated components that together
 4. [Formatter Integration Module](#formatter-integration-module)
 5. [Component Interactions](#component-interactions)
 
+
 ## Core Logging Module
 
-**File:** `lib/tools/logging.lua`
 
+**File:** `lib/tools/logging.lua`
 The core logging module provides the central logging functionality, including logger creation, configuration, and basic log output.
 
 ### Key Features
+
+
 
 - Named logger instances with independent configuration
 - Hierarchical log levels (FATAL, ERROR, WARN, INFO, DEBUG, TRACE)
@@ -28,21 +34,28 @@ The core logging module provides the central logging functionality, including lo
 - Performance-optimized logging with buffer support
 - Integration with the central configuration system
 
+
 ### API Reference
 
+
 #### Logger Creation
+
+
 
 ```lua
 -- Import the logging module
 local logging = require("lib.tools.logging")
-
 -- Create a logger for your module
 local logger = logging.get_logger("my_module")
 ```
 
+
+
 #### Log Methods
 
+
 Each logger provides these methods:
+
 
 ```lua
 -- Log levels from highest to lowest priority
@@ -54,7 +67,11 @@ logger.debug("Function called with parameters", {param1 = "value", param2 = 123}
 logger.trace("Detailed execution information", {state = {...}})
 ```
 
+
+
 #### Configuration
+
+
 
 ```lua
 -- Global configuration
@@ -77,14 +94,17 @@ logging.configure({
     environment = "production"
   }
 })
-
 -- Module-specific configuration
 logging.set_module_level("database", logging.LEVELS.DEBUG)
 logging.filter_module("ui*")  -- Wildcard pattern for module filtering
 logging.blacklist_module("metrics")  -- Hide logs from this module
 ```
 
+
+
 #### Performance Optimization
+
+
 
 ```lua
 -- Check if level is enabled before expensive operations
@@ -93,24 +113,25 @@ if logger.is_debug_enabled() then
   local stats = gather_detailed_statistics()
   logger.debug("Performance statistics", stats)
 end
-
 -- Use buffered logging for high-volume scenarios
 local buffered_logger = logging.create_buffered_logger("metrics", {
   buffer_size = 1000,        -- Buffer up to 1000 messages
   flush_interval = 10,       -- Flush every 10 seconds
   output_file = "metrics.log" -- Write to specific file
 })
-
 -- Flush buffers manually when needed
 logging.flush()
 ```
 
+
+
 #### Central Configuration Integration
+
+
 
 ```lua
 -- Configure logging based on central config
 logging.configure_from_config("my_module")
-
 -- Configure based on command-line options
 logging.configure_from_options("my_module", {
   debug = true,     -- Sets DEBUG level if true
@@ -118,20 +139,27 @@ logging.configure_from_options("my_module", {
 })
 ```
 
+
+
 ## Export Module
 
-**File:** `lib/tools/logging/export.lua`
 
+**File:** `lib/tools/logging/export.lua`
 The export module provides functionality for exporting logs to various external logging platforms and formats.
 
 ### Key Features
+
+
 
 - Export logs to popular logging platforms (Elasticsearch, Logstash, Splunk, Datadog, Loki)
 - Convert between log formats (text, JSON, platform-specific)
 - Generate configuration files for logging platforms
 - Create real-time log exporters for streaming logs to external systems
 
+
 ### Supported Platforms
+
+
 
 - **Elasticsearch**: JSON-based search and analytics engine
 - **Logstash**: Log collection, parsing, and forwarding
@@ -139,18 +167,20 @@ The export module provides functionality for exporting logs to various external 
 - **Datadog**: Cloud monitoring and analytics
 - **Loki**: Grafana's log aggregation system
 
+
 ### API Reference
 
+
 #### Platform-Specific Export
+
+
 
 ```lua
 -- Import the export module
 local log_export = require("lib.tools.logging.export")
-
 -- Get list of supported platforms
 local platforms = log_export.get_supported_platforms()
 -- Returns: {"logstash", "elasticsearch", "splunk", "datadog", "loki"}
-
 -- Export logs to a platform-specific format
 local entries, err = log_export.export_to_platform(
   log_entries,           -- Array of log entries
@@ -162,7 +192,11 @@ local entries, err = log_export.export_to_platform(
 )
 ```
 
+
+
 #### Configuration File Generation
+
+
 
 ```lua
 -- Create a configuration file for a specific platform
@@ -176,7 +210,11 @@ local result, err = log_export.create_platform_config(
 )
 ```
 
+
+
 #### Log File Conversion
+
+
 
 ```lua
 -- Convert a log file to a platform-specific format
@@ -190,7 +228,6 @@ local result, err = log_export.create_platform_file(
     sourcetype = "app:logs"
   }
 )
-
 -- Result contains:
 -- {
 --   entries_processed = 157,  -- Number of entries processed
@@ -199,7 +236,11 @@ local result, err = log_export.create_platform_file(
 -- }
 ```
 
+
+
 #### Real-Time Exporters
+
+
 
 ```lua
 -- Create a real-time log exporter
@@ -211,7 +252,6 @@ local exporter, err = log_export.create_realtime_exporter(
     environment = "production"
   }
 )
-
 -- Use the exporter
 local formatted_entry = exporter.export({
   timestamp = "2025-03-26T14:32:45",
@@ -223,19 +263,22 @@ local formatted_entry = exporter.export({
     error = "Connection refused"
   }
 })
-
 -- Exporter contains HTTP endpoint information if needed
 local endpoint = exporter.http_endpoint
 -- { method = "POST", url = "https://http-intake.logs.datadoghq.com/v1/input", ... }
 ```
 
+
+
 ## Search Module
 
-**File:** `lib/tools/logging/search.lua`
 
+**File:** `lib/tools/logging/search.lua`
 The search module provides functionality for searching and analyzing log files.
 
 ### Key Features
+
+
 
 - Search log files with flexible filtering criteria
 - Parse log files in various formats (text, JSON)
@@ -244,14 +287,17 @@ The search module provides functionality for searching and analyzing log files.
 - Export log data to different formats (CSV, JSON, HTML)
 - Create real-time log processors for continuous log analysis
 
+
 ### API Reference
 
+
 #### Basic Log Search
+
+
 
 ```lua
 -- Import the search module
 local log_search = require("lib.tools.logging.search")
-
 -- Search logs with various criteria
 local results = log_search.search_logs({
   log_file = "logs/application.log", -- Log file to search
@@ -262,7 +308,6 @@ local results = log_search.search_logs({
   message_pattern = "connection",    -- Pattern to search for in messages
   limit = 100                        -- Maximum results to return
 })
-
 -- Results contain:
 -- {
 --   entries = { ... },  -- Array of matching log entries
@@ -271,7 +316,11 @@ local results = log_search.search_logs({
 -- }
 ```
 
+
+
 #### Log Statistics
+
+
 
 ```lua
 -- Get statistics about a log file
@@ -279,7 +328,6 @@ local stats = log_search.get_log_stats(
   "logs/application.log",
   { format = "json" }  -- Optional format (defaults to autodetect)
 )
-
 -- Stats contain:
 -- {
 --   total_entries = 1542,   -- Total number of log entries
@@ -303,7 +351,11 @@ local stats = log_search.get_log_stats(
 -- }
 ```
 
+
+
 #### Log Export
+
+
 
 ```lua
 -- Export logs to a different format
@@ -315,7 +367,6 @@ local result = log_search.export_logs(
     source_format = "json"     -- Source format (default: autodetect)
   }
 )
-
 -- Result contains:
 -- {
 --   entries_processed = 1542,  -- Number of entries processed
@@ -323,7 +374,11 @@ local result = log_search.export_logs(
 -- }
 ```
 
+
+
 #### Real-Time Log Processing
+
+
 
 ```lua
 -- Create a log processor for real-time analysis
@@ -332,7 +387,7 @@ local processor = log_search.get_log_processor({
   format = "json",                    -- Output format
   level = "ERROR",                    -- Only process errors
   module = "database*",               -- Only process database modules
-  
+
   -- Custom callback for each log entry
   callback = function(log_entry)
     -- Do custom processing here
@@ -340,7 +395,6 @@ local processor = log_search.get_log_processor({
     return true -- Return false to stop processing
   end
 })
-
 -- Process a log entry
 processor.process({
   timestamp = "2025-03-26 14:35:22",
@@ -349,12 +403,15 @@ processor.process({
   message = "Connection failed",
   params = { host = "db.example.com" }
 })
-
 -- Close the processor when done
 processor.close()
 ```
 
+
+
 #### Log Export Adapters
+
+
 
 ```lua
 -- Create an adapter for a specific platform
@@ -365,7 +422,6 @@ local adapter = log_search.create_export_adapter(
     environment = "production"
   }
 )
-
 -- Use the adapter to format a log entry
 local formatted = adapter({
   timestamp = "2025-03-26 14:35:22",
@@ -376,13 +432,17 @@ local formatted = adapter({
 })
 ```
 
+
+
 ## Formatter Integration Module
 
-**File:** `lib/tools/logging/formatter_integration.lua`
 
+**File:** `lib/tools/logging/formatter_integration.lua`
 The formatter integration module provides integration between the logging system and test output formatters.
 
 ### Key Features
+
+
 
 - Enhance test formatters with logging capabilities
 - Create test-specific loggers with context
@@ -390,17 +450,19 @@ The formatter integration module provides integration between the logging system
 - Create specialized formatters for log-friendly output
 - Step-based logging for test execution phases
 
+
 ### API Reference
 
+
 #### Formatter Enhancement
+
+
 
 ```lua
 -- Import the formatter integration module
 local formatter_integration = require("lib.tools.logging.formatter_integration")
-
 -- Enhance all registered formatters with logging capabilities
 local formatters = formatter_integration.enhance_formatters()
-
 -- Enable logging for a specific formatter
 formatter_integration.enable_formatter_logging(
   "html",                   -- Formatter name
@@ -408,7 +470,11 @@ formatter_integration.enable_formatter_logging(
 )
 ```
 
+
+
 #### Test-Specific Logging
+
+
 
 ```lua
 -- Create a test-specific logger with context
@@ -419,19 +485,21 @@ local test_logger = formatter_integration.create_test_logger(
     test_type = "integration"
   }
 )
-
 -- Log with test context automatically included
 test_logger.info("Starting database connection test")
 -- Result: "[INFO] [test.Database_Connection_Test] Starting database connection test 
 --          (test_name=Database Connection Test, component=database, test_type=integration)"
-
 -- Create a step-specific logger
 local step_logger = test_logger.step("Connection establishment")
 step_logger.info("Connecting to database")
 -- Result includes step name in the context
 ```
 
+
+
 #### Log Collection for Tests
+
+
 
 ```lua
 -- Start capturing logs for a specific test
@@ -439,13 +507,10 @@ formatter_integration.capture_start(
   "Database Connection Test",   -- Test name
   "test_123"                    -- Unique test ID
 )
-
 -- Run the test (logs are captured)
 test_function()
-
 -- End capture and get collected logs
 local logs = formatter_integration.capture_end("test_123")
-
 -- Attach logs to test results
 local enhanced_results = formatter_integration.attach_logs_to_results(
   test_results,  -- Original test results
@@ -453,23 +518,29 @@ local enhanced_results = formatter_integration.attach_logs_to_results(
 )
 ```
 
+
+
 #### Custom Log Formatter
+
+
 
 ```lua
 -- Create a specialized formatter for log output
 local log_formatter = formatter_integration.create_log_formatter()
-
 -- Initialize with options
 log_formatter:init({
   output_file = "test-results.log.json",
   format = "json"
 })
-
 -- Format test results with enhanced logging
 local result = log_formatter:format(test_results)
 ```
 
+
+
 #### Integration with Reporting System
+
+
 
 ```lua
 -- Integrate logging with the test reporting system
@@ -481,56 +552,60 @@ local reporting = formatter_integration.integrate_with_reporting({
 })
 ```
 
+
+
 ## Component Interactions
 
+
 The logging system components work together in the following ways:
+
 
 1. **Core Logging Module**
    - Provides the main API that users interact with directly
    - Manages configuration, levels, and module filtering
    - Handles writing logs to console and files
    - Lazy-loads other components when needed
-
 2. **Export Module**
    - Used by core module when exporting logs to external platforms
    - Provides adapters for different log analysis systems
    - Handles format conversion for external consumption
-
 3. **Search Module**
    - Separate utility for analyzing existing log files
    - Can be used independently for log analysis tasks
    - Provides export functionality for log reports
-
 4. **Formatter Integration Module**
    - Bridges logging and test reporting systems
    - Enhances test formatters with logging capabilities
    - Provides context-aware logging during test execution
 
+
 ### Usage Flow
+
+
 
 1. **Application Initialization**
    - Import core logging module
    - Configure global settings
    - Create module-specific loggers
-
 2. **Runtime Logging**
    - Applications use module-specific loggers
    - Logs are output to console and/or files
    - Buffer management and rotation happen automatically
-
 3. **Test Integration**
    - Formatter integration enhances test output
    - Test-specific loggers provide context
    - Test logs are collected and attached to results
-
 4. **Log Analysis**
    - Search module analyzes existing log files
    - Export module converts to external formats
    - Log data is presented in reports or dashboards
 
+
 ### Configuration Flow
 
+
 The logging system follows this configuration priority:
+
 
 1. Direct configuration (`logging.configure()`)
 2. Central configuration system (`.firmo-config.lua`)

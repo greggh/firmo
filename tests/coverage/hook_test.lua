@@ -4,7 +4,7 @@ local before, after = firmo.before, firmo.after
 local coverage = require("lib.coverage")
 local central_config = require("lib.core.central_config")
 local filesystem = require("lib.tools.filesystem")
-local temp_file = require("lib.tools.temp_file")
+local temp_file = require("lib.tools.filesystem.temp_file")
 local test_helper = require("lib.tools.test_helper")
 local error_handler = require("lib.tools.error_handler")
 

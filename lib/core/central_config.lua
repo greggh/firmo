@@ -208,28 +208,54 @@ end
 
 ---@private
 ---@param obj any The object to copy
+---@param cache table Cache table for cycle detection
 ---@return any A deep copy of the input object
--- Deep copy helper
-local function deep_copy(obj)
+-- Deep copy helper with cycle detection to prevent infinite recursion
+local function deep_copy(obj, cache)
   -- Input validation
-  if obj ~= nil and type(obj) ~= "table" then
-    -- For non-tables, just return the value
-    return obj
-  end
-
   if obj == nil then
     return nil
   end
-
-  local result = {}
-  for k, v in pairs(obj) do
-    if type(v) == "table" then
-      result[k] = deep_copy(v)
-    else
-      result[k] = v
-    end
+  
+  if type(obj) ~= "table" then
+    -- For non-tables, just return the value
+    return obj
   end
-
+  
+  -- Check if we've already copied this table (cycle detection)
+  if cache[obj] then
+    return cache[obj]
+  end
+  
+  -- Create new table and register it in cache immediately to handle cycles
+  local result = {}
+  cache[obj] = result
+  
+  -- Copy all key/value pairs
+  for k, v in pairs(obj) do
+    -- Handle table keys - check cache first to prevent recursion
+    local key_copy
+    if type(k) == "table" then
+      -- Check if key is already in cache before recursive copy
+      if cache[k] then
+        key_copy = cache[k]
+      else
+        key_copy = deep_copy(k, cache)
+      end
+    else
+      key_copy = k
+    end
+    
+    -- Handle values (already checks cache in deep_copy)
+    result[key_copy] = deep_copy(v, cache)
+  end
+  
+  -- Copy metatable if exists
+  local mt = getmetatable(obj)
+  if mt then
+    setmetatable(result, deep_copy(mt, cache))
+  end
+  
   return result
 end
 
@@ -311,12 +337,12 @@ function M.get(path, default)
 
   -- Return all config if no path specified
   if not path or path == "" then
-    return deep_copy(config.values)
+    return M.serialize(config.values)
   end
 
   local parts = path_to_parts(path)
   if #parts == 0 then
-    return deep_copy(config.values)
+    return M.serialize(config.values)
   end
 
   -- Navigate to value
@@ -361,7 +387,7 @@ function M.get(path, default)
 
   -- Return copy to prevent direct modification
   if type(current) == "table" then
-    return deep_copy(current)
+    return M.serialize(current)
   end
 
   return current
@@ -427,7 +453,7 @@ function M.set(path, value)
     end
 
     -- Set the root config (with deep copy)
-    config.values = deep_copy(value)
+    config.values = M.serialize(value)
     log("debug", "Set complete configuration", { keys = table.concat({}, ",") })
     return M
   end
@@ -436,7 +462,7 @@ function M.set(path, value)
   if #parts == 0 then
     -- Empty path parts (shouldn't normally happen with non-empty path)
     if type(value) == "table" then
-      config.values = deep_copy(value)
+      config.values = M.serialize(value)
       log("debug", "Set complete configuration (empty parts)", { path = path })
     else
       local err = error_handler.validation_error("Cannot set root config to non-table value", {
@@ -477,7 +503,7 @@ function M.set(path, value)
 
   -- Set the value (deep copy if it's a table)
   if type(value) == "table" then
-    parent[last_key] = deep_copy(value)
+    parent[last_key] = M.serialize(value)
   else
     parent[last_key] = value
   end
@@ -936,7 +962,7 @@ function M.register_module(module_name, schema, defaults)
       })
       log("warn", err.message, err.context)
     else
-      config.schemas[module_name] = deep_copy(schema) -- Use deep_copy to prevent modification
+      config.schemas[module_name] = M.serialize(schema) -- Use serialize to prevent modification
       log("debug", "Registered schema for module", {
         module = module_name,
         schema_keys = table.concat(
@@ -965,35 +991,60 @@ function M.register_module(module_name, schema, defaults)
       log("warn", err.message, err.context)
     else
       -- Store defaults (with deep copy to prevent modification)
-      config.defaults[module_name] = deep_copy(defaults)
+      config.defaults[module_name] = M.serialize(defaults)
 
       -- Make sure the module's config section exists
       config.values[module_name] = config.values[module_name] or {}
 
+      -- Simplified and more robust default application function with recursion protection
       -- Simplified and more robust default application function
-      local function apply_defaults(target, source)
+      local function apply_defaults(target, source, seen)
+        -- Initialize tracking table on first call
+        seen = seen or {}
+        
+        -- Validate input types
+        if type(target) ~= "table" or type(source) ~= "table" then
+          log("warn", "Invalid types in apply_defaults", {
+            module = module_name,
+            target_type = type(target),
+            source_type = type(source)
+          })
+          return
+        end
+        
+        -- Direct table reference check for cycle detection
+        if seen[source] then
+          log("warn", "Circular reference detected in apply_defaults", {
+            module = module_name
+          })
+          return
+        end
+        
+        -- Mark this source table as seen using direct reference
+        seen[source] = true
+        
         for k, v in pairs(source) do
+          -- Check if key exists in target
           if target[k] == nil then
             -- No value exists, so copy from defaults
             if type(v) == "table" then
-              target[k] = deep_copy(v) -- Use deep_copy for tables
+              target[k] = M.serialize(v) -- Use serialize for tables
             else
               target[k] = v -- Direct assignment for simple values
             end
+            
             log("debug", "Applied default value for key", {
               module = module_name,
               key = k,
               value_type = type(v),
             })
           elseif type(target[k]) == "table" and type(v) == "table" then
-            -- Both are tables, so merge recursively
-            apply_defaults(target[k], v)
+            -- Both are tables, so merge recursively - pass the same seen table
+            apply_defaults(target[k], v, seen)
           end
           -- If value exists and is not a table, keep the existing value
         end
       end
-
-      -- Apply defaults to the module's configuration
       apply_defaults(config.values[module_name], defaults)
 
       log("debug", "Applied defaults for module", {
@@ -1444,8 +1495,7 @@ function M.load_from_file(path)
   end
 
   -- Apply loaded configuration
-  local old_config = deep_copy(config.values)
-
+  local old_config = M.serialize(config.values)
   -- Store and apply the loaded configuration
   local merged_config, err = deep_merge(config.values, user_config)
   if err then
@@ -1619,7 +1669,7 @@ function M.save_to_file(path)
   end
 
   -- Create a copy of the config to serialize
-  local config_to_save = deep_copy(config.values)
+  local config_to_save = M.serialize(config.values)
 
   -- Generate Lua code
   local serialized_config, err = serialize(config_to_save)
@@ -1703,8 +1753,7 @@ function M.reset(module_name)
   -- If module_name is nil, completely reset everything
   if module_name == nil then
     -- Reset everything for testing
-    local old_values = deep_copy(config.values)
-
+    local old_values = M.serialize(config.values)
     -- Clear all configuration data structures with a single operation
     config.values = {}
     config.schemas = {}
@@ -1723,8 +1772,7 @@ function M.reset(module_name)
     -- If there are no defaults, just clear the module's configuration
     if config.values[module_name] then
       -- Store old config for change notifications
-      local old_config = deep_copy(config.values[module_name])
-
+      local old_config = M.serialize(config.values[module_name])
       -- Clear the module's config
       config.values[module_name] = {}
 
@@ -1736,15 +1784,15 @@ function M.reset(module_name)
       log("debug", "No configuration or defaults to reset for module", { module = module_name })
     end
 
+    config.resetting = false -- Clear flag before returning
     return M
   end
 
   -- Copy the old configuration for change detection
-  local old_config = deep_copy(config.values[module_name])
+  local old_config = M.serialize(config.values[module_name])
 
   -- Reset to defaults (with deep copy to prevent modification of defaults)
-  config.values[module_name] = deep_copy(config.defaults[module_name])
-
+  config.values[module_name] = M.serialize(config.defaults[module_name])
   log("info", "Reset configuration for module to defaults", {
     module = module_name,
     default_count = (function()
@@ -1941,8 +1989,28 @@ end
 --- local str_copy = central_config.serialize("hello") -- Returns "hello"
 --- local num_copy = central_config.serialize(42) -- Returns 42
 --- local nil_copy = central_config.serialize(nil) -- Returns nil
+--- Creates a deep copy of an object with cycle detection
+--- This function creates a complete deep copy of the provided object, ensuring that
+--- modifications to the returned object don't affect the original. It's particularly
+--- useful for tables, where it recursively copies all nested tables. For non-table
+--- values, it simply returns the value itself.
+---
+--- The function creates a fresh cycle detection cache for each call, which allows
+--- it to safely handle circular references in tables and prevents infinite recursion,
+--- while avoiding memory leaks between operations.
+---
+--- @param obj any Object to serialize (deep copy)
+--- @return any Serialized (deep-copied) object
 M.serialize = function(obj)
-  local result = deep_copy(obj)
+  -- Handle non-tables directly for better performance
+  if type(obj) ~= "table" then
+    return obj
+  end
+  
+  -- Create a new cache for this copy operation to prevent memory leaks
+  local cache = {}
+  
+  local result = deep_copy(obj, cache)
   if type(result) ~= "table" and obj ~= nil then
     log("warn", "serialize was called on a non-table value", {
       value_type = type(obj),

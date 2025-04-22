@@ -1,44 +1,47 @@
 # Tools Testing Knowledge
 
+
 ## Purpose
+
+
 Test utility modules functionality and helper tools.
 
 ## File Operations
+
+
+
 ```lua
 -- Safe file operations
 local content, err = fs.read_file("test.txt")
 if not content then
   expect(err.category).to.equal("IO")
 end
-
 -- Directory operations
 local success, err = fs.create_directory("test_dir")
 expect(success).to.be_truthy()
-
 -- Path normalization
 local path = fs.normalize_path("dir/../file.txt")
 expect(path).to.equal("file.txt")
-
 -- Complex file operations
 describe("File System Operations", function()
   local test_dir
-  
+
   before_each(function()
     test_dir = test_helper.create_temp_test_directory()
   end)
-  
+
   it("handles large files", function()
     -- Create large test file
     local content = string.rep("x", 1024 * 1024) -- 1MB
     local path = test_dir.path .. "/large.txt"
-    
+
     -- Write in chunks
     local success = fs.write_file(path, content, {
       chunk_size = 1024,
       mode = "644"
     })
     expect(success).to.be_truthy()
-    
+
     -- Read in chunks
     local result = fs.read_file(path, {
       chunk_size = 1024
@@ -48,7 +51,12 @@ describe("File System Operations", function()
 end)
 ```
 
+
+
 ## Parser Testing
+
+
+
 ```lua
 -- Parse Lua code
 local ast, err = parser.parse([[
@@ -57,11 +65,9 @@ local ast, err = parser.parse([[
   end
 ]])
 expect(err).to_not.exist()
-
 -- Get executable lines
 local lines = parser.get_executable_lines(ast)
 expect(lines[2]).to.be_truthy() -- return line
-
 -- Complex parsing
 describe("Parser functionality", function()
   it("handles complex syntax", function()
@@ -74,28 +80,31 @@ describe("Parser functionality", function()
         return t
       end
     ]]
-    
+
     local ast = parser.parse(code)
     expect(ast).to.exist()
-    
+
     local info = parser.analyze(ast)
     expect(info.functions).to.have_length(3) -- main + 2 inner
   end)
 end)
 ```
 
+
+
 ## Error Handling
+
+
+
 ```lua
 -- Test error handler
 local success, result, err = error_handler.try(function()
   return risky_operation()
 end)
-
 if not success then
   expect(err.category).to.exist()
   expect(err.message).to.match("pattern")
 end
-
 -- Complex error scenarios
 describe("Error handling", function()
   it("handles nested errors", function()
@@ -104,25 +113,34 @@ describe("Error handling", function()
         error("inner error")
       end)
     end
-    
+
     local _, err = test_helper.with_error_capture(function()
       return deep_error()
     end)()
-    
+
     expect(err).to.exist()
     expect(err.stack).to.exist()
   end)
 end)
 ```
 
+
+
 ## Critical Rules
+
+
+
 - Test cross-platform
 - Verify error handling
 - Check edge cases
 - Document test cases
 - Clean up resources
 
+
 ## Best Practices
+
+
+
 - Test all platforms
 - Handle errors
 - Check boundaries
@@ -134,7 +152,11 @@ end)
 - Validate input
 - Clean up state
 
+
 ## Performance Tips
+
+
+
 - Use appropriate chunks
 - Clean up resources
 - Handle timeouts

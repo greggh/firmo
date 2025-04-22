@@ -11,7 +11,7 @@ local firmo = require("firmo")
 local fs = require("lib.tools.filesystem")
 local error_handler = require("lib.tools.error_handler")
 local test_helper = require("lib.tools.test_helper")
-local temp_file = require("lib.tools.temp_file")
+local temp_file = require("lib.tools.filesystem.temp_file")
 local central_config = require("lib.core.central_config")
 
 -- Test functions

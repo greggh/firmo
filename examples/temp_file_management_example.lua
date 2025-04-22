@@ -8,7 +8,7 @@ package.path = "../?.lua;../lib/?.lua;" .. package.path
 local firmo = require("firmo")
 
 -- Import necessary modules
-local temp_file = require("lib.tools.temp_file")
+local temp_file = require("lib.tools.filesystem.temp_file")
 local fs = require("lib.tools.filesystem")
 
 print("=== TEMPORARY FILE MANAGEMENT EXAMPLE ===\n")

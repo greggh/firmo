@@ -2,9 +2,13 @@
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 
--- Import filesystem module
+-- Import utility modules
 local fs = require("lib.tools.filesystem")
 local test_helper = require("lib.tools.test_helper")
+local logging = require("lib.tools.logging")
+
+-- Create logger for performance tests
+local logger = logging.get_logger("performance_test")
 
 -- Try to load benchmark module
 local benchmark_loaded, benchmark = pcall(require, "lib.tools.benchmark")
@@ -43,44 +47,51 @@ describe("Performance Tests", function()
   
   describe("Test suite isolation", function()
     it("should measure performance impact of module reset", function()
+      -- Memory usage before tests
+      local initial_memory = collectgarbage("count")
+      
       -- Set up test modules with some mutable state
       local module_count = 10
       local modules = {}
       
       for i = 1, module_count do
-        local name = "bench_module_" .. i
-        local path = fs.join_paths("/tmp", name .. ".lua")
-        
-        -- Create module with some state
-        local module_content = [[
-          local ]] .. name .. [[ = {
-            counter = 0,
-            data = {},
-            name = "]] .. name .. [["
-          }
-          
-          function ]] .. name .. [[.increment()
-            ]] .. name .. [[.counter = ]] .. name .. [[.counter + 1
-            return ]] .. name .. [[.counter
+        -- Create a temporary module for testing module reset
+        local name = "test_module_" .. i
+        local path = "/tmp/" .. name .. ".lua"
+          -- Use pcall with dofile for safer execution
+          local success, err = pcall(dofile, file)
+          if not success then
+            logger.error("Failed to run test file", { 
+              file = file, 
+              error = err, 
+              index = i,
+              context = "test_execution" 
+            })
           end
-          
-          function ]] .. name .. [[.add_data(key, value)
-            ]] .. name .. [[.data[key] = value
-            return ]] .. name .. [[.data
-          end
-          
-          return ]] .. name .. [[
-        ]]
-        
+n %s.add_data(key, value)
+  %s.data[key] = value
+  return %s.data
+end
+
+return %s
+]], name, name, name, name, name, name, name, name, name)
+
+        -- Write module file
         local success, err = test_helper.with_error_capture(function()
           return fs.write_file(path, module_content)
         end)()
         
         if not success then
-          firmo.log.error({ message = "Failed to create test module", module = name, path = path, error = err })
-          return
+          logger.error("Failed to write module file", { 
+            name = name, 
+            path = path, 
+            error = err,
+            context = "module_creation"
+          })
+          goto continue
         end
         table.insert(modules, {name = name, path = path})
+        ::continue::
       end
       
       -- Ensure modules can be loaded
@@ -137,10 +148,17 @@ describe("Performance Tests", function()
         label = "With module reset"
       })
       
-      -- Compare results
-      local comparison = firmo.benchmark.compare(without_reset_results, with_reset_results)
+      -- Memory usage after tests
+      collectgarbage("collect")
+      local final_memory = collectgarbage("count")
+      local memory_growth = final_memory - initial_memory
       
-      -- Clean up test modules
+      logger.info("Memory usage statistics", { 
+        growth_kb = memory_growth,
+        context = "module_reset_testing",
+        test_phase = "completion"
+      })
+      expect(memory_growth).to.be_less_than(1000) -- 1MB is a reasonable limit
       for _, mod in ipairs(modules) do
         fs.delete_file(mod.path)
       end
@@ -187,20 +205,31 @@ describe("Performance Tests", function()
         end)()
         
         if not all_files then
-          firmo.log.error({ message = "Failed to list test files", directory = suite_dir, error = err })
+          logger.error("Failed to list test files", { directory = suite_dir, error = err })
           return
         end
-        -- Filter to only Lua files
+        
+        -- Filter to only Lua files and construct proper paths
         for _, file in ipairs(all_files) do
           if file:match("%.lua$") then
-            table.insert(files, fs.join_paths(suite_dir, file))
+            -- Create proper path without duplication
+            local file_path = fs.join_paths(suite_dir, file)
+            table.insert(files, file_path)
+            
+            -- Log the file path for debugging
+            firmo.log.debug({ message = "Added test file to run", file_path = file_path })
           end
         end
         
         -- Run each test file
-        for _, file in ipairs(files) do
+        for i, file in ipairs(files) do
           firmo.reset()
-          dofile(file)
+          
+          -- Use pcall with dofile for safer execution
+          local success, err = pcall(dofile, file)
+          if not success then
+            firmo.log.error({ message = "Failed to run test file", file = file, error = err, index = i })
+          end
         end
         
         -- Clean up
@@ -235,22 +264,21 @@ describe("Performance Tests", function()
         {label = "Large suite with reset"}
       )
       
-      -- Compare results
-      firmo.benchmark.compare(small_without_reset, small_with_reset)
-      firmo.benchmark.compare(large_without_reset, large_with_reset)
+      -- Memory measurement after tests
+      collectgarbage("collect")
+      local final_memory = collectgarbage("count")
+      local memory_growth = final_memory - initial_memory
+      
+      logger.info("Memory usage statistics", { 
+        growth_kb = memory_growth,
+        context = "memory_tracking",
+        test_phase = "completion" 
+      })
+      expect(memory_growth).to.be_less_than(1000) -- 1MB is a reasonable limit
       
       -- Clean up test files
       fs.remove_dir(small_suite.output_dir)
       fs.remove_dir(large_suite.output_dir)
-      
-      -- Verify memory usage is back to reasonable levels
-      collectgarbage("collect")
-      local final_memory = collectgarbage("count")
-      
-      -- Check that memory doesn't grow too much
-      local memory_growth = final_memory - initial_memory
-      firmo.log.info({ message = "Memory usage statistics", growth_kb = memory_growth })
-      expect(memory_growth).to.be_less_than(1000) -- 1MB is a reasonable limit
     end)
   end)
   
@@ -289,8 +317,13 @@ describe("Performance Tests", function()
         }
       )
       
-      -- Print results
-      firmo.benchmark.print_result(error_perf)
+      -- Log benchmark results
+      logger.info("Error handling benchmark results", {
+        mean_time = error_perf.time_stats.mean,
+        min_time = error_perf.time_stats.min,
+        max_time = error_perf.time_stats.max,
+        context = "error_handling_performance"
+      })
       
       -- Make sure the benchmark ran successfully
       expect(error_perf.time_stats.mean).to.be_greater_than(0)

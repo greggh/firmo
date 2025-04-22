@@ -1,10 +1,13 @@
 # Reporting Module API
 
+
 The reporting module in firmo provides a centralized system for generating, formatting, and saving reports from test data.
 
 ## Overview
 
+
 The reporting module handles the entire reporting pipeline from raw data to formatted output files, including:
+
 
 - Unified interface for generating coverage, quality, and test results reports
 - Support for multiple output formats (HTML, JSON, LCOV, TAP, CSV, JUnit, Cobertura, Summary)
@@ -14,9 +17,12 @@ The reporting module handles the entire reporting pipeline from raw data to form
 - Automatic directory creation and path management
 - Data normalization and validation
 
+
 ## Architecture
 
+
 The reporting module uses a class-based architecture with these core components:
+
 
 - **Base Formatter Class**: Provides common functionality for all formatters
 - **Formatter Registry**: Centralized registry for accessing formatters by type and format
@@ -26,9 +32,12 @@ The reporting module uses a class-based architecture with these core components:
 - **Error Handling**: Robust error handling at all stages of the reporting pipeline
 - **Central Configuration**: Integration with the central configuration system for configuration
 
+
 ### Formatter Class Hierarchy
 
-```
+
+
+```text
 Formatter (Base Class)
 ├── HTMLFormatter
 ├── JSONFormatter
@@ -40,9 +49,13 @@ Formatter (Base Class)
 └── SummaryFormatter
 ```
 
+
+
 ### Formatter Registration
 
+
 Each formatter implements a `register` function that adds itself to the formatter registry:
+
 
 ```lua
 function MyFormatter.register(formatters)
@@ -54,11 +67,15 @@ function MyFormatter.register(formatters)
 end
 ```
 
+
+
 ## Available Formatters
+
 
 The reporting module provides these formatter types:
 
 ### Coverage Formatters
+
 
 | Formatter  | Description                                           | File Extension |
 |------------|-------------------------------------------------------|----------------|
@@ -70,6 +87,7 @@ The reporting module provides these formatter types:
 
 ### Test Results Formatters
 
+
 | Formatter  | Description                                           | File Extension |
 |------------|-------------------------------------------------------|----------------|
 | JUnit      | XML format for CI/CD integration                      | .xml           |
@@ -78,18 +96,25 @@ The reporting module provides these formatter types:
 
 ## Module Functions
 
+
 ### Module Configuration
+
 
 #### `reporting.configure(options)`
 
+
 Configure the reporting module with custom options.
+
 
 ```lua
 ---@param options table Configuration options for the reporting module
 ---@return table The reporting module for method chaining
 ```
 
+
 Parameters:
+
+
 - `options` (table): Configuration options for the reporting module:
   - `default_format` (string): Default report format
   - `output_path` (string): Default output directory
@@ -100,11 +125,16 @@ Parameters:
   - `strict_mode` (boolean): Fail on validation errors
 
 Returns:
+
+
 - The reporting module for method chaining
+
 
 #### `reporting.configure_formatter(formatter_name, formatter_config)`
 
+
 Configure a specific formatter.
+
 
 ```lua
 ---@param formatter_name string Name of the formatter to configure
@@ -112,48 +142,73 @@ Configure a specific formatter.
 ---@return table The reporting module for method chaining
 ```
 
+
 Parameters:
+
+
 - `formatter_name` (string): Name of the formatter to configure
 - `formatter_config` (table): Configuration options for the formatter
 
 Returns:
+
+
 - The reporting module for method chaining
+
 
 #### `reporting.configure_formatters(formatters_config)`
 
+
 Configure multiple formatters at once.
+
 
 ```lua
 ---@param formatters_config table Table of formatter configurations {formatter_name = config, ...}
 ---@return table The reporting module for method chaining
 ```
 
+
 Parameters:
+
+
 - `formatters_config` (table): Table of formatter configurations {formatter_name = config, ...}
 
 Returns:
+
+
 - The reporting module for method chaining
+
 
 #### `reporting.get_formatter_config(formatter_name)`
 
+
 Get configuration for a specific formatter.
+
 
 ```lua
 ---@param formatter_name string Name of the formatter to get configuration for
 ---@return table|nil formatter_config Configuration for the formatter or nil if not found
 ```
 
+
 Parameters:
+
+
 - `formatter_name` (string): Name of the formatter to get configuration for
 
 Returns:
+
+
 - `formatter_config` (table): Configuration for the formatter or nil if not found
+
 
 ### Report Formatting Functions
 
+
 #### `reporting.format_coverage(coverage_data, format)`
 
+
 Format coverage data into the specified output format.
+
 
 ```lua
 ---@param coverage_data table Coverage data structure from the coverage module
@@ -163,7 +218,10 @@ Format coverage data into the specified output format.
 ---@return table|nil error Error object if formatting failed
 ```
 
+
 Parameters:
+
+
 - `coverage_data` (table): Coverage data structure from the coverage module
 - `format` (string|table): Output format (string name like "html", "json", "lcov", etc. or table with name and options)
 - `options` (table, optional): Formatting options:
@@ -172,12 +230,17 @@ Parameters:
   - `formatter_specific` (table): Formatter-specific options
 
 Returns:
+
+
 - The formatted report content (string or table depending on format)
 - Error object if formatting failed
 
+
 #### `reporting.format_quality(quality_data, format)`
 
+
 Format quality data into the specified output format.
+
 
 ```lua
 ---@param quality_data table Quality data structure from the quality module
@@ -187,18 +250,26 @@ Format quality data into the specified output format.
 ---@return table|nil error Error object if formatting failed
 ```
 
+
 Parameters:
+
+
 - `quality_data` (table): Quality data structure from the quality module
 - `format` (string|table): Output format (string name like "html", "json", "summary", etc. or table with name and options)
 - `options` (table, optional): Formatting options
 
 Returns:
+
+
 - The formatted report content (string or table depending on format)
 - Error object if formatting failed
 
+
 #### `reporting.format_results(results_data, format)`
 
+
 Format test results data into the specified output format.
+
 
 ```lua
 ---@param results_data table Test results data structure
@@ -208,47 +279,64 @@ Format test results data into the specified output format.
 ---@return table|nil error Error object if formatting failed
 ```
 
+
 Parameters:
+
+
 - `results_data` (table): Test results data structure
 - `format` (string|table): Output format (string name like "junit", "tap", "csv", etc. or table with name and options)
 - `options` (table, optional): Formatting options
 
 Returns:
+
+
 - The formatted report content (string or table depending on format)
 - Error object if formatting failed
 
 
 #### `reporting.save_quality_report(file_path, quality_data, format)`
 
-Format and save a quality report.
 
+Format and save a quality report.
 Parameters:
+
+
 - `file_path` (string): Path to save the report
 - `quality_data` (table): Quality data structure
 - `format` (string): Output format (html, json, summary)
 
 Returns:
+
+
 - `success` (boolean): True if the report was saved successfully
 - `error` (table, optional): Error object if the operation failed
 
+
 #### `reporting.save_results_report(file_path, results_data, format)`
 
-Format and save a test results report.
 
+Format and save a test results report.
 Parameters:
+
+
 - `file_path` (string): Path to save the report
 - `results_data` (table): Test results data structure
 - `format` (string): Output format (junit, tap, csv)
 
 Returns:
+
+
 - `success` (boolean): True if the report was saved successfully
 - `error` (table, optional): Error object if the operation failed
 
+
 #### `reporting.auto_save_reports(coverage_data, quality_data, results_data, options)`
 
-Automatically save multiple report formats to a directory with configurable paths.
 
+Automatically save multiple report formats to a directory with configurable paths.
 Parameters:
+
+
 - `coverage_data` (table, optional): Coverage data structure
 - `quality_data` (table, optional): Quality data structure
 - `results_data` (table, optional): Test results data structure
@@ -268,6 +356,8 @@ Parameters:
     - `validation_report_path` (string, optional): Path for validation report
 
 Path templates support the following placeholders:
+
+
 - `{format}`: Output format (html, json, lcov, etc.)
 - `{type}`: Report type (coverage, quality, results)
 - `{date}`: Current date using timestamp format
@@ -275,115 +365,166 @@ Path templates support the following placeholders:
 - `{suffix}`: The report suffix if specified
 
 Returns:
+
+
 - `results` (table): Table of results for each saved report with success/error information
+
 
 ### Formatter Management Functions
 
+
 #### `reporting.register_formatter(formatter)`
 
-Register a custom formatter class or module.
 
+Register a custom formatter class or module.
 Parameters:
+
+
 - `formatter` (table): A formatter class or module that implements the formatter interface
 
 Returns:
+
+
 - `success` (boolean): True if formatter was registered successfully
 - `error` (table, optional): Error object if registration failed
 
+
 #### `reporting.create_formatter(type, name, options)`
 
-Create a new formatter instance of the specified type.
 
+Create a new formatter instance of the specified type.
 Parameters:
+
+
 - `type` (string): Type of formatter ("coverage", "quality", or "results")
 - `name` (string): Name of the formatter to create
 - `options` (table, optional): Options for the formatter
 
 Returns:
+
+
 - `formatter` (table): A formatter instance or nil if creation failed
 - `error` (table, optional): Error object if creation failed
 
+
 #### `reporting.load_formatters(formatter_module)`
 
-Load formatters from a module (table with format functions).
 
+Load formatters from a module (table with format functions).
 Parameters:
+
+
 - `formatter_module` (table): Module containing formatters {coverage={}, quality={}, results={}}
 
 Returns:
+
+
 - `registered` (number): Number of formatters registered
 - `error` (table, optional): Error object if some formatters failed to register
 
+
 #### `reporting.get_available_formatters()`
 
-Get list of available formatters for each type.
 
+Get list of available formatters for each type.
 Returns:
+
+
 - `available_formatters` (table): Table with lists of formatters by type {coverage={}, quality={}, results={}}
+
 
 ### Validation Functions
 
+
 #### `reporting.validate_coverage_data(coverage_data)`
 
-Validate coverage data before saving.
 
+Validate coverage data before saving.
 Parameters:
+
+
 - `coverage_data` (table): Coverage data structure from the coverage module
 
 Returns:
+
+
 - `is_valid` (boolean): True if the data is valid
 - `issues` (table): List of validation issues if any
 
+
 #### `reporting.validate_report_format(formatted_data, format)`
 
-Validate formatted report output.
 
+Validate formatted report output.
 Parameters:
+
+
 - `formatted_data` (string or table): Formatted report content
 - `format` (string): Output format name
 
 Returns:
+
+
 - `is_valid` (boolean): True if the format is valid
 - `error_message` (string): Error message if validation failed
 
+
 #### `reporting.validate_report(coverage_data, formatted_output, format)`
 
-Perform comprehensive validation of a coverage report.
 
+Perform comprehensive validation of a coverage report.
 Parameters:
+
+
 - `coverage_data` (table): Coverage data structure
 - `formatted_output` (string or table, optional): Formatted report content
 - `format` (string, optional): Output format name
 
 Returns:
+
+
 - `result` (table): Validation results with analysis information
+
 
 ### Utility Functions
 
+
 #### `reporting.reset()`
 
-Reset the module to default configuration (local config only).
 
+Reset the module to default configuration (local config only).
 Returns:
+
+
 - The reporting module for method chaining
+
 
 #### `reporting.full_reset()`
 
-Fully reset both local and central configuration.
 
+Fully reset both local and central configuration.
 Returns:
+
+
 - The reporting module for method chaining
+
 
 #### `reporting.debug_config()`
 
-Show current configuration for debugging.
 
+Show current configuration for debugging.
 Returns:
+
+
 - `debug_info` (table): Current configuration information
+
 
 ## Built-in Formatters
 
+
 ### Coverage Report Formatters
+
+
 
 - **HTML**: Interactive HTML report with syntax highlighting and file details
 - **JSON**: Machine-readable format for CI integration
@@ -391,6 +532,7 @@ Returns:
 - **Cobertura**: XML format compatible with Jenkins and other CI systems
 - **Summary**: Text-based overview of coverage results with colorization support
 - **CSV**: Tabular format for data a### Quality Data Structure
+
 
 ```lua
 {
@@ -400,8 +542,9 @@ Returns:
   tests = {
     ["path/to/test.lua"] = {
       path = "path/to/test.lua### Test Results Data Structure
-
 ```lua
+
+
 {
   type = "results",  -- Type identifier 
   name = "TestSuite",
@@ -421,18 +564,18 @@ Returns:
 
 ### Base Formatter Class
 
+
 The `Formatter` class is the foundation for all formatters:
+
 
 ```lua
 -- Create a new formatter class
 local MyFormatter = Formatter.extend("myformat", "my")
-
 -- Implement format method
 function MyFormatter:format(data, options)
   -- Format the data
   return formatted_string
 end
-
 -- Register the formatter
 function MyFormatter.register(formatters)
   local formatter = MyFormatter.new()
@@ -443,9 +586,13 @@ function MyFormatter.register(formatters)
 end
 ```
 
+
+
 ### Formatter Methods
 
+
 All formatters inherit these methods:
+
 
 - `validate(data)`: Validates input data
 - `format(data, options)`: Formats data into output format
@@ -453,9 +600,13 @@ All formatters inherit these methods:
 - `generate(data, output_path, options)`: End-to-end report generation
 - `normalize_coverage_data(data)`: Normalizes coverage data structure
 
+
 ## Data Structures
 
+
 ### Normalized Coverage Data Structure
+
+
 
 ```lua
 {
@@ -510,7 +661,11 @@ All formatters inherit these methods:
 }
 ```
 
+
+
 ### Quality Data Structure
+
+
 
 ```lua
 {
@@ -546,7 +701,11 @@ All formatters inherit these methods:
 }
 ```
 
+
+
 ### Test Results Data Structure
+
+
 
 ```lua
 {
@@ -580,7 +739,11 @@ All formatters inherit these methods:
 }
 ```
 
+
+
 ## See Also
+
+
 
 - [Reporting Module Guide](../guides/reporting.md) - Practical guide with usage examples and best practices
 - [Reporting Examples](../../examples/reporting_examples.md) - Complete code examples for common reporting tasks

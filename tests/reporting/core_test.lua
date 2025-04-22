@@ -10,7 +10,7 @@ local before, after = firmo.before, firmo.after
 local test_helper = require("lib.tools.test_helper")
 local error_handler = require("lib.tools.error_handler")
 local fs = require("lib.tools.filesystem")
-local temp_file = require("lib.tools.temp_file")
+local temp_file = require("lib.tools.filesystem.temp_file")
 
 -- Initialize logging if available
 local logging, logger

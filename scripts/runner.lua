@@ -172,12 +172,12 @@ function runner.run_file(file_path, firmo, options)
   local temp_file
 
   -- Try to load temp_file_integration if available
-  local temp_file_integration_loaded, temp_file_integration_module = pcall(require, "lib.tools.temp_file_integration")
+  local temp_file_integration_loaded, temp_file_integration_module = pcall(require, "lib.tools.filesystem.temp_file_integration")
   if temp_file_integration_loaded then
     temp_file_integration = temp_file_integration_module
 
     -- Also load the temp_file module
-    local temp_file_loaded, temp_file_module = pcall(require, "lib.tools.temp_file")
+    local temp_file_loaded, temp_file_module = pcall(require, "lib.tools.filesystem.temp_file")
     if temp_file_loaded then
       temp_file = temp_file_module
 
@@ -1054,7 +1054,7 @@ function runner.parse_arguments(args)
     performance = false, -- Show performance stats
     coverage = false, -- Enable coverage tracking
     coverage_debug = false, -- Enable debug output for coverage
-    uuality = false, -- Enable quality validation
+    quality = false, -- Enable quality validation
     quality_level = 3, -- Quality validation level
     watch = false, -- Enable watch mode
     json_output = false, -- Output JSON results

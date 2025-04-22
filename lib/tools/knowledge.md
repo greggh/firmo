@@ -1,9 +1,15 @@
 # Tools Knowledge
 
+
 ## Purpose
+
+
 Core utility modules supporting the framework functionality.
 
 ## Module Usage
+
+
+
 ```lua
 -- Filesystem operations
 local fs = require("lib.tools.filesystem")
@@ -15,13 +21,11 @@ if not content then
   })
   return nil, err
 end
-
 -- Error handling
 local error_handler = require("lib.tools.error_handler")
 local success, result, err = error_handler.try(function()
   return risky_operation()
 end)
-
 if not success then
   logger.error("Operation failed", {
     error = err,
@@ -29,14 +33,12 @@ if not success then
   })
   return nil, err
 end
-
 -- Structured logging
 local logger = require("lib.tools.logging").get_logger("module_name")
 logger.info("Operation completed", {
   duration = time_taken,
   items = count
 })
-
 -- Parser usage
 local parser = require("lib.tools.parser")
 local ast, err = parser.parse([[
@@ -44,7 +46,6 @@ local ast, err = parser.parse([[
     return true
   end
 ]])
-
 -- File watching
 local watcher = require("lib.tools.watcher")
 watcher.watch("src/", {
@@ -57,14 +58,19 @@ watcher.watch("src/", {
 })
 ```
 
+
+
 ## Error Handling
+
+
+
 ```lua
 -- Standard error handling pattern
 local function safe_operation()
   local success, result, err = error_handler.try(function()
     return risky_operation()
   end)
-  
+
   if not success then
     logger.error("Operation failed", {
       error = err,
@@ -72,10 +78,9 @@ local function safe_operation()
     })
     return nil, err
   end
-  
+
   return result
 end
-
 -- File operation error handling
 local function safe_file_operation(path)
   if not fs.file_exists(path) then
@@ -84,24 +89,23 @@ local function safe_file_operation(path)
       { path = path }
     )
   end
-  
+
   local content, err = fs.read_file(path)
   if not content then
     return nil, err
   end
-  
+
   return content
 end
-
 -- Resource cleanup
 local function with_temp_file(callback)
   local path = fs.temp_file()
   local result, err = error_handler.try(function()
     return callback(path)
   end)
-  
+
   fs.delete_file(path)
-  
+
   if not result then
     return nil, err
   end
@@ -109,7 +113,12 @@ local function with_temp_file(callback)
 end
 ```
 
+
+
 ## Critical Rules
+
+
+
 - Use error_handler for all errors
 - Validate all input parameters
 - Clean up resources properly
@@ -121,7 +130,11 @@ end
 - Test thoroughly
 - Monitor performance
 
+
 ## Best Practices
+
+
+
 - Use structured logging
 - Handle all error cases
 - Clean up resources
@@ -133,7 +146,11 @@ end
 - Follow patterns
 - Handle timeouts
 
+
 ## Performance Tips
+
+
+
 - Check log levels
 - Use buffering
 - Clean up promptly

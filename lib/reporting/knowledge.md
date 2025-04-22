@@ -1,9 +1,15 @@
 # Reporting Knowledge
 
+
 ## Purpose
+
+
 Generate test and coverage reports in various formats.
 
 ## Report Generation
+
+
+
 ```lua
 -- HTML coverage report
 firmo.generate_coverage_report("html", {
@@ -16,7 +22,6 @@ firmo.generate_coverage_report("html", {
     exclude = { "tests/" }
   }
 })
-
 -- JSON report with stats
 firmo.generate_report("json", {
   output = "report.json",
@@ -24,7 +29,6 @@ firmo.generate_report("json", {
   pretty_print = true,
   include_source = false
 })
-
 -- Multiple formats at once
 firmo.generate_reports({
   html = {
@@ -39,7 +43,6 @@ firmo.generate_reports({
     output = "lcov.info"
   }
 })
-
 -- Complex reporting scenario
 local function generate_test_reports(results)
   -- Configure formatters
@@ -48,7 +51,7 @@ local function generate_test_reports(results)
     json = require("lib.reporting.formatters.json"),
     junit = require("lib.reporting.formatters.junit")
   }
-  
+
   -- Generate reports
   for format, formatter in pairs(formatters) do
     local output_file = string.format(
@@ -56,7 +59,7 @@ local function generate_test_reports(results)
       format,
       formatter.extension
     )
-    
+
     local success, err = error_handler.try(function()
       return formatter.generate(results, {
         output = output_file,
@@ -64,7 +67,7 @@ local function generate_test_reports(results)
         pretty_print = true
       })
     end)
-    
+
     if not success then
       logger.error("Report generation failed", {
         format = format,
@@ -75,14 +78,18 @@ local function generate_test_reports(results)
 end
 ```
 
+
+
 ## Custom Formatters
+
+
+
 ```lua
 -- Create custom formatter
 local MyFormatter = {
   name = "custom",
   extension = "txt"
 }
-
 function MyFormatter:format(results)
   local output = {
     summary = {
@@ -94,7 +101,7 @@ function MyFormatter:format(results)
     },
     tests = {}
   }
-  
+
   for _, test in ipairs(results.tests) do
     table.insert(output.tests, {
       name = test.name,
@@ -103,21 +110,25 @@ function MyFormatter:format(results)
       error = test.error
     })
   end
-  
+
   return output
 end
-
 -- Register formatter
 firmo.register_formatter("custom", MyFormatter)
 ```
 
+
+
 ## Error Handling
+
+
+
 ```lua
 -- Report validation
 local function validate_report_data(data)
   local validator = require("lib.reporting.validation")
   local valid, errors = validator.validate(data)
-  
+
   if not valid then
     for _, err in ipairs(errors) do
       logger.error("Report validation error", {
@@ -127,10 +138,9 @@ local function validate_report_data(data)
     end
     return false
   end
-  
+
   return true
 end
-
 -- Safe report generation
 local function safe_generate_report(format, data, options)
   -- Validate data first
@@ -139,21 +149,26 @@ local function safe_generate_report(format, data, options)
       "Invalid report data"
     )
   end
-  
+
   -- Generate report
   local success, err = error_handler.try(function()
     return generate_report(format, data, options)
   end)
-  
+
   if not success then
     return nil, err
   end
-  
+
   return success
 end
 ```
 
+
+
 ## Critical Rules
+
+
+
 - Validate report data
 - Handle large reports
 - Clean up old reports
@@ -163,7 +178,11 @@ end
 - Document formats
 - Test thoroughly
 
+
 ## Best Practices
+
+
+
 - Use appropriate format
 - Configure paths properly
 - Handle large files
@@ -175,7 +194,11 @@ end
 - Document formats
 - Test thoroughly
 
+
 ## Performance Tips
+
+
+
 - Stream large reports
 - Use efficient formatters
 - Clean up old files

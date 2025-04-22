@@ -1,16 +1,22 @@
 # Vendor Knowledge
 
+
 ## Purpose
+
+
 Third-party dependencies used by the framework.
 
 ## Integration Pattern
+
+
+
 ```lua
 -- Safe module loading
 local function load_vendor_module(name)
   local success, module = error_handler.try(function()
     return require("lib.tools.vendor." .. name)
   end)
-  
+
   if not success then
     logger.error("Failed to load vendor module", {
       module = name,
@@ -18,19 +24,17 @@ local function load_vendor_module(name)
     })
     return nil, module
   end
-  
+
   return module
 end
-
 -- Version compatibility check
 local function check_version_compatibility(module, min_version)
   if not module.VERSION then
     return false, "No version information"
   end
-  
+
   return semver.gte(module.VERSION, min_version)
 end
-
 -- Complex vendor integration
 local function setup_vendor_module()
   -- Version locking
@@ -38,7 +42,7 @@ local function setup_vendor_module()
     lpeglabel = "1.6.1",
     other_dep = "2.0.0"
   }
-  
+
   -- Load and verify modules
   local modules = {}
   for name, required in pairs(versions) do
@@ -50,7 +54,7 @@ local function setup_vendor_module()
         name
       )
     end
-    
+
     -- Check version
     local compatible = check_version_compatibility(
       module, required
@@ -61,33 +65,35 @@ local function setup_vendor_module()
         name, required
       )
     end
-    
+
     modules[name] = module
   end
-  
+
   return modules
 end
 ```
 
+
+
 ## LPegLabel Integration
+
+
+
 ```lua
 -- Basic usage
 local lpeg = require("lib.tools.vendor.lpeglabel")
 local P, V, C, Ct = lpeg.P, lpeg.V, lpeg.C, lpeg.Ct
-
 -- Simple grammar test
 local grammar = P{
   "S";
   S = Ct(C(P"a"^1) * P"," * C(P"b"^1))
 }
-
 -- Grammar with labels
 local grammar = P{
   "S";
   S = Ct(C(P"a"^1) * P"," * C(P"b"^1)) + 
       lpeg.T(ErrLabel)  -- Custom error label
 }
-
 -- Complex parsing example
 local function create_parser()
   -- Define grammar
@@ -104,12 +110,17 @@ local function create_parser()
     Number = C(P"-"^-1 * P"0" + R"19" * R"09"^0);
     Id = C(R"az"^1)
   }
-  
+
   return grammar
 end
 ```
 
+
+
 ## Error Handling
+
+
+
 ```lua
 -- Safe module loading
 local function safe_load_vendor()
@@ -117,24 +128,23 @@ local function safe_load_vendor()
   local success, module = error_handler.try(function()
     return require("lib.tools.vendor.lpeglabel")
   end)
-  
+
   if success then
     return module
   end
-  
+
   -- Try compilation
   success, module = error_handler.try(function()
     return compile_and_load_module()
   end)
-  
+
   if not success then
     -- Fall back to pure Lua implementation
     return require("lib.tools.vendor.lpeglabel.fallback")
   end
-  
+
   return module
 end
-
 -- Version verification
 local function verify_versions()
   for name, required in pairs(versions) do
@@ -142,7 +152,7 @@ local function verify_versions()
     if not module then
       return false, "Failed to load " .. name
     end
-    
+
     local compatible = check_version_compatibility(
       module, required
     )
@@ -154,7 +164,12 @@ local function verify_versions()
 end
 ```
 
+
+
 ## Critical Rules
+
+
+
 - NEVER modify vendor code
 - Document all patches
 - Track versions
@@ -164,7 +179,11 @@ end
 - Clean up state
 - Monitor usage
 
+
 ## Best Practices
+
+
+
 - Lock versions
 - Document requirements
 - Track upstream
@@ -176,7 +195,11 @@ end
 - Test integration
 - Monitor updates
 
+
 ## Performance Tips
+
+
+
 - Cache module loads
 - Check versions once
 - Handle failures

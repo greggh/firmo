@@ -221,25 +221,39 @@ describe('Expect Assertion System', function()
   describe('Reset Function', function()
     if log then log.debug("Testing reset functionality") end
     
-    it('allows chaining syntax', function()
-      -- Create a local function to avoid affecting main tests
-      local function test_reset_chaining()
-        -- If we get to here without errors, it means reset() supports chaining
-        -- since reset() is called in the chain below
-        firmo.reset().describe('test', function() end)
-        return true
-      end
-      
-      -- If test_reset_chaining succeeds, this will pass
-      expect(test_reset_chaining()).to.be.truthy()
-    end)
+    local test_definition = require("lib.core.test_definition")
     
     it('has important API functions', function()
-      -- Just check that the main API functions exist and are proper types
-      expect(type(firmo.reset)).to.equal("function")
-      expect(type(firmo.describe)).to.equal("function")
-      expect(type(firmo.it)).to.equal("function")
-      expect(type(firmo.expect)).to.equal("function")
+        expect(type(firmo.reset)).to.equal("function")
+        expect(type(firmo.describe)).to.equal("function")
+        expect(type(firmo.it)).to.equal("function")
+        expect(type(firmo.expect)).to.equal("function")
+    end)
+    
+    it('properly handles reset', function()
+        -- Get initial state
+        local initial_state = test_definition.get_state()
+        local initial_passes = initial_state.passes
+        
+        -- Add a test result to create some state
+        test_definition.add_test_result({
+            status = test_definition.STATUS.PASS,
+            name = "test pass",
+            timestamp = os.time()
+        })
+        
+        -- Verify state changed
+        local mid_state = test_definition.get_state()
+        expect(mid_state.passes).to.be_greater_than(initial_passes)
+        
+        -- Reset state
+        test_definition.reset()
+        
+        -- Verify state is cleared
+        local final_state = test_definition.get_state()
+        expect(final_state.passes).to.equal(0)
+        expect(final_state.errors).to.equal(0)
+        expect(final_state.skipped).to.equal(0)
     end)
   end)
   

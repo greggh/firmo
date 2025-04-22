@@ -1,9 +1,15 @@
 # Reports Knowledge
 
+
 ## Purpose
+
+
 Store and organize test and coverage reports.
 
 ## Report Organization
+
+
+
 ```lua
 -- Report directory structure
 local structure = {
@@ -19,7 +25,6 @@ local structure = {
   debug = "debug/",
   archive = "archive/"
 }
-
 -- Report naming pattern
 local function get_report_name(type, format)
   local timestamp = os.date("%Y-%m-%d_%H-%M-%S")
@@ -32,14 +37,23 @@ local function get_report_name(type, format)
 end
 ```
 
+
+
 ## Critical Rules
+
+
+
 - Clean old reports
 - Organize by type
 - Use consistent names
 - Validate formats
 - Archive properly
 
+
 ## Report Types
+
+
+
 ```lua
 -- Coverage reports
 local coverage_types = {
@@ -56,7 +70,6 @@ local coverage_types = {
     keep_days = 30
   }
 }
-
 -- Test results
 local result_types = {
   junit = {
@@ -70,7 +83,12 @@ local result_types = {
 }
 ```
 
+
+
 ## Best Practices
+
+
+
 - Clean regularly
 - Organize by date
 - Use consistent names
@@ -82,7 +100,11 @@ local result_types = {
 - Test validation
 - Keep organized
 
+
 ## Performance Tips
+
+
+
 - Clean old files
 - Compress archives
 - Monitor space

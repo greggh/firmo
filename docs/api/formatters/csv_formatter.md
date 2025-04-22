@@ -1,10 +1,13 @@
 # CSV Formatter API Reference
 
+
 The CSV formatter generates coverage and test results in Comma-Separated Values (CSV) format, providing structured tabular data suitable for spreadsheet analysis, data processing, and integration with external tools.
 
 ## Overview
 
+
 The CSV formatter creates standards-compliant CSV files with these key features:
+
 
 - Configurable column selection and ordering
 - Header row customization
@@ -15,16 +18,24 @@ The CSV formatter creates standards-compliant CSV files with these key features:
 - Row and column filtering capabilities
 - Performance optimizations for large datasets
 
+
 ## Class Reference
+
 
 ### Inheritance
 
-```
+
+
+```text
 Formatter (Base)
   └── CSVFormatter
 ```
 
+
+
 ### Class Definition
+
+
 
 ```lua
 ---@class CSVFormatter : Formatter
@@ -32,9 +43,13 @@ Formatter (Base)
 local CSVFormatter = Formatter.extend("csv", "csv")
 ```
 
+
+
 ## CSV Format Specification
 
+
 The CSV formatter adheres to RFC 4180 with these key features:
+
 
 - Each record appears on a separate line
 - Fields are separated by commas (configurable)
@@ -44,17 +59,23 @@ The CSV formatter adheres to RFC 4180 with these key features:
 
 Example CSV output:
 
+
 ```csv
 File,Total Lines,Covered Lines,Executed Lines,Coverage %
 lib/module.lua,100,75,25,75.0
 lib/other.lua,80,40,20,50.0
 ```
 
+
+
 ## Core Methods
+
 
 ### format(data, options)
 
+
 Formats coverage or test results data into CSV format.
+
 
 ```lua
 ---@param data table Normalized coverage or test results data
@@ -64,9 +85,13 @@ Formats coverage or test results data into CSV format.
 function CSVFormatter:format(data, options)
 ```
 
+
+
 ### format_coverage(data, options)
 
+
 Specialized method for formatting coverage data into CSV.
+
 
 ```lua
 ---@param data table Normalized coverage data
@@ -76,9 +101,13 @@ Specialized method for formatting coverage data into CSV.
 function CSVFormatter:format_coverage(data, options)
 ```
 
+
+
 ### format_results(data, options)
 
+
 Specialized method for formatting test results into CSV.
+
 
 ```lua
 ---@param data table Test results data
@@ -88,9 +117,13 @@ Specialized method for formatting test results into CSV.
 function CSVFormatter:format_results(data, options)
 ```
 
+
+
 ### generate(data, output_path, options)
 
+
 Generate and save a complete CSV report.
+
 
 ```lua
 ---@param data table Coverage or test results data
@@ -101,10 +134,12 @@ Generate and save a complete CSV report.
 function CSVFormatter:generate(data, output_path, options)
 ```
 
+
+
 ## Configuration Options
 
-The CSV formatter supports these configuration options:
 
+The CSV formatter supports these configuration options:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `delimiter` | string | `","` | Field separator character |
@@ -130,6 +165,8 @@ The CSV formatter supports these configuration options:
 
 ### Configuration Example
 
+
+
 ```lua
 local reporting = require("lib.reporting")
 reporting.configure_formatter("csv", {
@@ -150,12 +187,15 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ## Column Configuration and Customization
+
 
 ### Standard Columns
 
-Default file-level columns available:
 
+Default file-level columns available:
 | Column ID | Description | Type |
 |-----------|-------------|------|
 | `path` | File path | string |
@@ -173,8 +213,8 @@ Default file-level columns available:
 
 ### Line-Level Columns
 
-Available when `include_line_data = true`:
 
+Available when `include_line_data = true`:
 | Column ID | Description | Type |
 |-----------|-------------|------|
 | `file_path` | File path | string |
@@ -186,8 +226,8 @@ Available when `include_line_data = true`:
 
 ### Function-Level Columns
 
-Available when `include_function_data = true`:
 
+Available when `include_function_data = true`:
 | Column ID | Description | Type |
 |-----------|-------------|------|
 | `file_path` | File path | string |
@@ -200,7 +240,9 @@ Available when `include_function_data = true`:
 
 ### Column Definition Options
 
+
 Advanced column configuration with transformation:
+
 
 ```lua
 reporting.configure_formatter("csv", {
@@ -215,11 +257,16 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ## Data Mapping and Transformation
+
 
 ### Value Transformation
 
+
 Transform values before output with the `transform` function:
+
 
 ```lua
 -- Convert value to percentage with % sign
@@ -230,7 +277,6 @@ Transform values before output with the `transform` function:
     return string.format("%.1f%%", value) 
   end 
 }
-
 -- Truncate long paths
 { 
   id = "path", 
@@ -243,9 +289,13 @@ Transform values before output with the `transform` function:
 }
 ```
 
+
+
 ### Custom Value Generation
 
+
 Generate custom values with the `value` function:
+
 
 ```lua
 -- Add quality rating based on coverage
@@ -260,7 +310,6 @@ Generate custom values with the `value` function:
     else return "Poor" end
   end 
 }
-
 -- Add file modified date from filesystem
 { 
   id = "modified_date", 
@@ -272,9 +321,14 @@ Generate custom values with the `value` function:
 }
 ```
 
+
+
 ## Integration with Spreadsheet Tools
 
+
 ### Microsoft Excel Integration
+
+
 
 ```lua
 -- Configure for Excel compatibility
@@ -287,7 +341,11 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ### Google Sheets Integration
+
+
 
 ```lua
 -- Configure for Google Sheets
@@ -299,7 +357,11 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ### LibreOffice Calc Integration
+
+
 
 ```lua
 -- Configure for LibreOffice Calc
@@ -312,19 +374,27 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ### Import Instructions
 
+
 To import CSV reports into spreadsheet tools:
+
 
 1. **Excel**: File → Open → Browse to your CSV file → Open → Select "Delimited" → Next → Check "Comma" → Finish
 2. **Google Sheets**: File → Import → Upload → Select your CSV file → Import data
 3. **LibreOffice Calc**: File → Open → Select your CSV file → Open → Select settings → OK
 
+
 ## Performance Considerations for Large Datasets
+
 
 ### Memory Usage Optimization
 
+
 For large codebases, optimize memory usage:
+
 
 ```lua
 -- Reduce memory usage for large codebases
@@ -341,9 +411,13 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ### Processing Speed
 
+
 The CSV formatter is optimized for speed with these techniques:
+
 
 - Single-pass data processing
 - Minimized table creation
@@ -353,17 +427,17 @@ The CSV formatter is optimized for speed with these techniques:
 
 For very large datasets (1000+ files):
 
+
 ```lua
 -- Split output into multiple files
 local file_count = 0
 local csv_content = ""
 local BATCH_SIZE = 500
-
 for file_path, file_data in pairs(coverage_data.files) do
   -- Add file data to CSV content
   csv_content = csv_content .. format_file_csv_row(file_data)
   file_count = file_count + 1
-  
+
   -- Write in batches of 500 files
   if file_count % BATCH_SIZE == 0 then
     local batch_num = math.floor(file_count / BATCH_SIZE)
@@ -371,7 +445,6 @@ for file_path, file_data in pairs(coverage_data.files) do
     csv_content = ""
   end
 end
-
 -- Write remaining files
 if csv_content ~= "" then
   local batch_num = math.ceil(file_count / BATCH_SIZE)
@@ -379,11 +452,16 @@ if csv_content ~= "" then
 end
 ```
 
+
+
 ## Header Row Customization
+
 
 ### Custom Header Names
 
+
 Override default header names:
+
 
 ```lua
 reporting.configure_formatter("csv", {
@@ -395,9 +473,13 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ### Disabling Header Row
 
+
 Generate data-only CSV:
+
 
 ```lua
 reporting.configure_formatter("csv", {
@@ -405,9 +487,13 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ### Localized Headers
 
+
 Create localized headers for international teams:
+
 
 ```lua
 -- Example with Spanish headers
@@ -421,11 +507,16 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ## Custom Separators and Escaping
+
 
 ### Alternative Delimiters
 
+
 For TSV (Tab-Separated Values) or other formats:
+
 
 ```lua
 -- Configure as Tab-Separated Values (TSV)
@@ -434,7 +525,6 @@ reporting.configure_formatter("csv", {
   quote = "\"",
   extension = "tsv" -- Optional hint for file extension
 })
-
 -- Configure as Semicolon-Separated Values (common in Europe)
 reporting.configure_formatter("csv", {
   delimiter = ";",
@@ -442,9 +532,13 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ### Custom Escaping Rules
 
+
 For integration with specific tools:
+
 
 ```lua
 -- Custom escaping for special tool
@@ -456,11 +550,16 @@ reporting.configure_formatter("csv", {
 })
 ```
 
+
+
 ## Validation Rules and Error Handling
+
 
 ### Input Validation
 
+
 The CSV formatter validates input data structure:
+
 
 ```lua
 -- Check for required structure
@@ -471,7 +570,6 @@ if not data or type(data) ~= "table" then
     module = "csv_formatter"
   })
 end
-
 -- Check for files table
 if not data.files or type(data.files) ~= "table" then
   return nil, error_handler.validation_error("Missing or invalid files table", {
@@ -482,9 +580,13 @@ if not data.files or type(data.files) ~= "table" then
 end
 ```
 
+
+
 ### Error Response Example
 
+
 Handling formatting errors:
+
 
 ```lua
 local success, result_or_error = reporting.format_coverage(invalid_data, "csv")
@@ -500,21 +602,9 @@ if not success then
 end
 ```
 
+
+
 ## Usage Examples
 
+
 ### Basic Coverage Report
-
-```lua
-local reporting = require("lib.reporting")
-local coverage = require("lib.coverage")
-
--- Run tests with coverage
-coverage.start()
--- Run tests here...
-coverage.stop()
-
--- Get coverage data
-local data = coverage.get_data()
-
--- Generate CSV
-

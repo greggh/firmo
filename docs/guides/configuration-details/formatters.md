@@ -1,10 +1,12 @@
 # Coverage Report Formatters
 
-Firmo supports multiple output formats for coverage reports through a class-based architecture. Each formatter extends from a base Formatter class and has specific configuration options and capabilities. This guide covers all available formatters, their configuration settings, and how to create custom formatters.
 
+Firmo supports multiple output formats for coverage reports through a class-based architecture. Each formatter extends from a base Formatter class and has specific configuration options and capabilities. This guide covers all available formatters, their configuration settings, and how to create custom formatters.
 > 📌 **Note:** All formatters use the central configuration system. Configuration should always be applied through the `central_config` module, command-line flags, or the `.firmo-config.lua` file.
 
 ## Table of Contents
+
+
 
 - [Overview](#overview)
 - [Formatter Architecture](#formatter-architecture)
@@ -22,10 +24,11 @@ Firmo supports multiple output formats for coverage reports through a class-base
 - [Creating Custom Formatters](#creating-custom-formatters)
 - [Formatter Inheritance](#formatter-inheritance)
 
+
 ## Overview
 
-Firmo provides the following coverage report formatters:
 
+Firmo provides the following coverage report formatters:
 | Formatter     | Description                                                           | Primary Use Case                             |
 |---------------|-----------------------------------------------------------------------|---------------------------------------------|
 | HTML          | Rich, interactive HTML report with syntax highlighting                | Human readability, detailed analysis         |
@@ -39,7 +42,9 @@ Firmo provides the following coverage report formatters:
 
 ## Formatter Architecture
 
+
 Firmo uses a class-based architecture for all formatters:
+
 
 - All formatters extend a base `Formatter` class
 - Each formatter implements specific methods for its format
@@ -47,9 +52,12 @@ Firmo uses a class-based architecture for all formatters:
 - Configuration is centralized but can be overridden per formatter
 - Formatters provide both validation and formatting capabilities
 
+
 ### Formatter Inheritance Hierarchy
 
-```
+
+
+```text
 Formatter (Base Class)
 ├── HTMLFormatter
 ├── JSONFormatter
@@ -61,10 +69,12 @@ Formatter (Base Class)
 └── CSVFormatter
 ```
 
+
+
 ## Base Formatter Configuration
 
-All formatters inherit these common configuration options from the base formatter:
 
+All formatters inherit these common configuration options from the base formatter:
 | Option                  | Type    | Default         | Description                                        |
 |-------------------------|---------|----------------|----------------------------------------------------|
 | `output_path`           | string  | `nil`          | Path where the report should be saved             |
@@ -76,13 +86,18 @@ All formatters inherit these common configuration options from the base formatte
 
 ## Formatter Configuration
 
+
 All formatters are configured through the central configuration system. Configuration options can be set through:
+
 
 1. Command-line arguments with the `--format` flag
 2. Configuration file (`.firmo-config.lua`)
 3. Programmatic configuration via `central_config.set()`
 
+
 ### General Configuration
+
+
 
 ```lua
 -- In .firmo-config.lua
@@ -97,11 +112,16 @@ return {
 }
 ```
 
+
+
 ## HTML Formatter
+
 
 The HTML formatter generates a comprehensive, interactive HTML report with syntax highlighting, coverage statistics, and file navigation.
 
 ### Configuration Options
+
+
 
 ```lua
 -- In .firmo-config.lua
@@ -121,7 +141,11 @@ return {
 }
 ```
 
+
+
 ### Features
+
+
 
 - Interactive file navigation
 - Three-state coverage visualization (covered, executed, not covered)
@@ -131,11 +155,15 @@ return {
 - Coverage statistics and summaries
 - Line execution counts
 
+
 ## JSON Formatter
+
 
 The JSON formatter outputs coverage data in a structured, machine-readable JSON format suitable for integration with other tools.
 
 ### Configuration Options
+
+
 
 ```lua
 -- In .firmo-config.lua
@@ -153,7 +181,11 @@ return {
 }
 ```
 
+
+
 ### JSON Output Structure
+
+
 
 ```json
 {
@@ -187,11 +219,16 @@ return {
 }
 ```
 
+
+
 ## LCOV Formatter
+
 
 The LCOV formatter generates reports in the LCOV format, which is compatible with standard coverage tools like `genhtml` and integrates with many CI systems.
 
 ### Configuration Options
+
+
 
 ```lua
 -- In .firmo-config.lua
@@ -206,9 +243,13 @@ return {
 }
 ```
 
+
+
 ### LCOV Output Example
 
-```
+
+
+```text
 TN:lib/module.lua
 SF:lib/module.lua
 FN:10,function_name
@@ -223,11 +264,16 @@ LH:3
 end_of_record
 ```
 
+
+
 ## Cobertura Formatter
+
 
 The Cobertura formatter produces XML reports in the Cobertura format, which is widely supported by CI/CD systems and coverage visualization tools.
 
 ### Configuration Options
+
+
 
 ```lua
 -- In .firmo-config.lua
@@ -242,7 +288,11 @@ return {
 }
 ```
 
+
+
 ### Cobertura Output Example
+
+
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -258,11 +308,15 @@ return {
 ```
 
 
+
 ## Summary Formatter
+
 
 The Summary formatter outputs a plain text summary of coverage statistics, ideal for command-line output and basic reporting.
 
 ### Configuration Options
+
+
 
 ```lua
 -- In .firmo-config.lua
@@ -279,11 +333,16 @@ return {
 }
 ```
 
+
+
 ## JUnit Formatter
+
 
 The JUnit formatter generates XML reports compatible with JUnit test reporting tools and CI systems.
 
 ### Configuration Options
+
+
 
 ```lua
 -- In .firmo-config.lua
@@ -298,11 +357,16 @@ return {
 }
 ```
 
+
+
 ## TAP Formatter
+
 
 The TAP (Test Anything Protocol) formatter generates output compatible with TAP consumers, useful for integration with other testing frameworks.
 
 ### Configuration Options
+
+
 
 ```lua
 -- In .firmo-config.lua
@@ -317,11 +381,16 @@ return {
 }
 ```
 
+
+
 ## CSV Formatter
+
 
 The CSV formatter generates comma-separated values files for easy import into spreadsheets and data analysis tools.
 
 ### Configuration Options
+
+
 
 ```lua
 -- In .firmo-config.lua
@@ -338,14 +407,23 @@ return {
 }
 ```
 
+
+
 ## Multiple Formatters
+
 
 You can generate multiple report formats simultaneously using the command line or configuration:
 
+
 ```bash
+
 # Generate both HTML and LCOV reports
+
+
 lua test.lua --coverage --format=html,lcov tests/
 ```
+
+
 
 ```lua
 -- In .firmo-config.lua
@@ -368,82 +446,83 @@ return {
 }
 ```
 
+
+
 ## Creating Custom Formatters
 
+
 You can create custom formatters by extending the base Formatter class:
+
 
 ```lua
 local Formatter = require('lib.reporting.formatters.base')
 local error_handler = require('lib.tools.error_handler')
-
 -- Create a custom formatter by extending the base formatter
 local CustomFormatter = Formatter.extend("custom", "cst")
-
 -- Set version
 CustomFormatter._VERSION = "1.0.0"
-
 -- Implement the format method (required)
 function CustomFormatter:format(coverage_data, options)
   -- Normalize data for consistent structure
   local data = self:normalize_coverage_data(coverage_data)
-  
+
   -- Format data according to your needs
   local output = "# Custom Coverage Report\n\n"
   output = output .. "Total files: " .. data.summary.total_files .. "\n"
   output = output .. "Coverage: " .. string.format("%.2f%%", data.summary.coverage_percent) .. "\n"
-  
+
   -- Return formatted string
   return output
 end
-
 -- Register the formatter
 function CustomFormatter.register(formatters)
   -- Create an instance of the formatter
   local formatter = CustomFormatter.new()
-  
+
   -- Register with the formatters registry
   formatters.coverage = formatters.coverage or {}
   formatters.coverage.custom = function(data, options)
     return formatter:format(data, options)
   end
-  
+
   return true
 end
-
 return CustomFormatter
 ```
 
+
 To use your custom formatter:
+
 
 ```lua
 local reporting = require('lib.reporting')
 local custom_formatter = require('path.to.custom_formatter')
-
 -- Register the custom formatter
 reporting.register_formatter(custom_formatter)
-
 -- Use the custom formatter
 local report = reporting.format_coverage(coverage_data, "custom")
 reporting.write_file("./reports/custom-report.cst", report)
 ```
 
+
+
 ## Formatter Inheritance
 
+
 You can extend existing formatters to customize their behavior:
+
 
 ```lua
 local JSONFormatter = require('lib.reporting.formatters.json')
 local error_handler = require('lib.tools.error_handler')
-
 -- Create extended JSON formatter
 local EnhancedJSON = {}
 setmetatable(EnhancedJSON, {__index = JSONFormatter})
-
 -- Override the format method to customize output
 function EnhancedJSON:format(coverage_data, options)
   -- Call the parent formatter's format method
   local json_data = JSONFormatter.format(self, coverage_data, options)
-  
+
   -- Parse JSON to add custom fields
   local success, parsed = pcall(require('cjson').decode, json_data)
   if success then
@@ -452,53 +531,69 @@ function EnhancedJSON:format(coverage_data, options)
       timestamp = os.time(),
       environment = os.getenv("ENV") or "development"
     }
-    
+
     -- Convert back to JSON
     return require('cjson').encode(parsed)
   end
-  
+
   -- Return original if parsing failed
   return json_data
 end
-
 -- Register the enhanced formatter
 function EnhancedJSON.register(formatters)
   -- Create an instance
   local formatter = EnhancedJSON.new()
-  
+
   -- Register with the formatters registry
   formatters.coverage = formatters.coverage or {}
   formatters.coverage.enhanced_json = function(data, options)
     return formatter:format(data, options)
   end
-  
+
   return true
 end
-
 return EnhancedJSON
 ```
 
+
+
 ## Integrating with External Tools
+
 
 ### LCOV Integration
 
+
 To use the LCOV output with the `genhtml` tool:
 
+
 ```bash
+
 # Generate LCOV report
+
+
 lua test.lua --coverage --format=lcov tests/
 
 # Generate HTML from LCOV data
+
+
 genhtml -o coverage-html coverage-reports/coverage-report-v2.lcov
 ```
 
+
+
 ### CI/CD Integration
+
 
 For continuous integration, the Cobertura or JUnit formats are often most useful:
 
+
 ```bash
+
 # Generate Cobertura report for CI
+
+
 lua test.lua --coverage --format=cobertura tests/
 ```
+
 
 Many CI systems like Jenkins, GitHub Actions, and GitLab CI can automatically interpret Cobertura XML reports to display coverage information.

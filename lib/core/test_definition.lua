@@ -93,7 +93,7 @@ local function try_require(name)
 end
 
 -- Try to load temp_file module for test isolation
-local temp_file = try_require("lib.tools.temp_file")
+local temp_file = try_require("lib.tools.filesystem.temp_file")
 
 -- Local utility functions
 --- Merge provided options with defaults
@@ -771,7 +771,7 @@ end
 ---@usage
 --- -- Basic temporary file usage with automatic cleanup
 --- describe("File operations", function()
----   local temp_file = require("lib.tools.temp_file")
+---   local temp_file = require("lib.tools.filesystem.temp_file")
 ---
 ---   it("should write to file with automatic cleanup", function()
 ---     temp_file.with_temp_file("initial content", function(file_path)

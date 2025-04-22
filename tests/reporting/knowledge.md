@@ -1,9 +1,15 @@
 # Reporting Knowledge
 
+
 ## Purpose
+
+
 Test report generation system and output formatting.
 
 ## Supported Formats
+
+
+
 - **HTML** - Interactive reports with syntax highlighting
 - **JSON** - Machine-readable data for integration
 - **XML** - Standard JUnit/Cobertura XML for CI systems
@@ -13,7 +19,11 @@ Test report generation system and output formatting.
 - **Summary** - Concise console summary
 - **Custom** - User-defined formatter support
 
+
 ## Report Generation
+
+
+
 ```lua
 -- HTML coverage report
 firmo.generate_coverage_report("html", {
@@ -26,7 +36,6 @@ firmo.generate_coverage_report("html", {
     exclude = { "tests/" }
   }
 })
-
 -- JSON report with stats
 firmo.generate_report("json", {
   output = "report.json",
@@ -34,7 +43,6 @@ firmo.generate_report("json", {
   pretty_print = true,
   include_source = false
 })
-
 -- Multiple formats at once
 firmo.generate_reports({
   html = {
@@ -51,11 +59,15 @@ firmo.generate_reports({
 })
 ```
 
+
+
 ## Custom Formatters
+
+
+
 ```lua
 -- Create custom formatter
 local MyFormatter = {}
-
 function MyFormatter:format(results)
   return {
     tests = results.tests,
@@ -64,16 +76,13 @@ function MyFormatter:format(results)
     custom_field = "value"
   }
 end
-
 -- Register formatter
 firmo.register_formatter("custom", MyFormatter)
-
 -- Complex formatter example
 local HTMLFormatter = {
   name = "html",
   file_extension = "html"
 }
-
 function HTMLFormatter:format(results)
   local template = [[
     <!DOCTYPE html>
@@ -92,7 +101,7 @@ function HTMLFormatter:format(results)
       </body>
     </html>
   ]]
-  
+
   -- Generate test details
   local details = {}
   for _, test in ipairs(results.tests) do
@@ -102,7 +111,7 @@ function HTMLFormatter:format(results)
       test.name
     ))
   end
-  
+
   return template
     :gsub("${total}", results.total)
     :gsub("${passed}", results.passed)
@@ -111,14 +120,17 @@ function HTMLFormatter:format(results)
 end
 ```
 
+
+
 ## Report Validation
+
+
+
 ```lua
 -- Validate report data
 local validator = require("lib.reporting.validation")
-
 local report_data = generate_report_data()
 local valid, errors = validator.validate(report_data)
-
 if not valid then
   for _, err in ipairs(errors) do
     logger.error("Validation error", {
@@ -127,7 +139,6 @@ if not valid then
     })
   end
 end
-
 -- Schema validation
 local schema = {
   type = "object",
@@ -147,11 +158,15 @@ local schema = {
     }
   }
 }
-
 local valid = validator.validate_schema(report_data, schema)
 ```
 
+
+
 ## Critical Rules
+
+
+
 - Validate report data
 - Handle large reports
 - Clean up old reports
@@ -161,7 +176,11 @@ local valid = validator.validate_schema(report_data, schema)
 - Document formats
 - Test thoroughly
 
+
 ## Best Practices
+
+
+
 - Use appropriate format
 - Configure paths properly
 - Handle large files
@@ -173,7 +192,11 @@ local valid = validator.validate_schema(report_data, schema)
 - Document formats
 - Test thoroughly
 
+
 ## Performance Tips
+
+
+
 - Stream large reports
 - Use efficient formatters
 - Clean up old files

@@ -1,28 +1,34 @@
 # Fixtures Knowledge
 
+
 ## Purpose
+
+
 Provide common test data and utilities.
 
 ## Fixture Examples
+
+
+
 ```lua
 -- Common error fixtures
 local common_errors = {
   divide_by_zero = function()
     return 1/0
   end,
-  
+
   invalid_input = function()
     return nil, error_handler.validation_error(
       "Invalid input",
       {parameter = "input", provided = nil}
     )
   end,
-  
+
   type_error = function()
     local num = 42
     return num:upper() -- Attempting to call method on number
   end,
-  
+
   out_of_memory = function(limit)
     limit = limit or 1000000
     local t = {}
@@ -32,7 +38,6 @@ local common_errors = {
     return t
   end
 }
-
 -- Test module fixture
 local test_math = {
   add = function(a, b) return a + b end,
@@ -45,7 +50,6 @@ local test_math = {
     return a / b
   end
 }
-
 -- Data fixtures
 local sample_data = {
   users = {
@@ -59,8 +63,13 @@ local sample_data = {
 }
 ```
 
+
+
 ## Directory Structure
-```
+
+
+
+```text
 fixtures/
 ├── common_errors.lua    # Common error scenarios
 ├── modules/            # Test modules
@@ -69,18 +78,21 @@ fixtures/
     └── users.json     # Sample data
 ```
 
+
+
 ## Using Fixtures
+
+
+
 ```lua
 -- Import fixtures
 local common_errors = require("tests.fixtures.common_errors")
 local test_math = require("tests.fixtures.modules.test_math")
-
 describe("Error handling", function()
   it("handles division by zero", function()
     expect(common_errors.divide_by_zero).to.fail()
   end)
 end)
-
 describe("Math operations", function()
   it("adds numbers", function()
     expect(test_math.add(2, 3)).to.equal(5)
@@ -88,29 +100,40 @@ describe("Math operations", function()
 end)
 ```
 
+
+
 ## Temporary Files
+
+
+
 ```lua
 -- Create test directory
 local test_dir = test_helper.create_temp_test_directory()
-
 -- Create test files
 test_dir.create_file("config.json", '{"setting": "value"}')
 test_dir.create_file("data.txt", "test content")
-
 -- Create multiple files
 test_dir.create_numbered_files("test", "content %d", 10)
-
 -- Clean up happens automatically
 ```
 
+
+
 ## Critical Rules
+
+
+
 - Keep fixtures simple
 - Document purpose
 - Make reusable
 - Clean up resources
 - Version control
 
+
 ## Best Practices
+
+
+
 - Keep focused
 - Document usage
 - Make independent
@@ -122,7 +145,11 @@ test_dir.create_numbered_files("test", "content %d", 10)
 - Document changes
 - Handle errors
 
+
 ## Performance Tips
+
+
+
 - Cache fixtures
 - Clean up promptly
 - Monitor resources

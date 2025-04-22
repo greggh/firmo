@@ -1,9 +1,15 @@
 # Formatters Knowledge
 
+
 ## Purpose
+
+
 Output test and coverage results in various standardized formats.
 
 ## Formatter Implementation
+
+
+
 ```lua
 -- Basic formatter structure
 local MyFormatter = {
@@ -11,7 +17,6 @@ local MyFormatter = {
   extension = "txt",
   description = "Custom test result format"
 }
-
 function MyFormatter:format(results)
   local output = {
     summary = {
@@ -23,7 +28,7 @@ function MyFormatter:format(results)
     },
     tests = {}
   }
-  
+
   for _, test in ipairs(results.tests) do
     table.insert(output.tests, {
       name = test.name,
@@ -32,24 +37,21 @@ function MyFormatter:format(results)
       error = test.error
     })
   end
-  
+
   return output
 end
-
 -- Register formatter
 firmo.register_formatter("custom", MyFormatter)
-
 -- Complex HTML formatter
 local HTMLFormatter = {
   name = "html",
   extension = "html",
   description = "HTML test report formatter"
 }
-
 function HTMLFormatter:format(results)
   -- Load template
   local template = self:load_template()
-  
+
   -- Generate test details
   local details = {}
   for _, test in ipairs(results.tests) do
@@ -68,7 +70,7 @@ function HTMLFormatter:format(results)
         ]], test.error) or ""
     ))
   end
-  
+
   -- Apply template
   return template
     :gsub("${title}", results.title or "Test Results")
@@ -79,7 +81,12 @@ function HTMLFormatter:format(results)
 end
 ```
 
+
+
 ## Built-in Formatters
+
+
+
 ```lua
 -- HTML coverage report
 local html = require("formatters.html")
@@ -88,26 +95,22 @@ html.generate({
   include_source = true,
   theme = "light"
 })
-
 -- JSON output
 local json = require("formatters.json")
 json.format({
   pretty = true,
   include_source = false
 })
-
 -- TAP output
 local tap = require("formatters.tap")
 tap.format({
   include_yaml = true
 })
-
 -- JUnit XML
 local junit = require("formatters.junit")
 junit.format({
   include_system_out = true
 })
-
 -- LCOV coverage
 local lcov = require("formatters.lcov")
 lcov.format({
@@ -115,7 +118,12 @@ lcov.format({
 })
 ```
 
+
+
 ## Error Handling
+
+
+
 ```lua
 -- Formatter error handling
 function MyFormatter:format(results)
@@ -126,35 +134,39 @@ function MyFormatter:format(results)
       { provided_type = type(results) }
     )
   end
-  
+
   -- Handle errors during formatting
   local success, output = error_handler.try(function()
     return self:do_format(results)
   end)
-  
+
   if not success then
     return nil, error_handler.format_error(
       "Formatting failed",
       { error = output }
     )
   end
-  
+
   return output
 end
-
 -- Resource cleanup
 local function with_temp_file(callback)
   local path = fs.temp_file()
   local result, err = error_handler.try(function()
     return callback(path)
   end)
-  
+
   fs.delete_file(path)
   return result, err
 end
 ```
 
+
+
 ## Critical Rules
+
+
+
 - Follow format specs
 - Handle large files
 - Stream output
@@ -164,7 +176,11 @@ end
 - Test thoroughly
 - Monitor performance
 
+
 ## Best Practices
+
+
+
 - Stream large reports
 - Handle memory limits
 - Clean up temp files
@@ -176,7 +192,11 @@ end
 - Monitor performance
 - Use helpers
 
+
 ## Performance Tips
+
+
+
 - Use streaming
 - Minimize memory
 - Clean up promptly
