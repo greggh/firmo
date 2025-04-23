@@ -1,5 +1,5 @@
 ---@class firmo
----@field version string Current version of the framework (following semantic versioning)
+---@field version string Version string from lib.core.version (read-only)
 ---@field level number Current depth level of test blocks for nested test structures
 ---@field passes number Number of passing tests in the current run
 ---@field errors number Number of failing tests in the current run
@@ -123,6 +123,18 @@ if not logging then
     { module = "firmo" }
   )
 end
+
+-- Load version module
+local version = try_require("lib.core.version")
+if not version then
+  error_handler.throw(
+    "Required module 'lib.core.version' could not be loaded",
+    error_handler.CATEGORY.CONFIGURATION,
+    error_handler.SEVERITY.FATAL,
+    { module = "firmo" }
+  )
+end
+
 ---@diagnostic disable-next-line: need-check-nil
 local logger = logging.get_logger("firmo-core")
 
@@ -172,6 +184,7 @@ logger.debug("Logging system initialized", {
     error_handler = error_handler ~= nil,
     filesystem = fs ~= nil,
     logging = logging ~= nil,
+    version = version ~= nil,
     assertion = assertion ~= nil,
     test_definition = test_definition ~= nil,
     cli = cli_module ~= nil,
@@ -195,7 +208,8 @@ logger.debug("Logging system initialized", {
 
 -- Initialize the firmo table
 local firmo = {}
-firmo.version = "0.7.5"
+---@diagnostic disable-next-line: need-check-nil
+firmo.version = version.string
 
 -- Set up core state
 firmo.level = 0
@@ -366,6 +380,7 @@ end
 local module = setmetatable({
   ---@type firmo
   firmo = firmo,
+  version = firmo.version,
 
   -- Export the main functions directly
   describe = firmo.describe,
@@ -435,6 +450,8 @@ local module = setmetatable({
       _G.await = firmo.await
       _G.wait_until = firmo.wait_until
     end
+
+    _G.version = firmo.version
 
     return firmo
   end,

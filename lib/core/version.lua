@@ -1,7 +1,7 @@
 --- Version module for Firmo
 --- This module serves as the single source of truth for the Firmo project version.
 --- It provides semantic versioning capabilities, version parsing, comparison, and
---- compatibility checking functions. The module follows the semantic versioning 
+--- compatibility checking functions. The module follows the semantic versioning
 --- specification (https://semver.org/) and helps ensure version consistency across
 --- the project.
 ---
@@ -50,8 +50,8 @@ M.patch = 5
 M.string = string.format("%d.%d.%d", M.major, M.minor, M.patch)
 
 --- Parse a semantic version string into its components
---- This function takes a version string in the format "MAJOR.MINOR.PATCH" and 
---- parses it into a table with separate numeric components. It validates the 
+--- This function takes a version string in the format "MAJOR.MINOR.PATCH" and
+--- parses it into a table with separate numeric components. It validates the
 --- format and returns appropriate error objects if the parsing fails.
 ---
 ---@param version_string string Version string to parse in format "MAJOR.MINOR.PATCH"
@@ -76,64 +76,55 @@ M.string = string.format("%d.%d.%d", M.major, M.minor, M.patch)
 function M.parse(version_string)
   -- Parameter validation
   if version_string == nil then
-    local err = error_handler.validation_error(
-      "Version string cannot be nil",
-      { function_name = "version.parse" }
-    )
-    log.debug("version.parse validation failed", {
-      error = error_handler.format_error(err)
-    })
-    return nil, err
-  end
-  
-  if type(version_string) ~= "string" then
-    local err = error_handler.validation_error(
-      "Version string must be a string",
-      { 
-        function_name = "version.parse",
-        provided_type = type(version_string)
-      }
-    )
+    local err = error_handler.validation_error("Version string cannot be nil", { function_name = "version.parse" })
     log.debug("version.parse validation failed", {
       error = error_handler.format_error(err),
-      provided_type = type(version_string)
     })
     return nil, err
   end
-  
+
+  if type(version_string) ~= "string" then
+    local err = error_handler.validation_error("Version string must be a string", {
+      function_name = "version.parse",
+      provided_type = type(version_string),
+    })
+    log.debug("version.parse validation failed", {
+      error = error_handler.format_error(err),
+      provided_type = type(version_string),
+    })
+    return nil, err
+  end
+
   -- Parse semantic version
   local major, minor, patch = version_string:match("^(%d+)%.(%d+)%.(%d+)$")
   if not (major and minor and patch) then
-    local err = error_handler.validation_error(
-      "Invalid version format, must be MAJOR.MINOR.PATCH",
-      { 
-        function_name = "version.parse",
-        provided_version = version_string,
-        expected_format = "MAJOR.MINOR.PATCH"
-      }
-    )
+    local err = error_handler.validation_error("Invalid version format, must be MAJOR.MINOR.PATCH", {
+      function_name = "version.parse",
+      provided_version = version_string,
+      expected_format = "MAJOR.MINOR.PATCH",
+    })
     log.debug("version.parse invalid format", {
       error = error_handler.format_error(err),
-      version_string = version_string
+      version_string = version_string,
     })
     return nil, err
   end
-  
+
   -- Convert to numbers
   local result = {
     major = tonumber(major),
     minor = tonumber(minor),
     patch = tonumber(patch),
-    string = version_string
+    string = version_string,
   }
-  
+
   log.debug("Parsed version string", {
     version_string = version_string,
     major = result.major,
     minor = result.minor,
-    patch = result.patch
+    patch = result.patch,
   })
-  
+
   return result
 end
 
@@ -175,31 +166,25 @@ end
 function M.compare(version1, version2)
   -- Parameter validation
   if version1 == nil then
-    local err = error_handler.validation_error(
-      "First version cannot be nil",
-      { function_name = "version.compare" }
-    )
+    local err = error_handler.validation_error("First version cannot be nil", { function_name = "version.compare" })
     log.debug("version.compare validation failed", {
-      error = error_handler.format_error(err)
+      error = error_handler.format_error(err),
     })
     return nil, err
   end
-  
+
   if version2 == nil then
-    local err = error_handler.validation_error(
-      "Second version cannot be nil",
-      { function_name = "version.compare" }
-    )
+    local err = error_handler.validation_error("Second version cannot be nil", { function_name = "version.compare" })
     log.debug("version.compare validation failed", {
-      error = error_handler.format_error(err)
+      error = error_handler.format_error(err),
     })
     return nil, err
   end
-  
+
   -- Parse versions if they're strings
   local v1, v1_err
   local v2, v2_err
-  
+
   if type(version1) == "string" then
     v1, v1_err = M.parse(version1)
     if not v1 then
@@ -208,20 +193,17 @@ function M.compare(version1, version2)
   elseif type(version1) == "table" and version1.major and version1.minor and version1.patch then
     v1 = version1
   else
-    local err = error_handler.validation_error(
-      "First version must be a string or a properly formatted version table",
-      { 
-        function_name = "version.compare",
-        provided_type = type(version1)
-      }
-    )
+    local err = error_handler.validation_error("First version must be a string or a properly formatted version table", {
+      function_name = "version.compare",
+      provided_type = type(version1),
+    })
     log.debug("version.compare validation failed", {
       error = error_handler.format_error(err),
-      version1 = version1
+      version1 = version1,
     })
     return nil, err
   end
-  
+
   if type(version2) == "string" then
     v2, v2_err = M.parse(version2)
     if not v2 then
@@ -230,41 +212,39 @@ function M.compare(version1, version2)
   elseif type(version2) == "table" and version2.major and version2.minor and version2.patch then
     v2 = version2
   else
-    local err = error_handler.validation_error(
-      "Second version must be a string or a properly formatted version table",
-      { 
+    local err =
+      error_handler.validation_error("Second version must be a string or a properly formatted version table", {
         function_name = "version.compare",
-        provided_type = type(version2)
-      }
-    )
+        provided_type = type(version2),
+      })
     log.debug("version.compare validation failed", {
       error = error_handler.format_error(err),
-      version2 = version2
+      version2 = version2,
     })
     return nil, err
   end
-  
+
   -- Compare major version
   if v1.major > v2.major then
     return 1
   elseif v1.major < v2.major then
     return -1
   end
-  
+
   -- Compare minor version (if major versions are equal)
   if v1.minor > v2.minor then
     return 1
   elseif v1.minor < v2.minor then
     return -1
   end
-  
+
   -- Compare patch version (if major and minor versions are equal)
   if v1.patch > v2.patch then
     return 1
   elseif v1.patch < v2.patch then
     return -1
   end
-  
+
   -- Versions are equal
   return 0
 end
@@ -314,19 +294,18 @@ function M.satisfies_requirement(required_version)
       { function_name = "version.satisfies_requirement" }
     )
     log.debug("version.satisfies_requirement validation failed", {
-      error = error_handler.format_error(err)
+      error = error_handler.format_error(err),
     })
     return nil, err
   end
-  
+
   local comparison, err = M.compare(M, required_version)
   if not comparison then
     return nil, err
   end
-  
+
   -- Current version is greater or equal to required version
   return comparison >= 0
 end
 
--- For compatibility with direct require
-return M.string
+return M

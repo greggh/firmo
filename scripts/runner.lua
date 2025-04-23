@@ -10,6 +10,7 @@ local runner = {}
 local fs = require("lib.tools.filesystem")
 local error_handler = require("lib.tools.error_handler")
 local logging = require("lib.tools.logging")
+local version = require("lib.core.version")
 
 -- Set error handler to test mode since we're running tests
 error_handler.set_test_mode(true)
@@ -172,7 +173,8 @@ function runner.run_file(file_path, firmo, options)
   local temp_file
 
   -- Try to load temp_file_integration if available
-  local temp_file_integration_loaded, temp_file_integration_module = pcall(require, "lib.tools.filesystem.temp_file_integration")
+  local temp_file_integration_loaded, temp_file_integration_module =
+    pcall(require, "lib.tools.filesystem.temp_file_integration")
   if temp_file_integration_loaded then
     temp_file_integration = temp_file_integration_module
 
@@ -1080,6 +1082,9 @@ function runner.parse_arguments(args)
     -- Boolean flags
     if arg == "--verbose" or arg == "-v" then
       options.verbose = true
+    elseif arg == "--version" or arg == "-V" then
+      print("firmo - Version " .. version.string)
+      os.exit(0)
     elseif arg == "--memory" or arg == "-m" then
       options.memory = true
     elseif arg == "--performance" or arg == "-p" then
@@ -1165,6 +1170,7 @@ function runner.print_usage()
   print("  --performance, -p     Show performance metrics")
   print("  --watch, -w           Enable watch mode for continuous testing")
   print("  --json, -j            Output JSON results")
+  print("  --version, -V         Show version")
   print("  --help, -h            Show this help message")
   print("")
   print("Examples:")

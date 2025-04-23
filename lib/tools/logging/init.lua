@@ -38,7 +38,6 @@
 ---@field WARN number Warning log level
 ---@field ERROR number Error log level (least verbose)
 ---@field get_logger fun(name: string): logger_instance Create a named logger instance
----@field get_logger fun(name: string): logger_instance Create a named logger instance
 ---@field get_configured_logger fun(name: string): logger_instance Create and configure a named logger instance
 ---@field configure fun(options: {level?: number|string, file?: string, format?: string, console?: boolean, max_file_size?: number, include_source?: boolean, include_timestamp?: boolean, include_level?: boolean, include_colors?: boolean, colors?: table<string, string>}): logging Configure the logging system
 ---@field configure_from_config fun(config_key: string): logging Configure logging from central config

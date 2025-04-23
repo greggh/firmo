@@ -22,7 +22,6 @@ local error_handler = require("lib.tools.error_handler")
 ---@field protected_modules table<string, boolean> Registry of modules that should never be reset
 ---@field firmo table|nil Reference to the firmo instance for integration
 ---@field protect fun(modules: string|string[]): module_reset Add modules to the protected list to prevent resettingmodule
-This sub-plan is documented in the docs/firmo/claude_document_update_plan.md
 ---@field count_protected_modules fun(): number Count the number of protected modules in the registry
 ---@field snapshot fun(): table<string, boolean>, number Take a snapshot of the current module state and return count
 ---@field init fun(): module_reset Initialize the module tracking system and capture initial state
@@ -112,8 +111,7 @@ local function init_logger()
 
   if not config_success then
     -- Log error but continue
-    print("[WARNING] Failed to configure module_reset logger: "
-      .. error_handler.format_error(config_err))
+    print("[WARNING] Failed to configure module_reset logger: " .. error_handler.format_error(config_err))
   end
 
   logger.debug("Module reset system initialized", {
@@ -149,7 +147,6 @@ module_reset.protected_modules = {
 ---@param modules string|string[] Module name or array of module names to protect
 -- Configure additional modules that should be protected
 function module_reset.protect(modules)
-
   if type(modules) == "string" then
     logger.debug("Protecting single module", {
       module = modules,
@@ -517,7 +514,6 @@ end
 ---@return string[] module_names List of loaded, non-protected module names
 -- Get list of currently loaded modules
 function module_reset.get_loaded_modules()
-
   local success, result = error_handler.try(function()
     local modules = {}
     local total_loaded = 0
@@ -563,7 +559,6 @@ end
 ---@return table info Memory usage information { current: number, count: number }
 -- Get memory usage information
 function module_reset.get_memory_usage()
-
   local success, result = error_handler.try(function()
     local current_mem = collectgarbage("count")
 
@@ -599,7 +594,6 @@ end
 ---@return table[] results Array of { name: string, memory: number } sorted by memory usage
 -- Calculate memory usage per module (approximately)
 function module_reset.analyze_memory_usage(options)
-
   -- Validate options
   options = options or {}
   validate_type_or_nil(options, "table", "options")
@@ -748,7 +742,6 @@ end
 ---@return boolean added Whether the module was newly added (false if already protected)
 -- Add a module to the protected list
 function module_reset.add_protected_module(module_name)
-
   -- Validate input
   validate_not_nil(module_name, "module_name")
   validate_type(module_name, "string", "module_name")
@@ -889,7 +882,6 @@ end
 ---@return table firmo The configured firmo instance
 -- Configure isolation options for firmo
 function module_reset.configure(options)
-
   -- Validate options
   options = options or {}
   validate_type_or_nil(options, "table", "options")
