@@ -8,6 +8,8 @@ changes, and module integrations are accurately documented while adhering to fir
 
 It also documents plans for many updates to other files in the firmo project.
 
+After work is done on a plan, please mark it as complete in the list at the bottom of this file.
+
 ## Documentation Updates by Area
 
 ### 1. JSDoc Updates
@@ -26,7 +28,13 @@ This sub-plan is documented in the docs/firmo/examples_cleanup_plan.md
 
 This sub-plan is documented in the docs/firmo/claude_document_update_plan.md
 
-### 5. Unused files update
+### 5. lib/mocking/stub.lua file Updates
+
+~~This file has many duplicate function definitions and we don't know which are the good ones.~~
+~~Can you review this file and remove the duplicate functions based on which one is correct.~~
+35.1|Reviewed `lib/mocking/stub.lua`. No duplicate top-level function definitions were found. Methods like `.returns()` are defined dynamically within constructor functions (`stub.new`, `stub.on`), which is not harmful duplication. The unimplemented `stub.sequence` is noted. No code removal needed.
+
+### 6. Unused files update
 
 These are files that I don't beleive are used, and can be deleted. Can you review these files and
 the codebase to verify they aren't used and remove them if needed.
@@ -35,37 +43,67 @@ the codebase to verify they aren't used and remove them if needed.
 - lib/core/fix_expect.lua
 - lib/tools/hash/init.lua
 
-### 6. lib/core/module_reset.lua review/audit
+  44.1|**Outcome:**
+  44.2|- `lib/core/init.lua`: Removed (unused).
+  44.3|- `lib/core/fix_expect.lua`: Removed (unused and obsolete).
+  44.4|- `lib/tools/hash/init.lua`: Kept (used in examples/tests).
+  44.5|
+
+### 7. lib/core/module_reset.lua review/audit
 
 Can you review the lib/core/module_reset.lua and it's usage in scripts/runner.lua. I am not sure it is
 being used as much as it should. It seems like it gets required and configured, but then never used again.
 I am wondering if it needs to be used more, and if any of the test logic in runner.lua or other locations
 needs to be moved to the module_reset.lua and then used correctly in the runner.lua
 
-### 7. version_bump.lua and version_check.lua updates
+**Findings:**
+
+- Reviewed `lib/core/module_reset.lua` and usage in `scripts/runner.lua`.
+- The module _is_ correctly registered via `register_with_firmo` in `runner.run_all`.
+- The enhanced `firmo.reset` (which includes `module_reset.reset_all`) is called _before each file_ within `runner.run_all`, providing **file-level isolation** when running multiple files (e.g., from a directory).
+- The `runner.run_file` function (used for single file execution) does _not_ trigger the module reset. This is acceptable as single-file runs typically occur in fresh processes, making inter-file isolation less critical in that context. Per-test isolation _within_ a file is not the default goal of this integration point.
+- No obvious redundant logic found in `runner.lua`; the integration provides the intended file-level isolation.
+- Conclusion: Current usage is appropriate for its purpose. No code changes deemed necessary from this review.
+
+### 8. version_bump.lua and version_check.lua updates
 
 I believe both scripts/version_bump.lua and scripts/version_check.lua do not load lib/core/version.lua correctly.
 Can you verify this, and verify their functionality actually does what we want.
 
-### 8. Duplicate JSON modules
+### 9. Duplicate JSON modules
 
 We have two JSON modules. One in lib/reporting/json.lua and one in lib/tools/json/init.lua.
 The lib/tools/json/init.lua seems like the more complete module. Should we remove the
 lib/reporting/json.lua and replace any uses of it in firmo with the lib/tools/json/init.lau module?
 
-### 9. check_assertion_patterns.lua updates
+### 10. firmo.lua try_require update
 
-I think the scripts/check_assertion_patterns.lua file is out of date and does not contain checks
-for all of our assertions. Can you review it and update it as needed.
+This sub-plan is documented in the docs/firmo/firmo_try_require_update_plan.md
+
+### 11. complete try_require update
+
+This sub-plan is documented in the docs/firmo/complete_try_require_update_plan.md
+
+### 12. add fit_async, xit_async, describe_async, fdescribe_async, xdescribe_async
+
+This sub-plan is documented in the docs/firmo/add_more_async_functions_plan.md
+
+### 13. Review pcall and xpcall usage in the codebase
+
+This sub-plan is documented in the docs/firmo/pcall_update_plan.md
 
 ## Progress
 
-- [ ] JSDoc Updates
-- [ ] Knowledge Files Updates
+- [x] JSDoc Updates
+- [x] Knowledge Files Updates
 - [ ] Example Files Updates
-- [ ] CLAUDE.md file Updates
-- [ ] Unused file update
-- [ ] lib/core/module_reset.lua review/audit
-- [ ] version_bump.lua and version_check.lua updates
-- [ ] Duplicate JSON modules
-- [ ] check_assertion_patterns.lua updates
+- [x] CLAUDE.md file Updates
+- [x] lib/mocking/stub.lua file updates
+- [x] Unused file update
+- [x] lib/core/module_reset.lua review/audit
+- [x] version_bump.lua and version_check.lua updates
+- [x] Duplicate JSON modules
+- [x] firmo.lua try_require update
+- [x] complete try_require update
+- [ ] add fit_async, xit_async, describe_async, fdescribe_async, xdescribe_async
+- [ ] Review pcall and xpcall usage in the codebase

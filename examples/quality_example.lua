@@ -1,28 +1,63 @@
--- Example to demonstrate test quality validation
+--- quality_example.lua
+--
+-- This example demonstrates the *concept* of classifying tests into different
+-- quality levels (e.g., Basic, Standard, Comprehensive, Advanced, Complete).
+-- The `describe` blocks are named according to these conceptual levels.
+--
+-- It suggests how a test runner *could* potentially use a hypothetical
+-- `--quality` or `--quality-level=N` flag to filter which tests are executed
+-- based on these levels.
+--
+-- **Note:** This quality level filtering is *not* standard Firmo functionality
+-- but is presented here as an illustration of advanced test organization.
+--
+-- Run embedded tests: lua test.lua examples/quality_example.lua
+--
+
 local firmo = require("firmo")
 local error_handler = require("lib.tools.error_handler")
 local test_helper = require("lib.tools.test_helper")
+local logging = require("lib.tools.logging")
+
+-- Setup logger
+local logger = logging.get_logger("QualityExample")
 
 -- Extract test functions
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
 
--- A simple calculator module to test
+--- A simple calculator module used for demonstrating tests at different quality levels.
 local calculator = {}
 
--- Basic operations
+--- Adds two numbers.
+-- @param a number First number.
+-- @param b number Second number.
+-- @return number Sum of a and b.
 calculator.add = function(a, b)
   return a + b
 end
 
+--- Subtracts the second number from the first.
+-- @param a number First number.
+-- @param b number Second number.
+-- @return number Difference of a and b.
 calculator.subtract = function(a, b)
   return a - b
 end
 
+--- Multiplies two numbers.
+-- @param a number First number.
+-- @param b number Second number.
+-- @return number Product of a and b.
 calculator.multiply = function(a, b)
   return a * b
 end
 
+--- Divides the first number by the second. Handles division by zero.
+-- @param a number Numerator.
+-- @param b number Denominator.
+-- @return number|nil Quotient on success, or nil.
+-- @return table|nil err Error object if b is zero.
 calculator.divide = function(a, b)
   if b == 0 then
     return nil, error_handler.validation_error(
@@ -33,7 +68,10 @@ calculator.divide = function(a, b)
   return a / b
 end
 
--- Advanced operation with boundary checking
+--- Calculates base raised to the power of exponent. Handles negative exponents.
+-- @param base number The base.
+-- @param exponent number The exponent.
+-- @return number The result of base^exponent.
 calculator.power = function(base, exponent)
   if exponent < 0 then
     return 1 / calculator.power(base, -exponent)
@@ -48,7 +86,7 @@ calculator.power = function(base, exponent)
   end
 end
 
--- Level 1 tests - Basic tests with minimal assertions
+--- Conceptual: Level 1 tests - Basic tests with minimal assertions.
 describe("Calculator - Level 1 (Basic)", function()
   -- This test has only one assertion
   it("adds two numbers", function()
@@ -56,7 +94,7 @@ describe("Calculator - Level 1 (Basic)", function()
   end)
 end)
 
--- Level 2 tests - Standard tests with more assertions
+--- Conceptual: Level 2 tests - Standard tests with more assertions and setup/teardown.
 describe("Calculator - Level 2 (Standard)", function()
   it("should add two positive numbers correctly", function()
     expect(calculator.add(2, 3)).to.equal(5)
@@ -72,18 +110,18 @@ describe("Calculator - Level 2 (Standard)", function()
   -- Setup and teardown functions
   before(function()
     -- Set up any test environment needed
-    print("Setting up test environment")
+    logger.debug("Setting up test environment")
   end)
 
   after(function()
     -- Clean up after tests
-    print("Cleaning up test environment")
+    logger.debug("Cleaning up test environment")
   end)
 end)
 
--- Level 3 tests - Comprehensive with edge cases
+--- Conceptual: Level 3 tests - Comprehensive tests including edge cases and error handling.
 describe("Calculator - Level 3 (Comprehensive)", function()
-  -- Using context nesting
+  --- Tests focused on the division operation, including edge cases.
   describe("when performing division", function()
     it("should divide two numbers", function()
       expect(calculator.divide(10, 2)).to.equal(5)
@@ -107,18 +145,12 @@ describe("Calculator - Level 3 (Comprehensive)", function()
       expect(err.message).to.match("Division by zero")
     end)
   end)
-
-  before(function()
-    -- Set up state
-  end)
-
-  after(function()
-    -- Clean up state
-  end)
+  -- Removed empty before/after hooks
 end)
 
--- Level 4 tests - Advanced with mocks and boundary testing
+--- Conceptual: Level 4 tests - Advanced tests including boundary conditions and basic mocking (spy).
 describe("Calculator - Level 4 (Advanced)", function()
+  --- Tests focused on the power operation, including boundary conditions and call tracking.
   describe("when performing power operations", function()
     it("should calculate powers with various exponents", function()
       expect(calculator.power(2, 3)).to.equal(8)
@@ -162,13 +194,13 @@ describe("Calculator - Level 4 (Advanced)", function()
       calculator.power = original_power
     end)
   end)
-
-  before(function() end)
-  after(function() end)
+  -- Removed empty before/after hooks
 end)
 
--- Level 5 tests - Complete with security and performance
+--- Conceptual: Level 5 tests - Complete tests including non-functional aspects
+-- like security considerations and performance checks.
 describe("Calculator - Level 5 (Complete)", function()
+  --- Tests related to security aspects of the calculator functions.
   describe("when considering security implications", function()
     it("should validate inputs to prevent overflow", function()
       -- Security test: very large inputs
@@ -199,6 +231,7 @@ describe("Calculator - Level 5 (Complete)", function()
     end)
   end)
 
+  --- Tests related to the performance of calculator functions.
   describe("when measuring performance", function()
     it("should calculate power efficiently", function()
       -- Performance test: measure execution time
@@ -215,14 +248,12 @@ describe("Calculator - Level 5 (Complete)", function()
       expect(tostring(execution_time):match("inf")).to_not.exist("Execution time should not be infinity")
     end)
   end)
-
-  before(function() end)
-  after(function() end)
+  -- Removed empty before/after hooks
 end)
 
--- Run this example with quality validation:
--- lua test.lua --quality --quality-level=3 examples/quality_example.lua
---
--- Try different quality levels:
--- lua test.lua --quality --quality-level=1 examples/quality_example.lua
--- lua test.lua --quality --quality-level=5 examples/quality_example.lua
+logger.info("\n-- Quality Levels Example --")
+logger.info("This example uses describe blocks named 'Level X' to illustrate test quality concepts.")
+logger.info("A hypothetical test runner might use a flag like '--quality' or '--quality-level=N'")
+logger.info("to filter tests based on these conceptual levels (this is not standard Firmo functionality).")
+logger.info("\nRun the tests normally:")
+logger.info("  lua test.lua examples/quality_example.lua")

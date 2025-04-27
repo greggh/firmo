@@ -1,4 +1,18 @@
--- Tests for module_reset functionality
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Module Reset Functionality Tests
+---
+--- Verifies the core features of the `lib.core.module_reset` module, including:
+--- - Tracking loaded modules.
+--- - Protecting specified modules from being reset.
+--- - Resetting all non-protected modules (`reset_all`).
+--- - Resetting modules matching a specific pattern (`reset_pattern`).
+--- - Integration with the main `firmo` object (`register_with_firmo`).
+--- - Memory usage tracking APIs (`get_memory_usage`, `analyze_memory_usage`).
+--- - Handling of invalid inputs.
+--- Uses dynamically created temporary test modules and `before`/`after` hooks for cleanup.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 ---@diagnostic disable-next-line: unused-local
@@ -12,22 +26,17 @@ local error_handler = require("lib.tools.error_handler")
 local fs = require("lib.tools.filesystem")
 
 -- Try to load the module reset module using test_helper
-local module_reset
-local module_reset_loaded = false
-
-local result, err = test_helper.with_error_capture(function()
-  return require("lib.core.module_reset")
-end)()
-
-if result then
-  module_reset = result
-  module_reset_loaded = true
-end
+local module_reset = require("lib.core.module_reset")
 
 -- Generate a unique suffix for this test run to avoid conflicts when running in parallel
 local test_suffix = tostring(os.time() % 10000) .. "_" .. tostring(math.random(1000, 9999))
-
--- Create test modules with unique names for this test run
+--- Creates a temporary Lua module file with the given content.
+--- Ensures a unique filename using a test-specific suffix.
+---@param name string Base name for the module (e.g., "a", "b").
+---@param content string The Lua code content for the module.
+---@return string|nil file_path The path to the created temporary file, or nil on error.
+---@return string|table module_name_or_error The unique module name (e.g., "test_module_a_1234_5678"), or an error object if file creation failed.
+---@private
 local function create_test_module(name, content)
   local unique_name = name .. "_" .. test_suffix
   local file_path = "/tmp/test_module_" .. unique_name .. ".lua"
@@ -35,25 +44,25 @@ local function create_test_module(name, content)
   local success, err = test_helper.with_error_capture(function()
     return fs.write_file(file_path, content)
   end)()
-  
+
   if not success then
-    return nil, error_handler.io_error(
-      "Failed to create test module",
-      {file_path = file_path, error = err or "unknown error"}
-    )
+    return nil,
+      error_handler.io_error("Failed to create test module", { file_path = file_path, error = err or "unknown error" })
   end
 
   -- Store the module name for reference
   return file_path, "test_module_" .. unique_name
 end
-
--- Clean up test modules
+--- Cleans up temporary module files created for the current test run.
+--- Finds files in /tmp matching the test run's unique suffix and deletes them.
+---@return nil
+---@private
 local function cleanup_test_modules()
   -- Get all files in /tmp directory
   local files = test_helper.with_error_capture(function()
     return fs.get_directory_contents("/tmp") or {}
   end)()
-  
+
   if not files then
     files = {}
   end
@@ -73,10 +82,12 @@ local function cleanup_test_modules()
   collectgarbage("collect")
 end
 
--- Helper function to safely add to package.path and return cleanup function
+--- Prepends a path to `package.path` temporarily and returns a function to restore the original path.
+---@param path string The path to prepend (e.g., "/tmp/?.lua").
+---@return function restore_func A function that, when called, restores `package.path` to its original value.
+---@private
 local function add_to_package_path(path)
   local original_path = package.path
-  package.path = path .. ";" .. package.path
 
   -- Return a function that restores the original path
   return function()
@@ -85,14 +96,6 @@ local function add_to_package_path(path)
 end
 
 describe("Module Reset Functionality", function()
-  -- Skip tests if module_reset is not available
-  if not module_reset_loaded then
-    it("module_reset module is required for these tests", function()
-      firmo.pending("module_reset module not available")
-    end)
-    return
-  end
-
   -- We have the module, so run the tests
   ---@diagnostic disable-next-line: unused-local
   local module_a_path, module_a_name
@@ -329,17 +332,17 @@ describe("Module Reset Functionality", function()
       expect(module_a_new.counter).to.equal(0)
       expect(module_b_new.value).to.equal("initial")
     end)
-    
+
     it("handles errors with invalid reset patterns", { expect_error = true }, function()
       -- Test with invalid pattern type
       local result1, err1 = test_helper.with_error_capture(function()
         module_reset.reset_pattern(123)
       end)()
-      
+
       expect(result1).to_not.exist()
       expect(err1).to.exist()
       expect(err1.message).to.match("pattern must be of type 'string'")
-      
+
       -- Test with empty pattern
       -- This test is conditional on whether the module_reset implementation
       -- actually validates empty patterns - some implementations might not
@@ -347,7 +350,7 @@ describe("Module Reset Functionality", function()
       local result2, err2 = test_helper.with_error_capture(function()
         return module_reset.reset_pattern("")
       end)()
-      
+
       -- Just check that we got some kind of result - it could be an error or a valid result
       expect(result2 ~= nil or err2 ~= nil).to.be_truthy()
     end)
@@ -472,7 +475,7 @@ describe("Module Reset Functionality", function()
       expect(type(memory_analysis)).to.equal("table")
       expect(#memory_analysis >= 0).to.be_truthy()
     end)
-    
+
     it("handles invalid threshold inputs gracefully", { expect_error = true }, function()
       -- Test with invalid threshold type
       local result1, err1 = test_helper.with_error_capture(function()
@@ -480,53 +483,45 @@ describe("Module Reset Functionality", function()
         -- but we can test the concept
         local function set_memory_threshold(threshold)
           if type(threshold) ~= "number" then
-            error(error_handler.validation_error(
-              "Memory threshold must be a number",
-              {provided_type = type(threshold)}
-            ))
+            error(
+              error_handler.validation_error("Memory threshold must be a number", { provided_type = type(threshold) })
+            )
           end
-          
+
           if threshold <= 0 then
-            error(error_handler.validation_error(
-              "Memory threshold must be positive",
-              {provided_value = threshold}
-            ))
+            error(error_handler.validation_error("Memory threshold must be positive", { provided_value = threshold }))
           end
-          
+
           return true
         end
-        
+
         set_memory_threshold("not a number")
       end)()
-      
+
       expect(result1).to_not.exist()
       expect(err1).to.exist()
       expect(err1.category).to.equal(error_handler.CATEGORY.VALIDATION)
       expect(err1.message).to.match("Memory threshold must be a number")
-      
+
       -- Test with invalid threshold value
       local result2, err2 = test_helper.with_error_capture(function()
         local function set_memory_threshold(threshold)
           if type(threshold) ~= "number" then
-            error(error_handler.validation_error(
-              "Memory threshold must be a number",
-              {provided_type = type(threshold)}
-            ))
+            error(
+              error_handler.validation_error("Memory threshold must be a number", { provided_type = type(threshold) })
+            )
           end
-          
+
           if threshold <= 0 then
-            error(error_handler.validation_error(
-              "Memory threshold must be positive",
-              {provided_value = threshold}
-            ))
+            error(error_handler.validation_error("Memory threshold must be positive", { provided_value = threshold }))
           end
-          
+
           return true
         end
-        
+
         set_memory_threshold(-10)
       end)()
-      
+
       expect(result2).to_not.exist()
       expect(err2).to.exist()
       expect(err2.category).to.equal(error_handler.CATEGORY.VALIDATION)

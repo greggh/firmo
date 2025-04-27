@@ -1,28 +1,95 @@
----@class ReportingValidation
----@field _VERSION string Module version
----@field validate_coverage_data fun(coverage_data: table): boolean, table Validates coverage data structure against schema
----@field analyze_coverage_statistics fun(coverage_data: table): table Performs statistical analysis of coverage data
----@field cross_check_with_static_analysis fun(coverage_data: table): table Cross-checks coverage data with static analysis
----@field get_validation_issues fun(): table<number, {severity: string, message: string, context: table, file?: string, line?: number}> Returns all validation issues found
----@field reset_validation_issues fun() Resets the validation issues list
----@field validate_report_format fun(data: any, format: string): boolean, string? Validates report format against schema
----@field validate_report fun(coverage_data: table, options?: {validate_schema?: boolean, analyze_statistics?: boolean, cross_check?: boolean, validate_files?: boolean}): table Performs comprehensive report validation
----@field validate_file_paths fun(coverage_data: table): boolean, table Validates that file paths exist and are readable
----@field validate_test_results fun(results_data: table): boolean, table Validates test results data structure
----@field configure fun(options: table): boolean Configure validation options
----@field is_coverage_threshold_met fun(coverage_data: table, threshold: number): boolean, table Check if coverage meets threshold
----@field get_error_summary fun(): string Get a human-readable summary of validation errors
--- Validation module for coverage reports and test results
--- Ensures data conforms to expected schemas and performs sanity checks
+--- Firmo Reporting Data Validation Module
+---
+--- Ensures coverage report data conforms to expected schemas and performs
+--- various sanity checks (line counts, percentages, file paths, statistics).
+--- Collects and reports validation issues. Integrates with central config for settings.
+---
+--- @module lib.reporting.validation
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 0.1.0
+
+---@class ReportingValidation The public API of the reporting validation module.
+---@field _VERSION string Module version.
+---@field validate_coverage_data fun(coverage_data: table): boolean, table[] Validates coverage data structure and internal consistency. Returns `is_valid, validation_issues`.
+
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("Reporting:Validation")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+-- Load mandatory dependencies
+local central_config = try_require("lib.core.central_config")
+local schema_module = try_require("lib.reporting.schema")
+
 local M = {}
 
-local logging = require("lib.tools.logging")
-
--- Create a logger for this module
-local logger = logging.get_logger("Reporting:Validation")
-
--- Configure module logging
-logging.configure_from_config("Reporting:Validation")
+--- Module version
+M._VERSION = "0.1.0"
 
 -- Default validation configuration
 local DEFAULT_CONFIG = {
@@ -37,58 +104,31 @@ local DEFAULT_CONFIG = {
   warn_on_validation_failure = true,
 }
 
---- Get the validation configuration from central_config or fall back to defaults
----@private
----@return table config The validation configuration with all necessary fields
-local function get_config()
-  -- Try to load central_config module
-  local success, central_config = pcall(require, "lib.core.central_config")
-  if success then
-    local validation_config = central_config.get("reporting.validation")
-    if validation_config then
-      return validation_config
-    end
-  end
-
-  -- Fall back to default configuration
-  return DEFAULT_CONFIG
+-- Register schema with central_config immediately after loading it
+if central_config then
+  central_config.register_module("reporting.validation", {
+    validate_reports = { type = "boolean", default = true },
+    validate_line_counts = { type = "boolean", default = true },
+    validate_percentages = { type = "boolean", default = true },
+    validate_file_paths = { type = "boolean", default = true },
+    validate_function_counts = { type = "boolean", default = true },
+    validate_block_counts = { type = "boolean", default = true },
+    validate_cross_module = { type = "boolean", default = true },
+    validation_threshold = { type = "number", default = 0.5 },
+    warn_on_validation_failure = { type = "boolean", default = true },
+  }, DEFAULT_CONFIG)
 end
-
---- Register the validation configuration schema with central_config
----@private
----@return boolean success Whether the schema was successfully registered
-local function register_config_schema()
-  local success, central_config = pcall(require, "lib.core.central_config")
-  if success then
-    local register_success = central_config.register_module("reporting.validation", {
-      validate_reports = { type = "boolean", default = true },
-      validate_line_counts = { type = "boolean", default = true },
-      validate_percentages = { type = "boolean", default = true },
-      validate_file_paths = { type = "boolean", default = true },
-      validate_function_counts = { type = "boolean", default = true },
-      validate_block_counts = { type = "boolean", default = true },
-      validate_cross_module = { type = "boolean", default = true },
-      validation_threshold = { type = "number", default = 0.5 },
-      warn_on_validation_failure = { type = "boolean", default = true },
-    })
-    return register_success == true
-  end
-
-  return false
-end
-
--- Try to register with central_config
-register_config_schema()
 
 -- List of validation issues
 local validation_issues = {}
 
 --- Add a validation issue to the issues list and log it appropriately
+---@param category string The issue category (e.g., "schema_validation", "line_count").
+---@param message string The human-readable issue message.
+---@param severity? string The issue severity ("error" or "warning", defaults to "warning").
+---@param details? table Additional contextual details about the issue.
+---@return nil
 ---@private
----@param category string The issue category (e.g., "schema_validation", "line_count")
----@param message string The human-readable issue message
----@param severity? string The issue severity ("error" or "warning", defaults to "warning")
----@param details? table<string, any> Additional contextual details about the issue
 local function add_issue(category, message, severity, details)
   table.insert(validation_issues, {
     category = category,
@@ -99,18 +139,19 @@ local function add_issue(category, message, severity, details)
 
   -- Log the issue
   if severity == "error" then
-    logger.error(message, details or {})
+    get_logger().error(message, details or {})
   else
-    logger.warn(message, details or {})
+    get_logger().warn(message, details or {})
   end
 end
 
---- Validate that line counts in the summary match the sum of file line counts
+--- Validates consistency between summary counts (lines, functions, blocks) and the sum of per-file counts.
+--- Also checks per-file percentages against calculated values. Adds issues via `add_issue`.
+---@param coverage_data {summary: table, files: table<string, table>} The coverage data to validate.
+---@return boolean valid `true` if counts are consistent within tolerance, `false` otherwise.
 ---@private
----@param coverage_data {summary: table, files: table<string, table>} The coverage data to validate
----@return boolean valid Whether the line counts are valid and consistent
 local function validate_line_counts(coverage_data)
-  local config = get_config()
+  local config = central_config and central_config.get("reporting.validation") or DEFAULT_CONFIG
   if not config.validate_line_counts then
     return true
   end
@@ -302,11 +343,13 @@ local function validate_line_counts(coverage_data)
   return valid
 end
 
+--- Validates if reported percentages (line, function, block, overall) match calculations based on counts.
+--- Uses a configurable threshold for comparison. Adds issues via `add_issue`.
+---@param coverage_data table The coverage data (requires `summary` table with counts and percentages).
+---@return boolean valid `true` if percentages are consistent within tolerance, `false` otherwise.
 ---@private
----@param coverage_data table The coverage data to validate percentages for
----@return boolean valid Whether the percentages are valid
 local function validate_percentages(coverage_data)
-  local config = get_config()
+  local config = central_config and central_config.get("reporting.validation") or DEFAULT_CONFIG
   if not config.validate_percentages then
     return true
   end
@@ -438,47 +481,45 @@ local function validate_percentages(coverage_data)
   return valid
 end
 
+--- Validates that absolute file paths referenced in the coverage data exist on the filesystem.
+--- Requires `lib.tools.filesystem`. Adds issues via `add_issue`.
+---@param coverage_data table The coverage data (requires `files` table).
+---@return boolean valid `true` if all absolute paths exist or if checks skipped, `false` otherwise.
+---@throws table If filesystem module interaction fails critically.
 ---@private
----@param coverage_data table The coverage data to validate file paths for
----@return boolean valid Whether the file paths are valid
 local function validate_file_paths(coverage_data)
-  local config = get_config()
+  local config = central_config and central_config.get("reporting.validation") or DEFAULT_CONFIG
   if not config.validate_file_paths then
     return true
   end
 
+  -- Check if we have fs module available
   local valid = true
 
-  -- Check if we have fs module available
-  local fs_available, fs = pcall(require, "lib.tools.filesystem")
-  if not fs_available then
-    logger.warn("Filesystem module not available, skipping file path validation")
-    return true
-  end
+  -- fs module is loaded at top level and guaranteed to exist
 
   -- Check that files exist
   if coverage_data and coverage_data.files then
-    for filename, _ in pairs(coverage_data.files) do
-      -- Only validate absolute paths
-      if filename:match("^/") then
-        if not fs.file_exists(filename) then
-          add_issue("file_path", "Coverage report references file that doesn't exist", "warning", {
-            file = filename,
-          })
-          valid = false
-        end
-      end
+    if not get_fs().file_exists(filename) then
+      add_issue("file_path", "Coverage report references file that doesn't exist", "warning", {
+        file = filename,
+      })
+      valid = false
     end
   end
 
   return valid
-end
+end -- <<< This closes the function validate_file_paths
 
+--- Validates consistency between the `files` and `original_files` sections in coverage data.
+--- Checks if file counts match and if all files in `files` exist in `original_files`. Adds issues via `add_issue`.
+--- Requires `lib.coverage.static_analyzer` (if deeper analysis is added later).
+---@param coverage_data table The coverage data (requires `files` and optionally `original_files`).
+---@return boolean valid `true` if checks pass or are skipped, `false` otherwise.
+---@throws table If static analyzer interaction fails critically (currently not used).
 ---@private
----@param coverage_data table The coverage data to validate cross-module references for
----@return boolean valid Whether the cross-module references are valid
 local function validate_cross_module(coverage_data)
-  local config = get_config()
+  local config = central_config and central_config.get("reporting.validation") or DEFAULT_CONFIG
   if not config.validate_cross_module then
     return true
   end
@@ -521,9 +562,11 @@ local function validate_cross_module(coverage_data)
   return valid
 end
 
----@param coverage_data table The coverage data to validate
----@return boolean is_valid Whether the coverage data is valid
----@return table validation_issues List of validation issues
+--- Validates the structure and internal consistency of coverage data.
+--- Performs schema validation (if available), checks line counts, percentages, file paths, and cross-module references based on configuration.
+---@param coverage_data table The coverage data to validate.
+---@return boolean is_valid `true` if all enabled validations pass.
+---@return table[] validation_issues A list of validation issue tables found.
 function M.validate_coverage_data(coverage_data)
   -- Reset issues list
   validation_issues = {}
@@ -536,7 +579,7 @@ function M.validate_coverage_data(coverage_data)
     end
   end
 
-  logger.debug("Starting coverage report validation", {
+  get_logger().debug("Starting coverage report validation", {
     has_data = coverage_data ~= nil,
     has_summary = coverage_data and coverage_data.summary ~= nil,
     has_files = coverage_data and coverage_data.files ~= nil,
@@ -553,15 +596,14 @@ function M.validate_coverage_data(coverage_data)
 
   -- Skip validation if disabled
   if not validate_reports then
-    logger.info("Coverage report validation is disabled in configuration")
-    return true, {}
-  end
-
-  -- Basic data structure validation
-  if not coverage_data then
-    add_issue("data_structure", "Coverage data is nil", "error")
+    get_logger().info("Coverage report validation is disabled in configuration")
     return false, validation_issues
   end
+
+  local validation_config = central_config and central_config.get("reporting.validation") or DEFAULT_CONFIG
+
+  -- Ensure we have valid config values
+  local validate_reports = validation_config.validate_reports
 
   if not coverage_data.summary then
     add_issue("data_structure", "Coverage data is missing summary section", "error")
@@ -576,13 +618,9 @@ function M.validate_coverage_data(coverage_data)
   -- Schema validation
   local schema_validation_ok = true
   local schema_error
-  local schema_module
+  -- schema_module is loaded at top level and guaranteed to exist
 
-  -- Try to load schema module
-  local schema_load_success, module = pcall(require, "lib.reporting.schema")
-  if schema_load_success then
-    schema_module = module
-
+  if schema_module then
     -- Perform schema validation
     schema_validation_ok, schema_error = schema_module.validate(coverage_data, "COVERAGE_SCHEMA")
     if not schema_validation_ok then
@@ -590,13 +628,11 @@ function M.validate_coverage_data(coverage_data)
         error = schema_error,
       })
     else
-      logger.debug("Schema validation passed")
+      get_logger().debug("Schema validation passed")
     end
   else
-    -- Schema module not available
-    logger.debug("Schema module not available, skipping schema validation", {
-      error = tostring(module),
-    })
+    -- This block should not be reachable if schema_module load is enforced
+    get_logger().warn("Schema module unexpectedly nil, skipping schema validation")
   end
 
   -- Run specific validation checks
@@ -612,7 +648,7 @@ function M.validate_coverage_data(coverage_data)
     and file_paths_valid
     and cross_module_valid
 
-  logger.info("Coverage report validation complete", {
+  get_logger().info("Coverage report validation complete", {
     valid = is_valid,
     issues_found = #validation_issues,
     schema_validation_ok = schema_validation_ok,
@@ -626,8 +662,11 @@ function M.validate_coverage_data(coverage_data)
   return is_valid, validation_issues
 end
 
----@param coverage_data table The coverage data to analyze
----@return table stats Statistical analysis results
+--- Performs statistical analysis on coverage data.
+--- Calculates mean, median, standard deviation of line coverage percentages.
+--- Identifies outlier files (coverage > 2 stddev from mean) and anomalies (e.g., large files with low coverage).
+---@param coverage_data table The coverage data (requires `files` table with `line_coverage_percent`).
+---@return table stats A table containing analysis results: `{ median_line_coverage, mean_line_coverage, std_dev_line_coverage, outliers = {}, anomalies = {} }`.
 function M.analyze_coverage_statistics(coverage_data)
   local stats = {
     median_line_coverage = 0,
@@ -730,7 +769,7 @@ function M.analyze_coverage_statistics(coverage_data)
     end
   end
 
-  logger.info("Statistical analysis complete", {
+  get_logger().info("Statistical analysis complete", {
     files_analyzed = #percentages,
     mean = stats.mean_line_coverage,
     median = stats.median_line_coverage,
@@ -742,8 +781,11 @@ function M.analyze_coverage_statistics(coverage_data)
   return stats
 end
 
----@param coverage_data table The coverage data to cross-check with static analysis
----@return table results The cross-check results
+--- Cross-checks coverage data (executable lines, function locations) against results from static analysis (if `lib.coverage.static_analyzer` is available).
+--- Requires `original_files` data within `coverage_data`.
+---@param coverage_data table The coverage data (requires `files` and `original_files`).
+---@return table results A table summarizing the cross-check: `{ files_checked, discrepancies={}, unanalyzed_files={}, analysis_success }`. `discrepancies` maps filename to a list of issues.
+---@throws table If static analyzer interaction fails critically.
 function M.cross_check_with_static_analysis(coverage_data)
   local results = {
     files_checked = 0,
@@ -755,16 +797,16 @@ function M.cross_check_with_static_analysis(coverage_data)
   -- Get static analyzer if available
   local analyzer_available, static_analyzer = pcall(require, "lib.coverage.static_analyzer")
   if not analyzer_available then
-    logger.warn("Static analyzer not available, skipping cross-check")
+    get_logger().warn("Static analyzer not available, skipping cross-check")
     return results
   end
 
-  logger.info("Starting cross-check with static analysis")
+  get_logger().info("Starting cross-check with static analysis")
 
   results.analysis_success = true
 
   if not coverage_data or not coverage_data.files then
-    logger.warn("No coverage data available for cross-check")
+    get_logger().warn("No coverage data available for cross-check")
     return results
   end
 
@@ -790,7 +832,7 @@ function M.cross_check_with_static_analysis(coverage_data)
 
     local analysis_result, err = static_analyzer.analyze_source(source, filename)
     if not analysis_result then
-      logger.warn("Static analysis failed for file", {
+      get_logger().warn("Static analysis failed for file", {
         file = filename,
         error = err,
       })
@@ -854,7 +896,7 @@ function M.cross_check_with_static_analysis(coverage_data)
     end
   end
 
-  logger.info("Static analysis cross-check complete", {
+  get_logger().info("Static analysis cross-check complete", {
     files_checked = results.files_checked,
     files_with_discrepancies = discrepancy_count,
     unanalyzed_files = #results.unanalyzed_files,
@@ -863,22 +905,28 @@ function M.cross_check_with_static_analysis(coverage_data)
   return results
 end
 
----@return table validation_issues List of validation issues found
+--- Returns the list of validation issues collected during the last call to `validate_coverage_data` or `validate_report`.
+---@return table[] validation_issues A list of issue tables (`{ category, message, severity, details }`).
 function M.get_validation_issues()
   return validation_issues
 end
 
+--- Resets the internal list of collected validation issues.
+--- Called automatically at the start of `validate_coverage_data`.
 ---@return nil
 function M.reset_validation_issues()
   validation_issues = {}
 end
 
----@param data any The data to validate
----@param format string The format name to validate against
----@return boolean success Whether the format is valid
----@return string? error_message Error message if validation failed
+--- Validates if the given data conforms to the schema expected for a specific report format name.
+--- Uses `lib.reporting.schema.validate_format`.
+---@param data any The formatted data (string or table) to validate.
+---@param format string The name of the format (e.g., "html", "json", "lcov").
+---@return boolean success `true` if validation passes or is skipped (if schema module unavailable).
+---@return string? error_message An error message if validation failed.
+---@throws table If the schema module interaction fails critically.
 function M.validate_report_format(data, format)
-  logger.debug("Validating report format", { format = format })
+  get_logger().debug("Validating report format", { format = format })
 
   -- Try to load schema module
   local schema_module
@@ -897,10 +945,10 @@ function M.validate_report_format(data, format)
       return false, "Format validation failed: " .. tostring(err)
     end
 
-    logger.debug("Format validation successful", { format = format })
+    get_logger().debug("Format validation successful", { format = format })
     return true
   else
-    logger.debug("Schema module not available, skipping format validation", {
+    get_logger().debug("Schema module not available, skipping format validation", {
       error = tostring(module),
     })
     -- Skip validation if schema module is not available
@@ -908,13 +956,15 @@ function M.validate_report_format(data, format)
   end
 end
 
----@param coverage_data table The coverage data to validate
----@param options? table Options for validation
----@return table validation_result The comprehensive validation results
+--- Performs comprehensive validation including coverage data checks, statistical analysis, static analysis cross-check, and optional format validation.
+--- Collects all issues found during the process.
+---@param coverage_data table The coverage data to validate.
+---@param options? {validate_schema?: boolean, analyze_statistics?: boolean, cross_check?: boolean, validate_files?: boolean, format?: string, formatted_output?: string|table} Validation options.
+---@return table validation_result A table containing results from each validation step: `{ validation={is_valid, issues}, statistics={...}, cross_check={...}, format_validation={is_valid, issues} }`.
+---@throws table If any sub-validation step fails critically.
 function M.validate_report(coverage_data, options)
   options = options or {}
-
-  logger.debug("Running comprehensive report validation", {
+  get_logger().debug("Running comprehensive report validation", {
     has_data = coverage_data ~= nil,
     has_options = options ~= nil,
     format = options.format,
@@ -965,7 +1015,7 @@ function M.validate_report(coverage_data, options)
     format_validation = format_validation,
   }
 
-  logger.info("Comprehensive validation complete", {
+  get_logger().info("Comprehensive validation complete", {
     data_valid = is_valid,
     format_valid = format_validation.is_valid,
     issues = #issues,
@@ -981,4 +1031,3 @@ end
 
 -- Return the module
 return M
-

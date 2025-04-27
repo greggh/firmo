@@ -1,14 +1,129 @@
----@class HTMLFormatter
----@field generate fun(coverage_data: table, output_path: string): boolean, string|nil
+--- HTML Coverage Report Formatter
+---
+--- Generates an interactive HTML report for code coverage results, including
+--- summary statistics, file lists, and syntax-highlighted source code views
+--- with line coverage indicators. Includes theme toggling (light/dark).
+--- Uses performance optimizations for large files.
+---
+--- @module lib.reporting.formatters.html
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 2.0.0
+
+--- @class CoverageReportFileStats Detailed coverage statistics for a single file.
+--- @field name string Normalized path of the file.
+--- @field path string Same as name (for compatibility/convenience).
+--- @field lines table<number|string, CoverageLineEntry> Map of line number (string or number) to line data.
+--- @field total_lines number Total number of lines in the file.
+--- @field covered_lines number Number of lines with at least one hit.
+--- @field executable_lines number Number of lines considered executable code.
+--- @field functions table Placeholder for function coverage data.
+--- @field executed_functions number Count of functions executed.
+--- @field total_functions number Total count of functions defined.
+--- @field line_coverage_percent number Percentage of lines covered (covered / executable).
+--- @field function_coverage_percent number Percentage of functions covered (executed / total).
+--- @field source? string Optional source code content.
+--- @field simplified_rendering? boolean Internal flag indicating only summary should be shown for this file due to size.
+
+--- @class CoverageLineEntry Detailed data for a single line.
+--- @field executable boolean Whether the line is executable.
+--- @field execution_count number Number of times the line was hit.
+--- @field covered boolean Whether the line was covered (usually `execution_count > 0`).
+--- @field content? string Optional source code content for the line.
+--- @field line_type? string Optional classification (e.g., "comment", "blank").
+
+--- @class CoverageReportSummary Overall coverage statistics for the report.
+--- @field total_files number Total number of files analyzed.
+--- @field covered_files number Number of files with at least one covered line.
+--- @field total_lines number Total number of lines across all analyzed files.
+--- @field covered_lines number Total number of lines covered across all analyzed files.
+--- @field executable_lines number Total executable lines across all files.
+--- @field total_functions number Total number of functions across all files.
+--- @field executed_functions number Total number of functions executed across all files.
+--- @field line_coverage_percent number Overall line coverage percentage.
+--- @field function_coverage_percent number Overall function coverage percentage.
+--- @field file_coverage_percent? number Percentage of files covered (if total_files > 0).
+
+--- @class CoverageReportData Expected structure for coverage data input.
+--- @field summary CoverageReportSummary Overall summary statistics.
+--- @field files table<string, CoverageReportFileStats> Map of normalized filename to file statistics.
+--- @field executed_lines? number Deprecated: Use `summary.executable_lines`.
+--- @field covered_lines? number Deprecated: Use `summary.covered_lines`.
+
+---@class HTMLFormatter API for generating HTML coverage reports.
+---@field _VERSION string Module version.
+---@field format_coverage fun(coverage_data: CoverageReportData): string Formats coverage data into a complete HTML document string.
+---@field generate fun(coverage_data: CoverageReportData, output_path: string): boolean, table? Generates and writes the HTML report to a file. Returns `success, error`. @throws table If validation or file operations fail critically.
 local M = {}
 
--- Dependencies
-local error_handler = require("lib.tools.error_handler")
-local logger = require("lib.tools.logging")
-local fs = require("lib.tools.filesystem")
-local central_config = require("lib.core.central_config")
-local original_debug_fn = logger.debug
-logger.debug = function() end -- No-op function to disable debug logging
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("Reporting:HTMLFormatter")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
 
 -- Version
 M._VERSION = "2.0.0"
@@ -535,7 +650,10 @@ tr:target {
 .light-theme .function { color: var(--function-light); }
 ]]
 
--- HTML escaping
+--- Escapes HTML special characters.
+---@param text string|nil The input string.
+---@return string The escaped string.
+---@private
 local function escape_html(text)
   if not text then
     return ""
@@ -543,7 +661,11 @@ local function escape_html(text)
   return text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"):gsub("'", "&#39;")
 end
 
--- Server-side syntax highlighting for Lua - SIMPLIFIED VERSION FOR PERFORMANCE
+--- Basic Lua syntax highlighter (currently simplified for performance).
+--- Returns HTML-escaped code, with no actual syntax highlighting applied in this version.
+---@param code string The Lua code string.
+---@return string The HTML-escaped code (no highlighting applied currently).
+---@private
 local function highlight_lua(code)
   if not code then
     return ""
@@ -557,13 +679,20 @@ local function highlight_lua(code)
   -- The current implementation was causing timeouts in test runs
 end
 
--- Round a number to the specified number of decimal places
+--- Rounds a number to a specified number of decimal places.
+---@param num number The number to round.
+---@param decimal_places? number Number of decimal places (default 0).
+---@return number The rounded number.
+---@private
 local function round(num, decimal_places)
   local mult = 10 ^ (decimal_places or 0)
   return math.floor(num * mult + 0.5) / mult
 end
 
--- Get a color class based on coverage percentage
+--- Gets CSS class ("high", "medium", "low") based on coverage percentage.
+---@param percent number Coverage percentage (0-100).
+---@return "high"|"medium"|"low" The CSS class name.
+---@private
 local function get_coverage_class(percent)
   if percent >= 80 then
     return "high"
@@ -574,7 +703,10 @@ local function get_coverage_class(percent)
   end
 end
 
--- Format a percentage for display
+--- Formats a percentage number as a string with "%", rounded to zero decimal places.
+---@param percent number|nil The percentage (0-100). Handles nil input.
+---@return string The formatted percentage string (e.g., "75%"). Returns "0%" for nil input.
+---@private
 local function format_percent(percent)
   if not percent or type(percent) ~= "number" then
     return "0%"
@@ -587,7 +719,11 @@ local function format_percent(percent)
   return tostring(percent) .. "%"
 end
 
--- Generate overview HTML
+--- Generates the HTML markup for the coverage summary section.
+--- Calculates overall percentages based on the data provided.
+---@param coverage_data CoverageReportData The report data, requires `summary` and `files` fields.
+---@return string The generated HTML string for the overview section.
+---@private
 local function generate_overview_html(coverage_data)
   -- Calculate summary statistics
   local total_files = 0
@@ -655,7 +791,11 @@ local function generate_overview_html(coverage_data)
   return html
 end
 
--- Generate file list HTML
+--- Generates the HTML markup for the file list table section.
+--- Sorts files by path.
+---@param coverage_data CoverageReportData The report data, requires `files` field.
+---@return string The generated HTML string for the file list table.
+---@private
 local function generate_file_list_html(coverage_data)
   -- Prepare file list with sorted paths
   local file_paths = {}
@@ -751,7 +891,14 @@ local function generate_file_list_html(coverage_data)
   return html
 end
 
--- Generate file source HTML with size-based optimizations
+--- Generates the HTML markup for a single file's source code display section.
+--- Includes line numbers, execution counts, coverage highlighting, and syntax highlighting (simplified).
+--- Uses a simplified summary view if `file_data.simplified_rendering` is true.
+--- Truncates display after `max_lines_to_display` for performance.
+---@param file_data CoverageReportFileStats The data for the specific file.
+---@param file_id string A unique HTML ID string generated from the file path.
+---@return string The generated HTML string for the file section.
+---@private
 local function generate_file_source_html(file_data, file_id)
   -- Performance optimization based on file size characteristics
   if file_data.simplified_rendering then
@@ -895,7 +1042,10 @@ local function generate_file_source_html(file_data, file_id)
   return html
 end
 
--- Format coverage data into HTML
+--- Formats the coverage data into a complete HTML document string.
+--- Combines overview, file list, and source code sections with CSS and JS.
+---@param coverage_data CoverageReportData The report data structure. Assumes data is already normalized.
+---@return string The complete HTML report content.
 function M.format_coverage(coverage_data)
   -- Generate report sections
   local overview_html = generate_overview_html(coverage_data)
@@ -1026,15 +1176,22 @@ function M.format_coverage(coverage_data)
   return html
 end
 
--- Generate HTML report with performance optimizations
+--- Generates and writes the HTML coverage report file.
+--- Applies performance optimizations (simplified rendering for large files) before formatting.
+--- Ensures output directory exists and writes the generated HTML.
+---@param coverage_data CoverageReportData The coverage data structure.
+---@param output_path string The path where the HTML report file should be saved. If it ends in "/", "coverage-report.html" is appended.
+---@return boolean success `true` if the report was generated and written successfully.
+---@return table? error Error object if validation, formatting, or file operations failed.
+---@throws table If input validation fails (via `error_handler.assert`) or if directory creation/file writing fails critically.
 function M.generate(coverage_data, output_path)
   -- Parameter validation
-  error_handler.assert(
+  get_error_handler().assert(
     type(coverage_data) == "table",
     "coverage_data must be a table",
-    error_handler.CATEGORY.VALIDATION
+    get_error_handler().CATEGORY.VALIDATION
   )
-  error_handler.assert(type(output_path) == "string", "output_path must be a string", error_handler.CATEGORY.VALIDATION)
+  get_error_handler().assert(type(output_path) == "string", "output_path must be a string", get_error_handler().CATEGORY.VALIDATION)
 
   -- If output_path is a directory, add a filename
   if output_path:sub(-1) == "/" then
@@ -1044,11 +1201,11 @@ function M.generate(coverage_data, output_path)
   -- Try to ensure the directory exists
   local dir_path = output_path:match("(.+)/[^/]+$")
   if dir_path then
-    local mkdir_success, mkdir_err = fs.ensure_directory_exists(dir_path)
+    local mkdir_success, mkdir_err = get_fs().ensure_directory_exists(dir_path)
     if not mkdir_success then
-      logger.warn("Failed to ensure directory exists, but will try to write anyway", {
+      get_logger().warn("Failed to ensure directory exists, but will try to write anyway", {
         directory = dir_path,
-        error = mkdir_err and error_handler.format_error(mkdir_err) or "Unknown error",
+        error = mkdir_err and get_error_handler().format_error(mkdir_err) or "Unknown error",
       })
     end
   end
@@ -1082,7 +1239,7 @@ function M.generate(coverage_data, output_path)
     file_count = file_count + 1
   end
 
-  logger.info("Generating report with performance optimization", {
+  get_logger().info("Generating report with performance optimization", {
     total_files = file_count,
     max_lines_threshold = max_lines_for_full_inclusion,
   })
@@ -1091,19 +1248,19 @@ function M.generate(coverage_data, output_path)
   local html = M.format_coverage(filtered_coverage_data)
 
   -- Write the report to the output file
-  local success, err = error_handler.safe_io_operation(function()
-    return fs.write_file(output_path, html)
+  local success, err = get_error_handler().safe_io_operation(function()
+    return get_fs().write_file(output_path, html)
   end, output_path, { operation = "write_coverage_report" })
 
   if not success then
-    logger.error("Failed to write HTML coverage report", {
+    get_logger().error("Failed to write HTML coverage report", {
       file_path = output_path,
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return false, err
   end
 
-  logger.info("Successfully wrote HTML coverage report", {
+  get_logger().info("Successfully wrote HTML coverage report", {
     file_path = output_path,
     report_size = #html,
   })

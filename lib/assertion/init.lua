@@ -1,53 +1,31 @@
----@class AssertionModule
----@field create_expectation fun(value: any): ExpectChain Create an expectation chain for value assertions
----@field eq fun(v1: any, v2: any, depth?: number): boolean Deep equality comparison between two values
----@field type_of fun(value: any, expected_type: string): boolean Type checking with enhanced type detection
----@field same fun(v1: any, v2: any): boolean Shallow equality comparison (alias for ==)
----@field isa fun(value: any, expected_class: string|table): boolean Check if value is instance of class
----@field near fun(v1: number, v2: number, tolerance?: number): boolean Check if numbers are close within tolerance
----@field has_error fun(fn: function, expected_error?: string): boolean Check if function raises expected error
----@field has_key fun(tbl: table, key: any): boolean Check if table has specific key
----@field has_keys fun(tbl: table, keys: table): boolean Check if table has all specified keys
----@field contains fun(tbl: table, value: any): boolean Check if table contains value
----@field contains_all fun(tbl: table, values: table): boolean Check if table contains all specified values
----@field matches fun(str: string, pattern: string): boolean Check if string matches Lua pattern
----@field is_callable fun(value: any): boolean Check if value is callable (function or has __call metatable)
----@field normalize_type fun(value: any): string Get normalized type including metatable-based types
----@field array_contains fun(array: table, value: any): boolean Check if array contains specific value
----@field is_array fun(value: any): boolean Check if value is an array-like table
----@field is_empty fun(value: table|string): boolean Check if collection is empty
----@field has_metatable fun(value: any, mt: table): boolean Check if value has specific metatable
----@field register_assertion fun(name: string, fn: function): boolean Register a custom assertion function
----@field stringify fun(value: any, depth?: number, visited?: table): string Convert any value to a readable string
----@field check_and_throw fun(condition: boolean, message: string, category?: string): boolean Check condition and throw error if false
----@field diff_values fun(v1: any, v2: any): string Generate a human-readable diff between values
+---@class AssertionModule The public API of the assertion module.
+---@field eq fun(t1: any, t2: any, eps?: number, visited?: table): boolean Performs a deep equality check between two values, handling cycles and optional epsilon for numbers.
+---@field isa fun(v: any, x: string|table): boolean, string, string Checks if value `v` is of type `x` (string) or inherits from class/metatable `x` (table). Returns success, success message, failure message.
+---@field expect fun(v: any): ExpectChain Creates an assertion chain (`ExpectChain`) for the given value `v`. This is the main entry point for expect-style assertions.
+---@field paths table The internal table defining assertion chains and their test functions. Exposed primarily for potential extension or inspection (use with caution).
+---@field assertion_count number A counter incremented each time `expect()` is called. Used for test quality metrics.
 
---[[
-    Assertion Module for the Firmo testing framework
-
-    This is a standalone module for assertions that resolves circular dependencies
-    and provides consistent error handling patterns. It implements the expect-style
-    assertion chain API and includes comprehensive equality testing, type checking,
-    and formatted error messages for test failures.
-
-    Features:
-    - Fluent, chainable assertion API with expect() function
-    - Deep equality comparison with cycle detection and diff generation
-    - Enhanced type checking beyond Lua's basic types (detects class instances)
-    - Rich error messages with detailed value formatting
-    - Support for custom assertions through registration
-    - Collection and string validation utilities
-    - Metatable-aware comparison operations
-    - Expectation negation through to_not chain
-    - Structured error reporting with categories and context
-    - Enhanced diff algorithm for readable failure messages
-
-    @module assertion
-    @author Firmo Team
-    @license MIT
-    @copyright 2023-2025
-    @version 1.0.0
-]]
+--- Assertion Module for the Firmo testing framework
+---
+--- This module provides the core assertion logic for Firmo, focusing on the `expect()`
+--- style chainable API. It is designed to be relatively standalone to avoid circular
+--- dependencies with other core modules like logging or error handling, using lazy-loading
+--- where necessary.
+---
+--- Features:
+--- - Fluent, chainable assertion API via `expect(value)`.
+--- - Deep equality comparison (`eq`) with cycle detection.
+--- - Type checking (`isa`) including metatable/class checks.
+--- - Detailed stringification (`stringify`) and diffing (`diff_values`) for error messages.
+--- - Negation via `.to_not` chain.
+--- - Integration with coverage system to mark asserted lines as 'covered'.
+--- - Lazy-loading of dependencies like error_handler and logging.
+---
+--- @module lib.assertion
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
 local M = {}
 
@@ -58,19 +36,21 @@ local unpack = table.unpack or _G.unpack
 ---@diagnostic disable-next-line: unused-local
 local _error_handler, _logging, _firmo, _coverage, _date
 
-local function get_date()
-  if not _date then
-    _date = require("lib.tools.date")
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
   end
-  return _date
+  return result
 end
 
 --- Get the error handler module with lazy loading to avoid circular dependencies
 ---@return table|nil The error handler module or nil if not available
 local function get_error_handler()
   if not _error_handler then
-    local success, error_handler = pcall(require, "lib.tools.error_handler")
-    _error_handler = success and error_handler or nil
+    _error_handler = try_require("lib.tools.error_handler")
   end
   return _error_handler
 end
@@ -79,8 +59,7 @@ end
 ---@return table|nil The logging module or nil if not available
 local function get_logging()
   if not _logging then
-    local success, logging = pcall(require, "lib.tools.logging")
-    _logging = success and logging or nil
+    _logging = try_require("lib.tools.logging")
   end
   return _logging
 end
@@ -112,25 +91,30 @@ local function get_logger()
   }
 end
 
----@diagnostic disable-next-line: unused-local
-local logger = get_logger()
+local function get_date()
+  if not _date then
+    _date = try_require("lib.tools.date")
+  end
+  return _date
+end
 
 --- Get the coverage module with lazy loading to avoid circular dependencies
 ---@return table|nil The coverage module or nil if not available
 local function get_coverage()
   if not _coverage then
-    local success, coverage = pcall(require, "lib.coverage")
-    _coverage = success and coverage or nil
+    _coverage = try_require("lib.coverage")
   end
   return _coverage
 end
 
 -- Utility functions
 
---- Check if a table contains a specific value
----@param t table The table to search in
----@param x any The value to search for
----@return boolean True if the value is found, false otherwise
+--- Checks if a table contains a specific value among its values.
+--- Performs a simple linear search using `pairs`.
+---@param t table|nil The table to search in. Handles `nil` input gracefully.
+---@param x any The value to search for using direct equality (`==`).
+---@return boolean `true` if the value `x` is found among the values of `t`, `false` otherwise.
+---@private
 local function has(t, x)
   if not t then
     return false
@@ -148,10 +132,14 @@ end
 
 --- Enhanced stringify function with better formatting for different types
 --- and protection against cyclic references
----@param t any The value to stringify
----@param depth? number The current depth level (for recursive calls)
----@param visited? table Table of already visited objects (for cycle detection)
----@return string A string representation of the value
+--- Converts any Lua value into a readable string representation.
+--- Handles tables recursively with indentation and cycle detection.
+--- Uses custom formatting for strings (quotes) and attempts `__tostring` metamethods.
+---@param t any The value to convert to a string.
+---@param depth? number Internal recursion depth tracker (default 0).
+---@param visited? table Internal table to track visited tables for cycle detection.
+---@return string A string representation of the value `t`.
+---@private
 local function stringify(t, depth, visited)
   depth = depth or 0
   visited = visited or {}
@@ -225,12 +213,18 @@ local function stringify(t, depth, visited)
 end
 
 --- Generate a simple diff between two values
----@param v1 any The first value to compare
----@param v2 any The second value to compare
----@return string A string representation of the differences
+--- Generates a simple human-readable diff string between two values.
+--- Primarily intended for showing differences between tables in assertion failure messages.
+--- Uses `stringify` for representing values.
+---@param v1 any The first value (typically the actual value).
+---@param v2 any The second value (typically the expected value).
+---@return string A string describing the differences, or a fallback message if no specific difference is found but `M.eq` returned false.
+---@private
 local function diff_values(v1, v2)
-  -- Create a shared visited table for cyclic reference detection
+  -- Create a shared visited table for cyclic reference detection within stringify
   local visited = {}
+
+  -- If types differ, show simple comparison
 
   if type(v1) ~= "table" or type(v2) ~= "table" then
     return "Expected: " .. stringify(v2, 0, visited) .. "\nGot:      " .. stringify(v1, 0, visited)
@@ -273,11 +267,11 @@ end
 --- Deep equality check function with cycle detection
 ---@param t1 any First value to compare
 ---@param t2 any Second value to compare
----@param eps? number Epsilon for floating point comparison (default 0)
----@param visited? table Table to track visited objects for cycle detection
----@return boolean True if the values are considered equal
+---@param eps? number Epsilon tolerance for floating-point number comparison (default 0).
+---@param visited? table Internal table to track visited table pairs for cycle detection during recursion.
+---@return boolean `true` if `t1` and `t2` are considered deeply equal, `false` otherwise.
 function M.eq(t1, t2, eps, visited)
-  -- Initialize visited tables on first call
+  -- Initialize visited table on the initial call
   visited = visited or {}
 
   -- Direct reference equality check for identical tables
@@ -365,9 +359,15 @@ function M.eq(t1, t2, eps, visited)
 end
 
 --- Type checking function that checks if a value is of a specific type
----@param v any The value to check
----@param x string|table The type string or metatable to check against
----@return boolean, string, string success, success_message, failure_message
+--- Checks if a value `v` is of a specific type or class `x`.
+--- If `x` is a string, it checks `type(v) == x`.
+--- If `x` is a table, it checks if `v`'s metatable chain includes `x`.
+---@param v any The value to check.
+---@param x string|table The expected type name (string) or class/metatable (table).
+---@return boolean success True if the check passes, false otherwise.
+---@return string success_message Message template for a successful assertion (e.g., "expected {v} to be a {x}").
+---@return string failure_message Message template for a failed assertion (e.g., "expected {v} to not be a {x}").
+---@throws string If `x` is not a string or table.
 function M.isa(v, x)
   if type(x) == "string" then
     local success = type(v) == x
@@ -498,13 +498,25 @@ local paths = {
       return a
     end,
   },
+  --- Alias for `isa`. Checks type or class inheritance.
+  ---@field test fun(v: any, x: string|table): boolean, string, string The `M.isa` function.
   a = { test = M.isa },
+  --- Alias for `isa`. Checks type or class inheritance.
+  ---@field test fun(v: any, x: string|table): boolean, string, string The `M.isa` function.
   an = { test = M.isa },
+  --- Tests if a value is "falsey" (evaluates to `false` or `nil` in a conditional).
+  ---@field test fun(v: any): boolean, string, string
   falsey = {
+    ---@param v any The value to check.
+    ---@return boolean success True if `v` is `false` or `nil`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v)
       return not v, "expected " .. tostring(v) .. " to be falsey", "expected " .. tostring(v) .. " to not be falsey"
     end,
   },
+  --- Chain link for various `be.*` assertions. Also performs direct equality check if called.
+  ---@field test fun(v: any, x: any): boolean, string, string Performs `v == x` check.
   be = {
     "a",
     "an",
@@ -522,6 +534,13 @@ local paths = {
     "integer",
     "uppercase",
     "lowercase",
+    "lowercase",
+    --- Performs a direct equality check (`v == x`).
+    ---@param v any The actual value.
+    ---@param x any The expected value.
+    ---@return boolean success True if `v == x`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v, x)
       return v == x,
         "expected " .. tostring(v) .. " and " .. tostring(x) .. " to be the same",
@@ -529,7 +548,15 @@ local paths = {
     end,
   },
 
+  --- Tests if a number `v` is greater than or equal to `x`.
+  ---@field test fun(v: number, x: number): boolean, string, string
   at_least = {
+    ---@param v number The actual number.
+    ---@param x number The threshold number.
+    ---@return boolean success True if `v >= x`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
+    ---@throws string If `v` or `x` are not numbers.
     test = function(v, x)
       if type(v) ~= "number" or type(x) ~= "number" then
         error("expected both values to be numbers for at_least comparison")
@@ -540,7 +567,15 @@ local paths = {
     end,
   },
 
+  --- Tests if a number `v` is strictly greater than `x`.
+  ---@field test fun(v: number, x: number): boolean, string, string
   greater_than = {
+    ---@param v number The actual number.
+    ---@param x number The threshold number.
+    ---@return boolean success True if `v > x`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
+    ---@throws string If `v` or `x` are not numbers.
     test = function(v, x)
       if type(v) ~= "number" or type(x) ~= "number" then
         error("expected both values to be numbers for greater_than comparison")
@@ -551,7 +586,15 @@ local paths = {
     end,
   },
 
+  --- Tests if a number `v` is strictly less than `x`.
+  ---@field test fun(v: number, x: number): boolean, string, string
   less_than = {
+    ---@param v number The actual number.
+    ---@param x number The threshold number.
+    ---@return boolean success True if `v < x`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
+    ---@throws string If `v` or `x` are not numbers.
     test = function(v, x)
       if type(v) ~= "number" or type(x) ~= "number" then
         error("expected both values to be numbers for less_than comparison")
@@ -562,62 +605,82 @@ local paths = {
     end,
   },
   --- Test if a value exists (is not nil)
+  --- Tests if a value exists (is not `nil`).
+  ---@field test fun(v: any): boolean, string, string
   exist = {
-    --- @param v any The value to check for existence
-    --- @return boolean, string, string result, success_message, failure_message
+    ---@param v any The value to check.
+    ---@return boolean success True if `v` is not `nil`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v)
       return v ~= nil, "expected " .. tostring(v) .. " to exist", "expected " .. tostring(v) .. " to not exist"
     end,
   },
 
-  --- Test if a value is truthy
+  --- Tests if a value is "truthy" (evaluates to true in a conditional, i.e., not `false` or `nil`).
+  ---@field test fun(v: any): boolean, string, string
   truthy = {
-    --- @param v any The value to check if truthy
-    --- @return boolean, string, string result, success_message, failure_message
+    ---@param v any The value to check.
+    ---@return boolean success True if `v` is neither `false` nor `nil`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v)
-      return v and true or false,
+      return v and true or false, -- Explicitly return boolean true/false
         "expected " .. tostring(v) .. " to be truthy",
         "expected " .. tostring(v) .. " to not be truthy"
     end,
   },
 
-  --- Test if a value is falsy
+  --- Tests if a value is "falsy" (evaluates to `false` or `nil` in a conditional).
+  --- Note: This is duplicated by the `falsey` entry; consider standardizing.
+  ---@field test fun(v: any): boolean, string, string
   falsy = {
-    --- @param v any The value to check if falsy
-    --- @return boolean, string, string result, success_message, failure_message
+    ---@param v any The value to check.
+    ---@return boolean success True if `v` is `false` or `nil`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v)
-      return not v and true or false,
+      return not v and true or false, -- Explicitly return boolean true/false
         "expected " .. tostring(v) .. " to be falsy",
         "expected " .. tostring(v) .. " to not be falsy"
     end,
   },
 
-  --- Test if a value is nil
-  ["nil"] = {
-    --- @param v any The value to check if nil
-    --- @return boolean, string, string result, success_message, failure_message
+  --- Tests if a value is exactly `nil`.
+  ---@field test fun(v: any): boolean, string, string
+  ["nil"] = { -- Using string key because 'nil' is a keyword
+    ---@param v any The value to check.
+    ---@return boolean success True if `v == nil`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v)
       return v == nil, "expected " .. tostring(v) .. " to be nil", "expected " .. tostring(v) .. " to not be nil"
     end,
   },
 
-  --- Test if a value is of a specific type
+  --- Tests if a value is of a specific Lua base type using `type()`.
+  ---@field test fun(v: any, expected_type: string): boolean, string, string
   type = {
-    --- @param v any The value to check the type of
-    --- @param expected_type string The expected type string
-    --- @return boolean, string, string result, success_message, failure_message
+    ---@param v any The value to check.
+    ---@param expected_type string The expected type name (e.g., "string", "number", "table").
+    ---@return boolean success True if `type(v) == expected_type`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v, expected_type)
       return type(v) == expected_type,
         "expected " .. tostring(v) .. " to be of type " .. expected_type .. ", got " .. type(v),
         "expected " .. tostring(v) .. " to not be of type " .. expected_type
     end,
   },
-  --- Test if two values are equal using deep equality comparison
+  --- Tests if two values are deeply equal using `M.eq`. Provides a diff in the failure message.
+  ---@field test fun(v: any, x: any, eps?: number): boolean, string, string
   equal = {
-    --- @param v any The actual value to check
-    --- @param x any The expected value to compare against
-    --- @param eps? number Optional epsilon for floating-point comparisons
-    --- @return boolean, string, string result, success_message, failure_message
+    ---@param v any The actual value.
+    ---@param x any The expected value.
+    ---@param eps? number Optional epsilon for floating-point comparisons within `M.eq`.
+    ---@return boolean success True if `M.eq(v, x, eps)` returns true.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure, potentially including a diff.
     test = function(v, x, eps)
       local equal = M.eq(v, x, eps)
       local comparison = ""
@@ -637,7 +700,15 @@ local paths = {
         "expected " .. stringify(v) .. " to not equal " .. stringify(x)
     end,
   },
+  --- Tests if a table `v` contains the value `x` among its values (uses `has` helper).
+  ---@field test fun(v: table, x: any): boolean, string, string
   have = {
+    ---@param v table The table to check.
+    ---@param x any The value to look for.
+    ---@return boolean success True if `v` contains `x`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
+    ---@throws string If `v` is not a table.
     test = function(v, x)
       if type(v) ~= "table" then
         error("expected " .. stringify(v) .. " to be a table")
@@ -652,22 +723,52 @@ local paths = {
         "expected table not to contain " .. stringify(x) .. " but it was found\nTable contents: " .. content_preview
     end,
   },
+
+  --- Tests if calling function `v` results in an error (using `pcall`).
+  ---@field test fun(v: function): boolean, string, string
   fail = {
     "with",
+    ---@param v function The function to call.
+    ---@return boolean success True if `pcall(v)` returns `false`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v)
       return not pcall(v), "expected " .. tostring(v) .. " to fail", "expected " .. tostring(v) .. " to not fail"
     end,
   },
+  --- Tests if calling function `v` results in an error whose message matches `pattern`. Used after `.fail`.
+  ---@field test fun(v: function, pattern: string): boolean, string, string
   with = {
+    ---@param v function The function to call.
+    ---@param pattern string The Lua pattern to match against the error message.
+    ---@return boolean success True if `pcall(v)` returns `false` and the error message matches `pattern`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v, pattern)
       local ok, message = pcall(v)
+      -- Ensure message is a string before matching
+      if type(message) == "table" then
+        message = message.message or message[1] or message[2] or message[3] or message[4]
+      end
+      if type(message) ~= "string" then
+        message = tostring(message)
+      end
+
       return not ok and message:match(pattern),
         "expected " .. tostring(v) .. ' to fail with error matching "' .. pattern .. '"',
         "expected " .. tostring(v) .. ' to not fail with error matching "' .. pattern .. '"'
     end,
   },
+  --- Tests if a string `v` contains a match for the Lua pattern `p`.
+  ---@field test fun(v: any, p: string): boolean, string, string
   match = {
+    ---@param v any The value to check (will be converted to string).
+    ---@param p string The Lua pattern.
+    ---@return boolean success True if `tostring(v)` contains a match for `p`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v, p)
+      -- Ensure v is a string for matching
       if type(v) ~= "string" then
         v = tostring(v)
       end
@@ -768,8 +869,19 @@ local paths = {
   },
 
   -- Alias for have_length
+  --- Alias for `have_length`. Tests string/table size.
+  ---@field test fun(v: string|table, expected_size: number): boolean, string, string
   have_size = {
+    ---@param v string|table The value to check the size of.
+    ---@param expected_size number The expected size/length.
+    ---@return boolean success True if the size matches.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
+    ---@throws string If `v` is not a string or table, or if `expected_size` is not a number.
     test = function(v, expected_size)
+      if type(expected_size) ~= "number" then
+        error("expected size must be a number", 2)
+      end
       local length
       if type(v) == "string" then
         length = string.len(v)
@@ -786,7 +898,16 @@ local paths = {
   },
 
   -- Property existence and value checking
+  --- Tests if a table `v` has a property `property_name`. Optionally checks if the property's value equals `expected_value` using `M.eq`.
+  ---@field test fun(v: table, property_name: any, expected_value?: any): boolean, string, string
   have_property = {
+    ---@param v table The table to check.
+    ---@param property_name any The key of the property to check for.
+    ---@param expected_value? any If provided, the value the property should have (checked using `M.eq`).
+    ---@return boolean success True if the property exists and (optionally) has the expected value.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
+    ---@throws string If `v` is not a table.
     test = function(v, property_name, expected_value)
       if type(v) ~= "table" then
         error("expected a table for property check, got " .. type(v))
@@ -818,7 +939,15 @@ local paths = {
   },
 
   -- Schema validation
+  --- Tests if a table `v` matches a given `schema`. Checks for key presence, type matching, and optional exact value matching.
+  ---@field test fun(v: table, schema: table): boolean, string, string
   match_schema = {
+    ---@param v table The table to validate.
+    ---@param schema table The schema definition. Keys are property names. Values can be type strings ("string", "number", etc.) or exact values to match against.
+    ---@return boolean success True if `v` matches the `schema`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure, detailing mismatches.
+    ---@throws string If `v` or `schema` are not tables.
     test = function(v, schema)
       if type(v) ~= "table" then
         error("expected a table for schema validation, got " .. type(v))
@@ -886,7 +1015,16 @@ local paths = {
   },
 
   -- Function behavior assertions
+  --- Tests if executing function `fn` causes a change in the value returned by `value_fn`. Optionally uses `change_fn` to define the criteria for change.
+  ---@field test fun(fn: function, value_fn: function, change_fn?: fun(before: any, after: any): boolean): boolean, string, string
   change = {
+    ---@param fn function The function to execute that might cause a change.
+    ---@param value_fn function A function that returns the value to monitor for changes. Called before and after `fn`.
+    ---@param change_fn? fun(before: any, after: any): boolean Optional function to determine if a change occurred. Defaults to `not M.eq(before, after)`.
+    ---@return boolean success True if the value changed according to the criteria.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
+    ---@throws string If `fn` or `value_fn` are not functions, or if `fn` throws an error.
     test = function(fn, value_fn, change_fn)
       if type(fn) ~= "function" then
         error("expected a function to execute, got " .. type(fn))
@@ -928,7 +1066,15 @@ local paths = {
   },
 
   -- Check if a function increases a value
+  --- Tests if executing function `fn` increases the numerical value returned by `value_fn`.
+  ---@field test fun(fn: function, value_fn: function): boolean, string, string
   increase = {
+    ---@param fn function The function to execute.
+    ---@param value_fn function Function returning the numerical value to check. Called before and after `fn`.
+    ---@return boolean success True if the value returned by `value_fn` increased after `fn` executed.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
+    ---@throws string If `fn` or `value_fn` are not functions, if `value_fn` does not return a number, or if `fn` throws an error.
     test = function(fn, value_fn)
       if type(fn) ~= "function" then
         error("expected a function to execute, got " .. type(fn))
@@ -970,7 +1116,15 @@ local paths = {
   },
 
   -- Check if a function decreases a value
+  --- Tests if executing function `fn` decreases the numerical value returned by `value_fn`.
+  ---@field test fun(fn: function, value_fn: function): boolean, string, string
   decrease = {
+    ---@param fn function The function to execute.
+    ---@param value_fn function Function returning the numerical value to check. Called before and after `fn`.
+    ---@return boolean success True if the value returned by `value_fn` decreased after `fn` executed.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
+    ---@throws string If `fn` or `value_fn` are not functions, if `value_fn` does not return a number, or if `fn` throws an error.
     test = function(fn, value_fn)
       if type(fn) ~= "function" then
         error("expected a function to execute, got " .. type(fn))
@@ -1012,7 +1166,15 @@ local paths = {
   },
 
   -- Alias for equal with clearer name for deep comparison
+  --- Alias for `equal`. Tests deep equality using `M.eq`.
+  ---@field test fun(v: any, x: any, eps?: number): boolean, string, string
   deep_equal = {
+    ---@param v any The actual value.
+    ---@param x any The expected value.
+    ---@param eps? number Optional epsilon for floating-point comparisons.
+    ---@return boolean success True if `M.eq(v, x, eps)` is true.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
     test = function(v, x, eps)
       return M.eq(v, x, eps),
         "expected " .. stringify(v) .. " to deeply equal " .. stringify(x),
@@ -1021,8 +1183,16 @@ local paths = {
   },
 }
 
--- Advanced regex matching with options
+--- Tests if string `v` matches Lua pattern `pattern`, with optional flags.
+---@field test fun(v: string, pattern: string, options?: {case_insensitive?: boolean, multiline?: boolean}): boolean, string, string
 paths.match_regex = {
+  ---@param v string The string to test.
+  ---@param pattern string The Lua pattern to match against.
+  ---@param options? {case_insensitive?: boolean, multiline?: boolean} Optional flags. `case_insensitive` converts both string and pattern to lowercase. `multiline` handles `^` matching start of lines differently.
+  ---@return boolean success True if `v` matches `pattern` with options.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` or `pattern` are not strings, or `options` is not a table.
   test = function(v, pattern, options)
     if type(v) ~= "string" then
       error("Expected a string, got " .. type(v))
@@ -1174,13 +1344,16 @@ paths.match_regex = {
   end,
 }
 
--- Date validation using date module
+--- Tests if string `v` can be parsed as a valid date by the `lib.tools.date` module.
+---@field test fun(v: string): boolean, string, string
 paths.be_date = {
+  ---@param v string The string to test.
+  ---@return boolean success True if `get_date()(v)` succeeds without error.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
   test = function(v)
     if type(v) ~= "string" then
-      return false,
-        "expected " .. stringify(v) .. " to be a valid date string",
-        "expected " .. stringify(v) .. " to not be a valid date string"
+      return false, "expected a string to check if it's a date, got " .. type(v), "expected not a string" -- Less useful negated message
     end
 
     local success, _ = pcall(function()
@@ -1192,11 +1365,16 @@ paths.be_date = {
   end,
 }
 
--- ISO date format validation
+--- Tests if string `value` conforms to common ISO 8601 date/time formats AND represents a valid date.
+---@field test fun(value: string): boolean, string, string
 paths.be_iso_date = {
+  ---@param value string The string to test.
+  ---@return boolean success True if `value` matches an ISO pattern and is a valid date according to `lib.tools.date`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure (either format mismatch or invalid date components).
   test = function(value)
     if type(value) ~= "string" then
-      return false, "expected string for ISO date format, got " .. type(value), "expected not to be an ISO date format"
+      return false, "expected string for ISO date format, got " .. type(value), "expected not a string"
     end
 
     -- Basic ISO 8601 patterns
@@ -1275,7 +1453,15 @@ paths.be_iso_date = {
   end,
 }
 
+--- Tests if date `a` is chronologically before date `b`. Parses `a` and `b` using `lib.tools.date`.
+---@field test fun(a: string, b: string): boolean, string, string
 paths.be_before = {
+  ---@param a string The first date string.
+  ---@param b string The second date string.
+  ---@return boolean success True if `a` parses to a date strictly before `b`.
+  ---@return string success_message Message for success.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure (including parsing errors).
   test = function(a, b)
     -- ensure both values are date objects
     local d1, r1 = get_date()(a)
@@ -1291,7 +1477,14 @@ paths.be_before = {
   end,
 }
 
+--- Tests if date `a` is chronologically after date `b`. Parses `a` and `b` using `lib.tools.date`.
+---@field test fun(a: string, b: string): boolean, string, string
 paths.be_after = {
+  ---@param a string The first date string.
+  ---@param b string The second date string.
+  ---@return boolean success True if `a` parses to a date strictly after `b`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure (including parsing errors).
   test = function(a, b)
     -- ensure both values are date objects
     local d1, r1 = get_date()(a)
@@ -1307,7 +1500,14 @@ paths.be_after = {
   end,
 }
 
+--- Tests if date string `v` represents the same calendar day as `expected_date`. Parses both using `lib.tools.date`.
+---@field test fun(v: string, expected_date: string): boolean, string, string
 paths.be_same_day_as = {
+  ---@param v string The first date string.
+  ---@param expected_date string The second date string.
+  ---@return boolean success True if both parse and represent the same year, month, and day.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure (including parsing errors).
   test = function(v, expected_date)
     if type(v) ~= "string" or type(expected_date) ~= "string" then
       return false, "Expected a date string, got " .. type(v), "Expected a non-date string"
@@ -1334,11 +1534,18 @@ paths.be_same_day_as = {
   end,
 }
 
--- Async assertions
+--- Tests if an async function `async_fn` (which accepts a `done` callback) completes within the given `timeout`. Requires `lib.async`.
+---@field test fun(async_fn: fun(done: function), timeout?: number): boolean, string, string
 paths.complete = {
+  ---@param async_fn fun(done: function) The async function to test. Must call `done()` on completion.
+  ---@param timeout? number Optional timeout in milliseconds (default 1000).
+  ---@return boolean success True if `done()` is called within `timeout`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure (timeout or internal error).
+  ---@throws string If called outside an async context, or if `async_fn` is not a function.
   test = function(async_fn, timeout)
     if type(async_fn) ~= "function" then
-      error("Expected a promise, got " .. type(async_fn))
+      error("Expected an async function, got " .. type(async_fn))
     end
 
     timeout = timeout or 1000 -- Default 1 second timeout
@@ -1395,10 +1602,18 @@ paths.complete = {
   end,
 }
 
+--- Tests if an async function `async_fn` completes within the specific `timeout`. Alias for `complete`. Requires `lib.async`.
+---@field test fun(async_fn: fun(done: function), timeout: number): boolean, string, string
 paths.complete_within = {
+  ---@param async_fn fun(done: function) The async function to test.
+  ---@param timeout number The required timeout in milliseconds.
+  ---@return boolean success True if `done()` is called within `timeout`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If called outside an async context, if `async_fn` is not a function, or if `timeout` is not a positive number.
   test = function(async_fn, timeout)
     if type(async_fn) ~= "function" then
-      error("Expected a promise, got " .. type(async_fn))
+      error("Expected an async function, got " .. type(async_fn))
     end
 
     if type(timeout) ~= "number" or timeout <= 0 then
@@ -1460,10 +1675,19 @@ paths.complete_within = {
   end,
 }
 
+--- Tests if an async function `async_fn` completes successfully and calls its `done` callback with a value deeply equal to `expected_value`. Requires `lib.async`.
+---@field test fun(async_fn: fun(done: fun(err?: any, result?: any)), expected_value: any, timeout?: number): boolean, string, string
 paths.resolve_with = {
+  ---@param async_fn fun(done: fun(err?: any, result?: any)) The async function. `done` typically called as `done(nil, result)`.
+  ---@param expected_value any The value expected to be passed to `done`.
+  ---@param timeout? number Optional timeout in milliseconds (default 1000).
+  ---@return boolean success True if completed successfully with the expected value.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure (timeout, error, or wrong value).
+  ---@throws string If called outside an async context, or if `async_fn` is not a function.
   test = function(async_fn, expected_value, timeout)
     if type(async_fn) ~= "function" then
-      error("Expected a promise, got " .. type(async_fn))
+      error("Expected an async function, got " .. type(async_fn))
     end
 
     timeout = timeout or 1000 -- Default 1 second timeout
@@ -1525,10 +1749,19 @@ paths.resolve_with = {
   end,
 }
 
+--- Tests if an async function `async_fn` calls its `done` callback with an error. Optionally checks if the error message matches `error_pattern`. Requires `lib.async`.
+---@field test fun(async_fn: fun(done: fun(err?: any)), error_pattern?: string, timeout?: number): boolean, string, string
 paths.reject = {
+  ---@param async_fn fun(done: fun(err?: any)) The async function. `done` typically called as `done(err)`.
+  ---@param error_pattern? string Optional Lua pattern to match against the error message passed to `done`.
+  ---@param timeout? number Optional timeout in milliseconds (default 1000).
+  ---@return boolean success True if completed by calling `done` with an error (and optionally matching pattern).
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure (timeout, no error, or pattern mismatch).
+  ---@throws string If called outside an async context, or if `async_fn` is not a function.
   test = function(async_fn, error_pattern, timeout)
     if type(async_fn) ~= "function" then
-      error("Expected a promise, got " .. type(async_fn))
+      error("Expected an async function, got " .. type(async_fn))
     end
 
     timeout = timeout or 1000 -- Default 1 second timeout
@@ -1605,10 +1838,15 @@ paths.reject = {
   end,
 }
 
--- Continue adding assertions to the paths table
-
--- Check if a table contains all specified keys
+--- Tests if table `v` contains *all* keys listed in table `x`.
+---@field test fun(v: table, x: table): boolean, string, string
 paths.keys = {
+  ---@param v table The table to check.
+  ---@param x table An array-like table listing the keys expected to be present in `v`.
+  ---@return boolean success True if all keys in `x` exist in `v`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` or `x` are not tables.
   test = function(v, x)
     if type(v) ~= "table" then
       error("expected " .. tostring(v) .. " to be a table")
@@ -1632,8 +1870,15 @@ paths.keys = {
   end,
 }
 
--- Check if a table contains a specific key
+--- Tests if table `v` contains the specific key `x`.
+---@field test fun(v: table, x: any): boolean, string, string
 paths.key = {
+  ---@param v table The table to check.
+  ---@param x any The key to look for.
+  ---@return boolean success True if `v[x]` is not `nil`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` is not a table.
   test = function(v, x)
     if type(v) ~= "table" then
       error("expected " .. tostring(v) .. " to be a table")
@@ -1645,8 +1890,15 @@ paths.key = {
   end,
 }
 
--- Numeric comparison assertions
+--- Tests if number `v` is strictly greater than number `x`.
+---@field test fun(v: number, x: number): boolean, string, string
 paths.be_greater_than = {
+  ---@param v number The actual number.
+  ---@param x number The threshold number.
+  ---@return boolean success True if `v > x`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` or `x` are not numbers.
   test = function(v, x)
     if type(v) ~= "number" then
       error("expected " .. tostring(v) .. " to be a number")
@@ -1662,8 +1914,14 @@ paths.be_greater_than = {
   end,
 }
 
--- Check if a number is negative
+--- Tests if number `v` is negative (`v < 0`).
+---@field test fun(v: number): boolean, string, string
 paths.negative = {
+  ---@param v number The number to check.
+  ---@return boolean success True if `v < 0`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` is not a number.
   test = function(v)
     if type(v) ~= "number" then
       error("expected " .. tostring(v) .. " to be a number")
@@ -1673,8 +1931,14 @@ paths.negative = {
   end,
 }
 
--- Check if a number is an integer
+--- Tests if number `v` is an integer (has no fractional part).
+---@field test fun(v: number): boolean, string, string
 paths.integer = {
+  ---@param v number The number to check.
+  ---@return boolean success True if `v == math.floor(v)`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` is not a number.
   test = function(v)
     if type(v) ~= "number" then
       error("expected " .. tostring(v) .. " to be a number")
@@ -1686,8 +1950,14 @@ paths.integer = {
   end,
 }
 
--- Check if a string is all uppercase
+--- Tests if string `v` consists entirely of uppercase characters.
+---@field test fun(v: string): boolean, string, string
 paths.uppercase = {
+  ---@param v string The string to check.
+  ---@return boolean success True if `v == string.upper(v)`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` is not a string.
   test = function(v)
     if type(v) ~= "string" then
       error("expected " .. tostring(v) .. " to be a string")
@@ -1699,8 +1969,14 @@ paths.uppercase = {
   end,
 }
 
--- Check if a string is all lowercase
+--- Tests if string `v` consists entirely of lowercase characters.
+---@field test fun(v: string): boolean, string, string
 paths.lowercase = {
+  ---@param v string The string to check.
+  ---@return boolean success True if `v == string.lower(v)`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` is not a string.
   test = function(v)
     if type(v) ~= "string" then
       error("expected " .. tostring(v) .. " to be a string")
@@ -1712,8 +1988,15 @@ paths.lowercase = {
   end,
 }
 
--- Satisfy assertion for custom predicates
+--- Tests if value `v` satisfies a custom `predicate` function.
+---@field test fun(v: any, predicate: fun(v: any): boolean): boolean, string, string
 paths.satisfy = {
+  ---@param v any The value to test.
+  ---@param predicate fun(v: any): boolean A function that receives `v` and returns `true` if satisfied, `false` otherwise.
+  ---@return boolean success The result returned by `predicate(v)`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `predicate` is not a function or if `predicate(v)` throws an error.
   test = function(v, predicate)
     if type(predicate) ~= "function" then
       error("expected predicate to be a function, got " .. type(predicate))
@@ -1731,7 +2014,15 @@ paths.satisfy = {
 }
 
 -- String assertions
+--- Tests if string `v` starts with the prefix string `x`.
+---@field test fun(v: string, x: string): boolean, string, string
 paths.start_with = {
+  ---@param v string The string to check.
+  ---@param x string The expected prefix.
+  ---@return boolean success True if `v` starts with `x`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` or `x` are not strings.
   test = function(v, x)
     if type(v) ~= "string" then
       error("expected " .. tostring(v) .. " to be a string")
@@ -1747,7 +2038,15 @@ paths.start_with = {
   end,
 }
 
+--- Tests if string `v` ends with the suffix string `x`.
+---@field test fun(v: string, x: string): boolean, string, string
 paths.end_with = {
+  ---@param v string The string to check.
+  ---@param x string The expected suffix.
+  ---@return boolean success True if `v` ends with `x`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` or `x` are not strings.
   test = function(v, x)
     if type(v) ~= "string" then
       error("expected " .. tostring(v) .. " to be a string")
@@ -1765,11 +2064,12 @@ paths.end_with = {
 
 -- Type checking assertions
 paths.be_type = {
-  callable = true,
-  comparable = true,
-  iterable = true,
+  callable = true, -- Marker for chaining
+  comparable = true, -- Marker for chaining
+  iterable = true, -- Marker for chaining
   test = function(v, expected_type)
     if expected_type == "callable" then
+      -- Check if it's a function or a table with __call metamethod
       local is_callable = type(v) == "function" or (type(v) == "table" and getmetatable(v) and getmetatable(v).__call)
       return is_callable,
         "expected " .. tostring(v) .. " to be callable",
@@ -1799,8 +2099,14 @@ paths.be_type = {
 -- Enhanced error assertions
 paths.throw = {
   error = true,
-  error_matching = true,
-  error_type = true,
+  error_matching = true, -- Marker for chaining
+  error_type = true, -- Marker for chaining
+  --- Base test for `throw` chain. Tests if calling function `v` throws any error.
+  ---@param v function The function to call.
+  ---@return boolean success True if `pcall(v)` returns `false`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` is not a function.
   test = function(v)
     if type(v) ~= "function" then
       error("expected " .. tostring(v) .. " to be a function")
@@ -1812,7 +2118,14 @@ paths.throw = {
   end,
 }
 
+--- Alias for `throw`. Tests if function `v` throws an error.
+---@field test fun(v: function): boolean, string, string
 paths.error = {
+  ---@param v function The function to call.
+  ---@return boolean success True if `pcall(v)` returns `false`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` is not a function.
   test = function(v)
     if type(v) ~= "function" then
       error("expected " .. tostring(v) .. " to be a function")
@@ -1824,7 +2137,15 @@ paths.error = {
   end,
 }
 
+--- Tests if function `v` throws an error whose message matches `pattern`. Used after `.throw`.
+---@field test fun(v: function, pattern: string): boolean, string, string
 paths.error_matching = {
+  ---@param v function The function to call.
+  ---@param pattern string The Lua pattern to match against the error message.
+  ---@return boolean success True if `v` throws and the message matches `pattern`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure (no error, or message mismatch).
+  ---@throws string If `v` is not a function or `pattern` is not a string.
   test = function(v, pattern)
     if type(v) ~= "function" then
       error("expected " .. tostring(v) .. " to be a function")
@@ -1848,7 +2169,15 @@ paths.error_matching = {
   end,
 }
 
+--- Tests if function `v` throws an error of a specific type `expected_type`. Used after `.throw`.
+---@field test fun(v: function, expected_type: string): boolean, string, string
 paths.error_type = {
+  ---@param v function The function to call.
+  ---@param expected_type string The expected type of the error (e.g., "string", "table"). Attempts basic type detection.
+  ---@return boolean success True if `v` throws an error matching `expected_type`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure (no error, or type mismatch).
+  ---@throws string If `v` is not a function.
   test = function(v, expected_type)
     if type(v) ~= "function" then
       error("expected " .. tostring(v) .. " to be a function")
@@ -1877,53 +2206,82 @@ paths.error_type = {
   end,
 }
 
---- @class ExpectChain
--- An expectation chain with `to` and `to_not` paths for fluent assertions.
--- This is what gets returned when you call `expect(value)`.
--- Use it to make assertions about values with methods like:
--- expect(value).to.equal(expected)
--- expect(value).to_not.be.a("string")
--- Assertions are chainable, allowing multiple assertions on the same value:
--- expect("test").to.be.a("string").to.match("es")
--- You can also chain negated assertions:
--- expect(5).to_not.equal(6).to_not.be.a("string")
--- @field val any The value being asserted against
--- @field negate boolean Whether the assertion should be negated
--- @field action string The current assertion action
----@field be.a fun(type: string): ExpectChain Assert value is of specified type
----@field be.truthy fun(): ExpectChain Assert value is truthy (evaluates to true in a conditional)
----@field be.falsy fun(): ExpectChain Assert value is falsy (evaluates to false in a conditional)
----@field be.empty fun(): ExpectChain Assert value is an empty collection
----@field be.positive fun(): ExpectChain Assert value is a positive number
----@field be.negative fun(): ExpectChain Assert value is a negative number
----@field be.integer fun(): ExpectChain Assert value is an integer (no decimal component)
----@field be.uppercase fun(): ExpectChain Assert string is all uppercase
----@field be.lowercase fun(): ExpectChain Assert string is all lowercase
----@field equal fun(expected: any): ExpectChain Assert deep equality with expected value
----@field exist fun(): ExpectChain Assert value is not nil
----@field match fun(pattern: string): ExpectChain Assert string matches Lua pattern
----@field contain fun(value: any): ExpectChain Assert collection contains value
----@field have fun(key: any): ExpectChain Assert table has specific key
----@field have_length fun(length: number): ExpectChain Assert collection has specific length
----@field have_property fun(property: string, value?: any): ExpectChain Assert object has property with optional value
----@field be_type fun(type: string): ExpectChain Assert value is of specified type
----@field be_greater_than fun(value: number): ExpectChain Assert number is greater than value
----@field be_less_than fun(value: number): ExpectChain Assert number is less than value
----@field be_between fun(min: number, max: number): ExpectChain Assert number is between min and max
----@field start_with fun(prefix: string): ExpectChain Assert string starts with prefix
----@field end_with fun(suffix: string): ExpectChain Assert string ends with suffix
----@field throw fun(): ExpectChain Assert function throws an error
----@field throw.error fun(): ExpectChain Assert function throws an error (alias)
----@field throw.error_matching fun(pattern: string): ExpectChain Assert function throws error matching pattern
----@field throw.error_type fun(type: string): ExpectChain Assert function throws error of specific type
----@field match_schema fun(schema: table): ExpectChain Assert object matches specified schema
----@field change fun(getter: function): ExpectChain Assert function changes value returned by getter
----@field increase fun(getter: function): ExpectChain Assert function increases value returned by getter
----@field decrease fun(getter: function): ExpectChain Assert function decreases value returned by getter
+---@class ExpectChain The object returned by `expect()` allowing for fluent, chainable assertions.
+--- It manages the value under test (`val`), the current assertion path (`action`), and the negation state (`negate`).
+--- Accessing properties like `.to` or `.be` returns the chain itself for readability.
+--- Accessing a valid assertion method (e.g., `.equal`, `.exist`) returns the chain.
+--- Calling an assertion method (e.g., `expect(x).to.equal(y)`) executes the corresponding test function from the `paths` table.
+---@field val any The actual value passed to `expect()`. Internal.
+---@field negate boolean Whether the next assertion should be negated (set by `.to_not`). Internal.
+---@field action string The current step in the assertion chain (e.g., "equal", "be_greater_than"). Internal.
+---@field to ExpectChain Syntactic sugar, returns self.
+---@field to_not ExpectChain Syntactic sugar and sets `negate` flag, returns self.
+---@field be ExpectChain Syntactic sugar, returns self.
+---@field a ExpectChain Syntactic sugar, returns self.
+---@field an ExpectChain Syntactic sugar, returns self.
+---@field have ExpectChain Syntactic sugar, returns self.
+---@field has ExpectChain Syntactic sugar (potential future use), returns self.
+---@field deep ExpectChain Modifier (potential future use, currently handled within `equal`), returns self.
+---@field only ExpectChain Modifier (potential future use), returns self.
+---@field any ExpectChain Modifier (potential future use), returns self.
+---@field all ExpectChain Modifier (potential future use), returns self.
+---@field equal fun(self: ExpectChain, expected: any, eps?: number): ExpectChain Asserts deep equality.
+---@field deep_equal fun(self: ExpectChain, expected: any, eps?: number): ExpectChain Alias for `equal`.
+---@field exist fun(self: ExpectChain): ExpectChain Asserts value is not nil.
+---@field be_a fun(self: ExpectChain, type_or_class: string|table): ExpectChain Asserts type or class inheritance via `M.isa`.
+---@field be_an fun(self: ExpectChain, type_or_class: string|table): ExpectChain Alias for `be_a`.
+---@field be_truthy fun(self: ExpectChain): ExpectChain Asserts value is truthy (not false or nil).
+---@field be_falsy fun(self: ExpectChain): ExpectChain Asserts value is falsy (false or nil).
+---@field be_falsey fun(self: ExpectChain): ExpectChain Alias for `be_falsy`.
+---@field be_nil fun(self: ExpectChain): ExpectChain Asserts value is nil.
+---@field be_type fun(self: ExpectChain, expected_type: string): ExpectChain Asserts `type(value) == expected_type`. Also supports advanced types "callable", "comparable", "iterable".
+---@field be_greater_than fun(self: ExpectChain, threshold: number): ExpectChain Asserts `value > threshold`.
+---@field be_less_than fun(self: ExpectChain, threshold: number): ExpectChain Asserts `value < threshold`.
+---@field be_at_least fun(self: ExpectChain, threshold: number): ExpectChain Asserts `value >= threshold`.
+---@field fail fun(self: ExpectChain): ExpectChain Asserts function call fails (throws error).
+---@field fail_with fun(self: ExpectChain, pattern: string): ExpectChain Asserts function fails with error message matching pattern.
+---@field match fun(self: ExpectChain, pattern: string): ExpectChain Asserts string matches Lua pattern.
+---@field implement_interface fun(self: ExpectChain, interface: table): ExpectChain Asserts table implements interface.
+---@field contain fun(self: ExpectChain, value: any): ExpectChain Asserts string contains substring or table contains value.
+---@field have_length fun(self: ExpectChain, length: number): ExpectChain Asserts string or table length.
+---@field have_size fun(self: ExpectChain, size: number): ExpectChain Alias for `have_length`.
+---@field have_property fun(self: ExpectChain, property_name: any, expected_value?: any): ExpectChain Asserts table has property (and optionally checks value).
+---@field have_keys fun(self: ExpectChain, keys: table): ExpectChain Asserts table has all keys listed in the `keys` table.
+---@field have_key fun(self: ExpectChain, key: any): ExpectChain Asserts table has the specified key.
+---@field match_schema fun(self: ExpectChain, schema: table): ExpectChain Asserts table matches schema definition.
+---@field change fun(self: ExpectChain, value_fn: function, change_fn?: fun(before: any, after: any): boolean): ExpectChain Asserts executing the (function) value changes the result of `value_fn`.
+---@field increase fun(self: ExpectChain, value_fn: function): ExpectChain Asserts executing the (function) value increases the numeric result of `value_fn`.
+---@field decrease fun(self: ExpectChain, value_fn: function): ExpectChain Asserts executing the (function) value decreases the numeric result of `value_fn`.
+---@field match_regex fun(self: ExpectChain, pattern: string, options?: {case_insensitive?: boolean, multiline?: boolean}): ExpectChain Asserts string matches Lua pattern with options.
+---@field be_date fun(self: ExpectChain): ExpectChain Asserts string is a valid date parsable by `lib.tools.date`.
+---@field be_iso_date fun(self: ExpectChain): ExpectChain Asserts string is a valid ISO 8601 date.
+---@field be_before fun(self: ExpectChain, date_str: string): ExpectChain Asserts date string is before another date string.
+---@field be_after fun(self: ExpectChain, date_str: string): ExpectChain Asserts date string is after another date string.
+---@field be_same_day_as fun(self: ExpectChain, date_str: string): ExpectChain Asserts date string represents the same calendar day as another.
+---@field complete fun(self: ExpectChain, timeout?: number): ExpectChain Asserts async function completes within timeout.
+---@field complete_within fun(self: ExpectChain, timeout: number): ExpectChain Asserts async function completes within specific timeout.
+---@field resolve_with fun(self: ExpectChain, expected_value: any, timeout?: number): ExpectChain Asserts async function completes successfully with expected value.
+---@field reject fun(self: ExpectChain, error_pattern?: string, timeout?: number): ExpectChain Asserts async function completes with an error (optionally matching pattern).
+---@field negative fun(self: ExpectChain): ExpectChain Asserts number is negative.
+---@field integer fun(self: ExpectChain): ExpectChain Asserts number is an integer.
+---@field uppercase fun(self: ExpectChain): ExpectChain Asserts string is uppercase.
+---@field lowercase fun(self: ExpectChain): ExpectChain Asserts string is lowercase.
+---@field satisfy fun(self: ExpectChain, predicate: fun(v: any): boolean): ExpectChain Asserts value satisfies custom predicate function.
+---@field start_with fun(self: ExpectChain, prefix: string): ExpectChain Asserts string starts with prefix.
+---@field end_with fun(self: ExpectChain, suffix: string): ExpectChain Asserts string ends with suffix.
+---@field throw fun(self: ExpectChain): ExpectChain Asserts function throws an error.
+---@field throw_error fun(self: ExpectChain): ExpectChain Alias for `throw`.
+---@field throw_error_matching fun(self: ExpectChain, pattern: string): ExpectChain Asserts function throws error matching pattern.
+---@field throw_error_type fun(self: ExpectChain, expected_type: string): ExpectChain Asserts function throws error of specific type.
 
 --- Main expect function for creating assertions
----@param v any The value to create assertions for
----@return ExpectChain An assertion object with chainable assertion methods
+--- Creates an assertion chain (`ExpectChain`) for a given value.
+--- This is the primary entry point for using Firmo's expect-style assertions.
+--- Increments the global `M.assertion_count`.
+---@param v any The value to make assertions about.
+---@return ExpectChain The newly created assertion chain object, ready for chaining methods like `.to`, `.to_not`, `.equal`, etc.
+---@example expect(1 + 1).to.equal(2)
+---@example expect(my_string).to_not.contain("error")
 function M.expect(v)
   ---@diagnostic disable-next-line: unused-local
   local error_handler = get_error_handler()
@@ -1943,171 +2301,168 @@ function M.expect(v)
   assertion.action = ""
   assertion.negate = false
 
-  setmetatable(assertion, {
-    __index = function(t, k)
-      -- Always check if key is one of the base paths first (to, to_not)
-      -- This ensures these paths are always accessible regardless of state
-      if has(paths[""], k) then
-        local current_negate = rawget(t, "negate")
+  setmetatable(
+    assertion,
+    {
+      __index = function(t, k)
+        -- Always check if key is one of the base paths first (to, to_not)
+        -- This ensures these paths are always accessible regardless of state
+        if has(paths[""], k) then
+          local current_negate = rawget(t, "negate")
 
-        -- Set the action to the base path
-        rawset(t, "action", k)
+          -- Set the action to the base path
+          rawset(t, "action", k)
 
-        -- Handle to_not specially for negation
-        if k == "to_not" then
-          rawset(t, "negate", true)
-        else
-          -- For "to" path, preserve the current negation state
-          rawset(t, "negate", current_negate)
+          -- Handle to_not specially for negation
+          if k == "to_not" then
+            rawset(t, "negate", true)
+          else
+            -- For "to" path, preserve the current negation state
+            rawset(t, "negate", current_negate)
+          end
+
+          return t
         end
 
-        return t
-      end
+        local current_action = rawget(t, "action")
+        local path_entry = paths[current_action]
 
-      local current_action = rawget(t, "action")
-      local path_entry = paths[current_action]
+        -- Check if the key is valid for the current path
+        local valid_key = false
 
-      -- Check if the key is valid for the current path
-      local valid_key = false
-
-      if path_entry then
-        if type(path_entry) == "table" then
-          if #path_entry > 0 then
-            -- Array-style path entry (like paths[""] = {"to", "to_not"})
-            for _, valid_path in ipairs(path_entry) do
-              if valid_path == k then
-                valid_key = true
-                break
+        if path_entry then
+          if type(path_entry) == "table" then
+            if #path_entry > 0 then
+              -- Array-style path entry (like paths[""] = {"to", "to_not"})
+              for _, valid_path in ipairs(path_entry) do
+                if valid_path == k then
+                  valid_key = true
+                  break
+                end
               end
+            else
+              -- Map-style path entry
+              valid_key = path_entry[k] ~= nil
+            end
+          end
+        end
+
+        if valid_key then
+          -- Store the previous action for proper chaining context
+          local prev_action = current_action
+          -- Store the current negation state
+          local current_negate = rawget(t, "negate")
+
+          -- Set the new action, preserving the negation state
+          rawset(t, "action", k)
+
+          -- Run chain function if it exists (e.g., for to_not)
+          local action = rawget(t, "action")
+          local path_entry = action and paths[action]
+          local chain = path_entry and type(path_entry) == "table" and path_entry.chain
+          if chain then
+            chain(t)
+          else
+            -- Explicitly preserve the negation state when no chain function exists
+            rawset(t, "negate", current_negate)
+          end
+
+          return t
+        end
+        return rawget(t, k)
+      end,
+      __call = function(t, ...)
+        local path_entry = paths[t.action]
+        if path_entry and type(path_entry) == "table" and path_entry.test then
+          local success, err, nerr
+
+          -- Use error_handler.try if available for structured error handling
+          if get_error_handler() then
+            local args = { ... }
+            local try_success, try_result = get_error_handler().try(function()
+              local res, e, ne = paths[t.action].test(t.val, unpack(args))
+              return { res = res, err = e, nerr = ne }
+            end)
+
+            if try_success then
+              success, err, nerr = try_result.res, try_result.err, try_result.nerr
+            else
+              -- Handle error in test function
+              get_logger().error("Error in assertion test function", {
+                action = t.action,
+                error = get_error_handler().format_error(try_result),
+              })
+              error(try_result.message or "Error in assertion test function", 2)
             end
           else
-            -- Map-style path entry
-            valid_key = path_entry[k] ~= nil
+            -- Fallback if error_handler is not available
+            local args = { ... }
+            success, err, nerr = paths[t.action].test(t.val, unpack(args))
           end
-        end
-      end
 
-      if valid_key then
-        -- Store the previous action for proper chaining context
-        local prev_action = current_action
-        -- Store the current negation state
-        local current_negate = rawget(t, "negate")
+          -- Use t.negate instead of assertion.negate for consistency
+          -- Apply negation if needed
+          local negate_flag = rawget(t, "negate")
+          if negate_flag then
+            -- Invert the success flag for negated assertions
+            success = not success
+            -- For negated assertions, use the nerr error message if available
+            if nerr then
+              err = nerr
+            end
+          end
+          if not success then
+            if error_handler then
+              -- Create a structured error
+              local context = {
+                expected = select(1, ...),
+                actual = t.val,
+                action = t.action,
+                negate = rawget(t, "negate"), -- Use rawget to ensure direct access
+              }
 
-        -- Set the new action, preserving the negation state
-        rawset(t, "action", k)
+              -- Add debug info about the negation state to help with troubleshooting
+              get_logger().debug("Creating assertion error", {
+                negate = rawget(t, "negate"), -- Use rawget to ensure direct access
+                error_message = err or "Assertion failed",
+                val = tostring(t.val),
+                action = t.action,
+              })
+              local error_obj = error_handler.create(
+                err or "Assertion failed",
+                error_handler.CATEGORY.VALIDATION,
+                error_handler.SEVERITY.ERROR,
+                context
+              )
 
-        -- Run chain function if it exists (e.g., for to_not)
-        local action = rawget(t, "action")
-        local path_entry = action and paths[action]
-        local chain = path_entry and type(path_entry) == "table" and path_entry.chain
-        if chain then
-          chain(t)
-        else
-          -- Explicitly preserve the negation state when no chain function exists
-          rawset(t, "negate", current_negate)
-        end
+              get_logger().debug("Assertion failed", {
+                error = get_error_handler().format_error(error_obj, false),
+              })
 
-        return t
-      end
-      return rawget(t, k)
-    end,
-    __call = function(t, ...)
-      local path_entry = paths[t.action]
-      if path_entry and type(path_entry) == "table" and path_entry.test then
-        local success, err, nerr
-
-        -- Use error_handler.try if available for structured error handling
-        local error_handler = get_error_handler()
-        if error_handler then
-          local args = { ... }
-          local try_success, try_result = error_handler.try(function()
-            local res, e, ne = paths[t.action].test(t.val, unpack(args))
-            return { res = res, err = e, nerr = ne }
-          end)
-
-          if try_success then
-            success, err, nerr = try_result.res, try_result.err, try_result.nerr
+              error(get_error_handler().format_error(error_obj, false), 2)
+            else
+              -- Fallback without error_handler
+              error(err or "unknown failure", 2)
+            end
           else
-            -- Handle error in test function
-            logger.error("Error in assertion test function", {
+            logger.trace("Assertion passed", {
               action = t.action,
-              error = error_handler.format_error(try_result),
-            })
-            error(try_result.message or "Error in assertion test function", 2)
-          end
-        else
-          -- Fallback if error_handler is not available
-          local args = { ... }
-          success, err, nerr = paths[t.action].test(t.val, unpack(args))
-        end
-
-        -- Use t.negate instead of assertion.negate for consistency
-        -- Apply negation if needed
-        local negate_flag = rawget(t, "negate")
-        if negate_flag then
-          -- Invert the success flag for negated assertions
-          success = not success
-          -- For negated assertions, use the nerr error message if available
-          if nerr then
-            err = nerr
-          end
-        end
-        if not success then
-          if error_handler then
-            -- Create a structured error
-            local context = {
-              expected = select(1, ...),
-              actual = t.val,
-              action = t.action,
-              negate = rawget(t, "negate"), -- Use rawget to ensure direct access
-            }
-
-            -- Add debug info about the negation state to help with troubleshooting
-            -- Add debug info about the negation state to help with troubleshooting
-            logger.debug("Creating assertion error", {
-              negate = rawget(t, "negate"), -- Use rawget to ensure direct access
-              error_message = err or "Assertion failed",
-              val = tostring(t.val),
-              action = t.action,
-            })
-            local error_obj = error_handler.create(
-              err or "Assertion failed",
-              error_handler.CATEGORY.VALIDATION,
-              error_handler.SEVERITY.ERROR,
-              context
-            )
-
-            logger.debug("Assertion failed", {
-              error = error_handler.format_error(error_obj, false),
+              value = tostring(t.val),
             })
 
-            error(error_handler.format_error(error_obj, false), 2)
-          else
-            -- Fallback without error_handler
-            error(err or "unknown failure", 2)
-          end
-        else
-          logger.trace("Assertion passed", {
-            action = t.action,
-            value = tostring(t.val),
-          })
-
-          -- Mark the code involved in this assertion as covered
-          -- This is what creates the distinction between "executed" and "covered" in the coverage report
-          local coverage = get_coverage()
-          if coverage and coverage.mark_line_covered then
-            -- Get the current stack frame to find where the assertion is happening
-            local info = debug.getinfo(3, "Sl") -- 3 is the caller of the assertion
-            if info and info.source and info.currentline then
+            -- Mark the code involved in this assertion as covered
+            -- This is what creates the distinction between "executed" and "covered" in the coverage report
+            if get_coverage() and get_coverage().mark_line_covered then
+              -- Get the current stack frame to find where the assertion is happening
+              local info = debug.getinfo(3, "Sl") -- 3 is the caller of the assertion
               local file_path = info.source:sub(2) -- Remove the '@' prefix
 
               -- Use the public API to mark the line as covered, which is safe and general
               local success, err = pcall(function()
-                coverage.mark_line_covered(file_path, info.currentline)
+                get_coverage().mark_line_covered(file_path, info.currentline) -- Use _coverage
               end)
 
               -- Disable logging to improve performance
-              -- Log was causing excessive output and performance issues
               -- if success then
               --   logger.debug("Marked line as covered from assertion", {
               --     file_path = file_path,
@@ -2129,7 +2484,7 @@ function M.expect(v)
           rawset(t, "negate", current_negate)
 
           -- Simple debug logging
-          logger.trace("Assertion passed and reset for chaining", {
+          get_logger().trace("Assertion passed and reset for chaining", {
             value = tostring(t.val),
             negate = t.negate,
           })
@@ -2137,9 +2492,9 @@ function M.expect(v)
           -- Return the assertion object to enable chaining
           return t
         end
-      end
-    end,
-  })
+      end, -- Close the __call function entry
+    } -- Close the metatable definition
+  )
 
   return assertion
 end

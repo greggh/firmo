@@ -1,9 +1,22 @@
--- Error Handler Module Tests
--- Tests for the error_handler module functionality
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Error Handler Module Tests
+---
+--- Verifies the core functionality of the `lib.tools.error_handler` module, including:
+--- - Creating structured error objects (`create`).
+--- - Formatting error objects (`format_error`).
+--- - Protected function calls (`try`).
+--- - Specific error type creators (`validation_error`, `io_error`).
+--- - Safe I/O operation wrapping (`safe_io_operation`).
+--- - Assertion helper (`assert`).
+--- Uses `test_helper.with_error_capture` for testing error throwing behavior.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local error_handler = require("lib.tools.error_handler")
+
 local test_helper = require("lib.tools.test_helper")
 
 describe("Error Handler Module", function()
@@ -106,6 +119,4 @@ describe("Error Handler Module", function()
     expect(err.category).to.equal("CUSTOM_CATEGORY")
     expect(err.context.test).to.equal(true)
   end)
-
-  -- Add more tests for other error_handler functionality
 end)

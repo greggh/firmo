@@ -1,12 +1,30 @@
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Coverage Hook System Tests
+---
+--- Verifies the core functionality of the coverage module's debug hook integration,
+--- including:
+--- - Basic initialization and shutdown.
+--- - Line execution tracking.
+--- - Temporary file handling during `save_stats` and `load_stats`.
+--- - Graceful handling of corrupted stats files.
+--- - Correct merging of coverage data across multiple saves/loads.
+--- - Respecting include/exclude patterns.
+--- - Pausing and resuming coverage collection.
+--- - Correct handling of coroutines.
+--- - Uses `before`/`after` for setup/teardown, temporary directories, and config management.
+--- - Employs `test_helper.with_error_capture` and `test_helper.expect_error` for robust error testing.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
+
 local coverage = require("lib.coverage")
 local central_config = require("lib.core.central_config")
 local filesystem = require("lib.tools.filesystem")
 local temp_file = require("lib.tools.filesystem.temp_file")
 local test_helper = require("lib.tools.test_helper")
-local error_handler = require("lib.tools.error_handler")
 
 describe("coverage module", function()
   -- Create a test directory for each test

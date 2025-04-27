@@ -1,18 +1,91 @@
----@class ReportingFormatters
----@field built_in table Available built-in formatters
----@field register_all fun(formatters: table): table|nil, table? Load and register all formatters
--- Formatter registry initialization
--- Import required modules
-local fs = require("lib.tools.filesystem")
-local logging = require("lib.tools.logging")
-local error_handler = require("lib.tools.error_handler")
+--- Formatter Registry Initialization
+---
+--- This module loads and registers all built-in reporting formatters (coverage,
+--- quality, results) into a central registry provided by the main reporting module.
+--- It handles different formatter module structures (registration function, register method,
+--- direct formatting functions) and provides error handling during loading.
+---
+--- @module lib.reporting.formatters
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
--- Initialize module logger
-local logger = logging.get_logger("formatters")
-logging.configure_from_config("formatters")
+---@class ReportingFormatters The public API for the formatter registry initializer.
+---@field _VERSION string Module version.
+---@field built_in table A table listing the names of built-in formatters by category (`coverage`, `quality`, `results`).
+---@field register_all fun(formatters: table): table|nil, table? Loads and registers all built-in formatters into the provided registry table. Returns the updated formatters table on success, or nil and an error table on failure.
+
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("formatters")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
 
 local M = {
-  -- Export a list of built-in formatters for documentation
+  --- Lists the names of built-in formatters categorized by type.
   built_in = {
     coverage = { "summary", "json", "html", "lcov", "cobertura" },
     quality = { "summary", "json", "html" },
@@ -20,30 +93,36 @@ local M = {
   },
 }
 
----@param formatters table The formatters registry object
----@return table|nil formatters The updated formatters registry or nil if registration failed
----@return table? error Error information if registration failed
+--- Module version
+M._VERSION = "1.0.0"
+
+--- Loads and registers all built-in formatter modules into the provided registry.
+--- Attempts to load formatters like "summary", "json", "html", "lcov", etc., from the current directory.
+--- Handles different module structures (registration function, register method, direct format functions).
+---@param formatters table The main formatters registry object, expected to have `coverage`, `quality`, and `results` sub-tables. This table is modified in place.
+---@return table|nil formatters The updated `formatters` table if at least one formatter registered successfully, `nil` otherwise.
+---@return table? error An error object containing details if some or all formatters failed to load/register.
 function M.register_all(formatters)
   -- Validate formatters parameter
   if not formatters then
-    local err = error_handler.validation_error("Missing required formatters parameter", {
+    local err = get_error_handler().validation_error("Missing required formatters parameter", {
       operation = "register_all",
       module = "formatters",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   -- Verify formatters has the expected structure
   if not formatters.coverage or not formatters.quality or not formatters.results then
-    local err = error_handler.validation_error("Formatters parameter missing required registries", {
+    local err = get_error_handler().validation_error("Formatters parameter missing required registries", {
       operation = "register_all",
       module = "formatters",
       has_coverage = formatters.coverage ~= nil,
       has_quality = formatters.quality ~= nil,
       has_results = formatters.results ~= nil,
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
@@ -59,7 +138,7 @@ function M.register_all(formatters)
     "cobertura",
   }
 
-  logger.debug("Registering reporting formatters", {
+  get_logger().debug("Registering reporting formatters", {
     modules = formatter_modules,
   })
 
@@ -69,16 +148,16 @@ function M.register_all(formatters)
 
   for _, module_name in ipairs(formatter_modules) do
     -- Get the current module path with error handling
-    local get_path_success, current_module_dir = error_handler.try(function()
+    local get_path_success, current_module_dir = get_error_handler().try(function()
       local source = debug.getinfo(1).source
       local dir = source:match("@(.+)/[^/]+$") or ""
-      return fs.normalize_path(dir)
+      return get_fs().normalize_path(dir)
     end)
 
     if not get_path_success then
-      logger.warn("Failed to get module directory", {
+      get_logger().warn("Failed to get module directory", {
         module = module_name,
-        error = error_handler.format_error(current_module_dir), -- current_module_dir contains the error
+        error = get_error_handler().format_error(current_module_dir), -- current_module_dir contains the error
       })
       -- Use empty string as fallback
       current_module_dir = ""
@@ -93,21 +172,21 @@ function M.register_all(formatters)
     table.insert(formatter_paths, "./lib/reporting/formatters/" .. module_name)
 
     -- Add path with directory base - wrap in try/catch to handle potential errors
-    local join_success, joined_path = error_handler.try(function()
-      return fs.join_paths(current_module_dir, module_name)
+    local join_success, joined_path = get_error_handler().try(function()
+      return get_fs().join_paths(current_module_dir, module_name)
     end)
 
     if join_success then
       table.insert(formatter_paths, joined_path)
     else
-      logger.warn("Failed to join paths for formatter", {
+      get_logger().warn("Failed to join paths for formatter", {
         module = module_name,
         base_dir = current_module_dir,
-        error = error_handler.format_error(joined_path), -- joined_path contains the error
+        error = get_error_handler().format_error(joined_path), -- joined_path contains the error
       })
     end
 
-    logger.trace("Attempting to load formatter", {
+    get_logger().trace("Attempting to load formatter", {
       module = module_name,
       paths = formatter_paths,
       base_dir = current_module_dir,
@@ -118,7 +197,7 @@ function M.register_all(formatters)
 
     for _, path in ipairs(formatter_paths) do
       -- Use error_handler.try for better error handling
-      local require_success, formatter_module_or_error = error_handler.try(function()
+      local require_success, formatter_module_or_error = get_error_handler().try(function()
         return require(path)
       end)
 
@@ -126,18 +205,18 @@ function M.register_all(formatters)
         -- Handle different module formats:
         if type(formatter_module_or_error) == "function" then
           -- 1. Function that registers formatters - use try/catch
-          logger.trace("Attempting to register formatter as function", {
+          get_logger().trace("Attempting to register formatter as function", {
             module = module_name,
             path = path,
           })
 
-          local register_success, register_result = error_handler.try(function()
+          local register_success, register_result = get_error_handler().try(function()
             formatter_module_or_error(formatters)
             return true
           end)
 
           if register_success then
-            logger.trace("Loaded formatter as registration function", {
+            get_logger().trace("Loaded formatter as registration function", {
               module = module_name,
               path = path,
             })
@@ -160,24 +239,24 @@ function M.register_all(formatters)
               },
               register_result -- register_result contains the error
             )
-            logger.warn(last_error.message, last_error.context)
+            get_logger().warn(last_error.message, last_error.context)
           end
         elseif
           type(formatter_module_or_error) == "table" and type(formatter_module_or_error.register) == "function"
         then
           -- 2. Table with register function - use try/catch
-          logger.trace("Attempting to register formatter with register() method", {
+          get_logger().trace("Attempting to register formatter with register() method", {
             module = module_name,
             path = path,
           })
 
-          local register_success, register_result = error_handler.try(function()
+          local register_success, register_result = get_error_handler().try(function()
             formatter_module_or_error.register(formatters)
             return true
           end)
 
           if register_success then
-            logger.trace("Loaded formatter with register() method", {
+            get_logger().trace("Loaded formatter with register() method", {
               module = module_name,
               path = path,
             })
@@ -200,7 +279,7 @@ function M.register_all(formatters)
               },
               register_result -- register_result contains the error
             )
-            logger.warn(last_error.message, last_error.context)
+            get_logger().warn(last_error.message, last_error.context)
           end
         elseif type(formatter_module_or_error) == "table" then
           -- 3. Table with format_coverage/format_quality functions
@@ -208,7 +287,7 @@ function M.register_all(formatters)
 
           -- Register each function with error handling
           if type(formatter_module_or_error.format_coverage) == "function" then
-            local register_success, _ = error_handler.try(function()
+            local register_success, _ = get_error_handler().try(function()
               formatters.coverage[module_name] = formatter_module_or_error.format_coverage
               return true
             end)
@@ -216,7 +295,7 @@ function M.register_all(formatters)
             if register_success then
               table.insert(functions_found, "format_coverage")
             else
-              logger.warn("Failed to register format_coverage function", {
+              get_logger().warn("Failed to register format_coverage function", {
                 module = module_name,
                 path = path,
               })
@@ -224,7 +303,7 @@ function M.register_all(formatters)
           end
 
           if type(formatter_module_or_error.format_quality) == "function" then
-            local register_success, _ = error_handler.try(function()
+            local register_success, _ = get_error_handler().try(function()
               formatters.quality[module_name] = formatter_module_or_error.format_quality
               return true
             end)
@@ -232,7 +311,7 @@ function M.register_all(formatters)
             if register_success then
               table.insert(functions_found, "format_quality")
             else
-              logger.warn("Failed to register format_quality function", {
+              get_logger().warn("Failed to register format_quality function", {
                 module = module_name,
                 path = path,
               })
@@ -240,7 +319,7 @@ function M.register_all(formatters)
           end
 
           if type(formatter_module_or_error.format_results) == "function" then
-            local register_success, _ = error_handler.try(function()
+            local register_success, _ = get_error_handler().try(function()
               formatters.results[module_name] = formatter_module_or_error.format_results
               return true
             end)
@@ -248,7 +327,7 @@ function M.register_all(formatters)
             if register_success then
               table.insert(functions_found, "format_results")
             else
-              logger.warn("Failed to register format_results function", {
+              get_logger().warn("Failed to register format_results function", {
                 module = module_name,
                 path = path,
               })
@@ -256,7 +335,7 @@ function M.register_all(formatters)
           end
 
           if #functions_found > 0 then
-            logger.trace("Loaded formatter with formatting functions", {
+            get_logger().trace("Loaded formatter with formatting functions", {
               module = module_name,
               path = path,
               functions = functions_found,
@@ -271,26 +350,26 @@ function M.register_all(formatters)
             break
           else
             -- No valid formatting functions found
-            last_error = error_handler.validation_error("No formatting functions found in module", {
+            last_error = get_error_handler().validation_error("No formatting functions found in module", {
               module = module_name,
               path = path,
               operation = "register_all",
             })
-            logger.warn(last_error.message, last_error.context)
+            get_logger().warn(last_error.message, last_error.context)
           end
         else
           -- Module is not in a recognized format
-          last_error = error_handler.validation_error("Formatter module is not in a recognized format", {
+          last_error = get_error_handler().validation_error("Formatter module is not in a recognized format", {
             module = module_name,
             path = path,
             module_type = type(formatter_module_or_error),
             operation = "register_all",
           })
-          logger.warn(last_error.message, last_error.context)
+          get_logger().warn(last_error.message, last_error.context)
         end
       else
         -- Require failed - record error but continue trying other paths
-        last_error = error_handler.runtime_error(
+        last_error = get_error_handler().runtime_error(
           "Failed to require formatter module",
           {
             module = module_name,
@@ -301,16 +380,16 @@ function M.register_all(formatters)
         )
 
         -- Only log at trace level since we try multiple paths and expect some to fail
-        logger.trace("Failed to require formatter", {
+        get_logger().trace("Failed to require formatter", {
           module = module_name,
           path = path,
-          error = error_handler.format_error(formatter_module_or_error),
+          error = get_error_handler().format_error(formatter_module_or_error),
         })
       end
     end
 
     if loaded then
-      logger.debug("Successfully registered formatter", { module = module_name })
+      get_logger().debug("Successfully registered formatter", { module = module_name })
     else
       -- Record the error if all load attempts failed
       if last_error then
@@ -320,23 +399,23 @@ function M.register_all(formatters)
         })
       end
 
-      logger.warn("Failed to load formatter module", {
+      get_logger().warn("Failed to load formatter module", {
         module = module_name,
-        error = last_error and error_handler.format_error(last_error) or "Unknown error",
+        error = last_error and get_error_handler().format_error(last_error) or "Unknown error",
       })
     end
   end
 
   -- If we have errors but loaded some formatters, continue with warning
   if #formatter_errors > 0 then
-    logger.warn("Some formatters failed to load", {
+    get_logger().warn("Some formatters failed to load", {
       total_modules = #formatter_modules,
       loaded = #loaded_formatters,
       failed = #formatter_errors,
     })
   end
 
-  logger.debug("Formatter registration complete", {
+  get_logger().debug("Formatter registration complete", {
     loaded_formatters = #loaded_formatters,
     error_count = #formatter_errors,
     coverage_formatters = table.concat(M.built_in.coverage, ", "),
@@ -346,14 +425,14 @@ function M.register_all(formatters)
 
   -- If all formatters failed to load, return an error
   if #loaded_formatters == 0 and #formatter_errors > 0 then
-    local err = error_handler.runtime_error("All formatters failed to load", {
+    local err = get_error_handler().runtime_error("All formatters failed to load", {
       operation = "register_all",
       module = "formatters",
       modules_attempted = #formatter_modules,
       error_count = #formatter_errors,
       first_error = formatter_errors[1] and formatter_errors[1].error.message or "Unknown error",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 

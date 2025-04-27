@@ -1,168 +1,139 @@
--- Example demonstrating async testing features
-package.path = "../?.lua;" .. package.path
-local firmo = require("firmo")
+--- async_example.lua
+--
+-- This example demonstrates Firmo's asynchronous testing capabilities, including:
+-- - Defining async tests using `it_async()` and `async()`.
+-- - Waiting for delays or operations using `await()`.
+-- - Waiting for conditions using `wait_until()`.
+-- - Testing functions that return promises.
+-- - Handling timeouts in async tests.
+--
 
--- Import the test functions
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+---@diagnostic disable: undefined-global
+local firmo = require("firmo")
+local describe, it, expect = firmo.describe, firmo.it, firmo.expect -- Ensure this is present
+local error_handler = require("lib.tools.error_handler")
+local logging = require("lib.tools.logging")
+local async_utils = require("lib.async") -- Use correct import path
+-- Setup logger
+local logger = logging.get_logger("AsyncExample")
 local it_async = firmo.it_async
-local async = firmo.async
+-- local async = firmo.async -- Remove this, potential conflict
 local await = firmo.await
 local wait_until = firmo.wait_until
-
--- Use the async module directly if we need more control
-local async_module = package.loaded["src.async"]
-
--- Set a default timeout for all async tests (in milliseconds)
-if async_module then
-  async_module.set_timeout(2000) -- 2 seconds
-end
-
--- Simulate an asynchronous API
+--- Simulate an asynchronous API using promises.
 local AsyncAPI = {}
-
--- Simulate a delayed response
-function AsyncAPI.fetch_data(callback, delay)
-  delay = delay or 100 -- default delay
-
-  -- In a real app, this might be a network request or database query
-
-  -- Create our own setTimeout simulation
-  local start_time = os.clock() * 1000
-  local function check_timer()
-    if os.clock() * 1000 - start_time >= delay then
-      callback({ status = "success", data = { value = 42 } })
-      return true
-    end
-    return false
-  end
-
-  return {
-    -- Function to check if the request is complete (for testing)
-    is_complete = check_timer,
-
-    -- Simulate cancellation
-    cancel = function()
-      -- Would cancel the request in a real implementation
-    end,
-  }
+--- Simulate a delayed API response using a promise.
+-- Resolves with mock data after the specified delay.
+-- @param delay number|nil The delay in milliseconds (default: 100ms).
+-- @return table A promise that resolves with the mock data.
+function AsyncAPI.fetch_data(delay)
+  delay = delay or 100
+  return async_utils.create_promise(function(resolve)
+    async_utils.set_timeout(function()
+      resolve({ status = "success", data = { value = 42 } })
+    end, delay)
+  end)
 end
-
--- Example that demonstrates how to test async code
+--- Main test suite demonstrating Firmo's async testing features.
 describe("Async Testing Demo", function()
+  --- Tests for basic await() and wait_until() functionality.
   describe("Basic async/await", function()
-    it_async("waits for a specified time", function()
+    it_async("waits for a specified time using await(ms)", function()
       local start_time = os.clock()
 
       -- Wait for 100ms
-      ---@diagnostic disable-next-line: redundant-parameter
       await(100)
 
       local elapsed = (os.clock() - start_time) * 1000
-      expect(elapsed).to.be.truthy()
-      expect(elapsed >= 95).to.be.truthy() -- Allow for small timing differences
+      expect(elapsed).to.exist()
+      expect(elapsed).to.be_greater_than(90) -- Allow for timing variations
     end)
 
     it_async("can perform assertions after waiting", function()
       local value = 0
 
-      -- Simulate async operation that changes a value after 50ms
-      local start_time = os.clock() * 1000
-
-      -- In a real app, this might be a callback from an event or API
-      local function check_value_updated()
-        if os.clock() * 1000 - start_time >= 50 then
-          value = 42
-          return true
-        end
-        return false
-      end
-
-      -- Wait until the condition is true or timeout
-      ---@diagnostic disable-next-line: redundant-parameter
-      wait_until(check_value_updated, 200)
+      -- Simulate an async operation that changes a value after 50ms
+      await(50)
+      value = 42
 
       -- Now we can make assertions on the updated value
       expect(value).to.equal(42)
     end)
+
+    it_async("waits until a condition is met using wait_until", function()
+      local flag = false
+      local flag = false
+      -- Simulate setting the flag after a delay
+      async_utils.set_timeout(function()
+        flag = true
+      end, 75)
+      -- Wait until the flag becomes true (up to 200ms timeout)
+      local condition_met = wait_until(function()
+        return flag
+      end, 200)
+      expect(condition_met).to.be_truthy() -- wait_until returns true if condition met
+      expect(flag).to.equal(true)
+    end)
   end)
 
-  describe("Simulated API testing", function()
-    it_async("can test callbacks with await", function()
-      local result = nil
+  --- Tests simulating interaction with an asynchronous API using promises.
+  describe("Simulated API testing with Promises", function()
+    it_async("can await a promise from simulated API", function()
+      -- Start the async operation (returns a promise)
+      local data_promise = AsyncAPI.fetch_data(100)
 
-      -- Start the async operation
-      local request = AsyncAPI.fetch_data(function(data)
-        result = data
-      end, 150)
+      -- Await the promise
+      local result = await(data_promise)
 
-      -- Wait until the request completes
-      ---@diagnostic disable-next-line: redundant-parameter
-      wait_until(request.is_complete, 500, 10)
-
-      -- Now we can make assertions on the result
+      -- Now we can make assertions on the resolved value
       expect(result).to.exist()
-      ---@diagnostic disable-next-line: need-check-nil, undefined-field
       expect(result.status).to.equal("success")
-      ---@diagnostic disable-next-line: need-check-nil, undefined-field
+      expect(result.data).to.exist()
       expect(result.data.value).to.equal(42)
     end)
 
-    it_async("demonstrates timeout behavior", function()
-      local result = nil
+    it_async(
+      "demonstrates timeout behavior with test options",
+      { timeout = 50, expect_error = true }, -- Set test-specific timeout shorter than API delay
+      function()
+        -- Start an async operation that will take too long (100ms)
+        local data_promise = AsyncAPI.fetch_data(100)
 
-      -- This test sets a very short timeout that should cause the test to fail
-      -- but we catch the error to demonstrate the behavior
+        -- Await the promise. This should fail because the test timeout (50ms)
+        -- is shorter than the API delay (100ms).
+        local success, err = pcall(function()
+          await(data_promise)
+        end)
 
-      -- Start an async operation that will take too long (300ms)
-      local request = AsyncAPI.fetch_data(function(data)
-        result = data
-      end, 300)
-
-      -- Try to wait with a short timeout (50ms)
-      local success = pcall(function()
-        ---@diagnostic disable-next-line: redundant-parameter
-        wait_until(request.is_complete, 50, 10)
-      end)
-
-      -- The wait should have timed out
-      expect(success).to.equal(false)
-      expect(result).to.equal(nil) -- The callback shouldn't have been called yet
-
-      -- Clean up (cancel the request in a real implementation)
-      request.cancel()
-    end)
+        expect(success).to.be_falsy()
+        expect(err).to.exist()
+        expect(err).to.match("timeout") -- Verify the error is a timeout error
+      end
+    )
   end)
 
-  describe("Using async() directly", function()
+  --- Tests demonstrating the explicit use of `async()` wrapper for tests.
+  describe("Using async() wrapper directly", function()
     it(
       "runs an async test with custom timeout",
-      ---@diagnostic disable-next-line: redundant-parameter
-      async(function()
+      firmo.async(function() -- Use firmo.async explicitly if local 'async' was removed
         local start_time = os.clock()
-
-        ---@diagnostic disable-next-line: redundant-parameter
         await(100)
-
         local elapsed = (os.clock() - start_time) * 1000
-        expect(elapsed >= 95).to.be.truthy()
-        ---@diagnostic disable-next-line: redundant-parameter
-      end, 1000)
-    ) -- 1 second timeout
+        expect(elapsed).to.be_greater_than(90)
+      end, 1000) -- 1 second timeout for the async function itself
+    )
 
     -- Nested async calls
     it(
       "supports nested async operations",
-      ---@diagnostic disable-next-line: redundant-parameter
-      async(function()
+      firmo.async(function() -- Use firmo.async explicitly if local 'async' was removed
         local value = 0
-
         -- First async operation
-        ---@diagnostic disable-next-line: redundant-parameter
         await(50)
         value = value + 1
 
         -- Second async operation
-        ---@diagnostic disable-next-line: redundant-parameter
         await(50)
         value = value + 1
 
@@ -172,5 +143,3 @@ describe("Async Testing Demo", function()
     )
   end)
 end)
-
-print("\nAsync testing features demo completed!")

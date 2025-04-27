@@ -58,10 +58,14 @@ jobs:
 
       - name: Generate test report (optional)
 
-        run: |
-          # If using a reporter/formatter
-          lua test.lua tests/ --reporter junit > test-results.xml
+      - name: Generate test report (optional)
 
+        # The runner automatically generates reports if configured
+        # e.g., in .firmo-config.lua or via --format=junit
+        # No separate command needed here if auto-generation is set up.
+        # If manual generation is needed, run the reporting tool separately.
+        run: |
+          echo "Assuming report generation is handled by runner configuration or a later step"
 
       - name: Upload test results
 
@@ -69,9 +73,8 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: test-results
-          path: test-results.xml
-```
-
+          # Adjust path based on where reports are saved (e.g., coverage-reports/)
+          path: coverage-reports/test-results.xml
 
 
 ### GitLab CI
@@ -110,10 +113,12 @@ run_tests:
     paths:
 
 
-      - test-results.xml
+      # Adjust path based on where reports are saved (e.g., coverage-reports/)
+      - coverage-reports/test-results.xml
 
     reports:
-      junit: test-results.xml
+      # Adjust path based on where reports are saved
+      junit: coverage-reports/test-results.xml
 ```
 
 
@@ -236,13 +241,16 @@ end)
 ```
 
 
-In your CI configuration, you can run specific test groups:
+The command-line runner does not currently support direct filtering using `--tags`. However, you can achieve similar results:
 
-
-```bash
-lua test.lua tests/ --tags unit  # Run only unit tests
-lua test.lua tests/ --tags integration  # Run only integration tests
-```
+1.  **Using `--filter`**: Filter tests by matching patterns in their *names* (including describe block names). This is less precise than tag filtering.
+    ```bash
+    # Run tests whose names contain "unit"
+    lua test.lua tests/ --filter unit
+    # Run tests whose names contain "integration"
+    lua test.lua tests/ --filter integration
+    ```
+2.  **Programmatic Filtering**: Set up different CI jobs or steps where each step configures Firmo programmatically using `firmo.only_tags(...)` before running the tests.
 
 
 
@@ -301,27 +309,29 @@ steps:
 
 ### 5. Parallel Test Execution
 
+For large test suites, consider running tests in parallel to speed up execution within a single CI job.
 
-For large test suites, consider running tests in parallel:
+```bash
+# Run tests using 4 worker processes
+lua test.lua tests/ --parallel --workers=4
+```
 
+Alternatively, you can split tests across multiple CI jobs using matrix strategies, often combined with filtering:
 
 ```yaml
-
-# In GitHub Actions
-
-
+# In GitHub Actions - using --filter (less precise than tags)
 jobs:
   test:
     strategy:
       matrix:
+        # Define groups based on naming patterns or directories
         test-group: [unit, integration, functional]
     steps:
-
-
-      - name: Run tests
-
+      # ... setup steps ...
+      - name: Run tests for group ${{ matrix.test-group }}
         run: |
-          lua test.lua tests/ --tags ${{ matrix.test-group }}
+          # Use --filter to run tests matching the group name pattern
+          lua test.lua tests/ --filter ${{ matrix.test-group }}
 ```
 
 
@@ -349,26 +359,26 @@ Math operations
 
 ### JUnit XML Format (For CI Systems)
 
-
-For better CI integration, use the JUnit XML reporter:
-
+For better CI integration, configure Firmo to generate JUnit XML reports using the `--format=junit` flag. This tells the reporting system to create a JUnit XML file, typically saved in the configured report directory (e.g., `./coverage-reports/test-results.xml`).
 
 ```bash
-lua test.lua tests/ --reporter junit > test-results.xml
+# Run tests and ensure JUnit report is generated (via config or this flag)
+lua test.lua tests/ --format=junit
 ```
 
+Most CI systems can automatically find and parse `junit.xml` (or similar) files if placed in expected locations or specified in the CI configuration. Make sure your artifact upload paths match where the report is saved.
 
-This generates an XML file that most CI systems can parse and display as test reports.
-
+### JSON Format (For Custom Processing)
 ### JSON Format (For Custom Processing)
 
 
 For custom processing of test results:
 
-
 ```bash
-lua test.lua tests/ --reporter json > test-results.json
+# Run tests and ensure a JSON report is generated
+lua test.lua tests/ --format=json
 ```
+This generates a structured JSON file (e.g., in `./coverage-reports/test-results.json`) containing detailed test results, suitable for custom processing or analysis tools.
 
 
 
@@ -431,14 +441,16 @@ jobs:
 
       - name: Run unit tests
 
-        run: lua test.lua tests/ --tags unit --reporter junit > unit-test-results.xml
-
+        run: |
+          # Filters tests with "unit" in their name/path; --format generates JUnit file
+          lua test.lua tests/ --filter unit --format=junit
 
       - name: Run integration tests
 
         if: success() || failure() # Run even if unit tests fail
-        run: lua test.lua tests/ --tags integration --reporter junit > integration-test-results.xml
-
+        run: |
+          # Filters tests with "integration" in their name/path; --format generates JUnit file
+          lua test.lua tests/ --filter integration --format=junit
 
       - name: Upload test results
 
@@ -446,8 +458,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: test-results-${{ matrix.lua-version }}-${{ matrix.os }}
-          path: |
-            *-test-results.xml
+          path: coverage-reports/*.xml # Adjust path if reports are saved elsewhere
 ```
 
 

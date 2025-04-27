@@ -347,18 +347,12 @@ describe("API", {tags = {"integration"}}, function()
 end)
 ```
 
-
-Then run with tag filters:
-
+This runs tests, first filtering by name pattern (`--filter unit`), then applying focus mode to that subset. Only focused tests whose name/path contains 'unit' will run.
 
 ```bash
-
-# Only runs focused tests with the "unit" tag
-
-
-lua test.lua --tags=unit tests/
+# Only runs focused tests whose name/path contains "unit"
+lua test.lua --filter unit tests/
 ```
-
 
 
 ## Best Practices

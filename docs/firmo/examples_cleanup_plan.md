@@ -56,47 +56,64 @@
 
 ## List of example files
 
-- [ ] examples/assertions_example.lua
-- [ ] examples/async_example.lua
-- [ ] examples/async_watch_example.lua
-- [ ] examples/basic_example.lua
-- [ ] examples/benchmark_example.lua
-- [ ] examples/central_config_example.lua
-- [ ] examples/cli_tool_example.lua
-- [ ] examples/cobertura_example.lua
-- [ ] examples/cobertura_jenkins_example.lua
-- [ ] examples/codefix_example.lua
-- [ ] examples/comprehensive_testing_example.lua
-- [ ] examples/coverage_example.lua
-- [ ] examples/csv_example.lua
-- [ ] examples/custom_formatters_example.lua
-- [ ] examples/error_handling_example.lua
-- [ ] examples/extended_assertions_example.lua
-- [ ] examples/filesystem_example.lua
-- [ ] examples/focused_tests_example.lua
-- [ ] examples/formatter_config_example.lua
-- [ ] examples/hash_example.lua
-- [ ] examples/html_coverage_example.lua
-- [ ] examples/html_formatter_example.lua
-- [ ] examples/html_report_example.lua
-- [ ] examples/interactive_mode_example.lua
-- [ ] examples/json_example.lua
-- [ ] examples/json_output_example.lua
-- [ ] examples/junit_example.lua
-- [ ] examples/lcov_example.lua
-- [ ] examples/logging_examples.md
-- [ ] examples/mock_sequence_example.lua
-- [ ] examples/mocking_example.lua
-- [ ] examples/module_reset_example.lua
-- [ ] examples/parallel_async_example.lua
-- [ ] examples/parallel_execution_example.lua
-- [ ] examples/parallel_json_example.lua
-- [ ] examples/quality_example.lua
-- [ ] examples/report_example.lua
-- [ ] examples/reporting_filesystem_integration.lua
-- [ ] examples/specialized_assertions_example.lua
-- [ ] examples/summary_example.lua
-- [ ] examples/tagging_example.lua
-- [ ] examples/tap_example.lua
-- [ ] examples/temp_file_management_example.lua
-- [ ] examples/watch_mode_example.lua
+- [x] examples/assertions_example.lua -- executes successfully
+- [x] examples/async_example.lua -- executes successfully
+- [x] examples/async_watch_example.lua -- executes successfully
+- [x] examples/basic_example.lua -- executes successfully
+- [x] examples/benchmark_example.lua
+- [x] examples/central_config_example.lua -- executes successfully
+- [x] examples/cobertura_example.lua -- executes successfully
+- [x] examples/cobertura_jenkins_example.lua -- executes successfully (with known report generation errors due to non-standard coverage setup)
+- [x] examples/codefix_example.lua -- executes successfully (with 'no matching files' warnings)
+- [x] examples/comprehensive_testing_example.lua -- executes successfully
+- [x] examples/coverage_example.lua
+- [x] examples/csv_example.lua
+- [x] examples/custom_formatters_example.lua
+- [x] examples/error_handling_example.lua
+- [x] examples/extended_assertions_example.lua
+- [x] examples/filesystem_example.lua
+- [x] examples/focused_tests_example.lua
+- [x] examples/formatter_config_example.lua
+- [x] examples/hash_example.lua
+- [x] examples/html_coverage_example.lua
+- [x] examples/html_formatter_example.lua
+- [x] examples/html_report_example.lua
+- [x] examples/interactive_mode_example.lua
+- [x] examples/json_example.lua
+- [x] examples/json_output_example.lua
+- [x] examples/junit_example.lua
+- [x] examples/lcov_example.lua
+- [x] examples/logging_examples.md
+- [x] examples/mock_sequence_example.lua
+- [x] examples/mocking_example.lua
+- [x] examples/module_reset_example.lua
+- [x] examples/parallel_async_example.lua
+- [x] examples/parallel_execution_example.lua
+- [x] examples/parallel_json_example.lua
+- [x] examples/quality_example.lua
+- [x] examples/report_example.lua
+- [x] examples/reporting_filesystem_integration.lua
+- [x] examples/specialized_assertions_example.lua
+- [x] examples/summary_example.lua
+- [x] examples/tagging_example.lua
+- [x] examples/tap_example.lua
+- [x] examples/temp_file_management_example.lua
+- [x] examples/watch_mode_example.lua
+
+--- gets the error handler for the filesystem module
+local function get_error_handler()
+if not error_handler then
+error_handler = require("lib.tools.error_handler")
+end
+return error_handler
+end
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+local success, result = pcall(require, module_name)
+if not success then
+print("Warning: Failed to load module:", module_name, "Error:", result)
+return nil
+end
+return result
+end

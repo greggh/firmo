@@ -70,30 +70,9 @@ end)
 
 ### Running Tests by Tag
 
+#### Programmatically (`firmo.only_tags`)
 
-#### Command Line
-
-
-The most common way to filter by tags is using the `--tags` option:
-
-
-```bash
-
-# Run only tests tagged with "unit"
-
-
-lua test.lua --tags unit tests/
-
-# Run tests with both "auth" and "security" tags
-
-
-lua test.lua --tags auth,security tests/
-```
-
-
-
-#### Programmatically
-
+You can filter programmatically within your test setup or a custom runner script:
 
 You can also filter programmatically:
 
@@ -109,35 +88,7 @@ require("tests/user_tests")
 ```
 
 
-
-## Tag Combinations
-
-
-The `--tags` option supports complex filtering:
-
-
-```bash
-
-# Tests tagged with both "unit" AND "auth"
-
-
-lua test.lua --tags unit,auth tests/
-
-# Tests tagged with EITHER "unit" OR "integration"
-
-
-lua test.lua --tags unit+integration tests/
-
-# Tests tagged with "auth" but NOT "slow"
-
-
-lua test.lua --tags auth,-slow tests/
-```
-
-
-
 ## Name Pattern Filtering
-
 
 You can also filter tests based on their names using Lua patterns.
 
@@ -168,28 +119,25 @@ lua test.lua --filter "^validates" tests/
 
 ```lua
 -- Filter to tests related to passwords
-firmo.filter("password")
+firmo.filter_pattern("password")
 -- Run the tests
 require("tests/auth_tests")
 ```
 
 
 
-## Combining Filters
+## Combining Filters (Programmatically)
 
+You can combine programmatic tag and pattern filtering:
 
-You can combine tag and pattern filters for precise test selection:
-
-
-```bash
-
-# Run "unit" tests that have "validation" in their name
-
-
-lua test.lua --tags unit --filter validation tests/
+```lua
+-- Run "unit" tests that have "validation" in their name
+firmo.only_tags("unit")
+firmo.filter_pattern("validation")
+-- Run tests
 ```
 
-
+From the command line, you can only use `--filter` for name pattern filtering.
 
 ## Common Tagging Strategies
 
@@ -274,9 +222,7 @@ describe("User module", {tags = {"unit"}}, function()
 end)
 ```
 
-
-When running with `--tags unit`, only the focused password test will run. Without the tag filter, the same focused test would run regardless of its tags.
-
+When running tests *after* programmatically setting `firmo.only_tags("unit")`, only the focused password test will run (as it matches the "unit" tag inherited from the describe block). If `only_tags` was not called (or reset), the focused test would run regardless of its tags. Focus mode applies *after* the initial set of tests to run has been determined by tag/pattern filters.
 ## Organizing Test Suites
 
 
@@ -310,18 +256,16 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-
-
-      - run: lua test.lua --tags unit tests/
+      # Use --filter to select tests by name pattern
+      - run: lua test.lua tests/ --filter unit
 
   integration-tests:
     runs-on: ubuntu-latest
     steps:
-
-
-      - run: lua test.lua --tags integration tests/
-
+      # ... setup ...
+      - run: lua test.lua tests/ --filter integration
 ```
+Alternatively, configure each job to use a different entry script or configuration file that applies programmatic tag filtering (`firmo.only_tags(...)`) before running `lua test.lua tests/`.
 
 
 
@@ -342,8 +286,9 @@ jobs:
 
 
 1. **Tag at the right level**: Apply to the highest level that makes sense
-2. **Don't over-tag**: Too many tags become hard to maintain
-3. **Tag during authoring**: Add tags as you write tests, not later
+2. **Don't over-tag**: Too many tags become hard to maintain. Focus on categories useful for filtering.
+3. **Tag during authoring**: Add tags as you write tests, not later.
+4. **CLI Filtering**: Use `--filter` for quick name-based filtering during development. For tag-based filtering in CI, prefer programmatic setup.
 
 
 ### Common Tag Combinations
@@ -380,14 +325,14 @@ end
 
 
 ```lua
--- Custom tag-based runner
+```lua
+-- Custom runner applying filters
 local function run_suite(options)
-  firmo.reset_filters()
+  firmo.reset() -- Reset filters, state, etc.
 
-  if options.exclude_slow then
-    -- Filter out slow tests
-    firmo.exclude_tags("slow")
-  end
+  -- Note: firmo.exclude_tags is not implemented.
+  -- Implementing exclusion requires filtering the test list manually
+  -- or modifying the runner logic.
 
   if options.components then
     -- Build a tag list from components
@@ -395,24 +340,24 @@ local function run_suite(options)
     for _, component in ipairs(options.components) do
       table.insert(tags, component)
     end
-    firmo.only_tags(unpack(tags))
+    -- Use compatibility unpack
+    local unpack_table = table.unpack or unpack
+    firmo.only_tags(unpack_table(tags))
   end
 
   if options.pattern then
-    firmo.filter(options.pattern)
+    firmo.filter_pattern(options.pattern)
   end
 
   -- Run the selected tests
-  require("tests/run_all")
+  require("tests/run_all") -- Assumes this loads/runs tests
 end
 -- Example usage
 run_suite({
-  exclude_slow = true,
+  -- exclude_slow = true, -- Cannot directly exclude tags
   components = {"auth", "user"},
   pattern = "validation"
 })
-```
-
 
 
 ## Troubleshooting
@@ -425,8 +370,8 @@ If no tests are running with your filters:
 
 
 1. **Check tag spelling**: Tags are case-sensitive
-2. **Look for tag hierarchy issues**: Make sure tags are applied at correct levels
-3. **Check for tag conflicts**: You might have excluded the tests with another tag
+2. **Look for tag hierarchy issues**: Make sure tags are applied at correct describe levels if using `firmo.tags()`.
+3. **Check Filter Pattern**: Ensure your `--filter` pattern is correct Lua syntax and matches the intended test names.
 
 
 ### Too Many Tests Running
@@ -435,9 +380,9 @@ If no tests are running with your filters:
 If filters aren't narrowing the selection enough:
 
 
-1. **Add more specific tags**: Break down generic tags like "unit" into more specific ones
-2. **Combine with pattern filters**: Use `--filter` alongside `--tags`
-3. **Use focus mode**: Temporarily use `fit` or `fdescribe` 
+1. **Add more specific tags**: Break down generic tags like "unit" into more specific ones if using programmatic `only_tags`.
+2. **Refine `--filter` Pattern**: Make your `--filter` pattern more specific.
+3. **Use focus mode**: Temporarily use `fit` or `fdescribe`.
 
 
 ## Conclusion

@@ -13,7 +13,7 @@ Firmo can be run directly from the command line to discover and run tests. This 
 2. **Watch Mode**: Continuously run tests when files change
 3. **Interactive Mode**: A full-featured interactive shell for running tests and configuring test options
 
-
+Note: The CLI functionality is typically accessed via the main `test.lua` script, which loads and uses this module (`lib/tools/cli`).
 ## Basic Usage
 
 
@@ -23,27 +23,27 @@ Firmo can be run directly from the command line to discover and run tests. This 
 # Run all tests in the default directory (./tests)
 
 
-lua scripts/run_tests.lua
+lua test.lua
 
 # Run tests in a specific directory
 
 
-lua scripts/run_tests.lua --dir path/to/tests
+lua test.lua --dir path/to/tests
 
 # Run a specific test file
 
 
-lua scripts/run_tests.lua path/to/test_file.lua
+lua test.lua path/to/test_file.lua
 
 # Run tests in watch mode (continuous testing)
 
 
-lua scripts/run_tests.lua --watch
+lua test.lua --watch
 
 # Start interactive CLI mode
 
 
-lua scripts/run_tests.lua --interactive
+lua test.lua --interactive
 ```
 
 
@@ -56,30 +56,34 @@ lua scripts/run_tests.lua --interactive
 
 | Option | Description |
 |--------|-------------|
-| `--dir DIRECTORY` | Directory to search for test files (default: ./tests) |
-| `--pattern PATTERN` | Pattern to match test files (default: *_test.lua) |
-| `--tags TAG1,TAG2,...` | Run only tests with specific tags |
-| `--filter PATTERN` | Run only tests with names matching pattern |
-| `--help`, `-h` | Show help message |
-| `--interactive`, `-i` | Start interactive CLI mode |
+| `--dir DIRECTORY`          | Directory to search for test files (default: ./tests) |
+| `--pattern PATTERN`        | Pattern to match test files (default: *_test.lua) |
+| `--tags TAG1,TAG2,...`     | Run only tests with specific tags |
+| `--filter PATTERN`         | Run only tests with names matching pattern |
+| `-h`, `--help`             | Show help message |
+| `-i`, `--interactive`      | Start interactive CLI mode |
+| `-w`, `--watch`            | Enable watch mode for continuous testing |
+| `-c`, `--coverage`         | Enable code coverage tracking |
+| `-p`, `--parallel`         | Run tests in parallel (requires `lib.tools.parallel`) |
+| `-q`, `--quality`          | Enable quality validation (requires `lib.quality`) |
+| `--quality-level LEVEL`  | Set quality validation level (1-5, default 1) |
+| `-r`, `--report`           | Generate reports after test run (coverage, quality) |
+| `-V`, `--version`          | Show version information |
+| `-v`, `--verbose`          | Enable verbose output |
+| `--format FORMAT`        | Set console output format (default, dot, summary, detailed, plain) |
+| `--report-format FORMAT` | Set report format (html, json, junit, etc.) |
+| `--config FILE`          | Load configuration from a specific Lua file |
+| `--create-config`      | Create a default `.firmo-config.lua` file and exit |
 
-### Watch Mode Options
-
-
-| Option | Description |
-|--------|-------------|
-| `--watch` | Enable watch mode for continuous testing |
-| `--watch-dir DIRECTORY` | Directory to watch for changes (can specify multiple) |
-| `--watch-interval SECONDS` | Interval between file checks (default: 1.0) |
-| `--exclude PATTERN` | Pattern to exclude from watching (can specify multiple) |
+Note: Watch mode specific settings (directories, interval, exclude patterns) are typically configured via the `.firmo-config.lua` file in the `watcher` section, not via direct command-line arguments to `test.lua`.
 
 ### Code Quality Options
 
 
 | Option | Description |
 |--------|-------------|
-| `--fix [DIRECTORY]` | Run code fixing on directory (default: .) |
-| `--check DIRECTORY` | Check for code issues without fixing |
+| `--fix [DIRECTORY]` | Run code fixing on directory (specified as positional argument, default: .) |
+| `--check DIRECTORY` | Check for code issues without fixing (directory specified as positional argument) |
 
 ## Examples
 
@@ -93,22 +97,38 @@ lua scripts/run_tests.lua --interactive
 # Run all tests
 
 
-lua scripts/run_tests.lua
+lua test.lua
 
 # Run a specific test file
 
 
-lua scripts/run_tests.lua tests/specific_test.lua
+lua test.lua tests/specific_test.lua
 
 # Run tests with custom pattern
 
 
-lua scripts/run_tests.lua --dir src --pattern "*_spec.lua"
+lua test.lua --dir src --pattern "*_spec.lua"
 
 # Run tests with specific tags
 
 
-lua scripts/run_tests.lua --tags unit,fast
+lua test.lua --tags unit,fast
+
+# Run tests with coverage and generate HTML report
+
+lua test.lua --coverage --report --report-format=html
+
+# Run tests in parallel with verbose output
+
+lua test.lua --parallel -v
+
+# Run tests with quality validation (level 3)
+
+lua test.lua --quality --quality-level=3
+
+# Run tests with 'dot' format output
+
+lua test.lua --format=dot
 ```
 
 
@@ -122,27 +142,13 @@ lua scripts/run_tests.lua --tags unit,fast
 # Basic watch mode
 
 
-lua scripts/run_tests.lua --watch
+# Basic watch mode
 
-# Watch specific directories
-
-
-lua scripts/run_tests.lua --watch --watch-dir src --watch-dir lib
-
-# Watch with faster check interval
-
-
-lua scripts/run_tests.lua --watch --watch-interval 0.5
-
-# Watch with exclusions
-
-
-lua scripts/run_tests.lua --watch --exclude "build/.*" --exclude "%.git"
+lua test.lua --watch
 
 # Watch a specific test file
 
-
-lua scripts/run_tests.lua --watch tests/specific_test.lua
+lua test.lua --watch tests/specific_test.lua
 ```
 
 
@@ -156,17 +162,17 @@ lua scripts/run_tests.lua --watch tests/specific_test.lua
 # Fix code issues in current directory
 
 
-lua scripts/run_tests.lua --fix
+lua test.lua --fix
 
-# Fix code issues in specific directory
-
-
-lua scripts/run_tests.lua --fix src
-
-# Check for issues without fixing
+# Fix code issues in specific directory (using positional arg)
 
 
-lua scripts/run_tests.lua --check src
+lua test.lua --fix src
+
+# Check for issues without fixing (using positional arg)
+
+
+lua test.lua --check src
 ```
 
 
@@ -195,17 +201,6 @@ Watch mode is a powerful feature that continuously monitors your project files f
 - **Focused Development**: Keep your focus on code, not on running tests
 - **Faster Development Cycles**: Shortens the feedback loop in test-driven development
 - **Increased Confidence**: Continuous verification that your code still works
-
-
-### Watch Mode Options
-
-
-The watch mode can be customized with several options:
-
-
-- **Watch Directories**: Specify which directories to monitor for changes
-- **Check Interval**: Adjust how frequently to check for changes
-- **Exclusion Patterns**: Ignore changes in specific files or directories
 
 
 ### Example Watch Mode Session
@@ -243,7 +238,7 @@ Test Summary: 5 passed, 0 failed
 ## Exit Codes
 
 
-Firmo sets the process exit code based on the test results:
+The `test.lua` script (or a custom runner) typically sets the process exit code based on the boolean return value of the CLI functions:
 
 
 - **0**: All tests passed
@@ -272,7 +267,7 @@ TEST_TYPE=${TEST_TYPE:-unit}
 # Run tests with appropriate tags
 
 
-lua scripts/run_tests.lua --tags $TEST_TYPE
+lua test.lua --tags $TEST_TYPE
 ```
 
 
@@ -294,13 +289,13 @@ You can integrate Firmo with Make for more complex test workflows:
 ```makefile
 .PHONY: test test-unit test-watch
 test:
-	lua scripts/run_tests.lua
+	lua test.lua
 test-unit:
-	lua scripts/run_tests.lua --tags unit
+	lua test.lua --tags unit
 test-watch:
-	lua scripts/run_tests.lua --watch
+	lua test.lua --watch
 test-coverage:
-	lua scripts/run_tests.lua --coverage
+	lua test.lua --coverage
 ```
 
 
@@ -319,7 +314,7 @@ Interactive mode provides a powerful command-line interface for running tests an
 # Start interactive mode
 
 
-lua scripts/run_tests.lua --interactive
+lua test.lua --interactive
 ```
 
 
@@ -343,8 +338,9 @@ lua scripts/run_tests.lua --interactive
 | `pattern <pat>` | Set test file pattern |
 | `clear` | Clear the screen |
 | `status` | Show current settings |
-| `history` | Show command history |
 | `exit` | Exit the interactive CLI |
+
+*Note: Some commands listed might depend on optional modules being available.*
 
 ### Example Interactive Session
 
@@ -419,7 +415,7 @@ You can also start interactive mode programmatically:
 
 ```lua
 local firmo = require("firmo")
-local interactive = require("src.interactive")
+local interactive = require("lib.tools.interactive")
 -- Run your tests...
 -- Start interactive mode
 interactive.start(firmo, {
@@ -464,12 +460,12 @@ jobs:
 
     - name: Run unit tests
 
-      run: lua scripts/run_tests.lua --tags unit
+      run: lua test.lua --tags unit
 
 
     - name: Run integration tests
 
-      run: lua scripts/run_tests.lua --tags integration
+      run: lua test.lua --tags integration
 ```
 
 

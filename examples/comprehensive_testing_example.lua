@@ -1,6 +1,17 @@
--- comprehensive_testing_example.lua
--- A comprehensive example demonstrating best practices for testing with Firmo
--- Including temp file management, error handling, assertions, and test organization
+--- comprehensive_testing_example.lua
+--
+-- This file provides a comprehensive demonstration of best practices for testing
+-- with the Firmo framework. It covers:
+-- - Test suite structure using BDD syntax (`describe`, `it`).
+-- - Setup (`before`) and teardown (`after`) hooks.
+-- - Making various assertions using `expect`.
+-- - Handling errors using `error_handler` and `test_helper.with_error_capture`.
+-- - Managing temporary files and directories using `test_helper.create_temp_test_directory`.
+-- - Integrating configuration via `central_config` into a testable module.
+-- - Using logging within tests.
+--
+-- Run embedded tests: lua test.lua examples/comprehensive_testing_example.lua
+--
 
 -- Import the Firmo framework
 local firmo = require("firmo")
@@ -12,9 +23,10 @@ local before, after = firmo.before, firmo.after
 -- Import supporting modules
 local test_helper = require("lib.tools.test_helper")
 local error_handler = require("lib.tools.error_handler")
-local temp_file = require("lib.tools.filesystem.temp_file")
+local temp_file = require("lib.tools.filesystem.temp_file") -- Keep for potential direct use if needed
 local fs = require("lib.tools.filesystem")
 local logging = require("lib.tools.logging")
+local central_config = require("lib.core.central_config")
 
 -- Configure logger for this example
 local logger = logging.get_logger("comprehensive_example")
@@ -22,19 +34,31 @@ local logger = logging.get_logger("comprehensive_example")
 -- ===================================================================
 -- Example Module to Test - A simple file processor
 -- ===================================================================
+--- A simple module designed to process files based on configuration.
+-- Demonstrates how to integrate with central_config and error_handler.
 local FileProcessor = {}
 
--- Create a new file processor instance
+--- Creates a new FileProcessor instance, initializing its configuration
+-- from `central_config` or using default values.
+-- @return table processor The new FileProcessor instance.
 function FileProcessor.new()
-  return {
+  local cfg = central_config.get() -- Corrected function call
+  local default_exts = cfg.file_processor and cfg.file_processor.allowed_extensions or {"lua", "txt", "json"}
+  
+  local self = {
     -- Internal state
     _files = {},
     _config = {
-      max_file_size = 1024 * 1024, -- 1MB default
-      allowed_extensions = { lua = true, txt = true, json = true },
+      max_file_size = cfg.file_processor and cfg.file_processor.max_file_size or 1024 * 1024, -- 1MB default
+      allowed_extensions = {}, -- Initialize empty, populate below
     },
     
-    -- Configure the processor
+    --- Configures the FileProcessor instance with new options, validating inputs.
+    -- Overrides defaults set during initialization.
+    -- @param self table The FileProcessor instance.
+    -- @param options table A table containing configuration options like `max_file_size` or `allowed_extensions`.
+    -- @return boolean|nil success True on success, nil on error.
+    -- @return table|nil err An error object if validation fails.
     configure = function(self, options)
       if not options or type(options) ~= "table" then
         return nil, error_handler.validation_error(
@@ -61,16 +85,23 @@ function FileProcessor.new()
           )
         end
         
-        self._config.allowed_extensions = {}
+        self._config.allowed_extensions = {} -- Reset before applying new ones
         for _, ext in ipairs(options.allowed_extensions) do
-          self._config.allowed_extensions[ext] = true
+          if type(ext) == "string" then
+            self._config.allowed_extensions[ext:lower()] = true -- Store lowercase
+          end
         end
       end
       
       return true
     end,
     
-    -- Add a file to process
+    --- Adds a file to the processor's queue after validating its existence,
+    -- extension, and size against the current configuration.
+    -- @param self table The FileProcessor instance.
+    -- @param file_path string The absolute path to the file to add.
+    -- @return boolean|nil success True if the file was added successfully, nil on error.
+    -- @return table|nil err An error object if validation or IO fails.
     add_file = function(self, file_path)
       -- Validate parameters
       if not file_path or type(file_path) ~= "string" then
@@ -100,11 +131,10 @@ function FileProcessor.new()
       
       -- Check file extension
       local extension = file_path:match("%.([^%.]+)$")
-      if not extension or not self._config.allowed_extensions[extension] then
+      if not extension or not self._config.allowed_extensions[extension:lower()] then
         return nil, error_handler.validation_error(
-          "File has invalid extension",
-          { file_path = file_path, extension = extension or "none", 
-            allowed = table.concat(self:get_allowed_extensions(), ", ") }
+            "File has invalid extension",
+            { file_path = file_path, extension = extension or "none" } -- Removed 'allowed' field
         )
       end
       
@@ -129,14 +159,19 @@ function FileProcessor.new()
       -- Add file to internal tracking
       table.insert(self._files, {
         path = file_path,
+        path = file_path,
         size = size,
-        added_at = os.time()
-      })
+        added_at = 0, -- Placeholder timestamp -- Added missing comma
+      }) -- Closing parenthesis for table.insert
       
       return true
     end,
     
-    -- Process all added files
+    --- Processes all files currently in the queue. Reads each file, gathers basic stats,
+    -- and returns a summary. Clears the queue after processing.
+    -- @param self table The FileProcessor instance.
+    -- @return table|nil results A table summarizing the processing results, or nil on error.
+    -- @return table|nil err An error object if no files were added.
     process = function(self)
       if #self._files == 0 then
         return nil, error_handler.validation_error(
@@ -191,7 +226,9 @@ function FileProcessor.new()
       return results
     end,
     
-    -- Get allowed file extensions
+    --- Returns a list of currently allowed file extensions based on the configuration.
+    -- @param self table The FileProcessor instance.
+    -- @return string[] extensions A list of allowed extensions (e.g., {"lua", "txt"}).
     get_allowed_extensions = function(self)
       local extensions = {}
       for ext, _ in pairs(self._config.allowed_extensions) do
@@ -200,18 +237,29 @@ function FileProcessor.new()
       return extensions
     end,
     
-    -- Reset processor state
+    --- Resets the internal state of the processor (clears the file queue)
+    -- but preserves the configuration.
+    -- @param self table The FileProcessor instance.
+    -- @return boolean success Always returns true.
     reset = function(self)
       self._files = {}
       -- Config is preserved
       return true
     end
   }
+
+  -- Populate initial allowed extensions from defaults
+  for _, ext in ipairs(default_exts) do
+    self._config.allowed_extensions[ext:lower()] = true -- Store lowercase
+  end
+
+  return self
 end
 
 -- ===================================================================
 -- Tests - Using Firmo's BDD-style nested blocks
 -- ===================================================================
+--- Main test suite for the FileProcessor module.
 describe("FileProcessor", function()
   -- Setup variables for test suite
   local processor
@@ -239,7 +287,7 @@ describe("FileProcessor", function()
     logger.debug("Test cleanup complete")
   end)
   
-  -- Test basic initialization
+  --- Tests related to the initialization and configuration of the FileProcessor.
   describe("Initialization", function()
     it("should initialize with default configuration", function()
       expect(processor).to.exist()
@@ -275,7 +323,7 @@ describe("FileProcessor", function()
     end)
   end)
   
-  -- Test file validation
+  --- Tests focused on the file validation logic within `add_file`.
   describe("File Validation", function()
     -- Using the test directory helper to create test files
     before(function()
@@ -338,7 +386,7 @@ describe("FileProcessor", function()
     end)
   end)
   
-  -- Test processing functionality
+  --- Tests focused on the `process` method and its outcomes.
   describe("File Processing", function()
     before(function()
       -- Create test files with different content
@@ -385,7 +433,7 @@ describe("FileProcessor", function()
     end)
   end)
   
-  -- Test reset functionality
+  --- Tests focused on the `reset` method and its effect on state and configuration.
   describe("Reset Functionality", function()
     before(function()
       -- Add a file to processor

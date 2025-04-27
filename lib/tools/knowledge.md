@@ -1,161 +1,84 @@
-# Tools Knowledge
-
+# lib/tools Knowledge
 
 ## Purpose
 
+The `lib/tools` directory serves as the central location for various utility modules within the Firmo framework. These modules provide common, reusable functionality needed to support the core testing framework, command-line interface, reporting, and other features. The tools cover a wide range of areas including filesystem interaction, error handling, logging, CLI argument parsing, data serialization (JSON), hashing, date/time manipulation, code analysis and fixing, performance benchmarking, interactive sessions, file watching, and managing third-party vendor libraries.
 
-Core utility modules supporting the framework functionality.
+## Key Concepts
 
-## Module Usage
+- **Reusable Utilities:** Each module under `lib/tools` aims to encapsulate a specific piece of functionality (e.g., handling files, parsing arguments, logging messages) in a reusable way, promoting modularity and reducing code duplication across the framework.
+- **Focused Responsibility:** Tools are generally designed to have a clear, focused responsibility, making them easier to understand, maintain, and test independently.
+- **Core Dependencies:** Certain tools are fundamental to the operation of almost all other parts of Firmo. Notably, `error_handler`, `filesystem`, and `logging` provide essential services relied upon throughout the codebase.
 
+## Usage Examples / Patterns
 
+### General Pattern: Requiring and Using a Tool
 
 ```lua
--- Filesystem operations
-local fs = require("lib.tools.filesystem")
-local content, err = fs.read_file("config.json")
-if not content then
-  logger.error("Failed to read config", {
-    error = err,
-    category = err.category
-  })
-  return nil, err
-end
--- Error handling
-local error_handler = require("lib.tools.error_handler")
-local success, result, err = error_handler.try(function()
-  return risky_operation()
-end)
+--[[
+  Demonstrates the general pattern for requiring and using a module
+  from the lib/tools directory. Specific function names and arguments
+  will vary based on the tool.
+]]
+-- Replace 'tool_name' with the actual name (e.g., 'filesystem', 'logging')
+local tool_name = require("lib.tools.tool_name")
+local error_handler = require("lib.tools.error_handler") -- Often needed
+
+-- Call functions provided by the tool
+-- Many tool functions return (result, err) or need try()
+local success, result_or_err = error_handler.try(tool_name.some_function, "arg1")
+
 if not success then
-  logger.error("Operation failed", {
-    error = err,
-    category = err.category
-  })
-  return nil, err
+  -- Handle the error object returned by error_handler.try
+  print("Tool operation failed: " .. result_or_err.message)
+else
+  -- Use the successful result
+  print("Tool operation succeeded: " .. tostring(result_or_err))
 end
--- Structured logging
-local logger = require("lib.tools.logging").get_logger("module_name")
-logger.info("Operation completed", {
-  duration = time_taken,
-  items = count
-})
--- Parser usage
-local parser = require("lib.tools.parser")
-local ast, err = parser.parse([[
-  local function test()
-    return true
-  end
-]])
--- File watching
-local watcher = require("lib.tools.watcher")
-watcher.watch("src/", {
-  patterns = { "*.lua" },
-  on_change = function(event)
-    if event.type == "modified" then
-      run_tests(event.path)
-    end
-  end
-})
+
+-- Some tools might provide objects or require configuration first
+-- e.g., local logger = require("lib.tools.logging").get_logger("my_component")
+-- logger:info("Starting process")
 ```
 
+## Related Components / Modules
 
+This directory contains the following primary utility modules:
 
-## Error Handling
+**Core Support:**
+- **`lib/tools/error_handler/knowledge.md`**: Provides the standardized error creation, handling (`try`, `safe_io_operation`), and logging framework used throughout Firmo.
+- **`lib/tools/filesystem/knowledge.md`**: Offers a cross-platform API for file and directory operations, including temporary file management for tests.
+- **`lib/tools/logging/knowledge.md`**: Implements the structured, leveled logging system used for diagnostics and reporting.
+- **`lib/tools/utils/knowledge.md`**: General utility functions, including `try_require`.
 
+**Framework Interaction:**
+- **`lib/tools/cli/knowledge.md`**: Handles parsing of command-line arguments for the main `test.lua` script and orchestrates different execution modes.
+- **`lib/tools/discover/knowledge.md`**: Implements the logic for finding test files based on configured patterns and rules.
+- **`lib/tools/interactive/knowledge.md`**: Provides the interactive REPL mode (`--interactive`) for running tests and managing the environment dynamically.
+- **`lib/tools/watcher/knowledge.md`**: Implements file watching capabilities used by the `--watch` mode to trigger test reruns on changes.
 
+**Data Handling:**
+- **`lib/tools/json/knowledge.md`**: Provides basic JSON encoding and decoding functionality (with limitations).
+- **`lib/tools/hash/knowledge.md`**: Offers fast, non-cryptographic hashing (FNV-1a) for strings and files.
+- **`lib/tools/parser/knowledge.md`**: Contains utilities for parsing Lua code into an Abstract Syntax Tree (AST).
+- **`lib/tools/date/knowledge.md`**: A comprehensive library for date and time manipulation, parsing, formatting, and calculations.
 
-```lua
--- Standard error handling pattern
-local function safe_operation()
-  local success, result, err = error_handler.try(function()
-    return risky_operation()
-  end)
+**Developer Utilities:**
+- **`lib/tools/benchmark/knowledge.md`**: Includes tools for measuring the performance (time, basic memory) of Lua functions and generating large test suites for framework benchmarking.
+- **`lib/tools/codefix/knowledge.md`**: Integrates external tools (StyLua, Luacheck) and custom fixers for automated code quality checks and fixes.
+- **`lib/tools/markdown/knowledge.md`**: Contains utilities specifically for fixing or manipulating Markdown files (partially implemented).
+- **`lib/tools/test_helper/knowledge.md`**: Provides utility functions specifically designed to aid in writing Firmo tests themselves.
 
-  if not success then
-    logger.error("Operation failed", {
-      error = err,
-      category = err.category
-    })
-    return nil, err
-  end
+**Execution:**
+- **`lib/tools/parallel/knowledge.md`**: Contains logic related to running tests in parallel (partially implemented).
 
-  return result
-end
--- File operation error handling
-local function safe_file_operation(path)
-  if not fs.file_exists(path) then
-    return nil, error_handler.io_error(
-      "File not found",
-      { path = path }
-    )
-  end
+**External/Vendor:**
+- **`lib/tools/vendor/knowledge.md`**: Serves as a container for third-party libraries included directly in the source tree.
+  - **`lib/tools/vendor/lpeglabel/knowledge.md`**: Documentation for the included `lpeglabel` library (an extension for the LPeg parsing library).
 
-  local content, err = fs.read_file(path)
-  if not content then
-    return nil, err
-  end
+## Best Practices / Critical Rules
 
-  return content
-end
--- Resource cleanup
-local function with_temp_file(callback)
-  local path = fs.temp_file()
-  local result, err = error_handler.try(function()
-    return callback(path)
-  end)
-
-  fs.delete_file(path)
-
-  if not result then
-    return nil, err
-  end
-  return result
-end
-```
-
-
-
-## Critical Rules
-
-
-
-- Use error_handler for all errors
-- Validate all input parameters
-- Clean up resources properly
-- Log operations appropriately
-- Use filesystem module for files
-- Never use io.* directly
-- Always handle cleanup
-- Document public APIs
-- Test thoroughly
-- Monitor performance
-
-
-## Best Practices
-
-
-
-- Use structured logging
-- Handle all error cases
-- Clean up resources
-- Monitor performance
-- Document patterns
-- Test edge cases
-- Use helper functions
-- Keep focused
-- Follow patterns
-- Handle timeouts
-
-
-## Performance Tips
-
-
-
-- Check log levels
-- Use buffering
-- Clean up promptly
-- Monitor resources
-- Handle timeouts
-- Batch operations
-- Cache results
-- Stream large files
+When using modules from `lib/tools`:
+- **Prefer Tools Over Raw Functions:** Whenever a tool exists for a task (e.g., filesystem access, logging, error handling), prefer using the tool module over raw Lua functions like `io.*` or `os.*` to ensure consistency, cross-platform compatibility, and integration with framework features (like standardized error handling).
+- **Mandatory Error Handling:** Always assume functions from tool modules can fail. Check return values and handle potential errors, typically by wrapping calls in `error_handler.try` or, specifically for filesystem I/O, `error_handler.safe_io_operation`.
+- **Consult Specific Knowledge:** Before using a tool extensively, consult its dedicated `knowledge.md` file (linked above) to understand its full API, specific configuration options, potential limitations (e.g., JSON's Unicode support), and best practices related to that particular tool.

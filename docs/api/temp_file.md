@@ -164,7 +164,7 @@ local success, err = temp_file.remove("/path/to/file.txt")
 
 
 - `success` (boolean): Whether the file was successfully removed
-- `error` (string|nil): Error message if removal failed
+- `error` (table|nil): Error object if removal failed
 
 
 #### `temp_file.remove_directory(dir_path)`
@@ -187,7 +187,7 @@ local success, err = temp_file.remove_directory("/path/to/directory")
 
 
 - `success` (boolean): Whether the directory was successfully removed
-- `error` (string|nil): Error message if removal failed
+- `error` (table|nil): Error object if removal failed
 
 
 #### `temp_file.cleanup_test_context()`
@@ -307,10 +307,7 @@ local stats = temp_file.get_stats()
   - `files` (number): Number of registered files
   - `directories` (number): Number of registered directories
   - `resources_by_context` (table): Resources grouped by test context
-
-
 ## Integration with Test Framework
-
 
 The temp_file module is designed to integrate with the Firmo test framework to automatically track and clean up temporary resources.
 

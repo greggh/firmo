@@ -1,4 +1,14 @@
--- truthy_falsey_test.lua
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Truthy/Falsy Assertion Tests
+---
+--- This file tests the `expect(...).to.be_truthy()` assertion and its
+--- negation `expect(...).to_not.be_truthy()` against various Lua values,
+--- including `true`, `false`, `nil`, numbers (0 and non-zero), strings
+--- (empty and non-empty), and tables.
+--- It uses `test_helper.expect_error` to verify failure messages.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect

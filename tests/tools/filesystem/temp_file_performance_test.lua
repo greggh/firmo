@@ -1,4 +1,14 @@
--- Performance tests for temp_file module
+--- Temporary File Module Performance Tests
+---
+--- Evaluates the performance of the `lib.tools.filesystem.temp_file` module,
+--- focusing on the efficiency of creating and cleaning up large numbers of
+--- temporary files, directories, and complex nested structures. Uses a helper
+--- function (`measure_time`) to record and print execution times.
+--- Relies on `temp_file_integration` for initialization and `test_helper` for
+--- complex directory structure creation.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
@@ -12,9 +22,15 @@ local test_helper = require("lib.tools.test_helper")
 -- Compatibility function for table unpacking (works with both Lua 5.1 and 5.2+)
 local unpack_table = table.unpack or unpack
 
--- Helper function for measuring execution time
+--- Measures the execution time of a given function and prints the result.
+--- Uses `os.clock()` for timing.
+---@param operation_name string A descriptive name for the operation being measured.
+---@param func function The function to execute and time.
+---@param ... any Arguments to pass to the `func`.
+---@return number elapsed The elapsed time in seconds.
+---@return ... any The return values from the executed `func`.
+---@private
 local function measure_time(operation_name, func, ...)
-  local start_time = os.clock()
   local results = { func(...) }
   local end_time = os.clock()
   local elapsed = end_time - start_time

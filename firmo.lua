@@ -1,54 +1,67 @@
+--- Firmo Test Framework Main Module
+---
+--- This is the main entry point for the Firmo testing framework. It provides a comprehensive
+--- set of functions for defining, running, and reporting on tests in Lua projects.
+--- Firmo supports BDD-style nested test blocks, a fluent assertion API, setup/teardown
+--- hooks, mocking, asynchronous testing, code coverage, and more.
+---
+--- @module firmo
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 0.7.5
+
 ---@class firmo
----@field version string Version string from lib.core.version (read-only)
----@field level number Current depth level of test blocks for nested test structures
----@field passes number Number of passing tests in the current run
----@field errors number Number of failing tests in the current run
----@field skipped number Number of skipped tests in the current run
----@field befores table Setup hooks at each nesting level for test initialization
----@field afters table Teardown hooks at each nesting level for test cleanup
----@field active_tags table Tags being used for test filtering when using tag-based filtering
----@field current_tags table Tags for the current test block in the nesting hierarchy
----@field filter_pattern string|nil Pattern for filtering test names by regex pattern
----@field focus_mode boolean Whether any focused tests exist in the test suite
----@field async_options table Configuration options for async testing (timeout, interval, etc.)
----@field config table|nil Central configuration if available through central_config module
----@field _current_test_context table|nil Current test context for temp file tracking integration
----@field test_results table|nil Structured test results for reporting and analysis
----@field describe fun(name: string, fn: function, options?: {focused?: boolean, excluded?: boolean, _parent_focused?: boolean, tags?: string[]}): nil Create a test group that can contain nested tests and other groups
----@field fdescribe fun(name: string, fn: function): nil Create a focused test group (only focused tests will run)
----@field xdescribe fun(name: string, fn: function): nil Create a skipped test group (none of the contained tests will run)
----@field it fun(name: string, options_or_fn: table|function, fn?: function): nil Create a test case with optional configuration
----@field fit fun(name: string, options_or_fn: table|function, fn?: function): nil Create a focused test case (only focused tests will run)
----@field xit fun(name: string, options_or_fn: table|function, fn?: function): nil Create a skipped test case (will not run but reports as skipped)
----@field before fun(fn: function): nil Add a setup hook for the current test block that runs before each test
----@field after fun(fn: function): nil Add a teardown hook for the current test block that runs after each test
----@field pending fun(message?: string): string Mark a test as pending with an optional explanation message
----@field expect fun(value: any): ExpectChain Create an assertion chain that allows chaining various assertions
----@field assert table Backward compatibility assertion interface for older tests (deprecated)
----@field tags fun(...: string): firmo Set tags for the current describe block or test for filtering
----@field nocolor fun(): nil Disable colors in the output for CI environments or logs
----@field only_tags fun(...: string): firmo Filter tests to run only those with specified tags
----@field set_filter fun(pattern: string): firmo Set a pattern filter for test names
----@field discover fun(dir?: string, pattern?: string): table, table|nil Discover test files in a directory
----@field run_file fun(file: string): table, table|nil Run a single test file with full lifecycle management
----@field run_discovered fun(dir?: string, pattern?: string): boolean, table|nil Run all discovered test files
----@field cli_run fun(args?: table): boolean Run tests from command line arguments with options
----@field report fun(name?: string, options?: table): table Generate a test report in various formats
----@field reset fun(): nil Reset the test state completely for a fresh test run
----@field get_current_test_context fun(): table|nil Get the current test context for temp file tracking
----@field get_structured_results fun(): table Get structured test results for reporting
----@field get_coverage fun(): table|nil Get code coverage data for tests (when coverage module is loaded)
----@field get_quality fun(): table|nil Get quality metrics for tests (when quality module is loaded)
----@field watch fun(dir: string, pattern?: string): nil Watch for file changes and run tests automatically
----@field mock fun(target: table, method_or_options?: string|table, impl_or_value?: any): table|nil, table|nil Create a mock object or method
----@field spy fun(target: table|function, method?: string): table|nil, table|nil Create a spy on an object method or function
----@field stub fun(value_or_fn?: any): table|nil, table|nil Create a stub that returns a value or executes a function
----@field with_mocks fun(fn: function): any Execute a function with automatic mock cleanup
----@field async fun(fn: function): function Convert a function to one that can be executed asynchronously
----@field await fun(ms: number): nil Wait for a specified time in milliseconds
----@field wait_until fun(condition: function, timeout?: number, check_interval?: number): boolean Wait until a condition is true or timeout occurs
----@field parallel_async fun(operations: table, timeout?: number): table Run multiple async operations concurrently
----@field configure_async fun(options: {timeout?: number, interval?: number}): firmo Configure async testing options
+---@field version string Version string from `lib.core.version` (read-only).
+---@field level number Current nesting level of `describe` blocks. Internal state.
+---@field passes number Count of passing tests in the current run. Internal state.
+---@field errors number Count of failing tests in the current run. Internal state.
+---@field skipped number Count of skipped tests in the current run. Internal state.
+---@field befores table Table storing `before` hooks per nesting level. Internal state.
+---@field afters table Table storing `after` hooks per nesting level. Internal state.
+---@field active_tags table Table storing tags currently being filtered for. Internal state.
+---@field current_tags table Table storing tags applied to the current `describe` block. Internal state.
+---@field filter_pattern string|nil Lua pattern used to filter tests by name. Internal state.
+---@field focus_mode boolean Flag indicating if any focused tests/suites (`fit`/`fdescribe`) exist. Internal state.
+---@field async_options table Configuration options for the async module (e.g., `{timeout = 5000}`).
+---@field config table|nil Reference to the `lib.core.central_config` module instance, if loaded.
+---@field _current_test_context table|nil Internal context for the currently running test or file (used by temp file integration).
+---@field test_results table|nil Structured results gathered during the test run. Internal state, accessed via `get_structured_results`.
+---@field describe fun(name: string, fn: function, options?: {focused?: boolean, excluded?: boolean, _parent_focused?: boolean, tags?: string[]}): nil Defines a test group (suite) that can contain tests (`it`) and nested groups.
+---@field fdescribe fun(name: string, fn: function): nil Defines a focused test group. If any focused groups/tests exist, only they will be run.
+---@field xdescribe fun(name: string, fn: function): nil Defines a skipped test group. All tests and hooks within this group will be skipped.
+---@field it fun(name: string, options_or_fn: table|function, fn?: function): nil Defines an individual test case. Can accept options like `{focus=true, tags={...}}` or just the test function.
+---@field fit fun(name: string, options_or_fn: table|function, fn?: function): nil Defines a focused test case. If any focused groups/tests exist, only they will be run.
+---@field xit fun(name: string, options_or_fn: table|function, fn?: function): nil Defines a skipped test case. It will not be run but will be reported as skipped.
+---@field before fun(fn: function): nil Registers a setup function to run before each test within the current `describe` block and any nested blocks.
+---@field after fun(fn: function): nil Registers a teardown function to run after each test within the current `describe` block and any nested blocks.
+---@field pending fun(message?: string): string Marks a test case (`it`) as pending (not yet implemented or temporarily disabled). Throws a specific error to signal this state.
+---@field expect fun(value: any): ExpectChain Starts an assertion chain for the given value. See `lib.assertion` for available matchers.
+---@field assert table Deprecated. Provides a basic `assert.equals` function for limited backward compatibility. Use `expect()` instead.
+---@field tags fun(...: string): firmo Applies one or more string tags to the current `describe` block. Used for filtering tests via `only_tags`.
+---@field nocolor fun(): nil Disables ANSI color codes in the runner's output. Useful for CI logs.
+---@field only_tags fun(...: string): firmo Sets tags for filtering. Only tests belonging to `describe` blocks matching *all* of these tags will run.
+---@field set_filter fun(pattern: string): firmo Deprecated. Sets a Lua pattern to filter tests by name. Use `cli_run` with `--pattern` argument instead.
+---@field discover fun(dir?: string, pattern?: string): table, table|nil Discovers test files matching a pattern within a directory (uses `lib.tools.discover`).
+---@field run_file fun(file: string): table, table|nil Runs tests defined in a single file (uses `lib.core.runner`).
+---@field run_discovered fun(dir?: string, pattern?: string): boolean, table|nil Discovers and runs all test files matching a pattern (uses `lib.core.runner`).
+---@field cli_run fun(args?: table): boolean Parses command-line arguments and runs tests accordingly (uses `lib.tools.cli`). Main entry point for `test.lua`.
+---@field report fun(name?: string, options?: table): table Generates test reports in various formats (depends on `lib.reporting` module).
+---@field reset fun(): nil Resets the internal state of the test framework (`passes`, `errors`, `hooks`, etc.) (uses `lib.core.test_definition`).
+---@field get_current_test_context fun(): table|nil Gets the context object for the currently running test (used by `lib.tools.filesystem.temp_file_integration`).
+---@field get_structured_results fun(): table Gets the raw, structured test results collected during the run (used by `lib.reporting`).
+---@field get_coverage fun(): table|nil Gets code coverage data collected during the run (depends on `lib.coverage` module).
+---@field get_quality fun(): table|nil Gets test quality metrics calculated during the run (depends on `lib.quality` module).
+---@field watch fun(dir: string, pattern?: string): nil Starts file watching mode to automatically re-run tests on changes (depends on `lib.tools.watcher` module).
+---@field mock fun(target: table, method_or_options?: string|table, impl_or_value?: any): table|nil, table|nil Creates a mock object or replaces methods with mocks (depends on `lib.mocking` module).
+---@field spy fun(target: table|function, method?: string): table|nil, table|nil Creates a spy on a function or object method to track calls (depends on `lib.mocking` module).
+---@field stub fun(value_or_fn?: any): table|nil, table|nil Creates a stub function that returns a value or executes a given function (depends on `lib.mocking` module).
+---@field with_mocks fun(fn: function): any Executes a function and automatically cleans up any mocks created within it (depends on `lib.mocking` module).
+---@field async fun(fn: function): function Wraps a function to run in a managed coroutine, enabling `await` and `wait_until` (depends on `lib.async` module).
+---@field await fun(ms: number): nil Pauses execution within an `async` function for a specified duration (uses `lib.async`).
+---@field wait_until fun(condition: function, timeout?: number, check_interval?: number): boolean Pauses execution within an `async` function until a condition returns true or a timeout occurs (uses `lib.async`).
+---@field parallel_async fun(operations: table, timeout?: number): table Runs multiple async operations concurrently within an `async` function (uses `lib.async`).
+---@field configure_async fun(options: {timeout?: number, interval?: number}): firmo Configures global options for the async module (e.g., default timeout).
 
 -- firmo v0.7.5 - Enhanced Lua test framework
 -- https://github.com/greggh/firmo
@@ -68,142 +81,122 @@
 -- * Watch mode for continuous testing
 
 -- Load required modules directly (without try/catch - these are required)
-local error_handler = require("lib.tools.error_handler")
-local assertion = require("lib.assertion")
+local error_handler
+local assertion = require("lib.assertion") -- Assertion is critical, load directly
 
---- Safely require a module without raising an error if it doesn't exist
----@param name string The name of the module to require
----@return table|nil The loaded module or nil if it couldn't be loaded
-local function try_require(name)
-  ---@diagnostic disable-next-line: unused-local
-  local success, mod, err = error_handler.try(function()
-    return require(name)
-  end)
+--- gets the error handler for the filesystem module
+local function get_error_handler()
+  if not error_handler then
+    error_handler = require("lib.tools.error_handler")
+  end
+  return error_handler
+end
 
-  if success then
-    return mod
-  else
-    -- Only log errors for modules that should exist but failed to load
-    -- (Don't log errors for optional modules that might not exist)
-    if name:match("^lib%.") then
-      -- This is an internal module that should exist
-      local logger = error_handler.get_logger and error_handler.get_logger() or nil
-      -- We can't use the centralized logger here because this function runs before
-      -- we load the logger module. This would create a circular dependency, so we
-      -- need to keep the conditional check in this specific place.
-      if logger then
-        logger.warn("Failed to load module", {
-          module = name,
-          error = error_handler.format_error(mod),
-        })
-      end
-    end
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
     return nil
   end
+  return result
 end
 
--- Load filesystem module (required for basic operations)
-local fs = try_require("lib.tools.filesystem")
-if not fs then
-  error_handler.throw(
-    "Required module 'lib.tools.filesystem' could not be loaded",
-    error_handler.CATEGORY.CONFIGURATION,
-    error_handler.SEVERITY.FATAL,
-    { module = "firmo" }
-  )
+-- Define essential modules required for Firmo core functionality
+local essential_modules = {
+  "lib.tools.filesystem",
+  "lib.tools.logging",
+  "lib.core.version",
+  "lib.core.test_definition",
+  "lib.tools.cli",
+  "lib.tools.discover",
+  "lib.core.runner",
+  "lib.coverage",
+  "lib.quality",
+  "lib.tools.codefix",
+  "lib.tools.parser",
+  "lib.tools.json",
+  "lib.tools.watcher",
+  "lib.core.type_checking", -- Corrected path
+  "lib.async",
+  "lib.reporting",
+  "lib.tools.interactive",
+  "lib.tools.parallel",
+  "lib.mocking",
+  "lib.core.central_config",
+  "lib.core.module_reset",
+  "lib.tools.filesystem.temp_file_integration",
+}
+
+-- Local variables for loaded modules
+local fs, logging, version, test_definition, cli_module, discover_module, runner_module
+local coverage, quality, codefix, parser, json, watcher, type_checking, async_module, temp_file_integration
+local reporting, interactive, parallel_module, mocking_module, central_config, module_reset_module
+
+-- Load essential modules using the safe utility
+local loaded_modules_status = {} -- Store status for logging
+for _, module_name in ipairs(essential_modules) do
+  local mod = try_require(module_name)
+
+  -- Assign to specific local variables based on module name
+  if module_name == "lib.tools.filesystem" then
+    fs = mod
+  elseif module_name == "lib.tools.logging" then
+    logging = mod
+  elseif module_name == "lib.core.version" then
+    version = mod
+  -- assertion is loaded directly above
+  elseif module_name == "lib.core.test_definition" then
+    test_definition = mod
+  elseif module_name == "lib.tools.cli" then
+    cli_module = mod
+  elseif module_name == "lib.tools.discover" then
+    discover_module = mod
+  elseif module_name == "lib.core.runner" then
+    runner_module = mod
+  elseif module_name == "lib.coverage" then
+    coverage = mod
+  elseif module_name == "lib.quality" then
+    quality = mod
+  elseif module_name == "lib.tools.codefix" then
+    codefix = mod
+  elseif module_name == "lib.tools.parser" then
+    parser = mod
+  elseif module_name == "lib.tools.json" then
+    json = mod
+  elseif module_name == "lib.tools.watcher" then
+    watcher = mod
+  elseif module_name == "lib.core.type_checking" then
+    type_checking = mod -- Corrected path
+  elseif module_name == "lib.async" then
+    async_module = mod
+  elseif module_name == "lib.reporting" then
+    reporting = mod
+  elseif module_name == "lib.tools.interactive" then
+    interactive = mod
+  elseif module_name == "lib.tools.parallel" then
+    parallel_module = mod
+  elseif module_name == "lib.mocking" then
+    mocking_module = mod
+  elseif module_name == "lib.core.central_config" then
+    central_config = mod
+  elseif module_name == "lib.core.module_reset" then
+    module_reset_module = mod
+  elseif module_name == "lib.tools.filesystem.temp_file_integration" then
+    temp_file_integration = mod
+  end
+  loaded_modules_status[module_name] = true -- Mark as loaded successfully
 end
 
--- Load logging module (required for proper error reporting)
-local logging = try_require("lib.tools.logging")
-if not logging then
-  error_handler.throw(
-    "Required module 'lib.tools.logging' could not be loaded",
-    error_handler.CATEGORY.CONFIGURATION,
-    error_handler.SEVERITY.FATAL,
-    { module = "firmo" }
-  )
-end
-
--- Load version module
-local version = try_require("lib.core.version")
-if not version then
-  error_handler.throw(
-    "Required module 'lib.core.version' could not be loaded",
-    error_handler.CATEGORY.CONFIGURATION,
-    error_handler.SEVERITY.FATAL,
-    { module = "firmo" }
-  )
-end
-
+-- Configure logging (MUST happen after logging module is loaded)
 ---@diagnostic disable-next-line: need-check-nil
 local logger = logging.get_logger("firmo-core")
 
--- Import required modules for modular architecture
-local test_definition = try_require("lib.core.test_definition")
-local cli_module = try_require("lib.tools.cli")
-local discover_module = try_require("lib.tools.discover")
-local runner_module = try_require("lib.core.runner")
-local coverage = try_require("lib.coverage")
-local quality = try_require("lib.quality")
-local codefix = try_require("lib.tools.codefix")
-local reporting = try_require("lib.reporting")
-local watcher = try_require("lib.tools.watcher")
-local json = try_require("lib.reporting.json")
-local type_checking = try_require("lib.core.type_checking")
-local async_module = try_require("lib.async")
-local interactive = try_require("lib.tools.interactive")
-local parallel_module = try_require("lib.tools.parallel")
--- Load mocking module for spy, stub and mock functionality
-local mocking_module = try_require("lib.mocking")
--- Use central_config for configuration
-local central_config = try_require("lib.core.central_config")
-local module_reset_module = try_require("lib.core.module_reset")
-
--- Configure logging (now a required component)
-local success, err = error_handler.try(function()
-  ---@diagnostic disable-next-line: need-check-nil
-  logging.configure_from_config("firmo-core")
-end)
-
-if not success then
-  local context = {
-    module = "firmo-core",
-    operation = "configure_logging",
-  }
-
-  -- Log warning but continue - configuration might fail but logging still works
-  logger.warn("Failed to configure logging", {
-    error = error_handler.format_error(err),
-    context = context,
-  })
-end
-
-logger.debug("Logging system initialized", {
+-- Log initial status and loaded modules
+logger.debug("Firmo core initialization complete", {
   module = "firmo-core",
-  modules_loaded = {
-    error_handler = error_handler ~= nil,
-    filesystem = fs ~= nil,
-    logging = logging ~= nil,
-    version = version ~= nil,
-    assertion = assertion ~= nil,
-    test_definition = test_definition ~= nil,
-    cli = cli_module ~= nil,
-    discover = discover_module ~= nil,
-    runner = runner_module ~= nil,
-    coverage = coverage ~= nil,
-    quality = quality ~= nil,
-    codefix = codefix ~= nil,
-    reporting = reporting ~= nil,
-    watcher = watcher ~= nil,
-    async = async_module ~= nil,
-    interactive = interactive ~= nil,
-    parallel = parallel_module ~= nil,
-    mocking = mocking_module ~= nil,
-    central_config = central_config ~= nil,
-    module_reset = module_reset_module ~= nil,
-    type_checking = type_checking ~= nil,
-    json = json ~= nil,
-  },
+  firmo_version = version and version.string or "unknown",
+  modules_loaded = loaded_modules_status, -- Use the status table from the loop
 })
 
 -- Initialize the firmo table
@@ -270,8 +263,11 @@ if test_definition then
   firmo.reset = test_definition.reset
 
   -- Sync the state fields
-  --- Synchronize test state fields from test_definition module to firmo table
+  --- Synchronizes internal state fields (counters, flags) from the `test_definition` module
+  --- to the main `firmo` table for exposure via the API.
+  --- Called internally after test definition functions update the state.
   ---@return nil
+  ---@private
   local function sync_state()
     local state = test_definition.get_state()
     firmo.level = state.level
@@ -329,8 +325,10 @@ if async_module then
   end
 else
   -- Define stub functions for when the module isn't available
-  --- Error function that throws when async functions are called without the async module
-  ---@return nil Never returns, always throws an error
+  --- Placeholder function that throws an error when an async feature is used but the `lib.async` module is not available.
+  ---@return nil This function never returns normally.
+  ---@throws string Always throws an error indicating the async module is missing.
+  ---@private
   local function async_error()
     error("Async module not available. Make sure lib/async.lua exists.", 2)
   end
@@ -369,7 +367,7 @@ if mocking_module then
   local success, err = mocking_module.ensure_assertions(firmo)
   if not success then
     logger.warn("Failed to register mocking assertions", {
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
       module = "firmo-core",
     })
   end
@@ -416,7 +414,10 @@ local module = setmetatable({
   interactive = interactive,
 
   --- Global exposure utility for easier test writing
-  ---@return firmo The firmo module
+  --- Exports core Firmo functions (describe, it, expect, etc.) to the global namespace (`_G`).
+  --- Makes test writing more concise by avoiding the need for `firmo.` prefixes.
+  --- Use with caution as it pollutes the global namespace.
+  ---@return firmo The `firmo` module instance (for potential chaining, though unlikely here).
   expose_globals = function()
     -- Test building blocks
     _G.describe = firmo.describe
@@ -458,9 +459,14 @@ local module = setmetatable({
 
   -- Main entry point when called
   ---@diagnostic disable-next-line: unused-vararg
-  ---@param _ table The module itself
-  ---@param ... any Arguments passed to the module
-  ---@return firmo The firmo module
+  --- Metamethod allowing the module table to be called like a function.
+  --- Determines if Firmo is being run directly from the command line (e.g., `lua firmo.lua ...`)
+  --- or being required (`require("firmo")`).
+  --- If run directly, it invokes the CLI handler. If required, it returns the `firmo` API table.
+  ---@param _ table The module table itself (conventionally ignored).
+  ---@param ... any Command-line arguments if run directly via `lua firmo.lua ...`.
+  ---@return firmo The `firmo` API table if required as a module. This function calls `os.exit` if run directly.
+  ---@private Used internally to control module execution behavior.
   __call = function(_, ...)
     -- Check if we are running tests directly or just being required
     local info = debug.getinfo(2, "S")
@@ -494,33 +500,29 @@ if module_reset_module then
   module_reset_module.register_with_firmo(firmo)
 end
 
--- Try to load temp_file_integration if available
-local temp_file_integration_loaded, temp_file_integration = pcall(require, "lib.tools.filesystem.temp_file_integration")
-if temp_file_integration_loaded and temp_file_integration then
-  -- Initialize the temp file integration system
-  logger.info("Initializing temp file integration system")
+-- Initialize the temp file integration system
+logger.info("Initializing temp file integration system")
 
-  -- Initialize integration with explicit firmo instance
-  temp_file_integration.initialize(firmo)
+-- Initialize integration with explicit firmo instance
+temp_file_integration.initialize(firmo)
 
-  -- Add getter/setter for current test context
-  --- Get the current test context for temp file tracking
-  ---@return table|nil The current test context or nil if not set
-  firmo.get_current_test_context = function()
-    return firmo._current_test_context
-  end
+-- Add getter/setter for current test context
+--- Gets the context object for the currently running test or file.
+--- Used by the temp file integration (`lib.tools.filesystem.temp_file_integration`)
+--- to associate temporary files with specific tests for automatic cleanup.
+--- The context is typically set by the test runner.
+---@return table|nil context The context object (e.g., `{type="test", name="...", file="..."}` or `{type="file", file="..."}`), or `nil` if no context is set.
+firmo.get_current_test_context = function()
+  return firmo._current_test_context
+end
 
-  --- Set the current test context for temp file tracking
-  ---@param context table|nil The test context to set
-  ---@return nil
-  firmo.set_current_test_context = function(context)
-    firmo._current_test_context = context
-  end
-else
-  logger.debug("Temp file integration not available", {
-    reason = "Module not loaded or not found",
-    status = "using fallback cleanup",
-  })
+--- Sets the context object for the currently running test or file.
+--- Called internally by the test runner or other framework components.
+---@param context table|nil The context object to set, or `nil` to clear the context.
+---@return nil
+---@private Should only be called by internal Firmo modules like the runner or temp file integration.
+firmo.set_current_test_context = function(context)
+  firmo._current_test_context = context
 end
 
 return module

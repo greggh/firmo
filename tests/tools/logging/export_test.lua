@@ -1,9 +1,21 @@
--- Logging Export Module Tests
--- Tests for the log export module functionality
+--- Logging Export Module Tests
+---
+--- Verifies the functionality of the log export module (`lib.tools.logging.export`), including:
+--- - Listing supported export platforms.
+--- - Formatting log entries for various platforms (Logstash, Elasticsearch, Splunk, Datadog).
+--- - Creating platform-specific configuration files (`create_platform_config`).
+--- - Converting log files into platform-specific formats (`create_platform_file`).
+--- - Creating real-time log exporters (`create_realtime_exporter`).
+--- - Graceful handling of invalid platform names.
+--- Uses `before` hook to create sample log data and `test_helper` for temporary files.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
+
 local log_export = require("lib.tools.logging.export")
 local fs = require("lib.tools.filesystem")
 local temp_file = require("lib.tools.filesystem.temp_file")

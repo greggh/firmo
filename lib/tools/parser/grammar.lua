@@ -1,29 +1,73 @@
---[[
-This module implements a parser for Lua 5.3/5.4 with LPeg,
-and generates an Abstract Syntax Tree.
+--- LPeg Grammar for Lua 5.3/5.4 Parser
+---
+--- This module implements a parser for Lua 5.3/5.4 using LPegLabel,
+--- generating an Abstract Syntax Tree (AST).
+--- Based on lua-parser by Andre Murbach Maidl (https://github.com/andremm/lua-parser).
+---
+--- @module lib.tools.parser.grammar
+--- @author Andre Murbach Maidl (original), Firmo Team (adaptations)
+--- @license MIT
+--- @copyright 2023-2025 Firmo Team, Andre Murbach Maidl (original)
+--- @version 1.0.0
 
-Based on lua-parser by Andre Murbach Maidl (https://github.com/andremm/lua-parser)
-]]
-
----@class parser.grammar
----@field _VERSION string Module version
----@field parser fun(subject: string, filename?: string): table|nil, table? Parse Lua code into an abstract syntax tree
----@field error_labels table<string, string> Table mapping error label names to error messages
----@field compile_grammar fun(options?: {annotate_positions?: boolean, label_errors?: boolean, extract_comments?: boolean}): table Compile the Lua grammar with the specified options
----@field extract_comments fun(subject: string): table<number, {line: number, text: string, type: string}> Extract comments from Lua source code
----@field parse_expression fun(subject: string): table|nil, table? Parse a Lua expression (not a full chunk)
----@field tokenize fun(subject: string): table<number, {type: string, value: string, line: number, col: number}> Split Lua code into tokens
-
-local logging = require("lib.tools.logging")
-
--- Initialize module logger
-local logger = logging.get_logger("grammar")
-logging.configure_from_config("grammar")
+---@class parser.grammar The API for the Lua grammar parser.
+---@field _VERSION string Module version.
+---@field parse fun(subject: string, filename?: string): table|nil, string? Parses a Lua code string into an AST table. Returns `ast_table, nil` on success, or `nil, error_message` on syntax error.
 
 local M = {
   -- Module version
   _VERSION = "1.0.0",
 }
+
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _logging
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("grammar")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
 
 -- UTF-8 char polyfill for pre-5.3 Lua versions
 -- Based on PR #19 from lua-parser: https://github.com/andremm/lua-parser/pull/19
@@ -88,11 +132,11 @@ local alpha, digit, alnum = lpeg.alpha, lpeg.digit, lpeg.alnum
 local xdigit = lpeg.xdigit
 local space = lpeg.space
 
--- Error message auxiliary functions
+--- Mapping of internal error labels to user-friendly error messages.
+---@private
 local labels = {
   { "ErrExtra", "unexpected character(s), expected EOF" },
   { "ErrInvalidStat", "unexpected token, invalid start of statement" },
-
   { "ErrEndIf", "expected 'end' to close the if statement" },
   { "ErrExprIf", "expected a condition after 'if'" },
   { "ErrThenIf", "expected 'then' after the condition" },
@@ -180,10 +224,15 @@ local labels = {
   { "ErrCloseLStr", "unclosed long string" },
 }
 
+--- Generates an LPeg error pattern (`T(index)`).
+--- Finds the index corresponding to the `Err` + `label` key in the `labels` table.
+---@param label string Error label suffix (e.g., "Extra", "InvalidStat").
+---@return table LPeg error pattern `T(i)`.
+---@private
+---@throws error If the combined label (`Err` + `label`) is not found in the `labels` table.
 local function throw(label)
   label = "Err" .. label
-
-  logger.debug("Throwing syntax error", {
+  get_logger().debug("Throwing syntax error", {
     label = label,
   })
 
@@ -193,43 +242,85 @@ local function throw(label)
     end
   end
 
-  logger.error("Error label not found", {
+  get_logger().error("Error label not found", {
     requested_label = label,
   })
 
   error("Label not found: " .. label)
 end
 
+--- Creates an LPeg pattern that expects `patt`, otherwise throws error `label`.
+--- Equivalent to `patt + throw(label)`.
+---@param patt table LPeg pattern to expect.
+---@param label string Error label suffix to throw if `patt` doesn't match.
+---@return table LPeg pattern.
+---@private
 local function expect(patt, label)
   return patt + throw(label)
 end
 
--- Regular combinators and auxiliary functions
+--- Creates an LPeg pattern that matches `patt` followed by optional whitespace/comments (`V("Skip")`).
+--- Used for matching tokens like identifiers, numbers, strings, symbols.
+---@param patt table LPeg pattern representing the core token.
+---@return table LPeg pattern for the token including optional skip pattern.
+---@private
 local function token(patt)
   return patt * V("Skip")
 end
 
+--- Creates an LPeg pattern for a specific symbol (e.g., "(", ")", ",", "=").
+--- Uses `token()` to handle surrounding whitespace/comments.
+---@param str string The symbol string.
+---@return table LPeg pattern for the symbol token.
+---@private
 local function sym(str)
   return token(P(str))
 end
 
+--- Creates an LPeg pattern for a specific keyword (e.g., "if", "then", "end").
+--- Ensures the keyword is not followed by identifier characters (`V("IdRest")`) to avoid matching prefixes of identifiers.
+---@param str string The keyword string.
+---@return table LPeg pattern for the keyword token.
+---@private
 local function kw(str)
   return token(P(str) * -V("IdRest"))
 end
 
+--- Simple decrement function for use with LPeg position captures (`Cp()`).
+---@param n number The number (position) to decrement.
+---@return number n-1.
+---@private
 local function dec(n)
   return n - 1
 end
 
+--- Creates an LPeg pattern that captures a structure tagged with `tag` and includes start (`pos`) and end (`end_pos`) positions.
+--- Uses `Ct` to create a table, `Cg` to capture groups named `pos`, `tag`, the `patt` result, and `end_pos`.
+---@param tag string The tag name for the captured structure (e.g., "Block", "If", "Number").
+---@param patt table The LPeg pattern to capture.
+---@return table LPeg capture pattern generating `{ tag = tag, pos = start_pos, ...patt_results..., end_pos = end_pos }`.
+---@private
 local function tagC(tag, patt)
   ---@diagnostic disable-next-line: redundant-parameter
   return Ct(Cg(Cp(), "pos") * Cg(Cc(tag), "tag") * patt * Cg(Cp() / dec, "end_pos"))
 end
 
+--- Creates an AST node table for a unary operation.
+---@param op string The unary operator (e.g., "not", "-", "#").
+---@param e table The operand expression AST node.
+---@return table The unary operation AST node: `{ tag = "Op", pos, end_pos, [1] = op, [2] = e }`.
+---@private
 local function unaryOp(op, e)
   return { tag = "Op", pos = e.pos, end_pos = e.end_pos, [1] = op, [2] = e }
 end
 
+--- Creates an AST node table for a binary operation, handling left-associativity.
+--- If `op` is nil, it means only one operand was parsed, so it returns that operand directly.
+---@param e1 table The left operand expression AST node.
+---@param op string|nil The binary operator (e.g., "+", "-", "and") or nil if no operator followed `e1`.
+---@param e2 table|nil The right operand expression AST node (only present if `op` is not nil).
+---@return table The binary operation AST node `{ tag = "Op", pos, end_pos, [1] = op, [2] = e1, [3] = e2 }`, or just `e1` if `op` is nil.
+---@private
 local function binaryOp(e1, op, e2)
   if not op then
     return e1
@@ -238,6 +329,13 @@ local function binaryOp(e1, op, e2)
   end
 end
 
+--- Creates an LPeg pattern for a list of `patt` separated by `sep`.
+--- Captures the elements into a sequence table. Expects `patt` after each `sep`.
+---@param patt table LPeg pattern for the list element.
+---@param sep table LPeg pattern for the separator.
+---@param label? string Optional error label suffix to throw if `patt` is missing after `sep`.
+---@return table LPeg pattern capturing a sequence of elements.
+---@private
 local function sepBy(patt, sep, label)
   if label then
     return patt * Cg(sep * expect(patt, label)) ^ 0
@@ -246,27 +344,56 @@ local function sepBy(patt, sep, label)
   end
 end
 
--- Helper function to prevent subcapture nesting too deep errors
--- Based on PR #21 from lua-parser: https://github.com/andremm/lua-parser/pull/21
--- This addresses an issue with parsing deeply nested tables (>16 levels)
+--- LPeg capture function used with `Cmt` to prevent excessive subcapture nesting errors
+--- by effectively "cutting" the capture history at this point. Used in `chainOp`.
+---@param s string The subject string (unused).
+---@param idx number The current position.
+---@param match any The captured value.
+---@return number idx The current position.
+---@return any match The captured value.
+---@private
 local function cut(s, idx, match)
   return idx, match
 end
 
+--- Creates an LPeg pattern for left-associative binary operators.
+--- Uses `sepBy` to match operands (`patt`) separated by operators (`sep`),
+--- folds the results using `binaryOp`, and uses `cut` to prevent deep nesting errors.
+---@param patt table LPeg pattern for the operands.
+---@param sep table LPeg pattern for the operators.
+---@param label? string Optional error label suffix if operand is missing after operator.
+---@return table LPeg pattern that generates a nested binary operation AST.
+---@private
 local function chainOp(patt, sep, label)
   ---@diagnostic disable-next-line: redundant-parameter
   return Cmt(Cf(sepBy(patt, sep, label), binaryOp), cut)
 end
 
+--- Creates an LPeg pattern for a comma-separated list of `patt`.
+--- Uses `sepBy` with a comma symbol.
+---@param patt table LPeg pattern for the list element.
+---@param label? string Optional error label suffix if element is missing after comma.
+---@return table LPeg pattern capturing a sequence of elements.
+---@private
 local function commaSep(patt, label)
   return sepBy(patt, sym(","), label)
 end
 
+--- Tags a captured block AST node (from a `do...end` statement) with the "Do" tag.
+---@param block table The captured block AST node.
+---@return table The modified block AST node with `tag = "Do"`.
+---@private
 local function tagDo(block)
   block.tag = "Do"
   return block
 end
 
+--- Adjusts the AST for a function statement (`FuncStat`) or local function (`LocalFunc`).
+--- Inserts "self" as the first parameter if it's a method definition (`:name`).
+--- Wraps the function name and parameters list in extra tables for consistent AST structure.
+---@param func table The raw function AST captured by `FuncStat` or `LocalFunc`.
+---@return table The adjusted function AST node.
+---@private
 local function fixFuncStat(func)
   if func[1].is_method then
     table.insert(func[2][1], 1, { tag = "Id", [1] = "self" })
@@ -276,6 +403,11 @@ local function fixFuncStat(func)
   return func
 end
 
+--- Adds the "..." (varargs) AST node to the parameter list if present.
+---@param params table The table of parameter AST nodes.
+---@param dots? table The optional "..." AST node.
+---@return table params The potentially modified parameter list.
+---@private
 local function addDots(params, dots)
   if dots then
     table.insert(params, dots)
@@ -283,10 +415,22 @@ local function addDots(params, dots)
   return params
 end
 
+--- Creates an AST node for an index operation (e.g., `t.field`, `t["key"]`).
+--- Used when folding dot-separated names in `FuncName`.
+---@param t table The table/prefix expression AST node.
+---@param index table The index expression AST node (usually a "String" tag).
+---@return table The index operation AST node: `{ tag = "Index", pos, end_pos, [1] = t, [2] = index }`.
+---@private
 local function insertIndex(t, index)
   return { tag = "Index", pos = t.pos, end_pos = index.end_pos, [1] = t, [2] = index }
 end
 
+--- Creates an AST node for a method name in a function definition (`function obj:name(...)`).
+--- Marks the node with `is_method = true` for later processing (adding "self").
+---@param t table The table/prefix expression AST node (object).
+---@param method table|nil The method name AST node (usually "String") or nil if not a method definition.
+---@return table The original `t` node, or a new "Index" node marked as a method: `{ tag = "Index", pos, end_pos, is_method = true, [1] = t, [2] = method }`.
+---@private
 local function markMethod(t, method)
   if method then
     return { tag = "Index", pos = t.pos, end_pos = method.end_pos, is_method = true, [1] = t, [2] = method }
@@ -294,6 +438,12 @@ local function markMethod(t, method)
   return t
 end
 
+--- Combines a primary expression (`t1`) with a suffix (`t2`) which can be an index (`.`, `[]`), a call (`()`, `{}`), or a method call (`:`).
+--- Constructs the appropriate AST node ("Index", "Call", "Invoke").
+---@param t1 table The base expression AST node (e.g., variable, function call).
+---@param t2 table The suffix AST node (e.g., from `Index` or `Call` rules).
+---@return table The combined AST node.
+---@private
 local function makeIndexOrCall(t1, t2)
   if t2.tag == "Call" or t2.tag == "Invoke" then
     local t = { tag = t2.tag, pos = t1.pos, end_pos = t2.end_pos, [1] = t1 }
@@ -520,6 +670,12 @@ local G = {
 }
 
 -- Helper function to calculate line number and column
+--- Calculates the line number and column for a given character position in a string.
+---@param subject string The source code string.
+---@param pos number The character position (1-based).
+---@return number line Line number (1-based).
+---@return number col Column number (1-based).
+---@private
 local function calcline(subject, pos)
   if pos > #subject then
     pos = #subject
@@ -534,12 +690,18 @@ local function calcline(subject, pos)
   return line, pos - linestart + 1
 end
 
--- Create an error message for the input string
+--- Formats a syntax error message including filename, line, column, and the specific error detail.
+--- Also logs the error using the module's get_logger().
+---@param errorinfo {subject: string, filename: string} Table containing the source string and filename.
+---@param pos number The character position (1-based) where the error occurred.
+---@param msg string The specific error message detail (from the `labels` table).
+---@return string The fully formatted error message string.
+---@private
 local function syntaxerror(errorinfo, pos, msg)
   local l, c = calcline(errorinfo.subject, pos)
   local error_msg = "%s:%d:%d: syntax error, %s"
 
-  logger.error("Syntax error in source", {
+  get_logger().error("Syntax error in source", {
     filename = errorinfo.filename or "input",
     line = l,
     column = c,
@@ -550,9 +712,13 @@ local function syntaxerror(errorinfo, pos, msg)
   return string.format(error_msg, errorinfo.filename or "input", l, c, msg)
 end
 
--- Parse a Lua source string
+--- Parses a Lua source code string into an Abstract Syntax Tree (AST).
+---@param subject string The Lua code to parse.
+---@param filename? string Optional filename to use in error messages (defaults to "input").
+---@return table|nil ast The generated AST table on success, or `nil` on failure.
+---@return string? error_message An error message string if parsing failed, `nil` otherwise.
 function M.parse(subject, filename)
-  logger.debug("Parsing Lua source", {
+  get_logger().debug("Parsing Lua source", {
     filename = filename or "input",
     subject_length = subject and #subject or 0,
   })
@@ -563,7 +729,7 @@ function M.parse(subject, filename)
   -- This complements the 'cut' function in chainOp to prevent "subcapture nesting too deep" errors
   lpeg.setmaxstack(1000)
 
-  logger.debug("Starting LPeg parse with max stack size 1000")
+  get_logger().debug("Starting LPeg parse with max stack size 1000")
   ---@diagnostic disable-next-line: redundant-parameter
   local ast, label, errorpos = lpeg.match(G, subject, nil, errorinfo)
 
@@ -571,7 +737,7 @@ function M.parse(subject, filename)
     local errmsg = labels[label][2]
     local error_message = syntaxerror(errorinfo, errorpos, errmsg)
 
-    logger.error("Parsing failed", {
+    get_logger().error("Parsing failed", {
       filename = filename or "input",
       error_label = labels[label][1],
       error_position = errorpos,
@@ -581,7 +747,7 @@ function M.parse(subject, filename)
     return nil, error_message
   end
 
-  logger.debug("Parsing completed successfully", {
+  get_logger().debug("Parsing completed successfully", {
     filename = filename or "input",
     ast_type = type(ast),
     has_ast = ast ~= nil,

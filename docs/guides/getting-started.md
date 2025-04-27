@@ -64,11 +64,10 @@ end)
 ### 2. Run the Test
 
 
-Run the test using the firmo runner script:
-
+Run the test using the main `test.lua` script:
 
 ```bash
-lua scripts/runner.lua example_test.lua
+lua test.lua example_test.lua
 ```
 
 
@@ -166,7 +165,7 @@ describe("Database tests", function()
     -- Set up database connection before each test
     db = Database.connect()
     -- Use structured logging for setup information
-    firmo.log.debug({ message = "Database connected", connection_id = db.id })
+    print("Database connected") -- Simple output for example
   end)
 
   it("queries data", function()
@@ -177,9 +176,9 @@ describe("Database tests", function()
   after(function()
     -- Clean up after each test
     db:disconnect()
-    -- Log cleanup operations
-    firmo.log.debug({ message = "Database disconnected" })
+    print("Database disconnected") -- Simple output for example
   end)
+end)
 end)
 ```
 
@@ -243,7 +242,7 @@ end)
 
 
 ```bash
-lua scripts/runner.lua tests/example_test.lua
+lua test.lua tests/example_test.lua
 ```
 
 
@@ -253,29 +252,22 @@ lua scripts/runner.lua tests/example_test.lua
 
 Create a directory for your tests (e.g., `tests`) and use Firmo's test discovery:
 
+Use the standard runner, passing the directory path:
 
 ```bash
-lua run_all_tests.lua --dir ./tests
+lua test.lua tests/
 ```
 
 
 
 ### Filtering Tests
-
-
-Run only tests with specific tags:
-
+Run only tests matching a name pattern using `--filter`:
 
 ```bash
-lua scripts/runner.lua --tags unit tests/example_test.lua
+lua test.lua --filter authentication tests/example_test.lua
 ```
 
-
-Run only tests matching a pattern:
-
-
-```bash
-lua scripts/runner.lua --filter authentication tests/example_test.lua
+Filtering by tags directly via the command line (`--tags`) is not currently supported. Use programmatic filtering (`firmo.only_tags(...)`) in your test setup or custom scripts for tag-based execution control.
 ```
 
 
@@ -287,7 +279,7 @@ For continuous testing that automatically reruns tests when files change:
 
 
 ```bash
-lua scripts/runner.lua --watch tests/example_test.lua
+lua test.lua --watch tests/example_test.lua
 ```
 
 
@@ -322,8 +314,9 @@ For isolating your tests, use the mocking system:
 
 
 ```lua
+local mocking = require("lib.mocking")
 -- Create a mock database
-local db_mock = firmo.mock(database)
+local db_mock = mocking.mock(database)
 -- Stub methods with test implementations
 db_mock:stub("query", function(query_string)
   return {
@@ -332,8 +325,7 @@ db_mock:stub("query", function(query_string)
 end)
 -- Test code that uses the database
 local users = UserService.get_users()
--- Verify the mock was called correctly
-expect(db_mock._stubs.query.called).to.be.truthy()
+-- Optionally verify calls using expect(spy).to.be.called() if using spies
 -- Restore original methods
 db_mock:restore()
 ```

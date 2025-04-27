@@ -33,9 +33,9 @@ The interactive module provides a command-line interface with the following capa
 
 The interactive module provides several configuration options that can be set via the initialization function or updated during runtime:
 
+The module uses the following default configuration values:
 
 ```lua
--- Default configuration
 {
   -- Test configuration
   test_dir = "./tests",
@@ -62,48 +62,9 @@ The interactive module provides several configuration options that can be set vi
 
 ## Core Functions
 
-
-### init
-
-
-Initialize the module with custom configuration options.
-
-
-```lua
-function interactive.init(options)
-```
-
-
-**Parameters:**
-
-
-- `options` (table, optional): Custom configuration options to override defaults
-
-**Returns:**
-
-
-- (interactive_module): The module instance for method chaining
-
-**Example:**
-
-
-```lua
-local interactive = require("lib.tools.interactive")
-interactive.init({
-  test_dir = "tests/unit",
-  test_pattern = "*_spec.lua",
-  watch_mode = true,
-  watch_interval = 0.5
-})
-```
-
-
-
 ### configure
 
-
-Configure the interactive CLI with custom options.
-
+Configures the interactive CLI module settings. This is the primary function for setting or overriding options after the module is loaded. It merges provided options with defaults, potentially loading from or saving to the central configuration system.
 
 ```lua
 function interactive.configure(options)

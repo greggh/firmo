@@ -1,4 +1,14 @@
--- Tests for the dedicated assertion module
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Standalone Assertion Module Tests
+---
+--- Verifies the core functionality of the standalone assertion module (`lib.assertion`),
+--- including its API exports (`expect`, `eq`, `isa`, `paths`), assertion chaining,
+--- basic assertions (equality, type, truthiness, existence), advanced assertions
+--- (match, contain, numeric comparison), error handling within tests and predicates,
+--- negation (`to_not`), and table comparisons with diffing.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 

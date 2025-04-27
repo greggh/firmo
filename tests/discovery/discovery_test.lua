@@ -1,6 +1,19 @@
--- Test for the discovery functionality
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Test Discovery Functionality Tests
+---
+--- Verifies the file discovery and execution features of Firmo, including:
+--- - `firmo.discover` function for finding test files based on path and pattern.
+--- - Handling of invalid directory paths and patterns.
+--- - `firmo.run_discovered` function for running tests found by `discover`.
+--- - Correct error propagation when a discovered test fails.
+--- - Recursive discovery (`discover` with `true` flag).
+--- - Uses `test_helper` and `filesystem` for temporary file creation and cleanup.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+
 local test_helper = require("lib.tools.test_helper")
 local fs = require("lib.tools.filesystem")
 

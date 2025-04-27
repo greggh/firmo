@@ -114,16 +114,18 @@ Configure the reporting module with custom options.
 
 Parameters:
 
+- `options` (table): Configuration options. Merged with defaults and central config.
+  - `debug` (boolean, optional): Enable debug logging.
+  - `verbose` (boolean, optional): Enable verbose logging.
+  - `report_dir` (string, optional): Default base directory for saved reports.
+  - `report_suffix` (string, optional): Suffix added to report filenames.
+  - `timestamp_format` (string, optional): `os.date` format for timestamp placeholders.
+  - `formats` (table, optional): Configuration for default formats and path templates per report type (`coverage`, `quality`, `results`).
+  - `formatters` (table, optional): Configuration options specific to each formatter (e.g., `html`, `json`).
+  - `lazy_loading` (table, optional): Options for lazy-loading formatters.
+  - `validation` (table, optional): Options controlling data/output validation.
 
-- `options` (table): Configuration options for the reporting module:
-  - `default_format` (string): Default report format
-  - `output_path` (string): Default output directory
-  - `formatter_defaults` (table): Default options for all formatters
-  - `normalize_data` (boolean): Whether to normalize data before formatting
-  - `validate_data` (boolean): Whether to validate data before formatting
-  - `validate_output` (boolean): Whether to validate formatter output
-  - `strict_mode` (boolean): Fail on validation errors
-
+Returns:
 Returns:
 
 
@@ -368,6 +370,25 @@ Returns:
 
 
 - `results` (table): Table of results for each saved report with success/error information
+### File Writing Functions
+
+#### `reporting.write_file(file_path, content)`
+
+Writes content (string or table automatically JSON encoded) to a specified file path.
+Ensures parent directories exist.
+
+```lua
+---@param file_path string The absolute or relative path to the output file.
+---@param content string|table The content to write. If a table, it's encoded as JSON.
+---@return boolean|nil success `true` if writing succeeded, `nil` otherwise.
+---@return table|nil error Error object if validation, encoding, or writing failed.
+```
+**Parameters:**
+- `file_path` (string): Path to the output file.
+- `content` (string|table): Content to write (tables are JSON encoded).
+**Returns:**
+- `success` (boolean|nil): True if writing succeeded.
+- `error` (table|nil): Error object on failure.
 
 
 ### Formatter Management Functions
@@ -375,38 +396,80 @@ Returns:
 
 #### `reporting.register_formatter(formatter)`
 
-
-Register a custom formatter class or module.
-Parameters:
-
-
+**[Deprecated]** Register a custom formatter class or module. Use type-specific registration functions instead (e.g., `register_coverage_formatter`).
+**Parameters:**
 - `formatter` (table): A formatter class or module that implements the formatter interface
-
-Returns:
-
-
+**Returns:**
 - `success` (boolean): True if formatter was registered successfully
 - `error` (table, optional): Error object if registration failed
+#### `reporting.register_coverage_formatter(name, formatter_fn)`
+
+Registers a custom formatter specifically for coverage reports.
+
+```lua
+---@param name string Name of the formatter (e.g., "my_coverage_format").
+---@param formatter_fn function The formatter function `(coverage_data, options) -> string|table`.
+---@return boolean|nil success `true` if registered successfully.
+---@return table|nil error Error object if registration failed.
+```
+**Parameters:**
+- `name` (string): Name for the formatter.
+- `formatter_fn` (function): The function implementing the formatter logic.
+**Returns:**
+- `success` (boolean|nil): True if successful.
+- `error` (table|nil): Error object on failure.
 
 
-#### `reporting.create_formatter(type, name, options)`
+#### `reporting.register_quality_formatter(name, formatter_fn)`
+
+Registers a custom formatter specifically for quality reports.
+
+```lua
+---@param name string Name of the formatter (e.g., "my_quality_format").
+---@param formatter_fn function The formatter function `(quality_data, options) -> string|table`.
+---@return boolean|nil success `true` if registered successfully.
+---@return table|nil error Error object if registration failed.
+```
+**Parameters:**
+- `name` (string): Name for the formatter.
+- `formatter_fn` (function): The function implementing the formatter logic.
+**Returns:**
+- `success` (boolean|nil): True if successful.
+- `error` (table|nil): Error object on failure.
 
 
-Create a new formatter instance of the specified type.
-Parameters:
+#### `reporting.register_results_formatter(name, formatter_fn)`
+
+Registers a custom formatter specifically for test results reports.
+
+```lua
+---@param name string Name of the formatter (e.g., "my_results_format").
+---@param formatter_fn function The formatter function `(results_data, options) -> string|table`.
+---@return boolean|nil success `true` if registered successfully.
+---@return table|nil error Error object if registration failed.
+```
+**Parameters:**
+- `name` (string): Name for the formatter.
+- `formatter_fn` (function): The function implementing the formatter logic.
+**Returns:**
+- `success` (boolean|nil): True if successful.
+- `error` (table|nil): Error object on failure.
 
 
-- `type` (string): Type of formatter ("coverage", "quality", or "results")
-- `name` (string): Name of the formatter to create
-- `options` (table, optional): Options for the formatter
+#### `reporting.get_formatter(format, type)`
 
-Returns:
+Gets a registered formatter function by name and type.
 
-
-- `formatter` (table): A formatter instance or nil if creation failed
-- `error` (table, optional): Error object if creation failed
-
-
+```lua
+---@param format string Name of the format (e.g., "html").
+---@param type string Type of report ("coverage", "quality", "results").
+---@return function|nil formatter The formatter function or nil if not found.
+```
+**Parameters:**
+- `format` (string): Name of the desired format.
+- `type` (string): Report type ("coverage", "quality", or "results").
+**Returns:**
+- `formatter` (function|nil): The formatter function or nil.
 #### `reporting.load_formatters(formatter_module)`
 
 

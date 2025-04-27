@@ -43,9 +43,9 @@ Spies let you track calls to functions without changing their behavior:
 
 
 ```lua
--- Import Firmo
-local firmo = require("firmo")
-local spy = firmo.spy
+-- Import mocking system
+local mocking = require("lib.mocking")
+local spy = mocking.spy
 -- Spy on a function
 local calculate = function(a, b) return a + b end
 local spy_calculate = spy(calculate)
@@ -69,9 +69,9 @@ Stubs replace real functions with controlled implementations:
 
 
 ```lua
--- Import Firmo
-local firmo = require("firmo")
-local stub = firmo.stub
+-- Import mocking system
+local mocking = require("lib.mocking")
+local stub = mocking.stub
 -- Create a stub that returns a fixed value
 local getUser = stub({ id = 1, name = "Test User" })
 -- Call the stub function
@@ -98,9 +98,9 @@ Mock objects replace entire objects and provide verification:
 
 
 ```lua
--- Import Firmo
-local firmo = require("firmo")
-local mock = firmo.mock
+-- Import mocking system
+local mocking = require("lib.mocking")
+local mock = mocking.mock
 -- Create a sample database object
 local database = {
   connect = function() return { connected = true } end,
@@ -124,13 +124,9 @@ end)
 local connection = database.connect()
 local result = database.query("SELECT * FROM users")
 database.disconnect()
--- Verify expected methods were called
-assert(mock_db._stubs.connect.called == true)
-assert(mock_db._stubs.query.called == true)
-assert(mock_db._stubs.query.calls[1][1] == "SELECT * FROM users")
--- Can also use the mock's verify method
-local success = mock_db:verify()
-assert(success == true)
+-- Verify expected methods were called using the mock's verify method
+local success, err = mock_db:verify()
+assert(success == true, err and err.message or "Verification failed")
 -- Clean up by restoring original methods
 mock_db:restore()
 ```
@@ -148,6 +144,8 @@ You can configure stubs to return different values on successive calls:
 
 ```lua
 -- Create a stub that returns different values in sequence
+local mocking = require("lib.mocking")
+local stub = mocking.stub
 local statusStub = stub():returns_in_sequence({
   "connecting",
   "authenticating",
@@ -173,6 +171,8 @@ For repeating patterns, you can make sequences cycle back to the beginning:
 
 ```lua
 -- Create a cycling stub for traffic light states
+local mocking = require("lib.mocking")
+local stub = mocking.stub
 local lightStub = stub()
   :returns_in_sequence({"red", "yellow", "green"})
   :cycle_sequence(true)
@@ -195,11 +195,11 @@ Control what happens when a sequence is exhausted:
 
 ```lua
 -- Define an API client
-local api_client = {
   get_status = function() return "real status" end
 }
+local mocking = require("lib.mocking")
 -- Create a mock with sequence that falls back to real implementation
-local mock_api = mock(api_client)
+local mock_api = mocking.mock(api_client)
 mock_api:stub_in_sequence("get_status", {"offline", "connecting"})
   :when_exhausted("fallback")
 -- Use first two values from sequence
@@ -214,7 +214,8 @@ Or return a custom value when exhausted:
 
 
 ```lua
-local stub = firmo.stub():returns_in_sequence({"first", "second"})
+local mocking = require("lib.mocking")
+local stub = mocking.stub():returns_in_sequence({"first", "second"})
   :when_exhausted("custom", "sequence ended")
 assert(stub() == "first")
 assert(stub() == "second")
@@ -231,6 +232,8 @@ Test error handling by making stubs throw errors:
 
 ```lua
 -- Create a stub that throws an error
+local mocking = require("lib.mocking")
+local stub = mocking.stub
 local errorStub = stub():throws("Test error message")
 -- Calling the stub will throw an error
 local success, error_message = pcall(function()
@@ -250,6 +253,8 @@ Verify the sequence of calls:
 
 ```lua
 -- Create spies for multiple functions
+local mocking = require("lib.mocking")
+local spy = mocking.spy
 local spy1 = spy(function() return "first" end)
 local spy2 = spy(function() return "second" end)
 local spy3 = spy(function() return "third" end)
@@ -278,11 +283,11 @@ local service = {
   getData = function() return "real data" end,
   processData = function(data) return "processed: " .. data end
 }
+local mocking = require("lib.mocking")
 -- Use with_mocks context
-firmo.with_mocks(function(mock_fn, spy, stub)
+mocking.with_mocks(function(mock_creator, spy_creator, stub_creator)
   -- Create a mock
-  local mock_service = mock_fn(service)
-
+  local mock_service = mock_creator(service)
   -- Stub methods
   mock_service:stub("getData", function() return "mock data" end)
   mock_service:stub("processData", function(data) return "mock processed: " .. data end)
@@ -294,11 +299,11 @@ firmo.with_mocks(function(mock_fn, spy, stub)
   -- Verification
   assert(data == "mock data")
   assert(result == "mock processed: mock data")
-  assert(mock_service._stubs.getData.called == true)
-  assert(mock_service._stubs.processData.called == true)
-
-  -- No need to restore, happens automatically
-end)
+  assert(data == "mock data")
+  assert(result == "mock processed: mock data")
+  -- Verification using verify() is preferred over checking internal state
+  local success, err = mock_service:verify()
+  assert(success == true, err and err.message or "Verification failed")
 -- Outside the context, original methods are restored
 assert(service.getData() == "real data")
 ```
@@ -314,10 +319,11 @@ The mocking system integrates with Firmo's expectation system for more readable 
 ```lua
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local spy, stub, mock = firmo.spy, firmo.stub, firmo.mock
+local describe, it, expect = require("firmo").describe, require("firmo").it, require("firmo").expect
+local mocking = require("lib.mocking")
+local spy, stub, mock = mocking.spy, mocking.stub, mocking.mock
 describe("User Service", function()
   it("processes user data correctly", function()
-    local db = {
       query = function() return { rows = {} } end
     }
 
@@ -398,13 +404,12 @@ describe("User Repository", function()
       expect(#users).to.equal(2)
       expect(users[1].name).to.equal("User 1")
 
-      -- Verify interactions
-      expect(mock_db._stubs.connect.called).to.be_truthy()
-      expect(mock_db._stubs.query.called).to.be_truthy()
-      expect(mock_db._stubs.query.calls[1][1]).to.match("FROM users")
+      -- Verify interactions using verify()
+      local verified, err = mock_db:verify()
+      expect(verified).to.be_truthy(err and err.message or "Mock verification failed")
+      -- You could also use expect(spy).to.be.called() if you spied on methods
     end)
   end)
-end)
 ```
 
 
@@ -453,11 +458,11 @@ describe("Weather API Client", function()
       expect(weather.conditions).to.equal("sunny")
 
       -- Verify HTTP client was called correctly
-      expect(mock_http._stubs.get.called).to.be_truthy()
-      expect(mock_http._stubs.get.calls[1][1]).to.match("Test City")
+      -- Verify HTTP client was called correctly using verify()
+      local verified, err = mock_http:verify()
+      expect(verified).to.be_truthy(err and err.message or "Mock verification failed")
     end)
   end)
-
   it("handles API errors gracefully", function()
     -- Real HTTP client
     local http_client = {
@@ -588,16 +593,17 @@ mock_obj:stub("method", function() return "stubbed" end)
 -- Other tests will now see the stubbed method!
 -- GOOD: Manual cleanup
 local obj = { method = function() return "original" end }
-local mock_obj = mock(obj)
+local mocking = require("lib.mocking")
+local obj = { method = function() return "original" end }
+local mock_obj = mocking.mock(obj)
 mock_obj:stub("method", function() return "stubbed" end)
 -- Run test...
 mock_obj:restore() -- Restore original method
 -- BEST: Automatic cleanup with context manager
-with_mocks(function(mock_fn)
-  local mock_obj = mock_fn(obj)
+mocking.with_mocks(function(mock_creator)
+  local mock_obj = mock_creator(obj)
   mock_obj:stub("method", function() return "stubbed" end)
   -- Run test...
-  -- No need for manual cleanup, happens automatically
 end)
 ```
 
@@ -617,6 +623,8 @@ local calculateStub = stub(function(a, b)
   return a * b * math.random()
 end)
 -- GOOD: Simple, deterministic stub
+local mocking = require("lib.mocking")
+local stub = mocking.stub
 local calculateStub = stub(function(a, b)
   return a * b
 end)
@@ -633,9 +641,10 @@ Focus verification on the interactions that matter for the test, not implementat
 ```lua
 -- BAD: Testing implementation details
 expect(mock_db._stubs.connect.calls[1][2]).to.equal(5432) -- Port number might change
--- GOOD: Testing meaningful interaction
-expect(mock_db._stubs.connect.called).to.be_truthy()
-expect(mock_db._stubs.query.called_with("SELECT * FROM users")).to.be_truthy()
+-- GOOD: Testing meaningful interaction via verify() or expect(spy)
+local success, err = mock_db:verify()
+expect(success).to.be_truthy(err and err.message or "Verification failed")
+-- Or if using spies: expect(db_spy).to.be.called()
 ```
 
 
@@ -648,7 +657,8 @@ Each test should create its own fresh mocks to avoid interference between tests:
 
 ```lua
 -- BAD: Shared mock across tests
-local mock_db = mock(database)
+local mocking = require("lib.mocking")
+local mock_db = mocking.mock(database) -- BAD: Shared mock
 it("test 1", function()
   mock_db:stub("query", function() return {rows = {}} end)
   -- Test using mock_db
@@ -659,28 +669,32 @@ it("test 2", function()
 end)
 -- GOOD: Fresh mocks for each test
 it("test 1", function()
-  local mock_db = mock(database)
+  local mocking = require("lib.mocking")
+  local mock_db = mocking.mock(database)
   mock_db:stub("query", function() return {rows = {}} end)
   -- Test using mock_db
   mock_db:restore()
 end)
 it("test 2", function()
-  local mock_db = mock(database)
+  local mocking = require("lib.mocking")
+  local mock_db = mocking.mock(database)
   mock_db:stub("query", function() return {count = 5} end)
   -- Test using fresh mock_db
   mock_db:restore()
 end)
 -- BEST: With automatic cleanup
 it("test 1", function()
-  with_mocks(function(mock_fn)
-    local mock_db = mock_fn(database)
+  local mocking = require("lib.mocking")
+  mocking.with_mocks(function(mock_creator)
+    local mock_db = mock_creator(database)
     mock_db:stub("query", function() return {rows = {}} end)
     -- Test using mock_db
   end)
 end)
 it("test 2", function()
-  with_mocks(function(mock_fn)
-    local mock_db = mock_fn(database)
+  local mocking = require("lib.mocking")
+  mocking.with_mocks(function(mock_creator)
+    local mock_db = mock_creator(database)
     mock_db:stub("query", function() return {count = 5} end)
     -- Test using fresh mock_db
   end)
@@ -723,10 +737,11 @@ local function print_spy_calls(spy_obj)
 end
 -- Usage
 local fn = function() end
-local spy_fn = spy(fn)
+local mocking = require("lib.mocking")
+local fn = function() end
+local spy_fn = mocking.spy(fn)
 spy_fn("hello", 123)
 spy_fn("world")
-print_spy_calls(spy_fn)
 ```
 
 
@@ -740,10 +755,11 @@ Make sure to restore original methods even if a test fails, to avoid affecting o
 ```lua
 -- Using pcall for error handling
 local obj = { method = function() return "original" end }
-local mock_obj = mock(obj)
+local mocking = require("lib.mocking")
+local obj = { method = function() return "original" end }
+local mock_obj = mocking.mock(obj)
 mock_obj:stub("method", function() return "stubbed" end)
 local success, err = pcall(function()
-  -- Test that might fail...
   error("Test error")
 end)
 -- Always restore, even if test failed
@@ -755,12 +771,12 @@ end
 ```
 
 
-Or better, use the `with_mocks` context manager which handles this automatically:
-
+Or better, use the `mocking.with_mocks` context manager which handles this automatically:
 
 ```lua
-with_mocks(function(mock_fn)
-  local mock_obj = mock_fn(obj)
+local mocking = require("lib.mocking")
+mocking.with_mocks(function(mock_creator)
+  local mock_obj = mock_creator(obj)
   mock_obj:stub("method", function() return "stubbed" end)
 
   -- Even if this error occurs, mocks will still be restored

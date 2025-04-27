@@ -1,6 +1,25 @@
--- Example demonstrating parallel async operations
-package.path = "../?.lua;" .. package.path
+--- parallel_async_example.lua
+--
+-- This example demonstrates how to run multiple asynchronous operations
+-- concurrently using `firmo.parallel_async`. This can significantly speed up
+-- tests that need to perform several independent async tasks, such as fetching
+-- data from multiple API endpoints simultaneously.
+--
+-- It shows:
+-- - Defining multiple async operations (using promises).
+-- - Running them in parallel using `parallel_async`.
+-- - Collecting and verifying the results.
+-- - Error handling when one or more parallel operations fail.
+--
+-- Run embedded tests: lua test.lua examples/parallel_async_example.lua
+--
+
 local firmo = require("firmo")
+local error_handler = require("lib.tools.error_handler")
+local logging = require("lib.tools.logging")
+
+-- Setup logger
+local logger = logging.get_logger("ParallelAsyncExample")
 
 -- Import the test functions
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
@@ -12,128 +31,89 @@ local await = firmo.await
 local wait_until = firmo.wait_until
 local parallel_async = firmo.parallel_async
 
+-- Import promise functions
+local create_promise = firmo.async.create_promise
+local set_timeout = firmo.async.set_timeout
+
 -- Simulate a set of asynchronous APIs
----@diagnostic disable-next-line: unused-local
 local AsyncAPI = {}
 
--- Simulated fetch function with delay
----@diagnostic disable-next-line: unused-local
-function AsyncAPI.fetch_user(user_id, callback, delay)
+--- Simulated fetch function with delay, returning a promise.
+-- @param user_id number The user ID.
+-- @param delay number|nil Optional delay in ms (default 100).
+-- @return table promise A promise that resolves with user data.
+function AsyncAPI.fetch_user(user_id, delay)
   delay = delay or 100
-
-  -- Immediately schedule the callback to run after delay ms
-  -- Instead of providing a check function which may not be called often enough
-  -- This approach is more reliable for the example
-  local start_time = os.clock() * 1000
-
-  -- Function that checks if enough time has passed and calls callback
-  local function check_and_call()
-    local current_time = os.clock() * 1000
-    if current_time - start_time >= delay then
-      callback({
+  return create_promise(function(resolve)
+    set_timeout(function()
+      resolve({
         id = user_id,
         name = "User " .. user_id,
         email = "user" .. user_id .. "@example.com",
       })
-      return true
-    else
-      -- Check again after a small delay
-      ---@diagnostic disable-next-line: redundant-parameter
-      await(5)
-      return check_and_call()
-    end
-  end
-
-  -- Start the checking process in a separate function
-  local completed = false
-  local function start_checking()
-    completed = check_and_call()
-  end
-  start_checking()
-
-  return {
-    is_complete = function()
-      return completed
-    end,
-    cancel = function() end, -- Simulated cancel function
-  }
+    end, delay)
+  end)
 end
 
--- Simulated data service
----@diagnostic disable-next-line: unused-local
-function AsyncAPI.fetch_posts(user_id, callback, delay)
+--- Simulated data service, returning a promise.
+-- @param user_id number The user ID.
+-- @param delay number|nil Optional delay in ms (default 150).
+-- @return table promise A promise that resolves with posts data.
+function AsyncAPI.fetch_posts(user_id, delay)
   delay = delay or 150
-
-  -- Immediately call the callback after delay ms
-  ---@diagnostic disable-next-line: redundant-parameter
-  await(delay)
-  callback({
-    { id = 1, title = "First post by user " .. user_id },
-    { id = 2, title = "Second post by user " .. user_id },
-  })
-
-  return {
-    is_complete = function()
-      return true
-    end,
-    cancel = function() end,
-  }
+  return create_promise(function(resolve)
+    set_timeout(function()
+      resolve({
+        { id = 1, title = "First post by user " .. user_id },
+        { id = 2, title = "Second post by user " .. user_id },
+      })
+    end, delay)
+  end)
 end
 
--- Simulated comments service
----@diagnostic disable-next-line: unused-local
-function AsyncAPI.fetch_comments(post_id, callback, delay)
+--- Simulated comments service, returning a promise.
+-- @param post_id number The post ID.
+-- @param delay number|nil Optional delay in ms (default 80).
+-- @return table promise A promise that resolves with comments data.
+function AsyncAPI.fetch_comments(post_id, delay)
   delay = delay or 80
-
-  -- Immediately call the callback after delay ms
-  ---@diagnostic disable-next-line: redundant-parameter
-  await(delay)
-  callback({
-    { id = 1, text = "Great post! #" .. post_id },
-    { id = 2, text = "I agree #" .. post_id },
-  })
-
-  return {
-    is_complete = function()
-      return true
-    end,
-    cancel = function() end,
-  }
+  return create_promise(function(resolve)
+    set_timeout(function()
+      resolve({
+        { id = 1, text = "Great post! #" .. post_id },
+        { id = 2, text = "I agree #" .. post_id },
+      })
+    end, delay)
+  end)
 end
 
--- Example tests demonstrating parallel async operations
+--- Test suite demonstrating `parallel_async`.
 describe("Parallel Async Operations Demo", function()
+  --- Tests demonstrating basic usage of `parallel_async`.
   describe("Basic parallel operations", function()
     it_async("can run multiple async operations in parallel", function()
       local start = os.clock()
 
       -- Define three different async operations
       local op1 = function()
-        ---@diagnostic disable-next-line: redundant-parameter
         await(70) -- Simulate a 70ms operation
-        return "Operation 1 complete"
       end
 
       local op2 = function()
-        ---@diagnostic disable-next-line: redundant-parameter
         await(120) -- Simulate a 120ms operation
-        return "Operation 2 complete"
       end
 
       local op3 = function()
-        ---@diagnostic disable-next-line: redundant-parameter
         await(50) -- Simulate a 50ms operation
-        return "Operation 3 complete"
       end
 
-      print("\nRunning 3 operations in parallel...")
+      logger.info("\nRunning 3 operations in parallel...")
 
       -- Run all operations in parallel and wait for all to complete
-      ---@diagnostic disable-next-line: redundant-parameter
       local results = parallel_async({ op1, op2, op3 })
 
       local elapsed = (os.clock() - start) * 1000
-      print(string.format("All operations completed in %.2fms", elapsed))
+      logger.info(string.format("All operations completed in %.2fms", elapsed))
       print("Results:")
       ---@diagnostic disable-next-line: param-type-mismatch
       for i, result in ipairs(results) do
@@ -148,52 +128,35 @@ describe("Parallel Async Operations Demo", function()
     end)
   end)
 
+  --- Tests demonstrating parallel fetching of data using the simulated AsyncAPI.
   describe("Simulated API service calls", function()
     it_async("can fetch user profile, posts, and comments in parallel", function()
       local user_data, posts_data, comments_data
 
-      -- Operation to fetch user profile
+      -- Operation to fetch user profile (returns promise)
       local fetch_user_op = function()
-        ---@diagnostic disable-next-line: redundant-parameter
-        await(100) -- Simulate network delay
-        return {
-          id = 123,
-          name = "User 123",
-          email = "user123@example.com",
-        }
+        return AsyncAPI.fetch_user(123, 100)
       end
 
-      -- Operation to fetch user posts
+      -- Operation to fetch user posts (returns promise)
       local fetch_posts_op = function()
-        ---@diagnostic disable-next-line: redundant-parameter
-        await(150) -- Simulate network delay
-        return {
-          { id = 1, title = "First post by user 123" },
-          { id = 2, title = "Second post by user 123" },
-        }
+        return AsyncAPI.fetch_posts(123, 150)
       end
 
-      -- Operation to fetch comments
+      -- Operation to fetch comments (returns promise)
       local fetch_comments_op = function()
-        ---@diagnostic disable-next-line: redundant-parameter
-        await(80) -- Simulate network delay
-        return {
-          { id = 1, text = "Great post! #1" },
-          { id = 2, text = "I agree #1" },
-        }
+        return AsyncAPI.fetch_comments(1, 80)
       end
 
-      print("\nFetching user profile, posts, and comments in parallel...")
+      logger.info("\nFetching user profile, posts, and comments in parallel...")
       local start = os.clock()
 
       -- Run all data fetching operations in parallel
-      ---@diagnostic disable-next-line: redundant-parameter
       local results = parallel_async({
         fetch_user_op,
         fetch_posts_op,
         fetch_comments_op,
       })
-
       -- Extract results
       ---@diagnostic disable-next-line: need-check-nil
       user_data = results[1]
@@ -203,10 +166,9 @@ describe("Parallel Async Operations Demo", function()
       comments_data = results[3]
 
       local elapsed = (os.clock() - start) * 1000
-      print(string.format("All data fetched in %.2fms", elapsed))
+      logger.info(string.format("All data fetched in %.2fms", elapsed))
 
       -- The user profile data should be available
-      expect(user_data).to.exist()
       expect(user_data.name).to.equal("User 123")
 
       -- The posts data should be available
@@ -228,68 +190,55 @@ describe("Parallel Async Operations Demo", function()
     end)
   end)
 
+  --- Tests demonstrating error handling within `parallel_async`.
   describe("Error handling", function()
     it_async("handles errors in parallel operations", function()
       -- Define operations where one will fail
+      -- Define operations where one will fail
       local op1 = function()
-        ---@diagnostic disable-next-line: redundant-parameter
         await(30)
-        return "Operation 1 succeeded"
+
+        local op2 = function()
+          await(20)
+          error("Simulated failure in operation 2")
+        end
+
+        local op3 = function()
+          await(40)
+        end
       end
 
-      local op2 = function()
-        ---@diagnostic disable-next-line: redundant-parameter
-        await(20)
-        error("Simulated failure in operation 2")
-      end
-
-      local op3 = function()
-        ---@diagnostic disable-next-line: redundant-parameter
-        await(40)
-        return "Operation 3 succeeded"
-      end
-
-      print("\nRunning operations with expected failure...")
+      logger.info("\nRunning operations with expected failure...")
 
       -- Attempt to run operations in parallel
       local success, err = pcall(function()
-        ---@diagnostic disable-next-line: redundant-parameter
         parallel_async({ op1, op2, op3 })
+
+        -- Operation 2 should cause an error
+        expect(success).to.equal(false)
+        logger.info("Caught expected error: " .. tostring(err))
+        expect(err).to.match("One or more parallel operations failed")
+        -- The message may contain line numbers, so just check for "Simulated failure"
+        expect(err).to.match("Simulated failure")
       end)
+    end)
 
-      -- Operation 2 should cause an error
-      expect(success).to.equal(false)
-      print("Caught expected error: " .. err)
-      expect(err).to.match("One or more parallel operations failed")
-      -- The message may contain line numbers, so just check for "Simulated failure"
-      expect(err).to.match("Simulated failure")
+    --- Tests demonstrating timeout handling (marked as pending).
+    describe("Timeout handling", function()
+      it("handles timeouts for operations that take too long", function()
+        -- Using the pending mechanism is better than manually printing skip messages
+        return firmo.pending("Timeout test is hard to test reliably - see implementation in src/async.lua")
+      end)
     end)
   end)
 
-  describe("Timeout handling", function()
-    it("handles timeouts for operations that take too long", function()
-      -- Using the pending mechanism is better than manually printing skip messages
-      return firmo.pending("Timeout test is hard to test reliably - see implementation in src/async.lua")
-    end)
-  end)
+  -- Log usage instructions
+  logger.info("\n-- Parallel Async Example --")
+  logger.info("This file demonstrates using firmo.parallel_async to run async operations concurrently.")
+  logger.info("Run with:")
+  logger.info("  lua test.lua examples/parallel_async_example.lua")
+  logger.info("\nKey features demonstrated:")
+  logger.info("1. Running multiple async operations concurrently")
+  logger.info("2. Collecting results from parallel operations")
+  logger.info("3. Error handling when one operation fails")
 end)
-
--- If running this file directly, print usage instructions
-if arg[0]:match("parallel_async_example%.lua$") then
-  print("\nParallel Async Operations Demo")
-  print("=============================")
-  print("This file demonstrates parallel async operations for running multiple")
-  print("asynchronous tasks concurrently in firmo tests.")
-  print("")
-  print("To run this example, use:")
-  print("  lua test.lua examples/parallel_async_example.lua")
-  print("")
-  print("Key features demonstrated:")
-  print("1. Running multiple async operations concurrently")
-  print("2. Collecting results from parallel operations")
-  print("3. Error handling and timeout management")
-  print("4. Simulating real-world API calls with parallel fetching")
-  print("")
-  print("In real applications, parallel_async can significantly speed up tests")
-  print("that need to perform multiple independent async operations.")
-end

@@ -1,19 +1,24 @@
---[[
-  Spy Module Tests
-  
-  Tests for the spy functionality in the Firmo mocking system.
-  The spy module provides function and method spying capabilities 
-  that track calls without changing behavior.
-  
-  The test suite covers:
-  - Basic spy creation and configuration
-  - Call counting and argument tracking
-  - Call order verification
-  - Error handling and restoration
-  
-  @module tests.mocking.spy_test
-  @copyright 2023-2025 Firmo Team
-]]
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Spy Module Tests
+---
+--- Tests for the spy functionality (`lib.mocking.spy`) in the Firmo mocking system.
+--- The spy module provides function and method spying capabilities
+--- that track calls without changing behavior.
+---
+--- The test suite covers:
+--- - Basic spy creation (`spy()`, `spy_module.new()`) and configuration.
+--- - Call counting (`call_count`) and argument tracking (`calls`, `arg`, `lastArg`).
+--- - Call order verification (`called_before`, `called_after`).
+--- - Argument verification (`called_with`).
+--- - Resetting spies (`reset`, `reset_all`).
+--- - Spying on object methods (`spy_module.on`).
+--- - Error handling (invalid creation, restoration, argument access).
+--- - Restoration (`restore`).
+--- - Spy identification (`is_spy`).
+--- Uses `before`/`after` hooks for setup/teardown and `test_helper` for error verification.
+---
+--- @author Firmo Team
+--- @test
 
 -- Adjust path to find modules
 package.path = "../?.lua;../lib/?.lua;../lib/?/init.lua;" .. package.path
@@ -22,17 +27,15 @@ package.path = "../?.lua;../lib/?.lua;../lib/?/init.lua;" .. package.path
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
+local logging = require("lib.tools.logging")
 
 -- Import the spy module and error handling modules
 local spy_module = require("lib.mocking.spy")
 local test_helper = require("lib.tools.test_helper")
-local logging = require("lib.tools.logging")
-local error_handler = require("lib.tools.error_handler")
 
 -- Initialize module logger to prevent nil errors
 local logger = logging.get_logger("spy_test")
 logging.configure_from_config("spy_test")
-
 
 -- Spy alias for convenience in tests
 local spy = spy_module.create or spy_module.new
@@ -55,7 +58,7 @@ describe("Spy Module", function()
   describe("Basic Functionality", function()
     it("creates a basic spy function", function()
       local spy_fn = spy()
-      
+
       expect(spy_fn).to.exist()
       expect(spy_fn).to.be.a("function")
       expect(spy_fn._is_firmo_spy).to.be_truthy()
@@ -218,7 +221,6 @@ describe("Spy Module", function()
       expect(spy_fn.call_count).to.equal(1)
       expect(#spy_fn.calls).to.be_greater_than(0)
 
-
       -- Reset the spy - handle both method and function styles
       if type(spy_fn.reset) == "function" then
         spy_fn:reset()
@@ -245,7 +247,7 @@ describe("Spy Module", function()
 
       -- Verify args helpers - handle both method and function styles
       local arg_func
-      
+
       if type(spy_fn.arg) == "function" then
         arg_func = function(call_idx, arg_idx)
           return spy_fn:arg(call_idx, arg_idx)
@@ -260,11 +262,11 @@ describe("Spy Module", function()
           return spy_fn.calls[call_idx].args[arg_idx]
         end
       end
-      
+
       expect(arg_func(1, 1)).to.exist()
       expect(arg_func(1, 1)).to.equal("arg1")
       expect(arg_func(1, 2)).to.equal("arg2")
-      
+
       -- Handle the table value argument
       local table_arg = arg_func(1, 3)
       expect(table_arg).to.exist()
@@ -283,24 +285,24 @@ describe("Spy Module", function()
     it("tracks call order between multiple spies", function()
       local spy1 = spy()
       local spy2 = spy()
-      
+
       -- Call in specific order
       spy1("first")
       spy2("second")
       spy1("third")
-      
+
       -- Verify ordering
       expect(spy1.called_before(spy2)).to.be_truthy()
       expect(spy2.called_after(spy1)).to.be_truthy()
     end)
-    
+
     it("provides argument verification helpers", function()
       local spy_fn = spy()
-      
+
       -- Call spy with various arguments
       spy_fn("first", 123)
       spy_fn("second", 456)
-      
+
       -- Verify calls with specific arguments
       expect(spy_fn.called_with("first", 123)).to.be_truthy()
       expect(spy_fn.called_with("second", 456)).to.be_truthy()
@@ -309,15 +311,14 @@ describe("Spy Module", function()
 
     it("can reset call history", function()
       local spy_fn = spy()
-      
+
       -- Make some calls
       spy_fn(1, 2, 3)
       spy_fn(4, 5, 6)
-      
+
       -- Verify calls were tracked
       expect(spy_fn.call_count).to.equal(2)
-      
-      
+
       -- Reset the spy - handle both method and function styles
       if type(spy_fn.reset) == "function" then
         spy_fn:reset()
@@ -338,29 +339,29 @@ describe("Spy Module", function()
 
   describe("Error Handling", function()
     it("handles thrown errors from original functions", { expect_error = true }, function()
-      local error_fn = function() 
+      local error_fn = function()
         error("Test error")
       end
-      
+
       local spy_fn = spy(error_fn)
-      
+
       -- The spy should propagate the error
       local success, result = pcall(function()
         spy_fn()
       end)
-      
+
       expect(success).to.equal(false)
       expect(result).to.match("Test error")
-      
+
       -- Use test_helper consistently for error handling
       local result, err = test_helper.with_error_capture(function()
-        spy_fn()  
+        spy_fn()
       end)()
-      
+
       expect(result).to_not.exist()
       expect(err).to.exist()
       expect(err).to.match("Test error")
-      
+
       -- Even when errors are thrown, the call is still tracked
       expect(spy_fn.called).to.be_truthy()
       expect(spy_fn.call_count).to.equal(2)
@@ -371,34 +372,34 @@ describe("Spy Module", function()
       local result, err = test_helper.with_error_capture(function()
         return spy_module.on(nil, "method")
       end)()
-      
+
       expect(result).to_not.exist()
       expect(err).to.exist()
       expect(err).to.match("Cannot create spy on nil object")
-      
+
       -- Try to spy on non-existent method
       local obj = {}
       local result2, err2 = test_helper.with_error_capture(function()
         return spy_module.on(obj, "non_existent")
       end)()
-      
+
       expect(result2).to_not.exist()
       expect(err2).to.exist()
       expect(err2).to.match("Method does not exist")
     end)
-    
+
     it("properly handles errors during spy creation", { expect_error = true }, function()
       -- Create an object with a problematic property
       local obj = {}
-      
+
       -- Make a property that's not a function
       obj.property = "string value"
-      
+
       -- Try to spy on a property that's not a function
       local result, err = test_helper.with_error_capture(function()
         return spy_module.on(obj, "property")
       end)()
-      
+
       expect(result).to_not.exist()
       expect(err).to.exist()
       expect(err).to.match("not a function")
@@ -408,85 +409,93 @@ describe("Spy Module", function()
   describe("Restoration", function()
     it("restores spied methods to their original implementation", function()
       local obj = {
-        method = function() return "original" end
+        method = function()
+          return "original"
+        end,
       }
-      
+
       -- Spy on the method
       local spy_method = spy_module.on(obj, "method")
-      
+
       -- Call the method through the spy
       local result = obj.method()
       expect(result).to.equal("original")
       expect(spy_method.called).to.be_truthy()
       expect(spy_method.call_count).to.equal(1)
-      
+
       -- Restore the original method
       local success = spy_method:restore()
       expect(success).to.be_truthy()
-      
+
       -- Reset spy state and call again
       spy_method.called = false
       spy_method.call_count = 0
       spy_method.calls = {}
-      
+
       -- Call after restoration - should not be tracked
       result = obj.method()
       expect(result).to.equal("original")
       expect(spy_method.called).to.equal(false)
       expect(spy_method.call_count).to.equal(0)
     end)
-    
+
     it("handles restoration of multiple spies", function()
       local obj = {
-        method1 = function() return "method1" end,
-        method2 = function() return "method2" end
+        method1 = function()
+          return "method1"
+        end,
+        method2 = function()
+          return "method2"
+        end,
       }
-      
+
       -- Spy on both methods
       local spy1 = spy_module.on(obj, "method1")
       local spy2 = spy_module.on(obj, "method2")
-      
+
       -- Call both methods
       expect(obj.method1()).to.equal("method1")
       expect(obj.method2()).to.equal("method2")
-      
+
       -- Verify both spies recorded calls
       expect(spy1.call_count).to.equal(1)
       expect(spy2.call_count).to.equal(1)
-      
+
       -- Restore both spies
       spy1:restore()
       spy2:restore()
-      
+
       -- Reset spy state
       spy1.call_count = 0
       spy2.call_count = 0
-      
+
       -- Call methods after restoration - should not affect spy objects
       obj.method1()
       obj.method2()
-      
+
       -- Verify spies didn't record calls after restoration
       expect(spy1.call_count).to.equal(0)
       expect(spy2.call_count).to.equal(0)
     end)
-    
+
     it("handles errors during restoration gracefully", { expect_error = true }, function()
       -- Create a spy on an object
       local obj = {
-        method = function() return "original" end
+        method = function()
+          return "original"
+        end,
       }
-      
+
       local spy_method = spy_module.on(obj, "method")
-      
+
       -- Corrupt the spy by removing the original function reference
       spy_method.original = nil
-      
+
       -- Try to restore the corrupted spy
       local result, err = test_helper.with_error_capture(function()
         return spy_method:restore()
       end)()
-      
+
       expect(result).to_not.exist()
       expect(err).to.exist()
       expect(err).to.match("Cannot restore")
@@ -496,83 +505,89 @@ describe("Spy Module", function()
   describe("Advanced Features", function()
     -- Use before/after for each test in this block
     local test_spies = {}
-    
+
     before(function()
       -- Reset spies before each test
       test_spies = {}
     end)
-    
+
     after(function()
       -- Clean up spies after each test
       for _, spy_obj in ipairs(test_spies) do
         if spy_obj and spy_obj.restore then
-          pcall(function() spy_obj:restore() end)
+          pcall(function()
+            spy_obj:restore()
+          end)
         end
       end
     end)
-    
+
     it("handles error cases for argument access", { expect_error = true }, function()
       local spy_fn = spy()
       table.insert(test_spies, spy_fn)
-      
+
       -- Call once
       spy_fn("first_call")
-      
+
       -- Try to access non-existent call
       local result, err = test_helper.with_error_capture(function()
         spy_fn:arg(99, 1) -- Call 99 doesn't exist
       end)()
-      
+
       expect(result).to_not.exist()
       expect(err).to.exist()
       expect(err).to.match("index out of bounds")
-      
+
       -- Try to access non-existent argument
       local result2, err2 = test_helper.with_error_capture(function()
         spy_fn:arg(1, 99) -- Argument 99 doesn't exist in call 1
       end)()
-      
+
       expect(result2).to_not.exist()
       expect(err2).to.exist()
       expect(err2).to.match("index out of bounds")
-      
+
       -- Try to access lastArg when no calls made
       spy_fn:reset() -- Clear calls
-      
+
       local result3, err3 = test_helper.with_error_capture(function()
         spy_fn:lastArg(1)
       end)()
-      
+
       expect(result3).to_not.exist()
       expect(err3).to.exist()
       expect(err3).to.match("No calls")
     end)
-    
+
     it("supports complex spy chaining", function()
       local obj = {
-        method1 = function() return "one" end,
-        method2 = function() return "two" end
+        method1 = function()
+          return "one"
+        end,
+        method2 = function()
+          return "two"
+        end,
       }
-      
+
       -- Create spies on both methods
       local spy1 = spy_module.on(obj, "method1")
       local spy2 = spy_module.on(obj, "method2")
       table.insert(test_spies, spy1)
       table.insert(test_spies, spy2)
-      
+
       -- Call methods in specific order
       obj.method1() -- First call to method1
       obj.method2() -- First call to method2
       obj.method1() -- Second call to method1
-      
+
       -- Verify call order
       expect(spy1.called_before(spy2, 1)).to.be_truthy()
       expect(spy1.called_before(spy2)).to.be_truthy()
       expect(spy2.called_after(spy1)).to.be_truthy()
-      
-      -- Verify that spy1 was called twice 
+
+      -- Verify that spy1 was called twice
       expect(spy1.call_count).to.equal(2)
-      
+
       -- Verify that spy2 was called once
       expect(spy2.call_count).to.equal(1)
     end)

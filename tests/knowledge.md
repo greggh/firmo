@@ -1,63 +1,82 @@
-# Tests Knowledge
+# tests/ Knowledge
 
+## Purpose
 
-## Directory Structure
+The `tests/` directory contains the comprehensive suite of automated tests for the Firmo framework itself. These tests are essential for verifying the correctness, stability, and reliability of Firmo's features and internal components. They serve to catch regressions during development, ensure adherence to design principles, and provide confidence in the framework's behavior across different scenarios.
 
+## Key Concepts
 
+- **Test Organization by Component:** The primary organization strategy follows the structure of the main `lib/` directory. Tests for a specific library component (e.g., `lib/core`) are generally located in a corresponding subdirectory within `tests/` (e.g., `tests/core/`). This convention makes it easier to locate tests relevant to a particular module or feature.
+- **Unit vs. Integration Tests:** Most subdirectories contain *unit tests*, which focus on testing individual modules or functions in relative isolation (potentially using mocks or stubs). The `tests/integration/` subdirectory is specifically designated for *integration tests* that verify the interactions between multiple components, although it may currently be empty.
+- **Test Structure (BDD Style):** Test files typically utilize Firmo's BDD-style syntax:
+    - `describe("Component Name", function() ... end)` blocks group tests related to a specific feature or component.
+    - `it("should perform some behavior", function() ... end)` blocks define individual test cases, each ideally focusing on a single behavior or expectation.
+    - `expect(actual_value).to.matcher(expected_value)` is used within `it` blocks to make assertions about the code's behavior.
+    - `before_each`, `after_each`, `before_all`, `after_all` hooks are used for setting up preconditions and cleaning up resources for tests or describe blocks.
+- **Fixtures:** Shared resources, mock modules, helper functions, or common data used across multiple tests are often placed in the `tests/fixtures/` directory to promote reusability and consistency.
 
-- assertions/: Assertion system tests
-- async/: Async testing functionality
-- core/: Core framework components
-- coverage/: Code coverage tracking
-- discovery/: Test file discovery
-- fixtures/: Common test fixtures
-- integration/: Cross-component tests
-- mocking/: Mocking system
-- parallel/: Parallel execution
-- quality/: Test quality validation
-- reporting/: Result and coverage reporting
-- tools/: Utility modules
+## Usage Examples / Patterns
 
+### Running Tests
 
-## Test Guidelines
+Tests are executed from the project's root directory using the main `test.lua` script, followed by the path to the tests you want to run and any desired Firmo command-line options:
 
+```bash
+# Run ALL tests within the tests/ directory
+lua test.lua tests/
 
+# Run only the tests for a specific component (e.g., core)
+lua test.lua tests/core/
 
-- Focus each test on single behavior
-- Isolate tests from each other
-- Use firmo-style assertions
-- Clean up test resources
-- Add comments for complex logic
-- Use mocks/stubs for isolation
+# Run only a single test file
+lua test.lua tests/core/config_test.lua
 
+# Run tests with specific Firmo options (e.g., coverage collection, verbose output)
+lua test.lua --coverage --verbose tests/
 
-## Running Tests
+# Run only tests whose describe/it block name matches a pattern
+lua test.lua --pattern "discovery" tests/
+```
 
+## Related Components / Modules (Directory Index)
 
+This directory contains tests organized as follows:
 
-- All tests: `lua test.lua tests/`
-- Specific component: `lua test.lua tests/core/`
-- Single file: `lua test.lua tests/core/config_test.lua`
-- With options: `lua test.lua --coverage --verbose tests/`
+- **`tests/assertions/knowledge.md`**: Tests for Firmo's `expect()` assertion library and its various matchers.
+- **`tests/async/knowledge.md`**: Tests for the asynchronous testing utilities (`it_async`, `await`, `wait_until`).
+- **`tests/core/knowledge.md`**: Tests for fundamental framework components (configuration, runner integration, module reset, tagging, etc.).
+- **`tests/coverage/knowledge.md`**: Tests for the code coverage system (debug hook integration, statistics collection).
+- **`tests/discovery/knowledge.md`**: Tests for the test file discovery mechanism (pattern matching, recursion, exclusion).
+- **`tests/error_handling/knowledge.md`**: Tests for the centralized error handler, including logging integration and test context suppression.
+- **`tests/fixtures/knowledge.md`**: Contains shared test data, helper modules (like mock modules), and other resources used by multiple tests.
+- **`tests/integration/knowledge.md`**: Designated location for tests verifying interactions between multiple Firmo components (currently empty).
+- **`tests/mocking/knowledge.md`**: Tests for Firmo's mocking and stubbing capabilities.
+- **`tests/parallel/knowledge.md`**: Tests for the parallel test execution feature (`--parallel`).
+- **`tests/performance/knowledge.md`**: Placeholder for performance benchmark tests of the Firmo framework itself (currently empty).
+- **`tests/quality/knowledge.md`**: Tests for the test quality validation rules and reporting.
+- **`tests/reporting/knowledge.md`**: Tests for the various report formatters (HTML, JSON, JUnit, LCOV, etc.).
+- **`tests/tools/knowledge.md`**: Contains subdirectories with tests for the utility modules found in `lib/tools/`.
+- **Standalone Test Files:**
+    - `simple_test.lua`: A very basic example test file, potentially used for initial setup verification or simple sanity checks.
+    - `debug_structured_results.lua`: Likely a specific test case designed to examine or debug the detailed structure of the results object generated by the test runner.
 
+## Best Practices / Critical Rules (Optional)
 
-## Test File Organization
+When writing or maintaining tests for Firmo:
+- **Isolation:** Aim for tests (`it` blocks) that verify a single, specific behavior. Use `before_each`/`after_each` hooks and utilities like `lib.core.module_reset` or `test_helper`'s temp file functions to ensure tests do not interfere with each other's state.
+- **Clarity:** Use clear and descriptive names for `describe` and `it` blocks. Add comments to explain complex setup or assertions.
+- **Assertions:** Use Firmo's standard `expect()` assertion style correctly and consistently. Prefer specific matchers (e.g., `.to.exist()`, `.to.be_truthy()`) over more generic ones. Verify the order of arguments (`expect(actual).to.equal(expected)`).
+- **Error Testing:** Explicitly test error conditions using `test_helper.expect_error` (to assert an error occurs and optionally match the message) or `test_helper.with_error_capture` (to inspect the properties of an expected error).
+- **Resource Cleanup:** Ensure any resources created during a test (temporary files, network connections, etc.) are properly cleaned up, ideally using `after_each` hooks or utilities like `test_helper.with_temp_test_directory` which handle cleanup automatically.
 
+## Troubleshooting / Common Pitfalls (Optional)
 
-
-1. Module imports
-2. Local test utilities
-3. Describe blocks for logical grouping
-4. Individual test cases
-5. Cleanup code
-
-
-## Error Testing
-
-
-
-- Use expect_error flag for error tests
-- Use test_helper.with_error_capture()
-- Check error existence before assertions
-- Use pattern matching for messages
-- Clean up resources properly
+- **Test Failures:** Failures within the `tests/` directory typically indicate either:
+    - **Framework Bugs:** An issue in the `lib/` code being tested.
+    - **Test Logic Errors:** An incorrect assertion, flawed setup/teardown logic, or misunderstanding of the feature being tested.
+    - **Environment Issues:** Problems external to the code, such as missing dependencies (e.g., failed LPegLabel build), incorrect file permissions, or unexpected interactions if tests are not properly isolated.
+- **Debugging Steps:**
+    1.  **Isolate:** Run the specific failing test file or even a specific `it` block using pattern matching (`lua test.lua path/to/test.lua --pattern "specific it block name"`) to narrow down the problem.
+    2.  **Examine Output:** Check the detailed failure message provided by Firmo. Use the `--verbose` flag for more output.
+    3.  **Logging:** Add targeted logging statements (`local logger = require("lib.tools.logging").get_logger("debug"); logger.debug("Value:", {myVar = value})`) within the test code or the framework code being tested to trace execution flow and variable states.
+    4.  **Inspect Errors:** If testing error conditions, use `test_helper.with_error_capture` and print the structure of the captured error object (`parser.dump(err)`) to understand its properties.

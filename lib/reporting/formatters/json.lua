@@ -1,13 +1,69 @@
 --- JSON Formatter for Coverage Reports
--- Generates JSON coverage reports with proper JSON structure and formatting
--- @module reporting.formatters.json
--- @author Firmo Team
--- @version 1.0.0
+---
+--- Generates coverage reports in JSON format, supporting optional pretty-printing.
+--- Inherits from the base Formatter class.
+---
+--- @module lib.reporting.formatters.json
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
-local Formatter = require("lib.reporting.formatters.base")
-local error_handler = require("lib.tools.error_handler")
-local central_config = require("lib.core.central_config")
-local filesystem = require("lib.tools.filesystem")
+--- @class CoverageReportFileStats Simplified structure expected by this formatter.
+--- @field name string File path.
+--- @field lines table<number, number> Map of line number to hit count.
+--- @field total_lines number Total lines in file.
+--- @field covered_lines number Covered lines in file.
+--- @field line_coverage_percent number Coverage percentage for file.
+
+--- @class CoverageReportSummary Simplified structure expected by this formatter.
+--- @field total_files number Total number of files.
+--- @field covered_files number Number of covered files.
+--- @field total_lines number Total lines across all files.
+--- @field covered_lines number Total covered lines across all files.
+--- @field line_coverage_percent number Overall line coverage percentage.
+
+--- @class CoverageReportData Expected structure for coverage data input (simplified).
+--- @field summary CoverageReportSummary Overall summary statistics.
+--- @field files table<string, CoverageReportFileStats> Map of file paths to file statistics.
+
+---@class JSONFormatter : Formatter JSON Formatter for coverage reports.
+--- Generates JSON reports with configurable pretty-printing.
+---@field _VERSION string Module version.
+---@field validate fun(self: JSONFormatter, coverage_data: CoverageReportData): boolean, table? Validates coverage data. Returns `true` or `false, error`.
+---@field format fun(self: JSONFormatter, coverage_data: CoverageReportData, options?: { pretty_print?: boolean, indent_size?: number, stream?: boolean }): string|nil, table? Formats coverage data as a JSON string. Returns `json_string, nil` or `nil, error`.
+---@field build_json fun(self: JSONFormatter, data: CoverageReportData, options: table): string Builds the JSON content. Returns JSON string.
+---@field build_json_streaming fun(self: JSONFormatter, data: CoverageReportData, options: table): string Placeholder for streaming JSON generation. Returns JSON string.
+---@field encode_json_value fun(self: JSONFormatter, value: any, pretty: boolean, indent_size: number, level: number): string Encodes a single Lua value to its JSON string representation. Returns JSON string. @private
+---@field encode_json_object fun(self: JSONFormatter, obj: table, pretty: boolean, indent_size: number, level: number): string Encodes a Lua table (as a JSON object) to its JSON string representation. Returns JSON string. @private
+---@field encode_json_array fun(self: JSONFormatter, arr: table, pretty: boolean, indent_size: number, level: number): string Encodes a Lua array to its JSON string representation. Returns JSON string. @private
+---@field write fun(self: JSONFormatter, json_content: string, output_path: string, options?: table): boolean, table? Writes the JSON content to a file. Returns `true, nil` or `false, error`. @throws table If writing fails critically.
+---@field register fun(formatters: table): boolean, table? Registers the JSON formatter with the main registry. Returns `true, nil` or `false, error`. @throws table If validation fails.
+
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+local Formatter = try_require("lib.reporting.formatters.base")
 
 -- Create JSON formatter class
 local JSONFormatter = Formatter.extend("json", "json")
@@ -27,7 +83,11 @@ local json_escape_chars = {
   ["\t"] = "\\t",
 }
 
--- Escape a string for JSON output
+--- Escapes a string for safe inclusion in a JSON string.
+--- Handles quotes, backslashes, and control characters.
+---@param s string The input string.
+---@return string The escaped string.
+---@private
 local function json_escape(s)
   if type(s) ~= "string" then
     s = tostring(s)
@@ -40,7 +100,11 @@ local function json_escape(s)
     end)
 end
 
--- Validate coverage data structure for JSON formatter
+--- Validates the coverage data structure. Inherits base validation.
+---@param self JSONFormatter The formatter instance.
+---@param coverage_data CoverageReportData The coverage data to validate.
+---@return boolean success `true` if validation passes.
+---@return table? error Error object if validation failed.
 function JSONFormatter:validate(coverage_data)
   -- Call base class validation first
   local valid, err = Formatter.validate(self, coverage_data)
@@ -53,11 +117,19 @@ function JSONFormatter:validate(coverage_data)
   return true
 end
 
--- Format coverage data as JSON
+--- Formats coverage data into a JSON string based on the specified options.
+---@param self JSONFormatter The formatter instance.
+---@param coverage_data CoverageReportData The coverage data structure.
+---@param options? { pretty_print?: boolean, indent_size?: number, stream?: boolean } Formatting options:
+---  - `pretty_print` (boolean, default true): Enable indentation and newlines.
+---  - `indent_size` (number, default 2): Number of spaces per indentation level.
+---  - `stream` (boolean, default false): Use streaming (currently placeholder).
+---@return string|nil json_content The generated JSON content as a single string, or `nil` on validation error.
+---@return table? error Error object if validation failed.
 function JSONFormatter:format(coverage_data, options)
   -- Parameter validation
   if not coverage_data then
-    return nil, error_handler.validation_error("Coverage data is required", { formatter = self.name })
+    return nil, get_error_handler().validation_error("Coverage data is required", { formatter = self.name })
   end
 
   -- Apply options with defaults
@@ -81,7 +153,11 @@ function JSONFormatter:format(coverage_data, options)
   return json
 end
 
--- Build JSON using standard approach (all in memory)
+--- Builds the JSON content string using standard in-memory encoding.
+---@param self JSONFormatter The formatter instance.
+---@param data CoverageReportData The normalized coverage data (requires `summary`, `files`).
+---@param options table Formatting options including `pretty_print`, `indent_size`.
+---@return string json_content The generated JSON string.
 function JSONFormatter:build_json(data, options)
   -- Determine indentation
   local indent = ""
@@ -106,7 +182,12 @@ function JSONFormatter:build_json(data, options)
   }, pretty, options.indent_size or 2)
 end
 
--- Build JSON using streaming approach for large datasets
+--- Placeholder for building JSON using a streaming approach.
+--- Currently calls the standard `build_json` method.
+---@param self JSONFormatter The formatter instance.
+---@param data CoverageReportData The normalized coverage data.
+---@param options table Formatting options.
+---@return string json_content The generated JSON string (using non-streaming method).
 function JSONFormatter:build_json_streaming(data, options)
   -- For now, this is a placeholder that just uses the standard approach
   -- In a real implementation, this would use a streaming JSON encoder
@@ -114,7 +195,15 @@ function JSONFormatter:build_json_streaming(data, options)
   return self:build_json(data, options)
 end
 
--- JSON encoder functions
+--- Encodes a single Lua value (nil, boolean, number, string, table) into its JSON string representation.
+--- Handles pretty-printing indentation.
+---@param self JSONFormatter The formatter instance.
+---@param value any The Lua value to encode.
+---@param pretty boolean Whether to pretty-print.
+---@param indent_size number Number of spaces per indent level.
+---@param level? number Current indentation level (default 0).
+---@return string json_string The JSON string representation of the value.
+---@private
 function JSONFormatter:encode_json_value(value, pretty, indent_size, level)
   level = level or 0
   local indent = pretty and string.rep(" ", level * indent_size) or ""
@@ -168,6 +257,15 @@ function JSONFormatter:encode_json_value(value, pretty, indent_size, level)
   end
 end
 
+--- Encodes a Lua table assumed to be a JSON object into its JSON string representation.
+--- Handles pretty-printing indentation and sorts keys for deterministic output.
+---@param self JSONFormatter The formatter instance.
+---@param obj table The Lua table to encode as an object.
+---@param pretty boolean Whether to pretty-print.
+---@param indent_size number Number of spaces per indent level.
+---@param level? number Current indentation level (default 0).
+---@return string json_string The JSON object string representation.
+---@private
 function JSONFormatter:encode_json_object(obj, pretty, indent_size, level)
   level = level or 0
   local indent = pretty and string.rep(" ", level * indent_size) or ""
@@ -212,6 +310,15 @@ function JSONFormatter:encode_json_object(obj, pretty, indent_size, level)
   return result
 end
 
+--- Encodes a Lua table assumed to be a JSON array into its JSON string representation.
+--- Handles pretty-printing indentation.
+---@param self JSONFormatter The formatter instance.
+---@param arr table The Lua array (sequential 1-based integer keys) to encode.
+---@param pretty boolean Whether to pretty-print.
+---@param indent_size number Number of spaces per indent level.
+---@param level? number Current indentation level (default 0).
+---@return string json_string The JSON array string representation.
+---@private
 function JSONFormatter:encode_json_array(arr, pretty, indent_size, level)
   level = level or 0
   local indent = pretty and string.rep(" ", level * indent_size) or ""
@@ -243,17 +350,27 @@ function JSONFormatter:encode_json_array(arr, pretty, indent_size, level)
   return result
 end
 
--- Write the report to the filesystem
+--- Writes the generated JSON content to a file.
+--- Inherits the write logic (including directory creation) from the base `Formatter`.
+---@param self JSONFormatter The formatter instance.
+---@param json_content string The JSON content string to write.
+---@param output_path string The path to the output file.
+---@param options? table Optional options passed to the base `write` method (currently unused by base).
+---@return boolean success `true` if writing succeeded.
+---@return table? error Error object if writing failed.
+---@throws table If writing fails critically.
 function JSONFormatter:write(json_content, output_path, options)
   return Formatter.write(self, json_content, output_path, options)
 end
 
---- Register the JSON formatter with the formatters registry
 -- @param formatters table The formatters registry
--- @return boolean success Whether registration was successful
+---@param formatters table The main formatters registry object (must contain `coverage`, `quality`, `results` tables).
+---@return boolean success `true` if registration succeeded.
+---@return table? error Error object if validation failed.
+---@throws table If validation fails critically.
 function JSONFormatter.register(formatters)
   if not formatters or type(formatters) ~= "table" then
-    local err = error_handler.validation_error("Invalid formatters registry", {
+    local err = get_error_handler().validation_error("Invalid formatters registry", {
       operation = "register",
       formatter = "json",
       provided_type = type(formatters),

@@ -116,7 +116,7 @@ local success, err = fs.move_file(source, destination)
 ```
 
 
-Moves a file from `source` to `destination`, creating any necessary parent directories.
+Moves a file from `source` to `destination`, creating any necessary parent directories. Attempts to use `os.rename` first, falling back to copy+delete if needed (e.g., across filesystems).
 **Parameters:**
 
 
@@ -139,7 +139,7 @@ local success, err = fs.delete_file(path)
 ```
 
 
-Deletes a file.
+Deletes a file. Alias: `remove_file`.
 **Parameters:**
 
 
@@ -161,7 +161,7 @@ local success, err = fs.rename(old_path, new_path)
 ```
 
 
-Renames a file or directory.
+Renames a file or directory using `os.rename`.
 **Parameters:**
 
 
@@ -231,7 +231,7 @@ local contents, err = fs.get_directory_contents(path)
 ```
 
 
-Lists the contents of a directory.
+Lists the contents (files and directories) of a directory. Aliases: `get_directory_items`, `list_directory`.
 **Parameters:**
 
 
@@ -242,30 +242,6 @@ Lists the contents of a directory.
 
 - `contents` (table|nil): Table of file and directory names or nil on failure
 - `err` (string|nil): Error message if the operation failed
-
-
-### Getting Directory Items
-
-
-
-```lua
-local items, err = fs.get_directory_items(path, include_hidden)
-```
-
-
-Gets all items (files and directories) in a directory.
-**Parameters:**
-
-
-- `path` (string): Path to the directory to list
-- `include_hidden` (boolean, optional): Whether to include hidden files (default: false)
-
-**Returns:**
-
-
-- `items` (table|nil): Table of file and directory names or nil on failure
-- `err` (string|nil): Error message if the operation failed
-
 
 ### Listing Files
 
@@ -345,7 +321,7 @@ local success, err = fs.delete_directory(path, recursive)
 ```
 
 
-Deletes a directory.
+Deletes a directory. Alias: `remove_directory`.
 **Parameters:**
 
 
@@ -357,6 +333,24 @@ Deletes a directory.
 
 - `success` (boolean|nil): True on success or nil on failure
 - `err` (string|nil): Error message if the operation failed
+
+### Copying Directories Recursively
+
+```lua
+local success, err = fs.copy_directory(source_dir, target_dir, overwrite)
+```
+
+Recursively copies a directory and all its contents from `source_dir` to `target_dir`.
+**Parameters:**
+
+- `source_dir` (string): Path to the source directory.
+- `target_dir` (string): Path to the destination directory.
+- `overwrite` (boolean, optional): If true, overwrite existing files in the destination (default: false).
+
+**Returns:**
+
+- `success` (boolean|nil): True on success or nil on failure.
+- `err` (string|nil): Error message if the operation failed.
 
 
 ## Path Manipulation
@@ -380,7 +374,7 @@ Standardizes path separators and removes redundant elements. Always uses forward
 **Returns:**
 
 
-- `normalized` (string|nil): Normalized path or nil if path is nil
+- `normalized` (string|nil): Normalized path, `.` if input resolves to empty, `/` if input resolves to root, or nil if input is nil.
 
 
 ### Joining Paths
@@ -401,8 +395,8 @@ Combines multiple path segments into a single path, handling separators appropri
 **Returns:**
 
 
-- `joined` (string|nil): Joined path or nil on error
-- `err` (string|nil): Error message if the operation failed
+- `joined` (string|nil): Joined path or nil on error.
+- `err` (string|table|nil): Error message or error object if the operation failed.
 
 
 ### Getting Directory Name
@@ -414,7 +408,7 @@ local dir = fs.get_directory_name(path)
 ```
 
 
-Extracts the directory component from a path.
+Extracts the directory component from a path. Aliases: `dirname`, `get_directory`.
 **Parameters:**
 
 
@@ -435,7 +429,7 @@ local name = fs.get_file_name(path)
 ```
 
 
-Extracts the file name component from a path.
+Extracts the file name component from a path. Aliases: `basename`, `get_filename`.
 **Parameters:**
 
 
@@ -444,8 +438,8 @@ Extracts the file name component from a path.
 **Returns:**
 
 
-- `name` (string|nil): File name component of path or nil on error
-- `err` (string|nil): Error message if the operation failed
+- `name` (string|nil): File name component of path or nil on error.
+- `err` (string|table|nil): Error message or error object if the operation failed.
 
 
 ### Getting File Extension
@@ -466,32 +460,8 @@ Extracts the file extension from a path (without the dot).
 **Returns:**
 
 
-- `ext` (string|nil): File extension (without the dot) or empty string if no extension, nil on error
-- `err` (string|nil): Error message if the operation failed
-
-
-### Changing File Extension
-
-
-
-```lua
-local new_path = fs.change_extension(path, new_ext)
-```
-
-
-Changes the extension of a file path.
-**Parameters:**
-
-
-- `path` (string): Path to process
-- `new_ext` (string): New extension (without the dot)
-
-**Returns:**
-
-
-- `new_path` (string): Path with the new extension
-
-
+- `ext` (string|nil): File extension (without the dot) or empty string if no extension, nil on error.
+- `err` (string|table|nil): Error message or error object if the operation failed.
 ### Getting Absolute Path
 
 
@@ -510,8 +480,8 @@ Converts a relative path to an absolute path.
 **Returns:**
 
 
-- `abs_path` (string|nil): Absolute path or nil on error
-- `err` (string|nil): Error message if the operation failed
+- `abs_path` (string|nil): Absolute path or nil on error.
+- `err` (string|table|nil): Error message or error object if the operation failed.
 
 
 ### Getting Relative Path
@@ -571,8 +541,8 @@ Gets the current working directory.
 **Returns:**
 
 
-- `current_dir` (string|nil): Current working directory or nil on error
-- `err` (string|nil): Error message if the operation failed
+- `current_dir` (string|nil): Current working directory or nil on error.
+- `err` (string|table|nil): Error message or error object if the operation failed.
 
 
 ### Setting Current Directory
@@ -595,6 +565,69 @@ Sets the current working directory.
 
 - `success` (boolean|nil): True on success or nil on failure
 - `err` (string|nil): Error message if the operation failed
+
+
+## Symbolic Link Operations
+
+### Checking for Symlink Support
+
+```lua
+local supported = fs.supports_symlinks
+```
+
+A boolean flag indicating whether the current platform and environment support creating symbolic links. Windows may require administrator privileges or developer mode.
+**Parameters:** None
+**Returns:**
+
+- `supported` (boolean): True if symbolic links are supported.
+
+### Checking if Path is Symlink
+
+```lua
+local is_link = fs.is_symlink(path)
+```
+
+Checks if the given path exists and is a symbolic link.
+**Parameters:**
+
+- `path` (string): Path to check.
+
+**Returns:**
+
+- `is_link` (boolean): True if the path is a symbolic link, false otherwise.
+
+### Creating Symlinks
+
+```lua
+local success, err = fs.create_symlink(target_path, link_path)
+```
+
+Creates a symbolic link at `link_path` pointing to `target_path`. Automatically handles file vs. directory links. Requires appropriate permissions.
+**Parameters:**
+
+- `target_path` (string): Path to the target file or directory.
+- `link_path` (string): Path where the symlink should be created.
+
+**Returns:**
+
+- `success` (boolean|nil): True on success or nil on failure.
+- `err` (string|nil): Error message if the operation failed.
+
+### Resolving Symlinks
+
+```lua
+local resolved_path, err = fs.resolve_symlink(path)
+```
+
+Resolves a symbolic link to its target path. If the path is not a symlink, it returns the original path. Alias: `get_symlink_target`.
+**Parameters:**
+
+- `path` (string): Path that might be a symlink.
+
+**Returns:**
+
+- `resolved_path` (string|nil): The resolved absolute path or nil on error.
+- `err` (string|nil): Error message if the resolution failed.
 
 
 ## File Discovery
@@ -640,8 +673,8 @@ Tests if a path matches a glob pattern.
 **Returns:**
 
 
-- `matches` (boolean|nil): True if path matches pattern, nil on error
-- `err` (string|nil): Error message if the operation failed
+- `matches` (boolean|nil): True if path matches pattern, false otherwise, or nil on error.
+- `err` (string|table|nil): Error message or error object if the operation failed.
 
 
 ### Glob Pattern Matching
@@ -687,8 +720,8 @@ Finds all files in the specified directories that match any pattern in `patterns
 **Returns:**
 
 
-- `files` (table|nil): List of matching file paths or nil on error
-- `err` (string|nil): Error message if the operation failed
+- `files` (table|nil): List of absolute paths for matching files or nil on error.
+- `err` (string|table|nil): Error message or error object if the operation failed.
 
 
 ### Scanning Directories
@@ -700,7 +733,7 @@ local files = fs.scan_directory(path, recursive)
 ```
 
 
-Lists all files in a directory.
+Scans a directory for files, optionally recursively.
 **Parameters:**
 
 
@@ -780,8 +813,26 @@ Finds directories in a directory that match a pattern.
 
 
 - `dirs` (table|nil): List of matching directory paths or nil on error
-- `err` (string|nil): Error message if the operation failed
+- `err` (string|nil): Error message if the operation failed.
 
+
+### Finding Directories (Matching Pattern)
+
+```lua
+local dirs, err = fs.find_directories(dir_path, pattern, recursive)
+```
+
+Finds directories within a directory that match a Lua pattern.
+**Parameters:**
+
+- `dir_path` (string): Directory to search in.
+- `pattern` (string): Lua pattern to match against directory names.
+- `recursive` (boolean, optional): Whether to search in subdirectories (default: false).
+
+**Returns:**
+
+- `dirs` (table|nil): List of matching directory paths or nil on error.
+- `err` (string|nil): Error message if the operation failed.
 
 ### Detecting Project Root
 
@@ -851,34 +902,22 @@ Tests if a directory exists and is accessible.
 - `exists` (boolean): True if the directory exists and is accessible
 
 
-### Getting File Information
 
-
+### Getting File Information (Using lfs)
 
 ```lua
-local info, err = fs.get_file_info(file_path)
+local info, err = fs.get_file_info(path)
 ```
 
-
-Gets detailed information about a file.
+Gets detailed file attributes using the `lfs` module (if available).
 **Parameters:**
 
-
-- `file_path` (string): Path to the file
+- `path` (string): Path to the file or directory.
 
 **Returns:**
 
-
-- `info` (table|nil): Table containing file information or nil on error:
-  - `size` (number): Size in bytes
-  - `modified` (number): Last modified timestamp
-  - `type` (string): File type
-  - `is_directory` (boolean): Whether it's a directory
-  - `is_file` (boolean): Whether it's a regular file
-  - `is_link` (boolean): Whether it's a symbolic link
-  - `permissions` (string): File permissions
-- `err` (string|nil): Error message if the operation failed
-
+- `info` (table|nil): Table containing attributes like `mode`, `size`, `modification`, etc., or nil on error. The exact fields depend on `lfs`.
+- `err` (string|nil): Error message if the operation failed.
 
 ### Getting File Size
 
@@ -911,7 +950,7 @@ local time, err = fs.get_modified_time(path)
 ```
 
 
-Gets the modification timestamp of a file or directory.
+Gets the modification timestamp of a file or directory. Alias: `get_file_modified_time`.
 **Parameters:**
 
 
@@ -922,29 +961,6 @@ Gets the modification timestamp of a file or directory.
 
 - `time` (number|nil): Modification time as Unix timestamp or nil on error
 - `err` (string|nil): Error message if the operation failed
-
-
-### Getting File Modified Time
-
-
-
-```lua
-local time, err = fs.get_file_modified_time(path)
-```
-
-
-Gets the modification timestamp of a file.
-**Parameters:**
-
-
-- `path` (string): Path to the file
-
-**Returns:**
-
-
-- `time` (number|nil): Modification time as Unix timestamp or nil on error
-- `err` (string|nil): Error message if the operation failed
-
 
 ### Getting Creation Time
 
@@ -1154,8 +1170,11 @@ Cleans up all temporary files and directories registered for the current test co
 All functions that can fail return two values:
 
 
-1. The result value (or `nil` if an error occurred)
-2. An error message (only present if an error occurred)
+1. The result value (or `nil` if an error occurred).
+2. An error value, which can be:
+   - `nil` if the operation was successful.
+   - A `string` containing an error message.
+   - A `table` or `object` if the error was caught by the `error_handler` module during complex operations like path manipulation or discovery.
 
 This allows for robust error handling:
 

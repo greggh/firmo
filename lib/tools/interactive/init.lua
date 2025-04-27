@@ -1,51 +1,109 @@
--- Interactive CLI module for firmo
--- Provides an interactive command-line interface for the test framework
+--- Firmo Interactive CLI Module
+---
+--- Provides an interactive command-line interface (REPL) for running tests,
+--- managing test settings, and interacting with other Firmo tools like codefix.
+--- Features command history, watch mode toggle, filtering, and more.
+---
+--- @module lib.tools.interactive
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.3.0
 
----@class interactive_module
----@field _VERSION string Module version
----@field init fun(options?: {history_file?: string, prompt?: string, max_history?: number, colors?: boolean, auto_complete?: boolean, enable_debugging?: boolean, silent?: boolean}): interactive_module Initialize the interactive CLI with configuration options
----@field start fun(): boolean Start the interactive CLI session
----@field stop fun(): boolean Stop the interactive CLI session
----@field run_command fun(command: string): boolean|nil, string? Run a CLI command
----@field parse_command fun(input: string): {command: string, args: string[]} Parse a command string into command and arguments
----@field configure fun(options?: table): interactive_module Configure the interactive CLI
----@field load_history fun(file_path?: string): boolean|nil, string? Load command history from a file
----@field save_history fun(file_path?: string): boolean|nil, string? Save command history to a file
----@field add_to_history fun(command: string): boolean Add a command to the history
----@field get_history fun(): string[] Get the command history
----@field register_command fun(name: string, handler: fun(args: string[]): boolean|string, help_text: string): boolean Register a custom command
----@field unregister_command fun(name: string): boolean Remove a registered command
----@field set_prompt fun(prompt: string): interactive_module Set the command prompt
----@field colorize fun(text: string, color: string): string Apply ANSI color to text
----@field get_registered_commands fun(): table<string, {handler: function, help: string}> Get all registered commands
----@field print fun(text: string, color?: string): nil Print text to the interactive console
----@field clear fun(): nil Clear the console screen
----@field set_completion_handler fun(handler: fun(input: string): string[]): interactive_module Set custom auto-completion handler
----@field handle_tab_completion fun(input: string): string[] Handle tab completion for commands
----@field get_command_help fun(command?: string): string Get help text for commands
----@field process_input fun(input: string): boolean Process user input
+---@class interactive_module The public API for the interactive CLI module.
+---@field _VERSION string Module version.
+---@field start fun(firmo: table, options?: {test_dir?: string, pattern?: string, watch_mode?: boolean}): boolean Starts the interactive CLI session. Requires the main `firmo` instance.
+---@field configure fun(options?: {test_dir?: string, test_pattern?: string, watch_mode?: boolean, watch_dirs?: string[], watch_interval?: number, exclude_patterns?: string[], max_history?: number, colorized_output?: boolean, prompt_symbol?: string, debug?: boolean, verbose?: boolean}): interactive_module Configures the interactive module settings, interacting with central config if available.
+---@field reset fun(): interactive_module Resets local configuration and runtime state (history, filters, etc.) to defaults.
+---@field full_reset fun(): interactive_module Resets local config, state, and attempts to reset central config for this module.
+---@field debug_config fun(): table Returns a table containing the current configuration and runtime state for debugging.
 
 local interactive = {}
+local interactive = {}
+
+--- Module version
 interactive._VERSION = "1.3.0"
 
-local logging = require("lib.tools.logging")
-local fs = require("lib.tools.filesystem")
-local error_handler = require("lib.tools.error_handler")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
 
--- Initialize module logger
-local logger = logging.get_logger("interactive")
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
 
--- Default configuration
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("interactive")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+local runner = try_require("lib.core.runner")
+
 local DEFAULT_CONFIG = {
-  test_dir = "./tests",
-  test_pattern = "*_test.lua",
-  watch_mode = false,
-  watch_dirs = { "." },
-  watch_interval = 1.0,
+  test_dir = "./tests", -- Default directory containing test files.
+  test_pattern = "*_test.lua", -- Default Lua pattern for matching test files.
+  watch_mode = false, -- Start in watch mode (true/false).
+  watch_dirs = { "." }, -- Directories to monitor in watch mode.
+  watch_interval = 1.0, -- Interval (seconds) for checking file changes in watch mode.
   exclude_patterns = { "node_modules", "%.git" },
-  max_history = 100,
-  colorized_output = true,
-  prompt_symbol = ">",
+  max_history = 100, -- Maximum number of commands to keep in history.
+  colorized_output = true, -- Use ANSI colors in output.
+  prompt_symbol = ">", -- Character(s) to display for the input prompt.
   debug = false,
   verbose = false,
 }
@@ -63,23 +121,23 @@ local colors = {
   normal = string.char(27) .. "[0m",
 }
 
--- Current state of the interactive CLI
+--- Internal state table for the interactive module.
 local state = {
-  firmo = nil,
-  test_dir = DEFAULT_CONFIG.test_dir,
+  firmo = nil, -- Reference to the main firmo instance.
+  test_dir = DEFAULT_CONFIG.test_dir, -- Current directory for test discovery.
   test_pattern = DEFAULT_CONFIG.test_pattern,
-  current_files = {},
-  focus_filter = nil,
-  tag_filter = nil,
+  current_files = {}, -- List of discovered test files based on current dir/pattern.
+  focus_filter = nil, -- Current focus pattern string applied to tests.
+  tag_filter = nil, -- Current tag filter string applied to tests.
   watch_mode = DEFAULT_CONFIG.watch_mode,
-  watch_dirs = {},
-  watch_interval = DEFAULT_CONFIG.watch_interval,
-  exclude_patterns = {},
-  last_command = nil,
-  history = {},
-  history_pos = 1,
-  codefix_enabled = false,
-  running = true,
+  watch_dirs = {}, -- Current list of directories being watched.
+  watch_interval = DEFAULT_CONFIG.watch_interval, -- Current watch interval.
+  exclude_patterns = {}, -- Current list of exclude patterns for watch mode.
+  last_command = nil, -- The previously executed command string.
+  history = {}, -- Array storing command history strings.
+  history_pos = 1, -- Current position in the history (for up/down navigation - partially implemented).
+  codefix_enabled = false, -- Flag indicating if the codefix module has been initialized.
+  running = true, -- Flag to control the main interactive loop.
   colorized_output = DEFAULT_CONFIG.colorized_output,
   prompt_symbol = DEFAULT_CONFIG.prompt_symbol,
 }
@@ -94,61 +152,39 @@ for _, pattern in ipairs(DEFAULT_CONFIG.exclude_patterns) do
 end
 
 -- Lazy loading of central_config to avoid circular dependencies
-local _central_config
+local central_config
 
-local function get_central_config()
-  if not _central_config then
-    -- Use pcall to safely attempt loading central_config
-    local success, central_config = pcall(require, "lib.core.central_config")
-    if success then
-      _central_config = central_config
+local central_config = try_require("lib.core.central_config")
 
-      -- Register this module with central_config
-      _central_config.register_module("interactive", {
-        -- Schema
-        field_types = {
-          test_dir = "string",
-          test_pattern = "string",
-          watch_mode = "boolean",
-          watch_dirs = "table",
-          watch_interval = "number",
-          exclude_patterns = "table",
-          max_history = "number",
-          colorized_output = "boolean",
-          prompt_symbol = "string",
-          debug = "boolean",
-          verbose = "boolean",
-        },
-        field_ranges = {
-          watch_interval = { min = 0.1, max = 10 },
-          max_history = { min = 10, max = 1000 },
-        },
-      }, DEFAULT_CONFIG)
+-- Register this module with central_config
+central_config.register_module("interactive", {
+  -- Schema
+  field_types = {
+    test_dir = "string",
+    test_pattern = "string",
+    watch_mode = "boolean",
+    watch_dirs = "table",
+    watch_interval = "number",
+    exclude_patterns = "table",
+    max_history = "number",
+    colorized_output = "boolean",
+    prompt_symbol = "string",
+    debug = "boolean",
+    verbose = "boolean",
+  },
+  field_ranges = {
+    watch_interval = { min = 0.1, max = 10 },
+    max_history = { min = 10, max = 1000 },
+  },
+}, DEFAULT_CONFIG)
 
-      logger.debug("Successfully loaded central_config", {
-        module = "interactive",
-      })
-    else
-      logger.debug("Failed to load central_config", {
-        error = tostring(central_config),
-      })
-    end
-  end
-
-  return _central_config
-end
-
--- Set up change listener for central configuration
+--- Registers a listener with central_config to update local config cache when interactive settings change.
+---@return boolean success `true` if the listener was registered, `false` otherwise.
+---@private
 local function register_change_listener()
-  local central_config = get_central_config()
-  if not central_config then
-    logger.debug("Cannot register change listener - central_config not available")
-    return false
-  end
-
   -- Register change listener for interactive configuration
   central_config.on_change("interactive", function(path, old_value, new_value)
-    logger.debug("Configuration change detected", {
+    get_logger().debug("Configuration change detected", {
       path = path,
       changed_by = "central_config",
     })
@@ -164,7 +200,7 @@ local function register_change_listener()
         else
           if state[key] ~= nil and state[key] ~= value then
             state[key] = value
-            logger.debug("Updated setting from central_config", {
+            get_logger().debug("Updated setting from central_config", {
               key = key,
               value = value,
             })
@@ -179,7 +215,7 @@ local function register_change_listener()
         for _, dir in ipairs(interactive_config.watch_dirs) do
           table.insert(state.watch_dirs, dir)
         end
-        logger.debug("Updated watch_dirs from central_config", {
+        get_logger().debug("Updated watch_dirs from central_config", {
           dir_count = #state.watch_dirs,
         })
       end
@@ -191,7 +227,7 @@ local function register_change_listener()
         for _, pattern in ipairs(interactive_config.exclude_patterns) do
           table.insert(state.exclude_patterns, pattern)
         end
-        logger.debug("Updated exclude_patterns from central_config", {
+        get_logger().debug("Updated exclude_patterns from central_config", {
           pattern_count = #state.exclude_patterns,
         })
       end
@@ -202,102 +238,74 @@ local function register_change_listener()
         verbose = interactive_config.verbose,
       })
 
-      logger.debug("Applied configuration changes from central_config")
+      get_logger().debug("Applied configuration changes from central_config")
     end
   end)
 
-  logger.debug("Registered change listener for central configuration")
+  get_logger().debug("Registered change listener for central configuration")
   return true
 end
 
--- Configure the module
---- Configure the interactive CLI with custom options
----@param options? table Configuration options to override defaults
----@return interactive_module The module instance for method chaining
+--- Configures the interactive module settings.
+--- Merges provided `options` with defaults, potentially loading from or saving to central config.
+---@param options? {test_dir?: string, test_pattern?: string, watch_mode?: boolean, watch_dirs?: string[], watch_interval?: number, exclude_patterns?: string[], max_history?: number, colorized_output?: boolean, prompt_symbol?: string, debug?: boolean, verbose?: boolean} Configuration options table.
+---@return interactive_module self The module instance (`interactive`) for method chaining.
 function interactive.configure(options)
   options = options or {}
 
-  logger.debug("Configuring interactive module", {
+  get_logger().debug("Configuring interactive module", {
     options = options,
   })
 
-  -- Check for central configuration first
-  local central_config = get_central_config()
-  if central_config then
-    -- Get existing central config values
-    local interactive_config = central_config.get("interactive")
+  -- Get existing central config values
+  local interactive_config = central_config.get("interactive")
 
-    -- Apply central configuration (with defaults as fallback)
-    if interactive_config then
-      logger.debug("Using central_config values for initialization", {
-        test_dir = interactive_config.test_dir,
-        test_pattern = interactive_config.test_pattern,
-        watch_mode = interactive_config.watch_mode,
-      })
+  -- Apply central configuration (with defaults as fallback)
+  if interactive_config then
+    get_logger().debug("Using central_config values for initialization", {
+      test_dir = interactive_config.test_dir,
+      test_pattern = interactive_config.test_pattern,
+      watch_mode = interactive_config.watch_mode,
+    })
 
-      -- Apply basic settings
-      for key, default_value in pairs(DEFAULT_CONFIG) do
-        -- Skip arrays, they will be handled separately
-        if key ~= "watch_dirs" and key ~= "exclude_patterns" then
-          state[key] = interactive_config[key] ~= nil and interactive_config[key] or default_value
-        end
+    -- Apply basic settings
+    for key, default_value in pairs(DEFAULT_CONFIG) do
+      -- Skip arrays, they will be handled separately
+      if key ~= "watch_dirs" and key ~= "exclude_patterns" then
+        state[key] = interactive_config[key] ~= nil and interactive_config[key] or default_value
       end
+    end
 
-      -- Apply watch_dirs if available
-      if interactive_config.watch_dirs then
-        state.watch_dirs = {}
-        for _, dir in ipairs(interactive_config.watch_dirs) do
-          table.insert(state.watch_dirs, dir)
-        end
-      else
-        -- Reset to defaults
-        state.watch_dirs = {}
-        for _, dir in ipairs(DEFAULT_CONFIG.watch_dirs) do
-          table.insert(state.watch_dirs, dir)
-        end
-      end
-
-      -- Apply exclude_patterns if available
-      if interactive_config.exclude_patterns then
-        state.exclude_patterns = {}
-        for _, pattern in ipairs(interactive_config.exclude_patterns) do
-          table.insert(state.exclude_patterns, pattern)
-        end
-      else
-        -- Reset to defaults
-        state.exclude_patterns = {}
-        for _, pattern in ipairs(DEFAULT_CONFIG.exclude_patterns) do
-          table.insert(state.exclude_patterns, pattern)
-        end
+    -- Apply watch_dirs if available
+    if interactive_config.watch_dirs then
+      state.watch_dirs = {}
+      for _, dir in ipairs(interactive_config.watch_dirs) do
+        table.insert(state.watch_dirs, dir)
       end
     else
-      logger.debug("No central_config values found, using defaults")
       -- Reset to defaults
-      for key, value in pairs(DEFAULT_CONFIG) do
-        -- Skip arrays, they will be handled separately
-        if key ~= "watch_dirs" and key ~= "exclude_patterns" then
-          state[key] = value
-        end
-      end
-
-      -- Reset watch_dirs to defaults
       state.watch_dirs = {}
       for _, dir in ipairs(DEFAULT_CONFIG.watch_dirs) do
         table.insert(state.watch_dirs, dir)
       end
+    end
 
-      -- Reset exclude_patterns to defaults
+    -- Apply exclude_patterns if available
+    if interactive_config.exclude_patterns then
+      state.exclude_patterns = {}
+      for _, pattern in ipairs(interactive_config.exclude_patterns) do
+        table.insert(state.exclude_patterns, pattern)
+      end
+    else
+      -- Reset to defaults
       state.exclude_patterns = {}
       for _, pattern in ipairs(DEFAULT_CONFIG.exclude_patterns) do
         table.insert(state.exclude_patterns, pattern)
       end
     end
-
-    -- Register change listener if not already done
-    register_change_listener()
   else
-    logger.debug("central_config not available, using defaults")
-    -- Apply defaults for basic settings
+    get_logger().debug("No central_config values found, using defaults")
+    -- Reset to defaults
     for key, value in pairs(DEFAULT_CONFIG) do
       -- Skip arrays, they will be handled separately
       if key ~= "watch_dirs" and key ~= "exclude_patterns" then
@@ -318,6 +326,9 @@ function interactive.configure(options)
     end
   end
 
+  -- Register change listener if not already done
+  register_change_listener()
+
   -- Apply user options (highest priority) and update central config
   for key, value in pairs(options) do
     -- Special handling for watch_dirs and exclude_patterns
@@ -330,9 +341,7 @@ function interactive.configure(options)
         end
 
         -- Update central_config if available
-        if central_config then
-          central_config.set("interactive.watch_dirs", value)
-        end
+        central_config.set("interactive.watch_dirs", value)
       end
     elseif key == "exclude_patterns" then
       if type(value) == "table" then
@@ -342,31 +351,25 @@ function interactive.configure(options)
           table.insert(state.exclude_patterns, pattern)
         end
 
-        -- Update central_config if available
-        if central_config then
-          central_config.set("interactive.exclude_patterns", value)
-        end
+        central_config.set("interactive.exclude_patterns", value)
       end
     else
       -- Apply basic setting
       if state[key] ~= nil then
         state[key] = value
 
-        -- Update central_config if available
-        if central_config then
-          central_config.set("interactive." .. key, value)
-        end
+        central_config.set("interactive." .. key, value)
       end
     end
   end
 
   -- Configure logging
-  logging.configure_from_options("interactive", {
+  get_logging().configure_from_options("interactive", {
     debug = state.debug,
     verbose = state.verbose,
   })
 
-  logger.debug("Interactive module configuration complete", {
+  get_logger().debug("Interactive module configuration complete", {
     test_dir = state.test_dir,
     test_pattern = state.test_pattern,
     watch_mode = state.watch_mode,
@@ -383,72 +386,35 @@ end
 interactive.configure()
 
 -- Log module initialization
-logger.debug("Interactive CLI module initialized", {
+get_logger().debug("Interactive CLI module initialized", {
   version = interactive._VERSION,
 })
 
--- Try to load modules with enhanced error handling
-local function load_module(name, module_path)
-  logger.debug("Attempting to load module", {
-    module = name,
-    path = module_path,
-  })
-
-  -- Try to load the module
-  local success, result = error_handler.try(function()
-    return require(module_path)
-  end)
-
-  if not success then
-    -- Don't show errors for these specific modules, which are used differently in the CLI version
-    if name == "discover" or name == "runner" then
-      logger.debug("Module not available in this context", {
-        module = name,
-        path = module_path,
-      })
-    else
-      logger.warn("Failed to load module", {
-        module = name,
-        path = module_path,
-        error = error_handler.format_error(result),
-      })
-    end
-  else
-    logger.debug("Successfully loaded module", {
-      module = name,
-      path = module_path,
-    })
-  end
-
-  return success, result
-end
-
--- These modules are loaded directly in the CLI version but not needed in the library context
-local has_discovery, discover = false, nil
-local has_runner, runner = false, nil
-
 -- Load internal modules (should exist)
-local has_watcher, watcher = load_module("watcher", "lib.tools.watcher")
-local has_codefix, codefix = load_module("codefix", "lib.tools.codefix")
+local watcher = try_require("lib.tools.watcher")
+local codefix = try_require("lib.tools.codefix")
+local discover = try_require("lib.tools.discover")
 
--- Print the interactive CLI header with error handling
+--- Clears the screen (if possible) and prints the standard interactive CLI header.
+--- Handles potential errors during screen clear or printing.
+---@private
 local function print_header()
   -- Safe screen clearing with error handling
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     io.write("\027[2J\027[H") -- Clear screen
     return true
   end)
 
   if not success then
-    logger.warn("Failed to clear screen", {
+    get_logger().warn("Failed to clear screen", {
       component = "CLI",
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
     -- Continue without clearing screen
   end
 
   -- Safe output with error handling
-  success, result = error_handler.try(function()
+  success, result = get_error_handler().try(function()
     print(colors.bold .. colors.cyan .. "Firmo Interactive CLI" .. colors.normal)
     print(colors.green .. "Type 'help' for available commands" .. colors.normal)
     print(string.rep("-", 60))
@@ -456,12 +422,12 @@ local function print_header()
   end)
 
   if not success then
-    logger.error("Failed to display header", {
+    get_logger().error("Failed to display header", {
       component = "CLI",
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
     -- Try a simple fallback for header display
-    error_handler.try(function()
+    get_error_handler().try(function()
       print("Firmo Interactive CLI")
       print("Type 'help' for available commands")
       print("---------------------------------------------------------")
@@ -471,7 +437,7 @@ local function print_header()
 
   -- Safely get current time
   local time_str = "unknown"
-  local time_success, time_result = error_handler.try(function()
+  local time_success, time_result = get_error_handler().try(function()
     return os.date("%H:%M:%S")
   end)
 
@@ -479,14 +445,14 @@ local function print_header()
     time_str = time_result
   end
 
-  logger.info("Interactive CLI header displayed", {
+  get_logger().info("Interactive CLI header displayed", {
     component = "CLI",
     time = time_str,
   })
 
   -- Safely check state properties with error handling
   local debug_info = {}
-  success, result = error_handler.try(function()
+  success, result = get_error_handler().try(function()
     debug_info = {
       component = "CLI",
       test_dir = state and state.test_dir or "unknown",
@@ -503,16 +469,17 @@ local function print_header()
   end)
 
   if success then
-    logger.debug("Display settings initialized", debug_info)
+    get_logger().debug("Display settings initialized", debug_info)
   else
-    logger.warn("Failed to get display settings", {
+    get_logger().warn("Failed to get display settings", {
       component = "CLI",
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
   end
 end
 
--- Print help information
+--- Prints the available commands and keyboard shortcuts to the console.
+---@private
 local function print_help()
   print(colors.bold .. "Available commands:" .. colors.normal)
   print("  help                Show this help message")
@@ -536,7 +503,7 @@ local function print_help()
   print("  Ctrl+C              Exit interactive mode")
   print(string.rep("-", 60))
 
-  logger.debug("Help information displayed", {
+  get_logger().debug("Help information displayed", {
     component = "CLI",
     command_count = 16, -- Count of available commands
     has_keyboard_shortcuts = true,
@@ -561,7 +528,8 @@ local function print_help()
   })
 end
 
--- Show current state/settings
+--- Prints the current configuration settings (test dir, pattern, filters, watch mode, etc.) to the console.
+---@private
 local function print_status()
   print(colors.bold .. "Current settings:" .. colors.normal)
   print("  Test directory:     " .. state.test_dir)
@@ -580,7 +548,7 @@ local function print_status()
   print("  Available tests:    " .. #state.current_files)
   print(string.rep("-", 60))
 
-  logger.debug("Status information displayed", {
+  get_logger().debug("Status information displayed", {
     component = "UI",
     test_count = #state.current_files,
     watch_mode = state.watch_mode and "on" or "off",
@@ -594,11 +562,14 @@ local function print_status()
   })
 end
 
--- List available test files
+--- Lists the currently discovered test files (from `state.current_files`) to the console.
+--- Shows a warning if no files have been discovered.
+---@return nil
+---@private
 local function list_test_files()
   if #state.current_files == 0 then
     print(colors.yellow .. "No test files found in " .. state.test_dir .. colors.normal)
-    logger.warn("No test files found", {
+    get_logger().warn("No test files found", {
       directory = state.test_dir,
       pattern = state.test_pattern,
     })
@@ -611,7 +582,7 @@ local function list_test_files()
   end
   print(string.rep("-", 60))
 
-  logger.debug("Test files listed", {
+  get_logger().debug("Test files listed", {
     component = "CLI",
     file_count = #state.current_files,
     directory = state.test_dir,
@@ -620,21 +591,25 @@ local function list_test_files()
   })
 end
 
--- Discover test files with comprehensive error handling
+--- Discovers test files based on current settings (`state.test_dir`, `state.test_pattern`).
+--- Uses the `discover` module (if available) and updates `state.current_files`.
+--- Handles errors during validation and discovery.
+---@return boolean found `true` if files were found (or discovery skipped), `false` otherwise.
+---@private
 local function discover_test_files()
   -- Validate necessary state for test discovery
   if not state then
-    local err = error_handler.runtime_error("State not initialized for test discovery", {
+    local err = get_error_handler().runtime_error("State not initialized for test discovery", {
       operation = "discover_test_files",
       module = "interactive",
     })
-    logger.error("Test discovery failed due to missing state", {
+    get_logger().error("Test discovery failed due to missing state", {
       component = "TestDiscovery",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
 
     -- Safe error display with fallback
-    error_handler.try(function()
+    get_error_handler().try(function()
       print(colors.red .. "Error: Internal state not initialized" .. colors.normal)
       return true
     end)
@@ -644,19 +619,19 @@ local function discover_test_files()
 
   -- Validate test directory and pattern
   if not state.test_dir or type(state.test_dir) ~= "string" then
-    local err = error_handler.validation_error("Invalid test directory", {
+    local err = get_error_handler().validation_error("Invalid test directory", {
       operation = "discover_test_files",
       test_dir = state.test_dir,
       test_dir_type = type(state.test_dir),
       module = "interactive",
     })
-    logger.error("Test discovery failed due to invalid directory", {
+    get_logger().error("Test discovery failed due to invalid directory", {
       component = "TestDiscovery",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
 
     -- Safe error display with fallback
-    error_handler.try(function()
+    get_error_handler().try(function()
       print(colors.red .. "Error: Invalid test directory" .. colors.normal)
       return true
     end)
@@ -665,46 +640,20 @@ local function discover_test_files()
   end
 
   if not state.test_pattern or type(state.test_pattern) ~= "string" then
-    local err = error_handler.validation_error("Invalid test pattern", {
+    local err = get_error_handler().validation_error("Invalid test pattern", {
       operation = "discover_test_files",
       test_pattern = state.test_pattern,
       test_pattern_type = type(state.test_pattern),
       module = "interactive",
     })
-    logger.error("Test discovery failed due to invalid pattern", {
+    get_logger().error("Test discovery failed due to invalid pattern", {
       component = "TestDiscovery",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
 
     -- Safe error display with fallback
-    error_handler.try(function()
+    get_error_handler().try(function()
       print(colors.red .. "Error: Invalid test pattern" .. colors.normal)
-      return true
-    end)
-
-    return false
-  end
-
-  -- Verify discovery module is available
-  if not has_discovery then
-    local err = error_handler.runtime_error("Discovery module not available", {
-      operation = "discover_test_files",
-      module = "interactive",
-      test_dir = state.test_dir,
-      test_pattern = state.test_pattern,
-    })
-    logger.error("Test discovery failed", {
-      component = "TestDiscovery",
-      error = error_handler.format_error(err),
-      error_type = "ModuleNotFound",
-      directory = state.test_dir,
-      pattern = state.test_pattern,
-      attempted_recovery = false,
-    })
-
-    -- Safe error display with fallback
-    error_handler.try(function()
-      print(colors.red .. "Error: Discovery module not available" .. colors.normal)
       return true
     end)
 
@@ -717,7 +666,7 @@ local function discover_test_files()
   end
 
   -- Log discovery start
-  logger.debug("Discovering test files", {
+  get_logger().debug("Discovering test files", {
     component = "TestDiscovery",
     directory = state.test_dir,
     pattern = state.test_pattern,
@@ -725,7 +674,7 @@ local function discover_test_files()
   })
 
   -- Attempt to discover test files with error handling
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     -- Get timestamp for performance tracking
     local start_time = os.time()
 
@@ -744,7 +693,7 @@ local function discover_test_files()
 
   -- Handle discovery results
   if not success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Test discovery operation failed",
       {
         operation = "discover_test_files",
@@ -754,17 +703,17 @@ local function discover_test_files()
       },
       result -- Original error as cause
     )
-    logger.error("Test discovery failed with exception", {
+    get_logger().error("Test discovery failed with exception", {
       component = "TestDiscovery",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
       directory = state.test_dir,
       pattern = state.test_pattern,
       attempted_recovery = false,
     })
 
     -- Safe error display with fallback
-    error_handler.try(function()
-      print(colors.red .. "Error: Test discovery failed: " .. error_handler.format_error(result) .. colors.normal)
+    get_error_handler().try(function()
+      print(colors.red .. "Error: Test discovery failed: " .. get_error_handler().format_error(result) .. colors.normal)
       return true
     end)
 
@@ -773,21 +722,21 @@ local function discover_test_files()
 
   -- Process successful discovery results
   if not result.files or type(result.files) ~= "table" then
-    local err = error_handler.runtime_error("Discovery returned invalid result", {
+    local err = get_error_handler().runtime_error("Discovery returned invalid result", {
       operation = "discover_test_files",
       module = "interactive",
       result_type = type(result.files),
     })
-    logger.error("Test discovery failed with invalid result", {
+    get_logger().error("Test discovery failed with invalid result", {
       component = "TestDiscovery",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
       directory = state.test_dir,
       pattern = state.test_pattern,
       attempted_recovery = false,
     })
 
     -- Safe error display with fallback
-    error_handler.try(function()
+    get_error_handler().try(function()
       print(colors.red .. "Error: Test discovery returned invalid result" .. colors.normal)
       return true
     end)
@@ -800,7 +749,7 @@ local function discover_test_files()
 
   -- Get timestamp for logging
   local timestamp = "unknown"
-  local time_success, time_result = error_handler.try(function()
+  local time_success, time_result = get_error_handler().try(function()
     return os.date("%H:%M:%S")
   end)
 
@@ -809,7 +758,7 @@ local function discover_test_files()
   end
 
   -- Log discovery completion
-  logger.debug("Test files discovery completed", {
+  get_logger().debug("Test files discovery completed", {
     component = "TestDiscovery",
     file_count = #state.current_files,
     success = #state.current_files > 0,
@@ -822,47 +771,27 @@ local function discover_test_files()
   return #state.current_files > 0
 end
 
--- Run tests with comprehensive error handling
+--- Runs tests either for a single specified file or for all currently discovered files (`state.current_files`).
+--- Uses the `runner` module (if available) and the `firmo` instance.
+--- Resets `firmo` state before running. Handles errors during validation and execution.
+---@param file_path? string Path to a single test file. If `nil`, runs all files in `state.current_files`.
+---@return boolean success `true` if the test run(s) succeeded without errors, `false` otherwise.
+---@private
 local function run_tests(file_path)
   -- Validate state and dependencies
   if not state then
-    local err = error_handler.runtime_error("State not initialized for test execution", {
+    local err = get_error_handler().runtime_error("State not initialized for test execution", {
       operation = "run_tests",
       module = "interactive",
     })
-    logger.error("Test execution failed due to missing state", {
+    get_logger().error("Test execution failed due to missing state", {
       component = "TestRunner",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
 
     -- Safe error display with fallback
-    error_handler.try(function()
+    get_error_handler().try(function()
       print(colors.red .. "Error: Internal state not initialized" .. colors.normal)
-      return true
-    end)
-
-    return false
-  end
-
-  -- Verify runner module is available
-  if not has_runner then
-    local err = error_handler.runtime_error("Runner module not available", {
-      operation = "run_tests",
-      module = "interactive",
-      file_path = file_path or "all tests",
-    })
-
-    logger.error("Test execution failed", {
-      component = "TestRunner",
-      error = error_handler.format_error(err),
-      error_type = "ModuleNotFound",
-      file = file_path or "all tests",
-      attempted_recovery = false,
-    })
-
-    -- Safe error display with fallback
-    error_handler.try(function()
-      print(colors.red .. "Error: Runner module not available" .. colors.normal)
       return true
     end)
 
@@ -871,22 +800,22 @@ local function run_tests(file_path)
 
   -- Verify firmo test framework is available
   if not state.firmo then
-    local err = error_handler.runtime_error("Test framework not initialized", {
+    local err = get_error_handler().runtime_error("Test framework not initialized", {
       operation = "run_tests",
       module = "interactive",
       file_path = file_path or "all tests",
     })
 
-    logger.error("Test execution failed", {
+    get_logger().error("Test execution failed", {
       component = "TestRunner",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
       error_type = "FrameworkNotInitialized",
       file = file_path or "all tests",
       attempted_recovery = false,
     })
 
     -- Safe error display with fallback
-    error_handler.try(function()
+    get_error_handler().try(function()
       print(colors.red .. "Error: Test framework not initialized" .. colors.normal)
       return true
     end)
@@ -895,13 +824,13 @@ local function run_tests(file_path)
   end
 
   -- Reset firmo state with error handling
-  local reset_success, reset_result = error_handler.try(function()
+  local reset_success, reset_result = get_error_handler().try(function()
     state.firmo.reset()
     return true
   end)
 
   if not reset_success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Failed to reset test environment",
       {
         operation = "run_tests",
@@ -911,9 +840,9 @@ local function run_tests(file_path)
       reset_result -- Original error as cause
     )
 
-    logger.error("Test environment reset failed", {
+    get_logger().error("Test environment reset failed", {
       component = "TestRunner",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
       file = file_path or "all tests",
       attempted_recovery = true,
     })
@@ -922,7 +851,7 @@ local function run_tests(file_path)
   else
     -- Get timestamp for logging
     local timestamp = "unknown"
-    local time_success, time_result = error_handler.try(function()
+    local time_success, time_result = get_error_handler().try(function()
       return os.date("%H:%M:%S")
     end)
 
@@ -930,7 +859,7 @@ local function run_tests(file_path)
       timestamp = time_result
     end
 
-    logger.debug("Test environment reset before execution", {
+    get_logger().debug("Test environment reset before execution", {
       component = "TestRunner",
       file_path = file_path or "all files",
       focus_filter = state.focus_filter or "none",
@@ -947,21 +876,21 @@ local function run_tests(file_path)
 
     -- Validate file path
     if type(file_path) ~= "string" or file_path == "" then
-      local err = error_handler.validation_error("Invalid file path for test execution", {
+      local err = get_error_handler().validation_error("Invalid file path for test execution", {
         operation = "run_tests",
         module = "interactive",
         file_path = file_path,
         file_path_type = type(file_path),
       })
 
-      logger.error("Test execution failed", {
+      get_logger().error("Test execution failed", {
         component = "TestRunner",
-        error = error_handler.format_error(err),
+        error = get_error_handler().format_error(err),
         file = tostring(file_path),
       })
 
       -- Safe error display with fallback
-      error_handler.try(function()
+      get_error_handler().try(function()
         print(colors.red .. "Error: Invalid file path for test execution" .. colors.normal)
         return true
       end)
@@ -970,7 +899,7 @@ local function run_tests(file_path)
     end
 
     -- Verify file exists with safe I/O
-    local file_exists, file_err = error_handler.safe_io_operation(
+    local file_exists, file_err = get_error_handler().safe_io_operation(
       function()
         return fs.file_exists(file_path)
       end,
@@ -982,7 +911,7 @@ local function run_tests(file_path)
     )
 
     if not file_exists then
-      local err = error_handler.io_error(
+      local err = get_error_handler().io_error(
         "Test file not found",
         {
           operation = "run_tests",
@@ -992,14 +921,14 @@ local function run_tests(file_path)
         file_err -- Include underlying error as cause
       )
 
-      logger.error("Test execution failed", {
+      get_logger().error("Test execution failed", {
         component = "TestRunner",
-        error = error_handler.format_error(err),
+        error = get_error_handler().format_error(err),
         file = file_path,
       })
 
       -- Safe error display with fallback
-      error_handler.try(function()
+      get_error_handler().try(function()
         print(colors.red .. "Error: Test file not found: " .. file_path .. colors.normal)
         return true
       end)
@@ -1008,24 +937,24 @@ local function run_tests(file_path)
     end
 
     -- Display running message with error handling
-    error_handler.try(function()
+    get_error_handler().try(function()
       print(colors.cyan .. "Running file: " .. file_path .. colors.normal)
       return true
     end)
 
-    logger.info("Running single test file", {
+    get_logger().info("Running single test file", {
       file = file_path,
       focus_filter = state.focus_filter or "none",
       tag_filter = state.tag_filter or "none",
     })
 
     -- Run the single test file with error handling
-    local run_success, results = error_handler.try(function()
+    local run_success, results = get_error_handler().try(function()
       return runner.run_file(file_path, state.firmo)
     end)
 
     if not run_success then
-      local err = error_handler.runtime_error(
+      local err = get_error_handler().runtime_error(
         "Test file execution failed with exception",
         {
           operation = "run_tests",
@@ -1035,15 +964,15 @@ local function run_tests(file_path)
         results -- Original error as cause
       )
 
-      logger.error("Test file execution failed", {
+      get_logger().error("Test file execution failed", {
         component = "TestRunner",
-        error = error_handler.format_error(err),
+        error = get_error_handler().format_error(err),
         file = file_path,
       })
 
       -- Safe error display with fallback
-      error_handler.try(function()
-        print(colors.red .. "Error executing test file: " .. error_handler.format_error(results) .. colors.normal)
+      get_error_handler().try(function()
+        print(colors.red .. "Error executing test file: " .. get_error_handler().format_error(results) .. colors.normal)
         return true
       end)
 
@@ -1052,21 +981,21 @@ local function run_tests(file_path)
 
     -- Validate results
     if type(results) ~= "table" then
-      local err = error_handler.runtime_error("Test runner returned invalid result", {
+      local err = get_error_handler().runtime_error("Test runner returned invalid result", {
         operation = "run_tests",
         module = "interactive",
         file_path = file_path,
         result_type = type(results),
       })
 
-      logger.error("Test file execution completed with invalid result", {
+      get_logger().error("Test file execution completed with invalid result", {
         component = "TestRunner",
-        error = error_handler.format_error(err),
+        error = get_error_handler().format_error(err),
         file = file_path,
       })
 
       -- Safe error display with fallback
-      error_handler.try(function()
+      get_error_handler().try(function()
         print(colors.red .. "Error: Test runner returned invalid result" .. colors.normal)
         return true
       end)
@@ -1077,7 +1006,7 @@ local function run_tests(file_path)
     -- Extract success state
     success = results.success and results.errors == 0
 
-    logger.info("Test run completed", {
+    get_logger().info("Test run completed", {
       file = file_path,
       success = success,
       errors = results.errors or 0,
@@ -1090,7 +1019,7 @@ local function run_tests(file_path)
 
     -- Check if we need to discover files first
     if not state.current_files or #state.current_files == 0 then
-      logger.debug("No test files in state, attempting discovery", {
+      get_logger().debug("No test files in state, attempting discovery", {
         component = "TestRunner",
         test_dir = state.test_dir,
         test_pattern = state.test_pattern,
@@ -1100,12 +1029,12 @@ local function run_tests(file_path)
         -- Error messages already handled by discover_test_files
 
         -- Safe error display with fallback
-        error_handler.try(function()
+        get_error_handler().try(function()
           print(colors.yellow .. "No test files found. Check test directory and pattern." .. colors.normal)
           return true
         end)
 
-        logger.warn("No test files found to run", {
+        get_logger().warn("No test files found to run", {
           directory = state.test_dir,
           pattern = state.test_pattern,
         })
@@ -1116,30 +1045,30 @@ local function run_tests(file_path)
 
     -- Get file count safely
     local file_count = 0
-    error_handler.try(function()
+    get_error_handler().try(function()
       file_count = #state.current_files
       return true
     end)
 
     -- Display running message with error handling
-    error_handler.try(function()
+    get_error_handler().try(function()
       print(colors.cyan .. "Running " .. file_count .. " test files..." .. colors.normal)
       return true
     end)
 
-    logger.info("Running multiple test files", {
+    get_logger().info("Running multiple test files", {
       file_count = file_count,
       focus_filter = state.focus_filter or "none",
       tag_filter = state.tag_filter or "none",
     })
 
     -- Run all test files with error handling
-    local run_success, run_result = error_handler.try(function()
+    local run_success, run_result = get_error_handler().try(function()
       return runner.run_all(state.current_files, state.firmo)
     end)
 
     if not run_success then
-      local err = error_handler.runtime_error(
+      local err = get_error_handler().runtime_error(
         "Multiple test file execution failed with exception",
         {
           operation = "run_tests",
@@ -1149,15 +1078,17 @@ local function run_tests(file_path)
         run_result -- Original error as cause
       )
 
-      logger.error("Multiple test file execution failed", {
+      get_logger().error("Multiple test file execution failed", {
         component = "TestRunner",
-        error = error_handler.format_error(err),
+        error = get_error_handler().format_error(err),
         file_count = file_count,
       })
 
       -- Safe error display with fallback
-      error_handler.try(function()
-        print(colors.red .. "Error executing test files: " .. error_handler.format_error(run_result) .. colors.normal)
+      get_error_handler().try(function()
+        print(
+          colors.red .. "Error executing test files: " .. get_error_handler().format_error(run_result) .. colors.normal
+        )
         return true
       end)
 
@@ -1176,7 +1107,7 @@ local function run_tests(file_path)
       end
     end
 
-    logger.info("Multiple file test run completed", {
+    get_logger().info("Multiple file test run completed", {
       success = success,
       file_count = file_count,
     })
@@ -1185,31 +1116,18 @@ local function run_tests(file_path)
   return success
 end
 
--- Start watch mode
+--- Starts the file watcher loop.
+--- Initializes the `watcher` module, performs an initial test run, and then enters a loop
+--- checking for file changes and user input (Enter key to exit). Re-runs tests on change.
+--- Requires `watcher` and `runner` modules.
+---@return boolean success `true` if watch mode started and exited normally (user input), `false` if required modules are missing.
+---@private
 local function start_watch_mode()
-  if not has_watcher then
-    print(colors.red .. "Error: Watch module not available" .. colors.normal)
-    logger.error("Watch mode initialization failed", {
-      error = "Watch module not available",
-      component = "WatchMode",
-    })
-    return false
-  end
-
-  if not has_runner then
-    print(colors.red .. "Error: Runner module not available" .. colors.normal)
-    logger.error("Watch mode initialization failed", {
-      error = "Runner module not available",
-      component = "WatchMode",
-    })
-    return false
-  end
-
   print(colors.cyan .. "Starting watch mode..." .. colors.normal)
   print("Watching directories: " .. table.concat(state.watch_dirs, ", "))
   print("Press Enter to return to interactive mode")
 
-  logger.info("Watch mode starting", {
+  get_logger().info("Watch mode starting", {
     directories = state.watch_dirs,
     exclude_patterns = state.exclude_patterns,
     check_interval = state.watch_interval,
@@ -1221,7 +1139,7 @@ local function start_watch_mode()
 
   -- Initial test run
   if #state.current_files == 0 then
-    logger.debug("No test files found, discovering tests before watch", {
+    get_logger().debug("No test files found, discovering tests before watch", {
       component = "WatchMode",
     })
     discover_test_files()
@@ -1235,7 +1153,11 @@ local function start_watch_mode()
   -- Watch loop
   local watch_running = true
 
-  -- Create a non-blocking input check
+  --- Performs a non-blocking check for keyboard input (specifically Enter key).
+  --- Sets `watch_running` to false if input is detected.
+  --- **Note:** `io.read(0)` behavior might be platform-dependent or require specific terminal settings.
+  ---@return boolean input_detected `true` if input was detected, `false` otherwise.
+  ---@private
   local function check_input()
     local input_available = io.read(0) ~= nil
     if input_available then
@@ -1243,7 +1165,7 @@ local function start_watch_mode()
       ---@diagnostic disable-next-line: discard-returns
       io.read("*l")
       watch_running = false
-      logger.debug("User input detected, exiting watch mode", {
+      get_logger().debug("User input detected, exiting watch mode", {
         component = "WatchMode",
       })
     end
@@ -1254,7 +1176,7 @@ local function start_watch_mode()
   io.write("\027[2J\027[H")
 
   -- Initial test run
-  logger.debug("Running initial tests in watch mode", {
+  get_logger().debug("Running initial tests in watch mode", {
     component = "WatchMode",
     file_count = #state.current_files,
   })
@@ -1264,7 +1186,7 @@ local function start_watch_mode()
 
   print(colors.cyan .. "\n--- WATCHING FOR CHANGES (Press Enter to return to interactive mode) ---" .. colors.normal)
 
-  logger.info("Watch mode active", {
+  get_logger().info("Watch mode active", {
     component = "WatchMode",
     status = "waiting for changes",
     directories = state.watch_dirs,
@@ -1285,7 +1207,7 @@ local function start_watch_mode()
         print("  - " .. file)
       end
 
-      logger.info("File changes detected in watch mode", {
+      get_logger().info("File changes detected in watch mode", {
         component = "WatchMode",
         changed_file_count = #changed_files,
         changed_files = changed_files,
@@ -1304,7 +1226,7 @@ local function start_watch_mode()
       -- Clear terminal
       io.write("\027[2J\027[H")
 
-      logger.info("Running tests after file changes", {
+      get_logger().info("Running tests after file changes", {
         component = "WatchMode",
         debounce_time = debounce_time,
         time_since_last_run = current_time - last_run_time,
@@ -1326,7 +1248,7 @@ local function start_watch_mode()
         colors.cyan .. "\n--- WATCHING FOR CHANGES (Press Enter to return to interactive mode) ---" .. colors.normal
       )
 
-      logger.info("Watch mode resumed", {
+      get_logger().info("Watch mode resumed", {
         component = "WatchMode",
         status = "waiting for changes",
         timestamp = os.date("%Y-%m-%d %H:%M:%S"),
@@ -1342,27 +1264,24 @@ local function start_watch_mode()
     os.execute("sleep 0.1")
   end
 
-  logger.info("Watch mode exited", {
+  get_logger().info("Watch mode exited", {
     component = "WatchMode",
   })
 
   return true
 end
 
--- Run codefix operations
+--- Executes a codefix command ("check" or "fix") on a target directory.
+--- Initializes the `codefix` module if needed and calls its `run_cli`.
+--- Requires `codefix` module. Prints status messages to console.
+---@param command "check"|"fix" The codefix operation to perform.
+---@param target string The directory path to target.
+---@return boolean success `true` if the codefix command succeeded, `false` otherwise (e.g., module unavailable, invalid command/target, codefix failure).
+---@private
 local function run_codefix(command, target)
-  if not has_codefix then
-    print(colors.red .. "Error: Codefix module not available" .. colors.normal)
-    logger.error("Codefix operation failed", {
-      error = "Codefix module not available",
-      component = "CodeFix",
-    })
-    return false
-  end
-
   if not command or not target then
     print(colors.yellow .. "Usage: codefix <check|fix> <directory>" .. colors.normal)
-    logger.warn("Invalid codefix command", {
+    get_logger().warn("Invalid codefix command", {
       component = "CodeFix",
       command = command or "nil",
       target = target or "nil",
@@ -1373,7 +1292,7 @@ local function run_codefix(command, target)
 
   -- Initialize codefix if needed
   if not state.codefix_enabled then
-    logger.debug("Initializing codefix module", {
+    get_logger().debug("Initializing codefix module", {
       component = "CodeFix",
       options = {
         enabled = true,
@@ -1390,7 +1309,7 @@ local function run_codefix(command, target)
 
   print(colors.cyan .. "Running codefix: " .. command .. " " .. target .. colors.normal)
 
-  logger.info("Running codefix operation", {
+  get_logger().info("Running codefix operation", {
     component = "CodeFix",
     command = command,
     target = target,
@@ -1405,7 +1324,7 @@ local function run_codefix(command, target)
 
   if success then
     print(colors.green .. "Codefix completed successfully" .. colors.normal)
-    logger.info("Codefix operation completed", {
+    get_logger().info("Codefix operation completed", {
       component = "CodeFix",
       status = "success",
       command = command,
@@ -1413,7 +1332,7 @@ local function run_codefix(command, target)
     })
   else
     print(colors.red .. "Codefix failed" .. colors.normal)
-    logger.warn("Codefix operation failed", {
+    get_logger().warn("Codefix operation failed", {
       component = "CodeFix",
       status = "failed",
       command = command,
@@ -1424,12 +1343,16 @@ local function run_codefix(command, target)
   return success
 end
 
--- Add command to history
+--- Adds a command string to the internal history buffer (`state.history`).
+--- Avoids adding empty strings or consecutive duplicates. Limits history size.
+---@param command string The command string to add.
+---@return nil
+---@private
 local function add_to_history(command)
   -- Don't add empty commands or duplicates of the last command
   if command == "" or (state.history[#state.history] == command) then
-    if logger.is_debug_enabled() then
-      logger.debug("Skipping history addition", {
+    if get_logger().is_debug_enabled() then
+      get_logger().debug("Skipping history addition", {
         component = "CLI",
         reason = command == "" and "empty command" or "duplicate command",
         command = command,
@@ -1443,7 +1366,7 @@ local function add_to_history(command)
 
   -- Limit history size
   if #state.history > 100 then
-    logger.debug("Trimming command history", {
+    get_logger().debug("Trimming command history", {
       component = "CLI",
       history_size = #state.history,
       removed_command = state.history[1],
@@ -1451,7 +1374,7 @@ local function add_to_history(command)
     table.remove(state.history, 1)
   end
 
-  logger.debug("Command added to history", {
+  get_logger().debug("Command added to history", {
     component = "CLI",
     command = command,
     history_size = #state.history,
@@ -1459,7 +1382,11 @@ local function add_to_history(command)
   })
 end
 
--- Process a command
+--- Parses user input, updates history, and executes the corresponding command handler
+--- (e.g., `run`, `list`, `help`, `watch`, `exit`, etc.).
+---@param input string The raw command line input from the user.
+---@return boolean success `true` if the command was processed successfully (or was `exit`), `false` if command unknown or failed.
+---@private
 local function process_command(input)
   -- Add to history
   add_to_history(input)
@@ -1473,7 +1400,7 @@ local function process_command(input)
   command = command:lower()
   state.last_command = command
 
-  logger.debug("Command parsed", {
+  get_logger().debug("Command parsed", {
     component = "CLI",
     command = command,
     args = args or "",
@@ -1512,12 +1439,8 @@ local function process_command(input)
     state.test_dir = args
     print(colors.green .. "Test directory set to: " .. state.test_dir .. colors.normal)
 
-    -- Update central_config if available
-    local central_config = get_central_config()
-    if central_config then
-      central_config.set("interactive.test_dir", args)
-      logger.debug("Updated test_dir in central_config", { test_dir = args })
-    end
+    central_config.set("interactive.test_dir", args)
+    get_logger().debug("Updated test_dir in central_config", { test_dir = args })
 
     -- Rediscover tests with new directory
     discover_test_files()
@@ -1531,12 +1454,8 @@ local function process_command(input)
     state.test_pattern = args
     print(colors.green .. "Test pattern set to: " .. state.test_pattern .. colors.normal)
 
-    -- Update central_config if available
-    local central_config = get_central_config()
-    if central_config then
-      central_config.set("interactive.test_pattern", args)
-      logger.debug("Updated test_pattern in central_config", { test_pattern = args })
-    end
+    central_config.set("interactive.test_pattern", args)
+    get_logger().debug("Updated test_pattern in central_config", { test_pattern = args })
 
     -- Rediscover tests with new pattern
     discover_test_files()
@@ -1597,24 +1516,16 @@ local function process_command(input)
     if args == "on" or args == "true" or args == "1" then
       state.watch_mode = true
 
-      -- Update central_config if available
-      local central_config = get_central_config()
-      if central_config then
-        central_config.set("interactive.watch_mode", true)
-        logger.debug("Updated watch_mode in central_config", { watch_mode = true })
-      end
+      central_config.set("interactive.watch_mode", true)
+      get_logger().debug("Updated watch_mode in central_config", { watch_mode = true })
 
       print(colors.green .. "Watch mode enabled" .. colors.normal)
       return start_watch_mode()
     elseif args == "off" or args == "false" or args == "0" then
       state.watch_mode = false
 
-      -- Update central_config if available
-      local central_config = get_central_config()
-      if central_config then
-        central_config.set("interactive.watch_mode", false)
-        logger.debug("Updated watch_mode in central_config", { watch_mode = false })
-      end
+      central_config.set("interactive.watch_mode", false)
+      get_logger().debug("Updated watch_mode in central_config", { watch_mode = false })
 
       print(colors.green .. "Watch mode disabled" .. colors.normal)
       return true
@@ -1622,12 +1533,8 @@ local function process_command(input)
       -- Toggle watch mode
       state.watch_mode = not state.watch_mode
 
-      -- Update central_config if available
-      local central_config = get_central_config()
-      if central_config then
-        central_config.set("interactive.watch_mode", state.watch_mode)
-        logger.debug("Updated watch_mode in central_config", { watch_mode = state.watch_mode })
-      end
+      central_config.set("interactive.watch_mode", state.watch_mode)
+      get_logger().debug("Updated watch_mode in central_config", { watch_mode = state.watch_mode })
 
       print(colors.green .. "Watch mode " .. (state.watch_mode and "enabled" or "disabled") .. colors.normal)
 
@@ -1651,12 +1558,8 @@ local function process_command(input)
     table.insert(state.watch_dirs, args)
     print(colors.green .. "Added watch directory: " .. args .. colors.normal)
 
-    -- Update central_config if available
-    local central_config = get_central_config()
-    if central_config then
-      central_config.set("interactive.watch_dirs", state.watch_dirs)
-      logger.debug("Updated watch_dirs in central_config", { watch_dirs = state.watch_dirs })
-    end
+    central_config.set("interactive.watch_dirs", state.watch_dirs)
+    get_logger().debug("Updated watch_dirs in central_config", { watch_dirs = state.watch_dirs })
 
     return true
   elseif command == "watch-exclude" or command == "exclude" then
@@ -1670,12 +1573,8 @@ local function process_command(input)
     table.insert(state.exclude_patterns, args)
     print(colors.green .. "Added exclusion pattern: " .. args .. colors.normal)
 
-    -- Update central_config if available
-    local central_config = get_central_config()
-    if central_config then
-      central_config.set("interactive.exclude_patterns", state.exclude_patterns)
-      logger.debug("Updated exclude_patterns in central_config", { exclude_patterns = state.exclude_patterns })
-    end
+    central_config.set("interactive.exclude_patterns", state.exclude_patterns)
+    get_logger().debug("Updated exclude_patterns in central_config", { exclude_patterns = state.exclude_patterns })
 
     return true
   elseif command == "codefix" then
@@ -1700,24 +1599,29 @@ local function process_command(input)
   end
 end
 
--- Read a line with history navigation
+--- Reads a line of input from the console.
+--- **Placeholder:** Currently uses basic `io.read`. Full implementation would handle
+--- history navigation (Up/Down arrows), editing, and potentially tab completion.
+---@return string|nil input The line read from input, or `nil` on EOF (e.g., Ctrl+D).
+---@private
 local function read_line_with_history()
   local line = io.read("*l")
   return line
 end
 
--- Main entry point for the interactive CLI
---- Start the interactive CLI session
----@param firmo table The firmo framework instance
----@param options? table Additional options for the CLI session
----@return boolean success Whether the session was started successfully
+--- Starts the main interactive command-line loop.
+--- Initializes state, discovers tests, prints header/status, handles watch mode,
+--- and enters the read-process loop until the user exits.
+---@param firmo table The main `firmo` framework instance.
+---@param options? {test_dir?: string, pattern?: string, watch_mode?: boolean} Optional initial configuration overrides.
+---@return boolean success Always returns `true` when the loop terminates normally (via 'exit' command).
 function interactive.start(firmo, options)
   options = options or {}
 
   -- Record session start time
   state.session_start_time = os.time()
 
-  logger.info("Starting interactive CLI", {
+  get_logger().info("Starting interactive CLI", {
     version = interactive._VERSION,
     component = "CLI",
     timestamp = os.date("%Y-%m-%d %H:%M:%S"),
@@ -1734,34 +1638,22 @@ function interactive.start(firmo, options)
   if options.test_dir then
     state.test_dir = options.test_dir
 
-    -- Update central_config if available
-    local central_config = get_central_config()
-    if central_config then
-      central_config.set("interactive.test_dir", options.test_dir)
-    end
+    central_config.set("interactive.test_dir", options.test_dir)
   end
 
   if options.pattern then
     state.test_pattern = options.pattern
 
-    -- Update central_config if available
-    local central_config = get_central_config()
-    if central_config then
-      central_config.set("interactive.test_pattern", options.pattern)
-    end
+    central_config.set("interactive.test_pattern", options.pattern)
   end
 
   if options.watch_mode ~= nil then
     state.watch_mode = options.watch_mode
 
-    -- Update central_config if available
-    local central_config = get_central_config()
-    if central_config then
-      central_config.set("interactive.watch_mode", options.watch_mode)
-    end
+    central_config.set("interactive.watch_mode", options.watch_mode)
   end
 
-  logger.debug("Interactive CLI configuration", {
+  get_logger().debug("Interactive CLI configuration", {
     test_dir = state.test_dir,
     pattern = state.test_pattern,
     watch_mode = state.watch_mode and "on" or "off",
@@ -1783,7 +1675,7 @@ function interactive.start(firmo, options)
   end
 
   -- Main loop
-  logger.debug("Starting interactive CLI main loop", {
+  get_logger().debug("Starting interactive CLI main loop", {
     component = "CLI",
   })
 
@@ -1798,7 +1690,7 @@ function interactive.start(firmo, options)
     local input = read_line_with_history()
 
     if input then
-      logger.debug("Processing command", {
+      get_logger().debug("Processing command", {
         input = input,
         component = "CLI",
       })
@@ -1812,7 +1704,7 @@ function interactive.start(firmo, options)
     print("Exiting interactive mode")
   end
 
-  logger.info("Interactive CLI session ended", {
+  get_logger().info("Interactive CLI session ended", {
     component = "CLI",
     commands_executed = #state.history,
     session_duration = os.difftime(os.time(), state.session_start_time or os.time()),
@@ -1824,11 +1716,11 @@ function interactive.start(firmo, options)
   return true
 end
 
--- Reset the module configuration to defaults
---- Reset the interactive CLI to default configuration
----@return interactive_module The module instance for method chaining
+--- Resets the interactive module's local configuration and runtime state to defaults.
+--- Clears history, filters, etc., and re-applies `DEFAULT_CONFIG`.
+---@return interactive_module self The module instance (`interactive`) for chaining.
 function interactive.reset()
-  logger.debug("Resetting interactive module configuration to defaults")
+  get_logger().debug("Resetting interactive module configuration to defaults")
 
   -- Reset basic settings to defaults
   for key, value in pairs(DEFAULT_CONFIG) do
@@ -1858,31 +1750,27 @@ function interactive.reset()
   state.history_pos = 1
   state.codefix_enabled = false
 
-  logger.debug("Interactive module reset to defaults")
+  get_logger().debug("Interactive module reset to defaults")
 
   return interactive
 end
 
--- Fully reset both local and central configuration
---- Fully reset both configuration and state
----@return interactive_module The module instance for method chaining
+--- Resets local configuration and state (`interactive.reset()`) and also attempts
+--- to reset the "interactive" section in the central configuration system.
+---@return interactive_module self The module instance (`interactive`) for chaining.
 function interactive.full_reset()
   -- Reset local configuration
   interactive.reset()
 
-  -- Reset central configuration if available
-  local central_config = get_central_config()
-  if central_config then
-    central_config.reset("interactive")
-    logger.debug("Reset central configuration for interactive module")
-  end
+  central_config.reset("interactive")
+  get_logger().debug("Reset central configuration for interactive module")
 
   return interactive
 end
 
--- Debug helper to show current configuration
---- Get debug information about the current configuration
----@return table debug_info Detailed information about the current configuration and state
+--- Returns a table containing a snapshot of the current configuration and runtime state for debugging.
+--- Includes local config, central config (if available), and runtime variables like filters and file counts.
+---@return table debug_info Detailed information about the current configuration and state.
 function interactive.debug_config()
   local debug_info = {
     version = interactive._VERSION,
@@ -1909,15 +1797,11 @@ function interactive.debug_config()
     central_config = nil,
   }
 
-  -- Check for central_config
-  local central_config = get_central_config()
-  if central_config then
-    debug_info.using_central_config = true
-    debug_info.central_config = central_config.get("interactive")
-  end
+  debug_info.using_central_config = true
+  debug_info.central_config = central_config.get("interactive")
 
   -- Display configuration
-  logger.info("Interactive module configuration", debug_info)
+  get_logger().info("Interactive module configuration", debug_info)
 
   return debug_info
 end

@@ -1,11 +1,21 @@
--- Test for the new tagging and filtering functionality
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Tagging and Filtering Functionality Tests
+---
+--- Verifies the `firmo.tags()` function for applying tags to tests and the
+--- filtering mechanism (using the `--tags` and `--filter` CLI options).
+--- Includes tests for multiple tags, tag validation (must be string), and
+--- filter pattern validation (must be string). Also demonstrates basic usage
+--- in comments at the end of the file.
+---
+--- @author Firmo Team
+--- @test
 package.path = "../?.lua;" .. package.path
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+local error_handler = require("lib.tools.error_handler")
 
 -- Import test_helper for improved error handling
 local test_helper = require("lib.tools.test_helper")
-local error_handler = require("lib.tools.error_handler")
 
 describe("Tagging and Filtering", function()
   it("basic test with no tags", function()
@@ -35,58 +45,46 @@ describe("Tagging and Filtering", function()
   it("test with different numeric value 67890", function()
     expect(67890).to.be.a("number")
   end)
-  
+
   it("should validate tag types", { expect_error = true }, function()
     -- Test with non-string tag
     local result, err = test_helper.with_error_capture(function()
       firmo.tags(123)
     end)()
-    
+
     expect(result).to_not.exist()
     expect(err).to.exist()
     expect(err.message).to.match("Tag must be a string")
   end)
-  
+
   it("should validate filter pattern types", { expect_error = true }, function()
-    -- We need to create a temporary testing function since the actual filtering
-    -- happens in the runner, not directly callable here
+    --- Simulates applying a filter pattern to a test name.
+    --- This helper is needed because the actual filtering logic resides in the runner.
+    --- Validates that the pattern is a string.
+    ---@param pattern string The Lua pattern to apply.
+    ---@param test_name string The name of the test to check against the pattern.
+    ---@return boolean True if the test name matches the pattern, false otherwise.
+    ---@throws table If `pattern` is not a string (validation error).
+    ---@private
     local function apply_filter(pattern, test_name)
       if type(pattern) ~= "string" then
-        error(error_handler.validation_error(
-          "Filter pattern must be a string",
-          {provided_type = type(pattern)}
-        ))
+        error(error_handler.validation_error("Filter pattern must be a string", { provided_type = type(pattern) }))
       end
-      
+
       return string.find(test_name, pattern) ~= nil
     end
-    
+
     -- Test with valid pattern
     expect(apply_filter("numeric", "test with numeric value")).to.be_truthy()
-    
+
     -- Test with invalid pattern type
     local result, err = test_helper.with_error_capture(function()
       apply_filter(123, "test with numeric value")
     end)()
-    
+
     expect(result).to_not.exist()
     expect(err).to.exist()
     expect(err.category).to.equal(error_handler.CATEGORY.VALIDATION)
     expect(err.message).to.match("Filter pattern must be a string")
   end)
 end)
-
--- These tests demonstrate how to use the tagging functionality
--- Run with different filters to see how it works:
---
--- Run only unit tests:
---   lua firmo.lua --tags unit tests/tagging_test.lua
---
--- Run only integration tests:
---   lua firmo.lua --tags integration tests/tagging_test.lua
---
--- Run tests with numeric pattern in the name:
---   lua firmo.lua --filter "numeric" tests/tagging_test.lua
---
--- Run tests with specific number pattern:
---   lua firmo.lua --filter "12345" tests/tagging_test.lu

@@ -1,20 +1,22 @@
---[[
-  Mock Module Tests
-
-  Tests for the mocking functionality in the Firmo mocking system.
-  The mock module provides comprehensive test double capabilities with
-  stubbing, spying, and expectation verification features.
-
-  The test suite covers:
-  - Basic mock creation and configuration
-  - Stubbing methods and properties
-  - Setting and verifying expectations
-  - Error handling and validation
-  - Mock cleanup and restoration
-
-  @module tests.mocking.mock_test
-  @copyright 2023-2025 Firmo Team
-]]
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Mock Module Tests
+---
+--- Tests for the mocking functionality (`lib.mocking.mock`) in the Firmo mocking system.
+--- The mock module provides comprehensive test double capabilities with
+--- stubbing, spying, and expectation verification features.
+---
+--- The test suite covers:
+--- - Basic mock creation and structure.
+--- - Stubbing methods with functions or return values.
+--- - Spying on methods.
+--- - Setting and verifying call count and argument expectations.
+--- - Mock restoration (`reset`, `restore`) and identification (`is_mock`).
+--- - Error handling for invalid usage.
+--- - Also includes tests for standalone stubs (`firmo.stub`).
+--- Uses `before` hook for setup and `test_helper` for error verification.
+---
+--- @author Firmo Team
+--- @test
 
 -- Adjust path to find modules
 package.path = "../?.lua;../lib/?.lua;../lib/?/init.lua;" .. package.path
@@ -26,7 +28,6 @@ local before, after = firmo.before, firmo.after
 -- Required modules for testing
 local mock_module = require("lib.mocking.mock")
 local test_helper = require("lib.tools.test_helper")
-local logging = require("lib.tools.logging")
 
 -- Import mocking functions for convenience
 local mock = mock_module.create -- For creating mock objects

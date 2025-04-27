@@ -11,139 +11,9 @@ The firmo logging system consists of several integrated components that together
 2. [Export Module](#export-module)
 3. [Search Module](#search-module)
 4. [Formatter Integration Module](#formatter-integration-module)
+   - [Log Capture](#log-capture)
 5. [Component Interactions](#component-interactions)
-
-
-## Core Logging Module
-
-
-**File:** `lib/tools/logging.lua`
-The core logging module provides the central logging functionality, including logger creation, configuration, and basic log output.
-
-### Key Features
-
-
-
-- Named logger instances with independent configuration
-- Hierarchical log levels (FATAL, ERROR, WARN, INFO, DEBUG, TRACE)
-- Structured logging with context objects
-- Configurable output formats and destinations
-- Color-coded console output
-- File logging with rotation
-- Module-specific log level configuration
-- Performance-optimized logging with buffer support
-- Integration with the central configuration system
-
-
-### API Reference
-
-
-#### Logger Creation
-
-
-
-```lua
--- Import the logging module
-local logging = require("lib.tools.logging")
--- Create a logger for your module
-local logger = logging.get_logger("my_module")
-```
-
-
-
-#### Log Methods
-
-
-Each logger provides these methods:
-
-
-```lua
--- Log levels from highest to lowest priority
-logger.fatal("Critical error: system cannot continue", {error = err})
-logger.error("Operation failed", {operation = "save_file", error = err})
-logger.warn("Configuration value missing, using default", {key = "timeout"})
-logger.info("Process completed successfully", {items = 42})
-logger.debug("Function called with parameters", {param1 = "value", param2 = 123})
-logger.trace("Detailed execution information", {state = {...}})
-```
-
-
-
-#### Configuration
-
-
-
-```lua
--- Global configuration
-logging.configure({
-  level = logging.LEVELS.INFO,      -- Global default level
-  timestamps = true,                -- Include timestamps in logs
-  use_colors = true,                -- Use ANSI colors for console output
-  output_file = "application.log",  -- Log to file (nil = console only)
-  log_dir = "logs",                 -- Directory for log files
-  max_file_size = 1024 * 1024,      -- 1MB max file size before rotation
-  max_log_files = 5,                -- Keep 5 rotated log files
-  format = "text",                  -- Log format: "text" or "json"
-  json_file = "application.json",   -- Separate JSON structured log file
-  buffer_size = 100,                -- Buffer size (0 = no buffering)
-  buffer_flush_interval = 5,        -- Seconds between auto-flush (if buffering)
-  module_filter = {"ui", "network"},-- Only show logs from these modules
-  module_blacklist = {"metrics"},   -- Hide logs from these modules
-  standard_metadata = {             -- Added to all logs
-    version = "1.0.0",
-    environment = "production"
-  }
-})
--- Module-specific configuration
-logging.set_module_level("database", logging.LEVELS.DEBUG)
-logging.filter_module("ui*")  -- Wildcard pattern for module filtering
-logging.blacklist_module("metrics")  -- Hide logs from this module
-```
-
-
-
-#### Performance Optimization
-
-
-
-```lua
--- Check if level is enabled before expensive operations
-if logger.is_debug_enabled() then
-  -- Only do this expensive operation if debug logging is enabled
-  local stats = gather_detailed_statistics()
-  logger.debug("Performance statistics", stats)
-end
--- Use buffered logging for high-volume scenarios
-local buffered_logger = logging.create_buffered_logger("metrics", {
-  buffer_size = 1000,        -- Buffer up to 1000 messages
-  flush_interval = 10,       -- Flush every 10 seconds
-  output_file = "metrics.log" -- Write to specific file
-})
--- Flush buffers manually when needed
-logging.flush()
-```
-
-
-
-#### Central Configuration Integration
-
-
-
-```lua
--- Configure logging based on central config
-logging.configure_from_config("my_module")
--- Configure based on command-line options
-logging.configure_from_options("my_module", {
-  debug = true,     -- Sets DEBUG level if true
-  verbose = false   -- Sets TRACE level if true (only if debug is false)
-})
-```
-
-
-
 ## Export Module
-
-
 **File:** `lib/tools/logging/export.lua`
 The export module provides functionality for exporting logs to various external logging platforms and formats.
 
@@ -308,11 +178,13 @@ local results = log_search.search_logs({
   message_pattern = "connection",    -- Pattern to search for in messages
   limit = 100                        -- Maximum results to return
 })
--- Results contain:
+-- Results contain (LogSearchResults):
 -- {
 --   entries = { ... },  -- Array of matching log entries
---   count = 42,         -- Number of matches
---   truncated = false   -- Whether results were limited
+--   total = 1500,       -- Total number of entries processed
+--   matched = 42,       -- Number of entries that matched filters
+--   count = 42,         -- Alias for matched
+--   truncated = false   -- True if the search hit the result limit
 -- }
 ```
 
@@ -416,7 +288,7 @@ processor.close()
 ```lua
 -- Create an adapter for a specific platform
 local adapter = log_search.create_export_adapter(
-  "logstash",               -- Adapter type: "logstash", "elk", "splunk", "datadog"
+  "logstash",               -- Adapter type: "logstash", "elasticsearch", "splunk", "datadog", "loki"
   {                         -- Platform-specific options
     application_name = "my_app",
     environment = "production"
@@ -463,13 +335,7 @@ The formatter integration module provides integration between the logging system
 local formatter_integration = require("lib.tools.logging.formatter_integration")
 -- Enhance all registered formatters with logging capabilities
 local formatters = formatter_integration.enhance_formatters()
--- Enable logging for a specific formatter
-formatter_integration.enable_formatter_logging(
-  "html",                   -- Formatter name
-  html_formatter           -- Formatter object
-)
 ```
-
 
 
 #### Test-Specific Logging
@@ -495,35 +361,137 @@ step_logger.info("Connecting to database")
 -- Result includes step name in the context
 ```
 
-
-
-#### Log Collection for Tests
-
-
-
-```lua
--- Start capturing logs for a specific test
-formatter_integration.capture_start(
-  "Database Connection Test",   -- Test name
-  "test_123"                    -- Unique test ID
-)
--- Run the test (logs are captured)
-test_function()
--- End capture and get collected logs
-local logs = formatter_integration.capture_end("test_123")
--- Attach logs to test results
-local enhanced_results = formatter_integration.attach_logs_to_results(
-  test_results,  -- Original test results
-  logs           -- Captured logs
-)
 ```
 
 
+#### Log Capture
+
+##### `formatter_integration.capture_start(test_name, test_id)`
+
+Starts capturing logs associated with a specific test run.
+
+```lua
+---@param test_name string Name of the test being run.
+---@param test_id string Unique ID for this specific test run instance.
+```
+**Parameters:**
+- `test_name` (string): Name of the test.
+- `test_id` (string): Unique ID for the test run.
+**Returns:** `nil`
+**Example:**
+```lua
+formatter_integration.capture_start("My Test Case", "run-123")
+-- Logs generated after this point will be captured under "run-123"
+```
+
+
+##### `formatter_integration.capture_end(test_id)`
+
+Stops capturing logs for a specific test run and returns the collected logs.
+
+```lua
+---@param test_id string The unique ID used in `capture_start`.
+---@return table[] captured_logs An array of captured log entry tables.
+```
+**Parameters:**
+- `test_id` (string): Unique ID for the test run.
+**Returns:**
+- `captured_logs` (table[]): Array of log entry tables captured for this test ID.
+**Example:**
+```lua
+local captured_logs = formatter_integration.capture_end("run-123")
+print("Captured " .. #captured_logs .. " log entries.")
+```
+
+
+##### `formatter_integration.attach_logs_to_results(test_results, captured_logs)`
+
+Attaches captured logs to a test results object.
+
+```lua
+---@param test_results table The results object for a single test.
+---@param captured_logs table[] Array of log entries captured for this test.
+---@return table test_results The modified `test_results` table with a `logs` field added.
+```
+**Parameters:**
+- `test_results` (table): The test result object.
+- `captured_logs` (table[]): The array of logs returned by `capture_end`.
+**Returns:**
+- `test_results` (table): The input `test_results` table, now including a `logs` field containing `captured_logs`.
+**Example:**
+```lua
+local results = { name = "My Test", status = "pass" }
+local logs = formatter_integration.capture_end("run-123")
+local results_with_logs = formatter_integration.attach_logs_to_results(results, logs)
+-- results_with_logs now has a .logs field
+```
+```
+
+
+#### Log Capture
+
+##### `formatter_integration.capture_start(test_name, test_id)`
+
+Starts capturing logs associated with a specific test run.
+
+```lua
+---@param test_name string Name of the test being run.
+---@param test_id string Unique ID for this specific test run instance.
+```
+**Parameters:**
+- `test_name` (string): Name of the test.
+- `test_id` (string): Unique ID for the test run.
+**Returns:** `nil`
+**Example:**
+```lua
+formatter_integration.capture_start("My Test Case", "run-123")
+-- Logs generated after this point will be captured under "run-123"
+```
+
+
+##### `formatter_integration.capture_end(test_id)`
+
+Stops capturing logs for a specific test run and returns the collected logs.
+
+```lua
+---@param test_id string The unique ID used in `capture_start`.
+---@return table[] captured_logs An array of captured log entry tables.
+```
+**Parameters:**
+- `test_id` (string): Unique ID for the test run.
+**Returns:**
+- `captured_logs` (table[]): Array of log entry tables captured for this test ID.
+**Example:**
+```lua
+local captured_logs = formatter_integration.capture_end("run-123")
+print("Captured " .. #captured_logs .. " log entries.")
+```
+
+
+##### `formatter_integration.attach_logs_to_results(test_results, captured_logs)`
+
+Attaches captured logs to a test results object.
+
+```lua
+---@param test_results table The results object for a single test.
+---@param captured_logs table[] Array of log entries captured for this test.
+---@return table test_results The modified `test_results` table with a `logs` field added.
+```
+**Parameters:**
+- `test_results` (table): The test result object.
+- `captured_logs` (table[]): The array of logs returned by `capture_end`.
+**Returns:**
+- `test_results` (table): The input `test_results` table, now including a `logs` field containing `captured_logs`.
+**Example:**
+```lua
+local results = { name = "My Test", status = "pass" }
+local logs = formatter_integration.capture_end("run-123")
+local results_with_logs = formatter_integration.attach_logs_to_results(results, logs)
+-- results_with_logs now has a .logs field
+```
+
 
 #### Custom Log Formatter
-
-
-
 ```lua
 -- Create a specialized formatter for log output
 local log_formatter = formatter_integration.create_log_formatter()

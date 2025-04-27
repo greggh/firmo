@@ -2,9 +2,7 @@
 
 
 ## Overview
-
-
-The Benchmark module provides comprehensive utilities for measuring and analyzing the performance of Lua code. It offers statistical analysis, memory tracking, and comparative benchmarking capabilities to help identify bottlenecks and optimize performance.
+The Benchmark module provides utilities for measuring code performance (`measure`), running benchmark suites (`suite`), comparing results (`compare`), printing results (`print_result`), and generating large test suites for framework benchmarking (`generate_large_test_suite`).
 
 ## Module: `lib.tools.benchmark`
 
@@ -78,6 +76,7 @@ Measures the execution time and performance metrics of a function.
     - `std_dev` (number): Standard deviation of memory usage
     - `count` (number): Number of samples
     - `total` (number): Total memory usage
+- `nil, error` (table): If critical validation or measurement error occurs.
 
 **Example:**
 
@@ -97,7 +96,7 @@ local results = benchmark.measure(test_function, {1000}, {
 print("Average execution time: " .. results.time_stats.mean .. " seconds")
 ```
 
-
+**Throws:** Can throw a table error if input validation fails.
 
 ### `benchmark.suite(suite_def, options)`
 
@@ -164,7 +163,7 @@ local suite_results = benchmark.suite({
 })
 ```
 
-
+**Throws:** Can throw a table error if input validation fails.
 
 ### `benchmark.compare(benchmark1, benchmark2, options)`
 
@@ -189,6 +188,7 @@ Compares two benchmark results and calculates performance differences.
   - `less_memory` (string): Label of the benchmark using less memory
   - `time_percent` (number): Percentage difference in execution time
   - `memory_percent` (number): Percentage difference in memory usage
+- `nil, error` (table): If validation or comparison calculation fails.
 
 **Example:**
 
@@ -212,7 +212,7 @@ local comparison = benchmark.compare(string_concat, table_concat)
 print(comparison.faster .. " is " .. comparison.time_percent .. "% faster")
 ```
 
-
+**Throws:** Can throw a table error if input validation fails.
 
 ### `benchmark.print_result(result, options)`
 
@@ -243,7 +243,7 @@ end, {}, {label = "Sum calculation"})
 benchmark.print_result(result, {report_stats = true})
 ```
 
-
+**Throws:** Can throw a table error if input validation fails.
 
 ### `benchmark.generate_large_test_suite(options)`
 
@@ -269,6 +269,7 @@ Generates a large test suite for benchmarking purposes.
   - `failed_files` (number): Number of files that failed to create
   - `tests_per_file` (number): Tests per file
   - `total_tests` (number): Total number of tests generated
+- `nil, error` (table): If validation or file I/O fails.
 
 **Example:**
 
@@ -282,7 +283,7 @@ local suite = benchmark.generate_large_test_suite({
 print("Generated " .. suite.total_tests .. " tests in " .. suite.output_dir)
 ```
 
-
+**Throws:** Can throw a table error if validation or critical file I/O operations fail.
 
 ### `benchmark.register_with_firmo(firmo)`
 
@@ -295,9 +296,11 @@ Registers benchmark functionality with the firmo framework.
 
 **Returns:**
 
+- The `firmo` instance passed in (potentially modified if registration adds `firmo.benchmark`).
 
-- The firmo instance with the benchmark module attached
+**Throws:** Can throw a table error if `firmo` input validation fails.
 
+**Example:**
 **Example:**
 
 
@@ -315,23 +318,23 @@ firmo.benchmark.measure(function() return 1 + 1 end)
 
 
 ### `format_time(time_seconds)`
+- `@private`
 
-
-*Internal function that formats time values with appropriate units.*
+*Internal function used for formatting time values (implementation may be inline or missing).*
 
 ### `calculate_stats(measurements)`
 
-
+- `@private`
 *Internal function that calculates statistical metrics from measurement data.*
 
 ### `deep_clone(t)`
 
-
+- `@private`
 *Internal function that creates a deep copy of a table.*
 
 ### `high_res_time()`
 
-
+- `@private`
 *Internal function that returns high-resolution time with the best available precision.*
 
 ## Error Handling
@@ -361,3 +364,9 @@ The benchmark module has comprehensive error handling for all operations:
 
 
 The benchmark module follows semantic versioning and includes a `_VERSION` field with the current version.
+
+## Unimplemented Functions
+
+The following functions are listed in the module's JSDoc class definition but are **not currently implemented** and should not be used:
+
+- `time`, `run`, `print_results`, `save_results`, `load_results`, `gc`, `memory`, `configure`, `reset`, `stats`, `async_time`, `human_size`, `human_time` (use internal `format_time`), `measure_call_overhead`, `histogram`, `is_significant`, `plot`.

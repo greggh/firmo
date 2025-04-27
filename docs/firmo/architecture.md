@@ -17,9 +17,15 @@ firmo.lua                  # Main entry point and public API
 |
 ├── lib/                   # Core framework modules
 │   ├── core/              # Fundamental components
-│   │   ├── central_config.lua   # Centralized configuration system
-│   │   ├── version.lua    # Version information
-│   │   └── utils.lua      # Core utilities
+│   │   ├── init.lua           # Core aggregator
+│   │   ├── central_config.lua # Centralized configuration system
+│   │   ├── error_handler.lua # Standardized error handling (Moved from tools for centrality)
+│   │   ├── fix_expect.lua     # Expect system repair
+│   │   ├── module_reset.lua   # Module isolation system
+│   │   ├── runner.lua         # Core test execution logic
+│   │   ├── test_definition.lua # BDD functions (describe, it, etc.)
+│   │   ├── type_checking.lua  # Advanced type validation
+│   │   └── version.lua        # Version information
 │   │
 │   ├── assertion/         # Assertion system
 │   │   ├── expect.lua     # Expect-style assertions
@@ -35,22 +41,29 @@ firmo.lua                  # Main entry point and public API
 │   │       ├── formatter.lua # Base report formatter
 │   │       ├── html.lua      # HTML reporter with syntax highlighting
 │   │       ├── json.lua      # JSON reporter with pretty printing
+│   │       ├── json.lua      # JSON reporter with pretty printing
 │   │       ├── lcov.lua      # LCOV report formatter
-│   │       ├── tap.lua       # TAP v13 report formatter
-│   │       ├── csv.lua       # CSV report formatter with configurable columns
-│   │       └── junit.lua     # JUnit XML report formatter
+│   │       └── cobertura.lua # Cobertura XML formatter (Moved from reporting)
 │   │
 │   ├── tools/             # Utility tools
-│   │   ├── logging/       # Structured logging system
-│   │   ├── error_handler.lua # Standardized error handling
-│   │   ├── filesystem.lua    # Filesystem operations
-│   │   ├── benchmark.lua     # Performance benchmarking
-│   │   ├── codefix.lua       # Code quality checking and fixing
-│   │   ├── watcher.lua       # File watching for live reload
-│   │   └── parser.lua        # Lua code parsing
+│   │   ├── benchmark/     # Performance benchmarking
+│   │   ├── cli/           # Command-line argument parsing
+│   │   ├── codefix/       # Code quality checking and fixing (Partially Implemented)
+│   │   ├── date/          # Date/time utilities
+│   │   ├── discover/      # Test file discovery
+│   │   ├── filesystem/    # Filesystem operations (includes temp_file)
+│   │   ├── hash/          # Hashing utilities
+│   │   ├── interactive/   # Interactive mode (Partially Implemented)
+│   │   ├── json/          # JSON encoding/decoding
+│   │   ├── logging/       # Structured logging system (includes export, search, formatter_integration)
+│   │   ├── markdown/      # Markdown fixing utilities (Partially Implemented)
+│   │   ├── parallel/      # Parallel test execution
+│   │   ├── parser/        # Lua code parsing
+│   │   ├── test_helper/   # Utilities for writing tests
+│   │   ├── watcher/       # File watching for live reload (Partially Implemented)
+│   │   └── vendor/        # Third-party libraries (e.g., lpeglabel)
 │   │
 │   ├── mocking/           # Mocking system
-│   │   ├── spy.lua        # Function spying
 │   │   ├── stub.lua       # Function stubbing
 │   │   └── mock.lua       # Object mocking
 │   │
@@ -63,12 +76,21 @@ firmo.lua                  # Main entry point and public API
 │       ├── init.lua       # Report coordination
 │       └── formatters/    # Report formatters
 │           ├── html.lua   # HTML test reports
-│           ├── json.lua   # JSON test reports
-│           ├── junit.lua  # JUnit XML reports
-│           ├── lcov.lua   # LCOV reports
-│           ├── cobertura.lua # Cobertura XML reports
-│           ├── tap.lua    # TAP format reports
-│           └── csv.lua    # CSV reports
+│   │   ├── json.lua      # JSON test/coverage/quality reports
+│   │   ├── junit.lua     # JUnit XML test reports
+│   │   ├── lcov.lua      # LCOV coverage reports
+│   │   ├── cobertura.lua # Cobertura XML coverage reports
+│   │   ├── tap.lua       # TAP format test reports
+│   │   ├── summary.lua   # Text summary reports (coverage/quality)
+│   │   └── csv.lua       # CSV test reports
+│   │
+│   ├── async/             # Asynchronous testing utilities
+│   │   └── init.lua
+│   │
+│   └── quality/           # Test quality validation (Partially Implemented)
+│       ├── init.lua       # Quality API
+│       ├── level_checkers.lua # Logic for different quality levels
+│       └── report/        # Quality report generators (Potentially integrated with main reporting)
 │
 ├── scripts/               # Utilities and runners
 │   ├── runner.lua         # Test runner
@@ -147,12 +169,10 @@ The coverage system integrates LuaCov's proven debug hook approach, enhanced wit
 - **Reporting System**: Generates coverage reports in various formats
   - **HTML Format**: Interactive reports with syntax highlighting, color-coded line coverage, and collapsible file views
   - **JSON Format**: Structured data with configurable pretty printing for easy parsing
-  - **LCOV Format**: Standard format compatible with external LCOV tools, including function and line coverage
-  - **TAP Format**: Test Anything Protocol v13 compliant output with test case formatting and YAML diagnostics for integration with TAP consumers
-  - **CSV Format**: Configurable columns for tabular data export and spreadsheet integration with proper field escaping for special characters
-  - **JUnit XML Format**: CI/CD compatible format treating coverage metrics as test cases
-  - Integration with firmo's formatters
-
+  - **JSON Format**: Structured data with configurable pretty printing for easy parsing.
+  - **LCOV Format**: Standard format compatible with external LCOV tools.
+  - **Cobertura XML Format**: CI/CD compatible format.
+  - **Summary Format**: Text-based summary for console output.
 
 #### 2.2 Coverage Data Flow
 
@@ -295,27 +315,29 @@ Several utility modules provide supporting functionality:
 ### Completed Components
 
 
-
+- ✅ Core (`central_config`, `error_handler`, `test_definition`, `runner`, etc.)
 - ✅ Assertion system
 - ✅ Mocking system
-- ✅ Central configuration system
-- ✅ Error handling patterns
-- ✅ Filesystem module
-- ✅ Structured logging system
-- ✅ Test runner
+- ✅ Filesystem (including `temp_file`)
+- ✅ Logging (including `export`, `search`, `formatter_integration`)
+- ✅ Coverage (LuaCov integration, basic reporting)
+- ✅ Reporting (Core system, formatters: HTML, JSON, LCOV, Cobertura, JUnit, TAP, CSV, Summary)
+- ✅ Parser
+- ✅ Async
+- ✅ Benchmark
+- ✅ Discover
+- ✅ Hash
+- ✅ JSON
+- ✅ Date
 
+### Partially Implemented / In-Progress Components
 
-### In-Progress Components
-
-
-
-- ✅ LuaCov-based debug hook coverage system
-- ✅ Enhanced HTML report visualization with syntax highlighting and interactive features
-- ✅ Coverage reporting in multiple formats (HTML, JSON, LCOV, TAP, CSV, JUnit)
-- 🔄 Quality validation module (medium priority)
-- 🔄 File watcher module (medium priority)
-- 🔄 CodeFix module (medium priority)
-- 🔄 Benchmark module (medium priority)
+- 🔄 Quality Validation (`lib/quality`): Core logic exists, but reporting and full integration may be incomplete. API/Guides documented features that are not implemented in source.
+- 🔄 Watcher (`lib/tools/watcher`): Core watching loop exists, but several API functions are unimplemented.
+- 🔄 CodeFix (`lib/tools/codefix`): Integration with StyLua/Luacheck and some custom fixers exist, but API/Guides documented features that are not implemented in source.
+- 🔄 Markdown Fixer (`lib/tools/markdown`): Only heading and list fixing implemented; other features documented are not implemented.
+- 🔄 Interactive Mode (`lib/tools/interactive`): Basic structure exists but lacks full implementation and features documented in guides.
+- 🔄 Parallel (`lib/tools/parallel`): Core functionality exists but may have unimplemented helper functions.
 
 
 ## Implementation Timeline (Spring 2025)

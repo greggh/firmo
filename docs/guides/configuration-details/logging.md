@@ -1,13 +1,10 @@
 # Logging Module Configuration
 
-
 This document describes the comprehensive configuration options for the firmo logging system, which provides structured, leveled logging with multiple output formats and destinations.
 
 ## Overview
 
-
 The logging module provides a powerful logging system with support for:
-
 
 - Multiple named loggers with independent configuration
 - Hierarchical log levels (FATAL, ERROR, WARN, INFO, DEBUG, TRACE/VERBOSE)
@@ -18,56 +15,48 @@ The logging module provides a powerful logging system with support for:
 - Module-specific log levels and filtering
 - Buffered logging for high-performance scenarios
 
-
 ## Configuration Options
-
 
 ### Basic Options
 
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `level` | string or number | `"INFO"` | Global log level threshold |
-| `timestamps` | boolean | `true` | Include timestamps in log entries |
-| `use_colors` | boolean | `true` | Use ANSI colors in console output |
-| `output_file` | string | `nil` | Path to log file (nil = console only) |
-| `log_dir` | string | `"logs"` | Directory for log files |
-| `silent` | boolean | `false` | Suppress all logging output |
-| `format` | string | `"text"` | Log format: "text" or "json" |
+| Option        | Type             | Default  | Description                           |
+| ------------- | ---------------- | -------- | ------------------------------------- |
+| `level`       | string or number | `"INFO"` | Global log level threshold            |
+| `timestamps`  | boolean          | `true`   | Include timestamps in log entries     |
+| `use_colors`  | boolean          | `true`   | Use ANSI colors in console output     |
+| `output_file` | string           | `nil`    | Path to log file (nil = console only) |
+| `log_dir`     | string           | `"logs"` | Directory for log files               |
+| `silent`      | boolean          | `false`  | Suppress all logging output           |
+| `format`      | string           | `"text"` | Log format: "text" or "json"          |
 
 ### Module-Specific Options
 
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `module_levels` | table | `{}` | Log levels by module name |
-| `module_filter` | string/table | `nil` | Only log from specified modules |
-| `module_blacklist` | table | `{}` | Never log from specified modules |
+| Option             | Type         | Default | Description                      |
+| ------------------ | ------------ | ------- | -------------------------------- |
+| `module_levels`    | table        | `{}`    | Log levels by module name        |
+| `module_filter`    | string/table | `nil`   | Only log from specified modules  |
+| `module_blacklist` | table        | `{}`    | Never log from specified modules |
 
 ### File and Rotation Options
 
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `max_file_size` | number | `50 * 1024` | Maximum log file size in bytes (50KB) |
-| `max_log_files` | number | `5` | Number of rotated log files to keep |
-| `date_pattern` | string | `"%Y-%m-%d"` | Date pattern for log file names |
-| `json_file` | string | `nil` | Path for JSON structured logs |
+| Option          | Type   | Default      | Description                           |
+| --------------- | ------ | ------------ | ------------------------------------- |
+| `max_file_size` | number | `50 * 1024`  | Maximum log file size in bytes (50KB) |
+| `max_log_files` | number | `5`          | Number of rotated log files to keep   |
+| `date_pattern`  | string | `"%Y-%m-%d"` | Date pattern for log file names       |
+| `json_file`     | string | `nil`        | Path for JSON structured logs         |
 
 ### Performance Options
 
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `buffer_size` | number | `0` | Buffer size (0 = no buffering) |
-| `buffer_flush_interval` | number | `5` | Seconds between auto-flush if buffering |
-| `standard_metadata` | table | `{}` | Fields to include in all log entries |
+| Option                  | Type   | Default | Description                             |
+| ----------------------- | ------ | ------- | --------------------------------------- |
+| `buffer_size`           | number | `0`     | Buffer size (0 = no buffering)          |
+| `buffer_flush_interval` | number | `5`     | Seconds between auto-flush if buffering |
+| `standard_metadata`     | table  | `{}`    | Fields to include in all log entries    |
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the logging system in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -75,7 +64,7 @@ return {
   logging = {
     -- Basic configuration
     level = "DEBUG",
-    timestamps = true, 
+    timestamps = true,
     use_colors = true,
 
     -- Output destinations
@@ -114,13 +103,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the logging system programmatically:
-
 
 ```lua
 local logging = require("lib.tools.logging")
@@ -138,14 +123,9 @@ logging.configure({
 logging.set_module_level("Database", logging.LEVELS.INFO)
   .set_module_level("Network", logging.LEVELS.DEBUG)
   .set_module_level("UI", logging.LEVELS.WARN)
--- Configure from central config
-logging.configure_from_config("MyModule")
 ```
 
-
-
 ## Log Levels
-
 
 The logging system supports the following log levels, in order of decreasing severity:
 | Level | Numeric Value | Description |
@@ -159,14 +139,11 @@ The logging system supports the following log levels, in order of decreasing sev
 
 ## Module Filtering
 
-
 The logging system provides powerful filtering capabilities to control which modules' logs are displayed:
 
 ### Whitelist Filtering
 
-
 The `module_filter` option allows you to specify which modules should have their logs displayed:
-
 
 ```lua
 -- Through central configuration
@@ -178,13 +155,9 @@ logging.filter_module("Database")
   .filter_module("Auth*")
 ```
 
-
-
 ### Blacklist Filtering
 
-
 The `module_blacklist` option allows you to specify modules that should never log:
-
 
 ```lua
 -- Through central configuration
@@ -196,13 +169,9 @@ logging.blacklist_module("Stats")
   .blacklist_module("Metrics*")
 ```
 
-
-
 ## File Output and Rotation
 
-
 The logging system supports writing logs to files with automatic rotation:
-
 
 ```lua
 -- Configure file output
@@ -214,21 +183,16 @@ logging.configure({
 })
 ```
 
-
 When a log file reaches the maximum size:
-
 
 1. The current file (app.log) is renamed to app.log.1
 2. Existing rotated files move up one position (app.log.1 → app.log.2, etc.)
 3. The oldest file is deleted if the number of files exceeds max_log_files
 4. A new empty log file is created
 
-
 ## JSON Structured Logging
 
-
 The logging system can generate structured JSON logs alongside or instead of text logs:
-
 
 ```lua
 -- Configure JSON logging
@@ -238,9 +202,7 @@ logging.configure({
 })
 ```
 
-
 JSON logs include standard fields and all context parameters:
-
 
 ```json
 {
@@ -254,13 +216,9 @@ JSON logs include standard fields and all context parameters:
 }
 ```
 
-
-
 ## Buffered Logging
 
-
 For high-performance scenarios, the logging system supports buffered logging:
-
 
 ```lua
 -- Configure buffered logging
@@ -277,9 +235,7 @@ local metrics_logger = logging.create_buffered_logger("Metrics", {
 })
 ```
 
-
 Buffered logging reduces I/O operations by:
-
 
 1. Collecting multiple log messages in memory
 2. Writing them to disk in batches when:
@@ -287,13 +243,9 @@ Buffered logging reduces I/O operations by:
    - The flush interval elapses (buffer_flush_interval seconds)
    - The flush() method is called manually
 
-
 ## Advanced Usage
 
-
 ### Getting or Creating Loggers
-
-
 
 ```lua
 -- Get a logger for a specific module
@@ -304,11 +256,7 @@ logger.warn("Slow query detected", {query_id = "SELECT001", execution_time = 1.5
 logger.error("Connection failed", {error_code = "ACCESS_DENIED"})
 ```
 
-
-
 ### Checking Log Levels
-
-
 
 ```lua
 -- Check if a level is enabled before performing expensive operations
@@ -319,11 +267,7 @@ if logger.is_debug_enabled() then
 end
 ```
 
-
-
 ### Temporarily Changing Log Levels
-
-
 
 ```lua
 -- Temporarily increase log level for a specific operation
@@ -334,11 +278,7 @@ end)
 -- The original log level is automatically restored after function completes
 ```
 
-
-
 ## Example Logger Usage
-
-
 
 ```lua
 -- Get a logger
@@ -363,13 +303,9 @@ logger.info("Processing completed", {
 })
 ```
 
-
-
 ## Integration with Error Handler
 
-
 The logging system integrates with the error handler module to handle expected errors in tests:
-
 
 ```lua
 -- If this error occurs in a test marked with {expect_error = true},
@@ -377,9 +313,7 @@ The logging system integrates with the error handler module to handle expected e
 logger.error("Operation failed", {error = "Connection refused"})
 ```
 
-
 In tests marked with `{expect_error = true}`, errors will be:
-
 
 1. Prefixed with `[EXPECTED]` to indicate they're part of the test
 2. Downgraded to DEBUG level (unless --debug flag is present)

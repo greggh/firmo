@@ -711,86 +711,132 @@ expect(value).to_not.be.a("number")
 ### Complete Assertion Pattern Mapping
 
 If you're coming from a busted-style background, use this mapping to convert assertions:
-| busted-style | firmo style | Notes |
+| busted-style                      | firmo style                         | Notes                              |
 | --------------------------------- | ----------------------------------- | ---------------------------------- |
-| `assert.is_not_nil(value)` | `expect(value).to.exist()` | Checks if a value is not nil |
-| `assert.is_nil(value)` | `expect(value).to_not.exist()` | Checks if a value is nil |
-| `assert.equals(expected, actual)` | `expect(actual).to.equal(expected)` | Note the reversed parameter order! |
-| `assert.is_true(value)` | `expect(value).to.be_truthy()` | Checks if a value is truthy |
-| `assert.is_false(value)` | `expect(value).to_not.be_truthy()` | Checks if a value is falsey |
-| `assert.type_of(value, "string")` | `expect(value).to.be.a("string")` | Checks the type of a value |
-| `assert.is_string(value)` | `expect(value).to.be.a("string")` | Type check |
-| `assert.is_number(value)` | `expect(value).to.be.a("number")` | Type check |
-| `assert.is_table(value)` | `expect(value).to.be.a("table")` | Type check |
-| `assert.same(expected, actual)` | `expect(actual).to.equal(expected)` | Deep equality check |
-| `assert.matches(pattern, value)` | `expect(value).to.match(pattern)` | String pattern matching |
-| `assert.has_error(fn)` | `expect(fn).to.fail()` | Checks if a function throws error |
+| `assert.is_not_nil(value)`        | `expect(value).to.exist()`          | Checks if a value is not nil       |
+| `assert.is_nil(value)`            | `expect(value).to_not.exist()`      | Checks if a value is nil           |
+| `assert.is_true(value)`           | `expect(value).to.be_truthy()`      | Checks if a value is truthy        |
+| `assert.is_false(value)`          | `expect(value).to.be_falsy()`       | Checks if value is `false` or `nil`|
+| `assert.equals(expected, actual)` | `expect(actual).to.equal(expected)` | Deep equality check (reversed args)|
+| `assert.same(expected, actual)`   | `expect(actual).to.equal(expected)` | Deep equality check (reversed args)|
+| `assert.type_of(value, "string")` | `expect(value).to.be.a("string")`   | Checks `type(value)`               |
+| `assert.is_string(value)`         | `expect(value).to.be.a("string")`   | Checks `type(value)`               |
+| `assert.is_number(value)`         | `expect(value).to.be.a("number")`   | Checks `type(value)`               |
+| `assert.is_table(value)`          | `expect(value).to.be.a("table")`    | Checks `type(value)`               |
+| `assert.matches(pattern, value)`  | `expect(value).to.match(pattern)`   | String/Value pattern matching      |
+| `assert.has_error(fn)`            | `expect(fn).to.fail()`              | Checks if function throws error    |
 
+**Note on Negation**: Use `.to_not` before the assertion method for negation, e.g., `expect(actual).to_not.equal(unexpected)`.
 ### Extended Assertions
 
-Firmo includes a comprehensive set of advanced assertions for more precise and convenient testing:
+Firmo includes a comprehensive set of advanced assertions beyond the basic mappings:
 
-#### Collection Assertions
-
+#### Core & Type Assertions
 ```lua
--- Check length of strings or tables
-expect("hello").to.have_length(5)
-expect({1, 2, 3}).to.have_length(3)
-expect("hello").to.have_size(5)  -- alias for have_length
--- Check if collection is empty
-expect("").to.be.empty()
-expect({}).to.be.empty()
+expect(value).to.exist()                   -- Asserts value is not nil
+expect(nil).to_not.exist()                 -- Asserts value is nil
+expect(true).to.be_truthy()                -- Asserts value is not false or nil
+expect(false).to.be_falsy()                -- Asserts value is false or nil
+expect(nil).to.be_falsy()                  -- Asserts value is false or nil (also `be_falsey`)
+expect(value).to.be(other_value)           -- Checks direct equality (v == x)
+expect(value).to.equal(other_value)        -- Checks deep equality (handles tables, cycles)
+expect(value).to.deep_equal(other_value)   -- Alias for `equal`
+expect(1.001).to.equal(1.000, 0.01)        -- Equality with epsilon tolerance
+expect(my_table).to.be.a("table")          -- Checks `type()`
+expect(my_instance).to.be.a(MyClass)       -- Checks metatable inheritance
 ```
 
 #### Numeric Assertions
-
 ```lua
--- Numeric assertions
-expect(5).to.be.positive()
-expect(-5).to.be.negative()
-expect(10).to.be.integer()
-expect(5.5).to_not.be.integer()
+expect(5).to.be_greater_than(4)
+expect(4).to.be_less_than(5)
+expect(5).to.be_at_least(5)
+expect(5).to.be_at_least(4)
+expect(5).to.be_positive()                 -- Implemented via `greater_than(0)` logic potentially
+expect(-5).to.be_negative()
+expect(10).to.be_integer()
+expect(5.5).to_not.be_integer()
 ```
 
 #### String Assertions
-
 ```lua
--- String assertions
-expect("HELLO").to.be.uppercase()
-expect("hello").to.be.lowercase()
+expect("hello").to.match("ell")            -- Checks string.find(value, pattern)
+expect("hello").to.match_regex("^h.*o$")   -- More explicit regex match
+expect("case").to.match_regex("CASE", { case_insensitive = true })
+expect("hello").to.start_with("he")
+expect("hello").to.end_with("lo")
+expect("hello world").to.contain("lo w")   -- Checks string containment
+expect("HELLO").to.be_uppercase()
+expect("hello").to.be_lowercase()
 ```
 
-#### Object Structure Assertions
-
+#### Table & Collection Assertions
 ```lua
--- Object property assertions
-expect({name = "John"}).to.have_property("name")
-expect({name = "John"}).to.have_property("name", "John")
--- Schema validation
-expect({name = "John", age = 30}).to.match_schema({
-  name = "string",
-  age = "number"
-})
+expect({1, 2, 3}).to.contain(2)            -- Checks if value exists in table values
+expect({a=1, b=2}).to_not.contain(1)       -- Checks values, not keys
+expect({a=1, b=2}).to.have_key("a")
+expect({a=1, b=2}).to.have_keys({"a", "b"})
+expect({a=1, b=2}).to.have_property("a")
+expect({a=1, b=2}).to.have_property("a", 1) -- Checks key and value equality
+expect({1, 2, 3}).to.have_length(3)        -- Checks `#value`
+expect("abc").to.have_length(3)            -- Also works for strings
+expect({1, 2, 3}).to.have_size(3)          -- Alias for `have_length`
+expect({}).to.be.empty()                   -- Checks #value == 0
+expect("").to.be.empty()                   -- Checks string length == 0
+expect({name="a", age=1}).to.match_schema({name="string", age="number"})
+expect({name="a"}).to_not.match_schema({name="string", age="number"})
 ```
 
-#### Function Behavior Assertions
-
+#### Function & Error Assertions
 ```lua
--- Function behavior assertions
-local obj = {count = 0}
-expect(function() obj.count = obj.count + 1 end).to.change(function() return obj.count end)
-expect(function() obj.count = obj.count + 1 end).to.increase(function() return obj.count end)
-expect(function() obj.count = obj.count - 1 end).to.decrease(function() return obj.count end)
+local function may_fail(ok) if not ok then error("failed!") end end
+expect(function() may_fail(false) end).to.fail()
+expect(function() may_fail(true) end).to_not.fail()
+expect(function() may_fail(false) end).to.fail_with("fail") -- Checks error message pattern
+expect(function() may_fail(false) end).to.throw()           -- Alias for fail
+expect(function() may_fail(false) end).to.throw_error_matching("fail") -- Alias for fail_with
+-- expect(function() error({ code=1 }) end).to.throw_error_type("table") -- Check error type (may need adjustment)
+
+local obj = { count = 0 }
+local function get_count() return obj.count end
+expect(function() obj.count = 1 end).to.change(get_count)
+expect(function() obj.count = obj.count + 1 end).to.increase(get_count)
+expect(function() obj.count = obj.count - 1 end).to.decrease(get_count)
 ```
 
-#### Deep Equality
-
+#### Date Assertions (Requires `lib.tools.date`)
 ```lua
--- Deep equality (alias)
-expect({a = 1, b = {c = 2}}).to.deep_equal({a = 1, b = {c = 2}})
+expect("2024-01-01").to.be_date()
+expect("2024-01-01T10:00:00Z").to.be_iso_date()
+expect("2024-01-01").to.be_before("2024-01-02")
+expect("2024-01-02").to.be_after("2024-01-01")
+expect("2024-01-01T10:00:00Z").to.be_same_day_as("2024-01-01T23:00:00+05:00")
 ```
 
-For more comprehensive assertions and detailed examples, see `docs/coverage_repair/assertion_pattern_mapping.md` and `tests/assertions/extended_assertions_test.lua`.
+#### Async Assertions (Requires `lib.async` and async context)
+```lua
+-- Assume async_fn accepts a `done` callback
+it("tests async completion", { async = true }, function(done)
+  expect(function(cb) async_module.sleep(10, cb) end).to.complete(50) -- Completes within 50ms
+  expect(function(cb) async_module.sleep(10, cb) end).to.complete_within(50)
+  expect(function(cb) async_module.sleep(10, function() cb(nil, "result") end) end)
+    .to.resolve_with("result", 50)
+  expect(function(cb) async_module.sleep(10, function() cb("error") end) end)
+    .to.reject("error", 50) -- Checks error message pattern
+  done()
+end)
+```
+
+#### Other Assertions
+```lua
+expect(value).to.satisfy(function(v) return v > 10 end) -- Custom predicate
+expect(my_obj).to.implement_interface({ method1 = "function", property = "string" })
+-- expect(value).to.be_type("callable") -- Checks if function or has __call metamethod
+-- expect(value).to.be_type("comparable") -- Checks if < operator works
+-- expect(value).to.be_type("iterable") -- Checks if pairs() works
+```
+
+For the most up-to-date details on parameters and behavior, refer to the JSDoc comments within `lib/assertion/init.lua`.
 
 ### Temporary File Management
 
@@ -878,24 +924,26 @@ Tests are organized in a logical directory structure by component:
 
 ```text
 tests/
-├── core/            # Core framework tests
-├── coverage/        # Coverage-related tests
-│   ├── instrumentation/  # Instrumentation-specific tests
-│   └── hooks/           # Debug hook tests
-├── quality/         # Quality validation tests
-├── reporting/       # Reporting framework tests
-│   └── formatters/      # Formatter-specific tests
-├── tools/           # Utility module tests
-│   ├── filesystem/      # Filesystem module tests
-│   ├── logging/         # Logging system tests
-│   └── watcher/         # File watcher tests
+├── assertions/      # Assertion system tests
+├── async/           # Asynchronous functionality tests
+├── core/            # Core framework component tests (config, tagging, etc.)
+├── coverage/        # Coverage module tests (debug hook system)
+├── discovery/       # Test discovery mechanism tests
 ├── error_handling/  # Error handling tests
-│   ├── core/            # Core error handling tests
-│   ├── coverage/        # Coverage error handling tests
-│   ├── reporting/       # Reporting error handling tests
-│   ├── tools/           # Tools error handling tests
-│   └── mocking/         # Mocking error handling tests
-└── ...
+│   └── core/        # Core error handling mechanism tests
+├── fixtures/        # Test fixtures and helper modules
+│   └── modules/     # Example modules used in tests
+├── integration/     # Integration tests involving multiple components
+├── mocking/         # Mocking, stubbing, and spying tests
+├── parallel/        # Parallel test execution tests
+├── performance/     # Performance-related tests
+├── quality/         # Code quality validation tests
+├── reporting/       # Reporting system tests (formatters, core logic)
+└── tools/           # Utility module tests
+    ├── filesystem/  # Filesystem utilities (temp files) tests
+    ├── logging/     # Logging system tests
+    ├── vendor/      # Tests for vendored dependencies
+    └── watcher/     # File watcher tests
 ```
 
 ### Test Execution
@@ -918,83 +966,80 @@ tests/
 
 ## Project Structure
 
-- `/lib`: Modular codebase with logical subdirectories
-  - `/lib/assertion.lua`: Standalone assertion module
-  - `/lib/core`: Core utilities (type checking, fix_expect, version)
-  - `/lib/async`: Asynchronous testing functionality
-  - `/lib/coverage`: Code coverage tracking
-  - `/lib/quality`: Quality validation
-  - `/lib/reporting`: Test reporting system
-    - `/lib/reporting/formatters`: Individual formatter implementations
-  - `/lib/tools`: Utilities (codefix, watcher, interactive CLI, markdown)
-    - `/lib/tools/logging`: Structured logging system
-    - `/lib/tools/parser`: Lua code parsing utilities
-    - `/lib/tools/vendor`: Third-party dependencies
-  - `/lib/mocking`: Mocking system (spy, stub, mock)
-- `/tests`: Test files for framework functionality
-  - `/tests/core`: Core module tests
-  - `/tests/coverage`: Coverage system tests
-  - `/tests/quality`: Quality validation tests
-  - `/tests/reporting`: Reporting system tests
-  - `/tests/tools`: Utility module tests
-  - `/tests/error_handling`: Error handling tests
-- `/examples`: Example scripts demonstrating usage
-- `/scripts`: Development and maintenance utility scripts
-- `/docs`: Documentation files
-- `firmo.lua`: Main framework file
-- `test.lua`: Unified test runner
+The firmo project is organized as follows:
 
+- `/lib`: Core library code, organized by functionality.
+  - `/lib/assertion/`: Expect-style assertion implementation (`init.lua`).
+  - `/lib/async/`: Asynchronous test support (`init.lua`, helpers).
+  - `/lib/core/`: Fundamental framework components (`central_config.lua`, `firmo.lua`, `tagging.lua`, `type_checking.lua`, `version.lua`, `module_reset.lua`).
+  - `/lib/coverage/`: Debug hook-based code coverage system (`init.lua`).
+  - `/lib/discovery/`: Test file discovery logic (`init.lua`).
+  - `/lib/error_handling/`: Standardized error handling system (`init.lua`, helpers).
+  - `/lib/fixtures/`: Test fixture utilities (potentially).
+  - `/lib/mocking/`: Mocking framework (`init.lua`, `mock.lua`, `spy.lua`, `stub.lua`).
+  - `/lib/parallel/`: Parallel test execution support (`init.lua`).
+  - `/lib/quality/`: Code quality validation rules and checks (`init.lua`, levels).
+  - `/lib/reporting/`: Test result reporting system (`init.lua`, formatters).
+    - `/lib/reporting/formatters/`: Specific report formatters (e.g., `console.lua`, `html.lua`, `json.lua`).
+  - `/lib/tools/`: General utility modules.
+    - `/lib/tools/filesystem/`: Filesystem operations, including temporary file management (`init.lua`, `temp_file.lua`).
+    - `/lib/tools/logging/`: Structured logging (`init.lua`, formatters, search).
+    - `/lib/tools/parser/`: Lua code parsing utilities (`init.lua`).
+    - `/lib/tools/vendor/`: Third-party dependencies (e.g., `lpeglabel.lua`).
+    - `/lib/tools/watcher/`: File system watcher for `--watch` mode (`init.lua`).
+    - Other tools: `date.lua`, `hash/init.lua`, `interactive_mode.lua`, `json/init.lua`.
+- `/tests`: Unit and integration tests for the framework, mirroring `lib` structure.
+  - (See "Test Directory Structure" section above for detailed layout)
+- `/examples`: Example Lua projects demonstrating firmo usage.
+- `/scripts`: Helper scripts for development, maintenance, and CI tasks (e.g., `check_syntax.lua`, `cleanup_temp_files.lua`, `fix_markdown.lua`, `version_bump.lua`, `version_check.lua`).
+- `/docs`: Project documentation.
+  - `/docs/api/`: Generated API documentation.
+  - `/docs/guides/`: Usage guides (e.g., `central_config.md`).
+  - `/docs/firmo/`: Internal planning and architecture documents (e.g., `plan.md`, `architecture.md`, `claude_document_update_plan.md`).
+- `firmo.lua`: Main entry point for using firmo as a library (re-exports core components).
+- `test.lua`: The primary test runner script.
+- `.firmo-config.lua`: Default configuration file for project-specific settings.
+- `README.md`: Project overview and setup instructions.
+- `CHANGELOG.md`: Record of changes.
+- Other config/meta files: `.luacheckrc`, `.stylua.toml`, `LICENSE`, etc.
 ## Coverage Module Architecture
 
-### Components
+### Components (Debug Hook Architecture)
 
-1. **Coverage Module (init.lua)**:
-   - Provides public API for coverage tracking
-   - Initializes and configures subsystems
-   - Manages coverage lifecycle (start, stop, reset)
-   - Processes coverage data before reporting
-2. **Instrumentation Engine**:
-   - **Parser (parser.lua)**:
-     - Parses Lua source code
-     - Identifies logical lines and code structure
-     - Builds AST for transformation
-   - **Transformer (transformer.lua)**:
-     - Inserts tracking calls at each logical line
-     - Maintains original code structure
-     - Preserves comments and whitespace
-   - **Source Mapper (sourcemap.lua)**:
-     - Maps instrumented line numbers to original lines
-     - Provides utilities for error reporting
-3. **Module Loading Integration**:
-   - **Loader Hook (loader/hook.lua)**:
-     - Hooks into Lua's module loading system
-     - Intercepts require calls
-     - Instruments modules before execution
-   - **Module Cache (loader/cache.lua)**:
-     - Caches instrumented modules
-     - Provides fast lookup of transformed code
-4. **Runtime Tracking**:
-   - **Runtime Tracker (runtime/tracker.lua)**:
-     - Provides global tracking functions
-     - Records line execution
-     - Associates lines with modules
-   - **Data Store (runtime/data_store.lua)**:
-     - Stores execution data
-     - Manages coverage information
-5. **Assertion Integration**:
-   - **Assertion Hook (assertion/hook.lua)**:
-     - Hooks into firmo's assertion system
-     - Captures assertion execution context
-   - **Line Association (assertion/analyzer.lua)**:
-     - Associates assertions with verified lines
-     - Marks lines as covered rather than just executed
-6. **Reporting System**:
-   - **HTML Reporter (report/html.lua)**:
-     - Generates visual HTML reports
-     - Provides three-color visualization
-   - **JSON Reporter (report/json.lua)**:
-     - Outputs machine-readable coverage data
-     - Supports integration with other tools
+The coverage system leverages Lua's `debug.sethook` mechanism to track line execution without modifying the source code directly. This approach avoids the complexities of source code instrumentation and provides accurate coverage data based on runtime execution.
+
+1.  **Coverage Core (`lib/coverage/init.lua`)**:
+    *   **Public API**: Provides functions like `init`, `start`, `stop`, `pause`, `resume`, `save_stats`, `load_stats`.
+    *   **State Management**: Manages the coverage state (`initialized`, `paused`), coverage data (`state.data`), and configuration cache.
+    *   **Hook Management**: Sets the debug hook (`debug_hook`) on the main thread and patches `coroutine.create`/`wrap` to apply hooks to new coroutines. Ensures hooks are properly removed during `shutdown`.
+    *   **Configuration**: Integrates with `central_config` to get settings like `enabled`, `include`/`exclude` patterns, `statsfile`, `savestepsize`.
+    *   **Stats Handling**: Implements saving/loading coverage data to/from the configured stats file, using an atomic save process and handling potential errors. Merges loaded stats with existing data.
+    *   **Error Handling**: Uses `lib.tools.error_handler` and `lib.tools.filesystem` for robust operation and error reporting. Tracks write failures to prevent infinite loops if saving fails repeatedly.
+
+2.  **Debug Hook (`debug_hook` function inside `init.lua`)**:
+    *   **Execution Tracking**: Called by the Lua runtime for each executed line (`"l"` event).
+    *   **File Filtering**: Determines the source file, normalizes its path (`filesystem.normalize_path`), and checks if it should be tracked based on `include`/`exclude` patterns using `should_track_file`. Uses a cache (`ignored_files`) for efficiency.
+    *   **Data Recording**: If the file is tracked, increments the hit count for the specific line number in `state.data`. Initializes the file's entry if it's the first hit.
+    *   **Buffering & Saving**: Manages a buffer (`state.buffer`) and triggers `save_stats` periodically based on configuration (`savestepsize`, `tick`) or buffer limits (`MAX_BUFFER_SIZE`) to persist data.
+
+3.  **Configuration (`lib/core/central_config.lua`)**:
+    *   **Settings Source**: Provides all configuration for the coverage module (enabled status, include/exclude patterns, stats file path, save frequency).
+    *   **Defaults**: Defines default coverage settings.
+    *   **Project Overrides**: Reads project-specific settings from `.firmo-config.lua`.
+
+4.  **Filesystem (`lib/tools/filesystem/init.lua`)**:
+    *   **Path Normalization**: Provides `normalize_path` used extensively for consistent file tracking.
+    *   **File Operations**: Used by `save_stats` and `load_stats` for reading, writing, moving, and checking file existence.
+
+5.  **Error Handling (`lib.tools.error_handler.lua`)**:
+    *   **Error Reporting**: Used throughout the coverage module to create structured errors and handle exceptions gracefully (e.g., during file I/O).
+
+6.  **(Implicit) Assertion Integration**:
+    *   While not a separate component in the *coverage module itself*, the assertion module (`lib/assertion/init.lua`) *uses* the coverage module.
+    *   When an assertion passes (`expect(...).to...`), it calls `coverage.mark_line_covered(file_path, line_number)` (via a lazy-loaded `get_coverage()` call).
+    *   This mechanism allows distinguishing between lines that were merely executed and lines whose execution contributed to a passing assertion, enabling the three-state coverage reporting (Covered, Executed, Not Covered). The actual marking logic (`mark_line_covered`) might still be evolving or reside within the coverage module's internal handling of `state.data`. *[Self-correction: Based on the assertion code, it seems `mark_line_covered` IS called, but the implementation detail of how this translates to the final report's three states needs careful review in the reporting step, as the `state.data` in coverage only stores hit counts.]*
+
+This architecture differs significantly from instrumentation-based systems by relying on runtime hooks rather than code transformation.
 
 ### Error Handling Guidelines
 

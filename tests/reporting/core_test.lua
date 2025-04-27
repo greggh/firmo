@@ -1,5 +1,20 @@
--- Core testing for the reporting module
+--- Core Reporting Module Tests
+---
 ---@diagnostic disable: unused-local
+---
+--- Verifies the core API and functionality of the main reporting module (`lib.reporting`),
+--- including:
+--- - Configuration (`configure`, `configure_formatter`, `get_config`, `reset`).
+--- - Formatter registration (`register_*_formatter`, `get_available_formatters`).
+--- - Core formatting functions (`format_coverage`).
+--- - File writing (`write_file`).
+--- - Data validation (`validate_coverage_data`).
+--- - Error handling (formatter errors, filesystem errors, validation errors).
+--- Uses `before`/`after` hooks for setup/teardown (loading module, temp files)
+--- and `test_helper` for error verification.
+---
+--- @author Firmo Team
+--- @test
 
 -- Import firmo test framework
 local firmo = require("firmo")
@@ -8,34 +23,17 @@ local before, after = firmo.before, firmo.after
 
 -- Import modules needed for testing
 local test_helper = require("lib.tools.test_helper")
-local error_handler = require("lib.tools.error_handler")
 local fs = require("lib.tools.filesystem")
 local temp_file = require("lib.tools.filesystem.temp_file")
 
 -- Initialize logging if available
-local logging, logger
-local function initialize_logger()
-  if not logger then
-    local success, log_module = pcall(require, "lib.tools.logging")
-    if success then
-      logging = log_module
-      logger = logging.get_logger("test.reporting")
-      if logger and logger.debug then
-        logger.debug("Reporting core test initialized", {
-          module = "test.reporting",
-          test_type = "unit",
-          test_focus = "core API",
-        })
-      end
-    end
-  end
-  return logger
-end
+local logging = require("lib.tools.logging")
+local logger = logging.get_logger("test.reporting")
 
--- Initialize logger
-local log = initialize_logger()
-
--- Try to load the reporting module safely
+--- Safely loads the `lib.reporting` module using `test_helper.with_error_capture`.
+---@return table|nil module The reporting module table, or nil if loading failed.
+---@return table? error The error object if loading failed.
+---@private
 local function load_reporting_module()
   return test_helper.with_error_capture(function()
     return require("lib.reporting")

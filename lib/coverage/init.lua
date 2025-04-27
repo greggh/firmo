@@ -1,15 +1,103 @@
---- Coverage module for firmo
--- Integrates LuaCov's debug hook system with firmo's ecosystem
--- @module coverage
+--- Firmo Coverage Module
+---
+--- Integrates a LuaCov-inspired debug hook system for line execution tracking
+--- with Firmo's framework components like central configuration, filesystem,
+--- error handling, and logging. Provides functions to start, stop, pause, resume,
+--- save, and load coverage statistics.
+---
+--- @module lib.coverage
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
-local error_handler = require("lib.tools.error_handler")
-local central_config = require("lib.core.central_config")
-local filesystem = require("lib.tools.filesystem")
-local temp_file = require("lib.tools.filesystem.temp_file")
-local logging = require("lib.tools.logging")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
 
--- Initialize logger for coverage module
-local logger = logging.get_logger("coverage")
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("coverage")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+-- Load other mandatory dependencies using standard pattern
+local central_config = try_require("lib.core.central_config")
+
+
+
+---@class coverage The coverage module API.
+---@field init fun(): boolean Initializes the coverage system and hooks.
+---@field has_hook_per_thread fun(): boolean Checks if debug hooks are per-thread (always true in this implementation).
+---@field pause fun(): boolean Pauses coverage collection.
+---@field get_stats_file fun(): string|nil Gets the configured path for the statistics file.
+---@field get_current_data fun(): table Gets the current in-memory coverage data (for debugging).
+---@field resume fun(): boolean Resumes coverage collection.
+---@field save_stats fun(): boolean, string|nil Saves collected stats to the configured file. Returns `success, error_message`. Throws errors on critical failures.
+---@field load_stats fun(): table Loads coverage stats from the configured file. Returns empty table on error or if file doesn't exist. Throws errors on critical failures.
+---@field shutdown fun(): nil Shuts down the coverage system, attempts to save stats, and cleans up hooks.
+---@field start fun(): boolean Initializes and starts coverage collection.
+---@field stop fun(): boolean Stops coverage collection and cleans up.
+---@field is_paused fun(): boolean Checks if coverage collection is currently paused.
+---@field process_line_hit fun(filename: string, line_nr: number): nil Processes a single line hit (for testing purposes only).
 
 -- Module constants for better performance and clarity
 local STATS_FILE_HEADER = "FIRMO_COVERAGE_1.0\n"
@@ -82,44 +170,50 @@ local file_patterns = {
 --- Helper function to test pattern validity
 -- Validates Lua pattern strings by checking for common invalid patterns
 -- and ensuring the pattern can be compiled by Lua's pattern matcher
--- @param pattern string The pattern string to validate
--- @throws Error if the pattern is invalid or malformed
+---@param pattern string The pattern string to validate.
+---@return nil
+---@throws table If the pattern is invalid (error category TEST_EXPECTED).
+---@private
 local function test_pattern(pattern)
   -- Test for all known invalid patterns first with extremely comprehensive checks
-  if pattern == "" or 
-     pattern:match("%[%z") or 
-     pattern:match("%[z%-a%]") or
-     pattern:match("%[%-%]") or  -- Empty character class
-     pattern:match("%[%]") or    -- Empty brackets
-     pattern:match("%[%^%]") or  -- Empty negated class
-     pattern:match("%[%[") or    -- Invalid nesting
-     pattern:match("%]%]") or    -- Invalid nesting
-     pattern:match("%[%^%[") or  -- Invalid negation
-     pattern:match("%]%[") or    -- Misplaced brackets
-     pattern:match("%[%+%?") or  -- Invalid quantifier in class
-     pattern:match("%[%{%}") then  -- Invalid count specifier in class
+  if
+    pattern == ""
+    or pattern:match("%[%z")
+    or pattern:match("%[z%-a%]")
+    or pattern:match("%[%-%]") -- Empty character class
+    or pattern:match("%[%]") -- Empty brackets
+    or pattern:match("%[%^%]") -- Empty negated class
+    or pattern:match("%[%[") -- Invalid nesting
+    or pattern:match("%]%]") -- Invalid nesting
+    or pattern:match("%[%^%[") -- Invalid negation
+    or pattern:match("%]%[") -- Misplaced brackets
+    or pattern:match("%[%+%?") -- Invalid quantifier in class
+    or pattern:match("%[%{%}")
+  then -- Invalid count specifier in class
     -- Use TEST_EXPECTED category for proper test handling
-    error_handler.throw(
+    get_error_handler().throw(
       "invalid pattern: " .. pattern,
-      error_handler.CATEGORY.TEST_EXPECTED,
-      error_handler.SEVERITY.ERROR,
-      {pattern = pattern}
+      get_error_handler().CATEGORY.TEST_EXPECTED,
+      get_error_handler().SEVERITY.ERROR,
+      { pattern = pattern }
     )
   end
-  
+
   -- Test actual pattern compilation
   local ok, err = pcall(string.match, "test", pattern)
   if not ok then
     -- Propagate compilation errors as TEST_EXPECTED
-    error_handler.throw(
+    get_error_handler().throw(
       "invalid pattern: " .. err,
-      error_handler.CATEGORY.TEST_EXPECTED,
-      error_handler.SEVERITY.ERROR,
-      {pattern = pattern, error = err}
+      get_error_handler().CATEGORY.TEST_EXPECTED,
+      get_error_handler().SEVERITY.ERROR,
+      { pattern = pattern, error = err }
     )
   end
 end
--- Precompile patterns and update cached config values
+--- Compiles include/exclude patterns from config and updates cached settings.
+---@return nil
+---@private
 local function compile_patterns()
   local config = central_config.get("coverage")
   if not config then
@@ -133,17 +227,17 @@ local function compile_patterns()
       -- This will throw TEST_EXPECTED errors directly
       local ok, err = pcall(test_pattern, pattern)
       if not ok then
-        error(err, 0)  -- Re-throw to ensure it reaches tests with original stack trace
+        error(err, 0) -- Re-throw to ensure it reaches tests with original stack trace
       end
     end
   end
-  
+
   if config.exclude then
     for _, pattern in ipairs(config.exclude) do
       -- This will throw TEST_EXPECTED errors directly
       local ok, err = pcall(test_pattern, pattern)
       if not ok then
-        error(err, 0)  -- Re-throw to ensure it reaches tests with original stack trace
+        error(err, 0) -- Re-throw to ensure it reaches tests with original stack trace
       end
     end
   end
@@ -156,7 +250,7 @@ local function compile_patterns()
   cached_config.statsfile = config.statsfile or ".coverage-stats"
 
   -- Log coverage configuration
-  logger.debug("Coverage configuration", {
+  get_logger().debug("Coverage configuration", {
     tick = cached_config.tick,
     save_step_size = cached_config.savestepsize,
     stats_file = cached_config.statsfile,
@@ -166,7 +260,7 @@ local function compile_patterns()
   -- Clear patterns only after validation
   file_patterns.include = {}
   file_patterns.exclude = {}
-  
+
   -- Now compile patterns that we know are valid
   for _, pattern in ipairs(config.include or {}) do
     table.insert(file_patterns.include, {
@@ -184,7 +278,11 @@ local function compile_patterns()
   end
 end
 
--- Optimized file pattern matching
+--- Checks if a given filename should be tracked based on include/exclude patterns.
+--- Uses a cache (`ignored_files`) for efficiency.
+---@param filename string Normalized filename.
+---@return boolean `true` if the file should be tracked, `false` otherwise.
+---@private
 local function should_track_file(filename)
   -- Quick lookup for previously checked files
   if ignored_files[filename] then
@@ -201,7 +299,7 @@ local function should_track_file(filename)
 
     if status and result then
       included = true
-      logger.debug("File included by pattern", {
+      get_logger().debug("File included by pattern", {
         filename = filename,
         pattern = pattern.raw,
       })
@@ -219,7 +317,7 @@ local function should_track_file(filename)
 
       if status and result then
         ignored_files[filename] = true
-        logger.debug("File excluded by pattern", {
+        get_logger().debug("File excluded by pattern", {
           filename = filename,
           pattern = pattern.raw,
         })
@@ -231,7 +329,14 @@ local function should_track_file(filename)
   return included
 end
 
--- Optimized debug hook function
+--- The core debug hook function called by Lua on line execution.
+--- Determines the source file, checks if it should be tracked, updates hit counts,
+--- and potentially triggers saving stats based on configuration.
+---@param _ any Event name (ignored, usually "line").
+---@param line_nr number Line number executed.
+---@param level? number Stack level to query for source info (default 2).
+---@return nil
+---@private
 local function debug_hook(_, line_nr, level)
   -- Early checks
   if not state.initialized or state.paused then
@@ -254,7 +359,7 @@ local function debug_hook(_, line_nr, level)
 
   if prefixed_name then
     -- Always normalize paths immediately and consistently
-    local normalized_name = filesystem.normalize_path(prefixed_name)
+    local normalized_name = get_fs().normalize_path(prefixed_name)
 
     -- Quick lookup check against normalized path
     if ignored_files[normalized_name] then
@@ -275,14 +380,14 @@ local function debug_hook(_, line_nr, level)
         max_hits = 0,
       }
       -- Log this change with additional tracking information
-      logger.debug("Started tracking new file", {
+      get_logger().debug("Started tracking new file", {
         filename = normalized_name,
         original = prefixed_name,
         initialized = true,
         current_time = os.time(),
-        caller_info = debug.getinfo(3, "Sl") -- Get caller info for better debug
+        caller_info = debug.getinfo(3, "Sl"), -- Get caller info for better debug
       })
-      
+
       -- Mark that state has changed
       state.buffer.changes = state.buffer.changes + 1
     end
@@ -333,7 +438,9 @@ local function debug_hook(_, line_nr, level)
   end
 end
 
--- Simplified state reset function
+--- Resets the internal state of the coverage module (data, buffer, failures, caches).
+---@return nil
+---@private
 local function reset_state()
   -- Reset all module state
   state.initialized = false
@@ -358,7 +465,10 @@ local function reset_state()
   }
 end
 
--- Complete hook cleanup function
+--- Ensures all debug hooks (main thread and coroutines) are disabled and state is marked inactive/paused.
+--- Critical for cleanup to prevent dangling hooks.
+---@return nil
+---@private
 local function ensure_hooks_disabled()
   -- First disable hook for main thread - multiple calls for maximum safety
   debug.sethook(nil)
@@ -371,7 +481,14 @@ local function ensure_hooks_disabled()
   state.initialized = false
 end
 
--- Helper function to handle file operation failures
+--- Handles file operation failures (like saving stats), tracks consecutive errors,
+--- logs the failure, and potentially pauses coverage collection if a threshold is reached.
+---@param operation string Description of the failed operation (e.g., "save stats").
+---@param error_msg string|nil The error message captured.
+---@param context table Additional context information for logging.
+---@return boolean threshold_reached `true` if the failure threshold was reached (coverage paused), `false` otherwise.
+---@return string|nil error_message The original error message, or a specific message if threshold reached.
+---@private
 local function handle_file_failure(operation, error_msg, context)
   -- Track failure and maybe pause coverage
   state.write_failures.count = state.write_failures.count + 1
@@ -382,16 +499,20 @@ local function handle_file_failure(operation, error_msg, context)
     state.paused = true
 
     -- Log at debug level that threshold is reached
-    logger.debug("Failed to " .. operation .. " - threshold reached", context)
+    get_logger().debug("Failed to " .. operation .. " - threshold reached", context)
     return true, "Failure threshold reached, coverage paused"
   end
 
   -- Log error at debug level
-  logger.debug("Failed to " .. operation .. ": " .. (error_msg or "unknown error"), context)
+  get_logger().debug("Failed to " .. operation .. ": " .. (error_msg or "unknown error"), context)
   return false, error_msg
 end
 
--- Initialize coverage system
+--- Initializes the coverage system.
+--- Resets internal state, compiles include/exclude patterns from configuration,
+--- sets the debug hook for the main thread, and patches `coroutine.create`/`wrap`
+--- to set hooks on new coroutines. Marks the system as initialized and unpaused.
+---@return boolean success Always returns `true` (errors are thrown via `error_handler`).
 function coverage.init()
   -- If already initialized, clean up before reinitializing
   if state.initialized then
@@ -452,27 +573,32 @@ function coverage.init()
   return true
 end
 
--- Check if debug hooks are per-thread
+--- Checks if the Lua environment supports per-thread debug hooks.
+--- This implementation *always returns true* to enforce consistent behavior and patching,
+--- regardless of the underlying Lua version's capabilities.
+---@return boolean true Always returns `true`.
 function coverage.has_hook_per_thread()
   -- Always return true to ensure consistent behavior
   -- This forces thread-specific hooks to always be used
   return true
 end
 
---- Pause coverage collection
--- @return boolean success Whether pause was successful
+--- Pauses coverage collection by setting the internal `state.paused` flag.
+--- No more line hits will be recorded until `coverage.resume()` is called.
+--- Idempotent: Does nothing if already paused or not initialized.
+---@return boolean success `true` if coverage was running and is now paused, `false` otherwise.
 function coverage.pause()
   -- Atomic pause operation to prevent race conditions
   local was_initialized = state.initialized
   local was_paused = state.paused
 
   if not was_initialized then
-    logger.debug("Cannot pause coverage: system not initialized")
+    get_logger().debug("Cannot pause coverage: system not initialized")
     return false
   end
 
   if was_paused then
-    logger.debug("Coverage is already paused")
+    get_logger().debug("Coverage is already paused")
     return false
   end
 
@@ -480,7 +606,7 @@ function coverage.pause()
   state.paused = true
 
   -- For testing, log the specific pause point
-  logger.debug("Coverage paused", {
+  get_logger().debug("Coverage paused", {
     timestamp = os.time(),
     buffer_size = state.buffer.size,
   })
@@ -488,32 +614,37 @@ function coverage.pause()
   return true
 end
 
---- Get the configured stats file path
--- @return string|nil path The path to the stats file, or nil if not configured
+--- Gets the configured path for the statistics file where coverage data is saved/loaded.
+--- Reads from the cached configuration.
+---@return string|nil path The configured file path string, or `nil` if not configured.
 function coverage.get_stats_file()
   return cached_config.statsfile
 end
 
---- Dump the current coverage data for debugging
--- @return table The current coverage data
+--- Returns a reference to the current in-memory coverage data table.
+--- Primarily intended for debugging and testing purposes.
+--- The structure is `{[normalized_filename] = { [line_nr]=hit_count, max=max_line, max_hits=max_hits }, ...}`.
+---@return table data The current coverage data structure.
 function coverage.get_current_data()
   return state.data
 end
 
---- Resume coverage collection
--- @return boolean success Whether resume was successful
+--- Resumes coverage collection by clearing the internal `state.paused` flag.
+--- Line hits will be recorded again by the debug hook.
+--- Idempotent: Does nothing if already running or not initialized.
+---@return boolean success `true` if coverage was paused and is now running, `false` otherwise.
 function coverage.resume()
   -- Atomic resume operation to prevent race conditions
   local was_initialized = state.initialized
   local was_paused = state.paused
 
   if not was_initialized then
-    logger.debug("Cannot resume coverage: system not initialized")
+    get_logger().debug("Cannot resume coverage: system not initialized")
     return false
   end
 
   if not was_paused then
-    logger.debug("Coverage is already running")
+    get_logger().debug("Coverage is already running")
     return false
   end
 
@@ -521,7 +652,7 @@ function coverage.resume()
   state.paused = false
 
   -- For testing, log the specific resume point
-  logger.debug("Coverage resumed", {
+  get_logger().debug("Coverage resumed", {
     timestamp = os.time(),
     buffer_size = state.buffer.size,
   })
@@ -529,11 +660,13 @@ function coverage.resume()
   return true
 end
 
---- Save collected coverage statistics to a file
--- Tracks consecutive write failures and pauses coverage collection if threshold is reached
--- @return boolean success Whether stats were saved successfully
--- @return string|nil error Error message if saving failed
--- @throws TEST_EXPECTED errors are propagated directly
+--- Saves collected coverage statistics to the configured file (`coverage.statsfile`).
+--- Creates a temporary file first and then renames it for atomicity.
+--- Handles potential filesystem errors and tracks consecutive write failures, pausing
+--- coverage if a threshold (`coverage.max_write_failures`) is reached.
+---@return boolean success `true` if stats were saved successfully.
+---@return string|nil error Error message if saving failed due to non-critical errors (like threshold reached). Critical errors are thrown.
+---@throws table If critical filesystem operations (`write_file`, `move_file`) fail. These errors, potentially including `TEST_EXPECTED` category errors for testing, are propagated directly.
 function coverage.save_stats()
   -- Temporarily pause coverage during save to prevent recursion
   local was_paused = state.paused
@@ -548,7 +681,7 @@ function coverage.save_stats()
   local content = { STATS_FILE_HEADER }
   for filename, file_data in pairs(state.data) do
     table.insert(content, string.format("%d:%s\n", file_data.max, filename))
-    
+
     -- Write line hits
     for line_nr = 1, file_data.max do
       local hits = file_data[line_nr] or 0
@@ -571,86 +704,92 @@ function coverage.save_stats()
   local temp_stats = string.format("%s.%d.%d.tmp", statsfile, os.time(), math.random(1000000))
 
   -- Write temp file - let errors propagate directly
-  local result = filesystem.write_file(temp_stats, table.concat(content))
+  local result = get_fs().write_file(temp_stats, table.concat(content))
   if not result then
     -- Clean up temp file
-    pcall(filesystem.remove_file, temp_stats)
+    pcall(get_fs().remove_file, temp_stats)
     restore_state()
-    error_handler.throw(
+    get_error_handler().throw(
       "write error",
-      error_handler.CATEGORY.TEST_EXPECTED,
-      error_handler.SEVERITY.ERROR,
+      get_error_handler().CATEGORY.TEST_EXPECTED,
+      get_error_handler().SEVERITY.ERROR,
       { statsfile = temp_stats }
     )
   end
 
   -- Move file - IMPORTANT: Let any errors propagate directly
   -- The mock will throw TEST_EXPECTED errors that must reach tests
-  filesystem.move_file(temp_stats, statsfile)
+  get_fs().move_file(temp_stats, statsfile)
   -- Any errors from move_file will propagate directly to test
 
   -- If we reach here, operation succeeded
-  logger.debug("Successfully saved stats file", { statsfile = statsfile })
-  
+  get_logger().debug("Successfully saved stats file", { statsfile = statsfile })
+
   -- Reset state
   state.buffer.size = 0
   state.buffer.changes = 0
   state.write_failures.count = 0
-  
+
   -- Restore previous pause state
   restore_state()
   return true
 end
 
--- Load coverage stats from file
+--- Loads coverage statistics from the configured file (`coverage.statsfile`).
+--- If the coverage system is initialized (`coverage.init` called), the loaded stats
+--- are merged (by adding hit counts) into the current in-memory `state.data`.
+--- Parses the specific `FIRMO_COVERAGE_1.0` format.
+--- Returns an empty table if the file doesn't exist, is empty, or has an invalid header,
+--- logging debug messages in these cases.
+---@return table stats The loaded coverage data (may be empty). Structure: `{[normalized_filename] = { [line_nr]=hit_count, max=max_line, max_hits=max_hits }, ...}`.
+---@throws table If checking file existence (`filesystem.file_exists`) or reading the file (`filesystem.read_file`) fails critically.
 function coverage.load_stats()
   local statsfile = cached_config.statsfile
-
-  logger.debug("Attempting to load stats", { statsfile = statsfile })
+  get_logger().debug("Attempting to load stats", { statsfile = statsfile })
 
   -- Check if stats file exists
-  local file_exists, exists_err = filesystem.file_exists(statsfile)
+  local file_exists, exists_err = get_fs().file_exists(statsfile)
 
   -- Handle file existence check errors by properly propagating them
   if exists_err then
-    logger.debug("Failed to check stats file existence", {
+    get_logger().debug("Failed to check stats file existence", {
       category = "IO",
       statsfile = statsfile,
       error = exists_err,
     })
 
     -- Throw error for consistent error handling
-    error_handler.throw(
+    get_error_handler().throw(
       exists_err or "Failed to check stats file existence",
-      error_handler.CATEGORY.IO,
-      error_handler.SEVERITY.ERROR,
+      get_error_handler().CATEGORY.IO,
+      get_error_handler().SEVERITY.ERROR,
       { statsfile = statsfile }
     )
   end
 
   -- Log debug information consistently
-  logger.debug("Stats file operation", {
+  get_logger().debug("Stats file operation", {
     file = statsfile,
     operation = "load",
     exists = file_exists,
   })
 
   if not file_exists then
-    logger.debug("Stats file does not exist", { statsfile = statsfile })
+    get_logger().debug("Stats file does not exist", { statsfile = statsfile })
 
     -- Return empty stats for non-existent files (test compatibility)
     return {}
   end
   -- Read stats file content - let errors propagate naturally
   -- This allows test_helper.expect_error to properly catch errors
-  local content = filesystem.read_file(statsfile)
-  
+  local content = get_fs().read_file(statsfile)
+
   -- If file doesn't exist or couldn't be read, return empty stats
   if not content then
-    logger.debug("Stats file not found or empty", { statsfile = statsfile })
+    get_logger().debug("Stats file not found or empty", { statsfile = statsfile })
     return {}
   end
-  logger.debug("Successfully read stats file", {
+  get_logger().debug("Successfully read stats file", {
     statsfile = statsfile,
     content_length = #content,
   })
@@ -665,14 +804,14 @@ function coverage.load_stats()
 
   -- Check for header
   if #lines == 0 then
-    logger.debug("Empty stats file", { statsfile = statsfile })
+    get_logger().debug("Empty stats file", { statsfile = statsfile })
     -- Return empty table for empty stats files
     return {}
   end
 
   -- Validate header
   if lines[1] ~= STATS_FILE_HEADER:sub(1, -2) then
-    logger.debug("Invalid stats file header", {
+    get_logger().debug("Invalid stats file header", {
       header = lines[1],
       expected = STATS_FILE_HEADER:sub(1, -2),
     })
@@ -695,7 +834,7 @@ function coverage.load_stats()
     max = tonumber(max)
 
     -- Normalize the filename for consistent comparisons
-    filename = filesystem.normalize_path(filename)
+    filename = get_fs().normalize_path(filename)
 
     -- Move to data line
     i = i + 1
@@ -734,7 +873,7 @@ function coverage.load_stats()
     -- Merge loaded stats with current stats
     for filename, file_data in pairs(stats) do
       -- Make sure we use normalized paths for all operations
-      local normalized = filesystem.normalize_path(filename)
+      local normalized = get_fs().normalize_path(filename)
 
       -- If we already have data for this file, merge it
       if state.data[normalized] then
@@ -766,7 +905,7 @@ function coverage.load_stats()
 
       -- For testing, log added file
       if state.data[normalized] then
-        logger.debug("Added/updated file in coverage data", {
+        get_logger().debug("Added/updated file in coverage data", {
           filename = normalized,
           line_count = state.data[normalized].max,
         })
@@ -776,7 +915,11 @@ function coverage.load_stats()
   return stats
 end
 
--- Clean shutdown
+--- Performs a clean shutdown of the coverage system.
+--- Attempts to save any pending coverage data (ignoring non-critical save errors).
+--- Ensures all debug hooks are removed using `ensure_hooks_disabled`.
+--- Resets the internal state using `reset_state`.
+---@return nil
 function coverage.shutdown()
   if state.initialized then
     -- Always try to save stats on shutdown, regardless of pause state
@@ -791,7 +934,7 @@ function coverage.shutdown()
 
     -- Log any errors but continue with shutdown
     if not save_success and save_err then
-      logger.debug("Error saving stats during shutdown (proceeding with shutdown)", {
+      get_logger().debug("Error saving stats during shutdown (proceeding with shutdown)", {
         error = save_err,
       })
     end
@@ -808,7 +951,9 @@ function coverage.shutdown()
   end
 end
 
--- Start coverage collection
+--- Ensures the coverage system is initialized and then starts or resumes collection.
+--- Convenience function combining `init` and `resume`.
+---@return boolean success `true` if initialization and resume were successful.
 function coverage.start()
   -- Initialize if not already done
   if not coverage.init() then
@@ -819,7 +964,10 @@ function coverage.start()
   coverage.resume()
   return true
 end
--- Stop coverage collection
+
+--- Stops coverage collection and performs a full shutdown (saves stats, removes hooks, resets state).
+--- Convenience function calling `shutdown`.
+---@return boolean success Always returns `true`.
 function coverage.stop()
   -- Just use shutdown which already handles all cleanup steps
   coverage.shutdown()
@@ -829,13 +977,18 @@ function coverage.stop()
   return true
 end
 
---- Check if coverage collection is paused
--- @return boolean paused Whether coverage collection is paused
+--- Checks if coverage collection is currently paused.
+---@return boolean paused `true` if `state.paused` is true, `false` otherwise.
 function coverage.is_paused()
   return state.paused
 end
 
--- Process a line hit (exported for testing purposes only)
+--- Manually records a hit for a specific line in a file.
+--- Updates the in-memory coverage data (`state.data`).
+--- **Note:** This bypasses the normal debug hook mechanism and is intended primarily for testing the coverage module itself.
+---@param filename string Normalized path of the file hit.
+---@param line_nr number The line number hit.
+---@return nil
 function coverage.process_line_hit(filename, line_nr)
   -- CRITICAL: Exit immediately if not initialized or paused
   if not state.initialized or state.paused then

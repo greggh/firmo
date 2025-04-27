@@ -1,76 +1,118 @@
----@class QualityModule
----@field _VERSION string Module version (following semantic versioning)
----@field LEVEL_BASIC number Quality level 1 - basic validation with minimal assertions
----@field LEVEL_STRUCTURED number Quality level 2 - structured tests with multiple assertion types
----@field LEVEL_COMPREHENSIVE number Quality level 3 - comprehensive tests with error handling and setup/teardown
----@field LEVEL_ADVANCED number Quality level 4 - advanced tests with specialized assertions and complete test coverage
----@field LEVEL_COMPLETE number Quality level 5 - complete tests with all assertion types and thorough validation
----@field levels table<number, {name: string, description: string, requirements: table<string, number>}> Array of quality level definitions with detailed requirements
----@field stats {tests: number, assertions: number, assertion_types: table<string, number>, missing_assertions: table<string, boolean>, files_analyzed: number, tests_analyzed: number, test_duration?: number, quality_score?: number} Statistics about quality validation results
----@field config {current_level: number, required_assertion_types: table<string, boolean>, min_assertions_per_test: number, validate_missing_assertions: boolean, analyze_test_files: boolean, require_before_after: boolean, require_test_descriptions: boolean, required_assertion_count: number, allow_dynamic_calculation: boolean, skip_patterns: string[], extra_requirements: table} Configuration for quality validation behavior
----@field init fun(options?: {level?: number, required_assertion_types?: string[], min_assertions_per_test?: number, validate_missing_assertions?: boolean, analyze_test_files?: boolean, require_before_after?: boolean, required_assertion_count?: number, extra_requirements?: table}): QualityModule Initialize quality module with specified options
----@field reset fun(): QualityModule Reset quality data while preserving configuration
----@field full_reset fun(): QualityModule Full reset (clears all data and resets configuration to defaults)
----@field get_level_requirements fun(level?: number): table<string, number>|nil, table? Get requirements for a specific quality level, returning nil and error if invalid level
----@field track_assertion fun(type_name: string, test_name?: string): QualityModule Track assertion usage in a specific test
----@field start_test fun(test_name: string): QualityModule Start test analysis for a specific test and register timing
----@field end_test fun(): QualityModule End test analysis and record final results including duration
----@field analyze_file fun(file_path: string): {assertions: number, tests: number, assertion_types: table<string, number>, has_before_after: boolean, test_descriptions: boolean, assertion_per_test: number}|nil, table? Analyze test file statically for quality metrics
----@field get_report_data fun(): {level: number, level_name: string, tests: {count: number, analyzed: number, files: number, missing_assertions: table, below_threshold: table}, assertions: {count: number, types: table, per_test: number}, requirements: table, score: number} Get structured data for quality report generation
----@field report fun(format?: string): string|table Generate a quality report in various formats (text, json, html)
----@field summary_report fun(): {level: number, score: number, tests: number, assertions: number, assertion_types: number, files: number} Generate a concise summary report with key metrics
----@field level_name fun(level: number): string Get the descriptive name for a quality level
----@field set_level fun(level: number): QualityModule Set the current quality validation level (1-5)
----@field get_level fun(): number Get the current quality validation level
----@field analyze_directory fun(dir_path: string, recursive?: boolean): table|nil, table? Analyze all test files in a directory recursively or non-recursively
----@field register_assertion_type fun(type_name: string, description: string): QualityModule Register a custom assertion type for quality tracking
----@field is_quality_passing fun(): boolean Check if tests meet the current quality level requirements
----@field get_score fun(): number Get the quality score as percentage (0-100)
----@field add_custom_requirement fun(name: string, check_fn: function, min_value?: number): QualityModule Add a custom quality requirement with validation function
----@field json_report fun(): string Generate a detailed JSON report with all quality metrics
----@field html_report fun(): string Generate a formatted HTML report with quality visualization
----@field meets_level fun(level?: number): boolean Check if quality metrics meet a specific level requirement
----@field save_report fun(file_path: string, format?: string): boolean, string? Save a quality report to a file in the specified format
----@field get_level_name fun(level: number): string Get level name from level number (alias for level_name)
----@field check_file fun(file_path: string, level?: number): boolean, table Check if a test file meets quality requirements for a specific level
----@field validate_test_quality fun(test_name: string, options?: {level?: number, required_assertions?: number, required_types?: string[]}): boolean, table[] Validate a test against quality standards with detailed feedback
----@field debug_config fun(): QualityModule Print debug information about the current quality module configuration
----@field create_test_file fun(level: number, file_path?: string): string, string? Create a template test file that meets a specified quality level
+---@class QualityModule The public API of the test quality validation module.
+---@field _VERSION string Module version (following semantic versioning).
+---@field LEVEL_BASIC number Quality level 1: Basic validation with minimal assertions.
+---@field LEVEL_STRUCTURED number Quality level 2: Structured tests with multiple assertion types.
+---@field LEVEL_COMPREHENSIVE number Quality level 3: Comprehensive tests with error handling and setup/teardown.
+---@field LEVEL_ADVANCED number Quality level 4: Advanced tests with specialized assertions and complete test coverage.
+---@field LEVEL_COMPLETE number Quality level 5: Complete tests with all assertion types and thorough validation.
+---@field levels table<number, {level: number, name: string, description: string, requirements: table}> Array defining quality levels and their requirements (loaded from `level_checkers`).
+---@field stats {tests_analyzed: number, tests_passing_quality: number, assertions_total: number, assertions_per_test_avg: number, quality_level_achieved: number, assertion_types_found: table<string, number>, test_organization_score: number, required_patterns_score: number, forbidden_patterns_score: number, coverage_score: number, issues: table[]} Statistics collected during quality analysis.
+---@field config {enabled: boolean, level: number, strict: boolean, custom_rules: table, coverage_data: table|nil} Configuration settings for the quality module.
+---@field init fun(self: QualityModule, options?: {enabled?: boolean, level?: number, strict?: boolean, custom_rules?: table, coverage_data?: table, debug?: boolean, verbose?: boolean}): QualityModule Initializes the quality module. Returns self.
+---@field reset fun(self: QualityModule): QualityModule Resets quality statistics while preserving configuration. Returns self.
+---@field full_reset fun(self: QualityModule): QualityModule Performs a full reset including configuration. Returns self.
+---@field get_level_requirements fun(self: QualityModule, level?: number): table Returns the requirements table for the specified level (defaults to configured level).
+---@field track_assertion fun(self: QualityModule, type_name: string, test_name?: string): QualityModule Tracks an assertion usage for the current test. Returns self.
+---@field start_test fun(self: QualityModule, test_name: string): QualityModule Starts analysis for a specific test. Returns self.
+---@field end_test fun(self: QualityModule): QualityModule Ends analysis for the current test and evaluates its quality. Returns self.
+---@field analyze_file fun(self: QualityModule, file_path: string): table Performs static analysis on a file. Returns analysis results.
+---@field get_report_data fun(self: QualityModule): {level: number, level_name: string, tests: table, summary: {tests_analyzed: number, tests_passing_quality: number, quality_percent: number, assertions_total: number, assertions_per_test_avg: number, assertion_types_found: table<string, number>, issues: table[]}} Gets structured data for reporting.
+---@field report fun(self: QualityModule, format?: string): string|table Generates a quality report. @throws table If reporting module fails.
+---@field summary_report fun(self: QualityModule): {level: number, level_name: string, tests_analyzed: number, tests_passing_quality: number, quality_pct: number, assertions_total: number, assertions_per_test_avg: number, assertion_types_found: table<string, number>, issues: table[], tests: table} Generates a concise summary report.
+---@field level_name fun(level: number): string Gets the descriptive name for a quality level (alias for `get_level_name`).
+---@field set_level fun(self: QualityModule, level: number): QualityModule [Not Implemented] Set the current quality validation level.
+---@field get_level fun(): number [Not Implemented] Get the current quality validation level.
+---@field analyze_directory fun(dir_path: string, recursive?: boolean): table|nil, table? [Not Implemented] Analyze all test files in a directory.
+---@field register_assertion_type fun(self: QualityModule, type_name: string, description: string): QualityModule [Not Implemented] Register a custom assertion type.
+---@field is_quality_passing fun(): boolean [Not Implemented] Check if tests meet the current quality level requirements.
+---@field get_score fun(): number [Not Implemented] Get the quality score as percentage (0-100).
+---@field add_custom_requirement fun(self: QualityModule, name: string, check_fn: function, min_value?: number): QualityModule [Not Implemented] Add a custom quality requirement.
+---@field json_report fun(): string [Not Implemented] Generate a detailed JSON report.
+---@field html_report fun(): string [Not Implemented] Generate a formatted HTML report.
+---@field meets_level fun(self: QualityModule, level?: number): boolean Checks if quality metrics meet a specific level requirement.
+---@field save_report fun(self: QualityModule, file_path: string, format?: string): boolean, string|nil Saves a quality report to a file. Returns `success, error?`. @throws table If reporting fails critically.
+---@field get_level_name fun(level: number): string Gets the descriptive name for a quality level number.
+---@field check_file fun(self: QualityModule, file_path: string, level?: number): boolean, table[] Checks if a test file meets quality requirements. Returns `meets, issues`. @throws table If level checker fails critically.
+---@field validate_test_quality fun(self: QualityModule, test_name: string, options?: {level?: number, strict?: boolean}): boolean, table[] Validates a specific test against quality standards. Returns `meets, issues`.
+---@field debug_config fun(self: QualityModule): QualityModule Prints debug information about the current configuration. Returns self.
+---@field create_test_file fun(level: number, file_path?: string): string, string? [Not Implemented] Create a template test file.
 
--- firmo test quality validation module
--- Implementation of test quality analysis with level-based validation to ensure
--- tests meet required standards for reliability, completeness, and maintainability
+--- Firmo Test Quality Validation Module
+---
+--- Implementation of test quality analysis with level-based validation to ensure
+--- tests meet required standards for reliability, completeness, and maintainability.
+--- Integrates with central configuration, logging, and other Firmo modules.
+---
+--- @module lib.quality
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
--- Import modules
-local level_checkers = require("lib.quality.level_checkers")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _logging, _fs
 
--- Lazy loading of dependencies to avoid circular references
-local _central_config
----@private
----@return table|nil central_config The central configuration module or nil if not available
-local function get_central_config()
-  if not _central_config then
-    local success, central_config = pcall(require, "lib.core.central_config")
-    _central_config = success and central_config or nil
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
   end
-  return _central_config
+  return result
 end
 
-local fs = require("lib.tools.filesystem")
----@type Logging
-local logging = require("lib.tools.logging")
-
--- Create module logger
----@type Logger
-local logger = logging.get_logger("Quality")
-
--- Configure module logging
----@private
-local function configure_logging()
-  logging.configure_from_config("Quality")
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
 end
 
-configure_logging()
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("quality")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+-- Load other mandatory dependencies using standard pattern
+local level_checkers = try_require("lib.quality.level_checkers")
+
+local central_config = try_require("lib.core.central_config")
+--
 
 local M = {}
 
@@ -81,17 +123,18 @@ M.LEVEL_COMPREHENSIVE = 3
 M.LEVEL_ADVANCED = 4
 M.LEVEL_COMPLETE = 5
 
----@private
+--- Registers a listener with central_config to update local config cache when quality settings change.
 ---@return nil
+---@private
 local function register_change_listener()
-  local central_config = get_central_config()
+  -- central_config is guaranteed to be loaded due to check at top
   if central_config then
     central_config.on_change("quality", function(path, old_value, new_value)
-      logger.debug("Quality configuration changed, updating", {
+      get_logger().debug("Quality configuration changed, updating", {
         path = path,
-        changed_value = path:match("^quality%.(.+)$") or "all"
+        changed_value = path:match("^quality%.(.+)$") or "all",
       })
-      
+
       -- Apply the changes to our local config for backward compatibility
       if new_value then
         if path == "quality" then
@@ -107,23 +150,23 @@ local function register_change_listener()
           end
         end
       end
-      
-      logger.debug("Configuration updated from central_config", {
+
+      get_logger().debug("Configuration updated from central_config", {
         enabled = M.config.enabled,
         level = M.config.level,
-        strict = M.config.strict
+        strict = M.config.strict,
       })
     end)
-    
-    logger.debug("Registered change listener for quality configuration")
+
+    get_logger().debug("Registered change listener for quality configuration")
   end
 end
 
---- Check if a string value contains the specified Lua pattern
+--- Checks if a string value contains a specific Lua pattern.
+---@param value any The value to check (must be a string).
+---@param pattern string The Lua pattern to search for.
+---@return boolean contains `true` if `value` is a string and contains the `pattern`, `false` otherwise.
 ---@private
----@param value any The value to check for pattern matching (must be a string)
----@param pattern string The Lua pattern to search for in the value
----@return boolean contains True if value contains the pattern, false otherwise or if value is not a string
 local function contains_pattern(value, pattern)
   if type(value) ~= "string" then
     return false
@@ -131,22 +174,22 @@ local function contains_pattern(value, pattern)
   return string.find(value, pattern) ~= nil
 end
 
---- Check if a string value contains any of the specified Lua patterns
+--- Checks if a string value contains any of the Lua patterns in a given list.
+---@param value any The value to check (must be a string).
+---@param patterns string[] An array of Lua patterns to search for.
+---@return boolean contains `true` if `value` is a string and contains any of the `patterns`, `false` otherwise.
 ---@private
----@param value any The value to check for pattern matching (must be a string)
----@param patterns string[] Array of Lua patterns to search for in the value
----@return boolean contains True if value contains any of the patterns, false otherwise
 local function contains_any_pattern(value, patterns)
   if type(value) ~= "string" or not patterns or #patterns == 0 then
     return false
   end
-  
+
   for _, pattern in ipairs(patterns) do
     if contains_pattern(value, pattern) then
       return true
     end
   end
-  
+
   return false
 end
 
@@ -169,9 +212,9 @@ local patterns = {
     "expect%(.-%):to%.be%.equal",
     "expect%(.-%):to_be_equal",
     "==",
-    "~="
+    "~=",
   },
-  
+
   -- Type checking assertions
   type_checking = {
     "assert%.is_",
@@ -185,9 +228,9 @@ local patterns = {
     "expect%(.-%):to_be_an",
     "type%(",
     "assert%.matches_type",
-    "instanceof"
+    "instanceof",
   },
-  
+
   -- Truth assertions
   truth = {
     "assert%.true",
@@ -197,9 +240,9 @@ local patterns = {
     "expect%(.-%):to%.be%.true",
     "expect%(.-%):to_be_true",
     "expect%(.-%):to%.be%.truthy",
-    "expect%(.-%):to_be_truthy"
+    "expect%(.-%):to_be_truthy",
   },
-  
+
   -- Error assertions
   error_handling = {
     "assert%.error",
@@ -212,9 +255,9 @@ local patterns = {
     "expect%(.-%):to_fail",
     "pcall",
     "xpcall",
-    "try%s*{"
+    "try%s*{",
   },
-  
+
   -- Mock and spy assertions
   mock_verification = {
     "assert%.spy",
@@ -229,9 +272,9 @@ local patterns = {
     "verify%(",
     "was_called_with",
     "expects%(",
-    "returns"
+    "returns",
   },
-  
+
   -- Edge case tests
   edge_cases = {
     "nil",
@@ -246,9 +289,9 @@ local patterns = {
     "edge",
     "limit",
     "corner",
-    "special_case"
+    "special_case",
   },
-  
+
   -- Boundary tests
   boundary = {
     "boundary",
@@ -264,9 +307,9 @@ local patterns = {
     "%.0",
     "%.1",
     "min.value",
-    "max.value"
+    "max.value",
   },
-  
+
   -- Performance tests
   performance = {
     "benchmark",
@@ -278,9 +321,9 @@ local patterns = {
     "allocation",
     "time.complexity",
     "space.complexity",
-    "load.test"
+    "load.test",
   },
-  
+
   -- Security tests
   security = {
     "security",
@@ -295,8 +338,8 @@ local patterns = {
     "overflow",
     "xss",
     "csrf",
-    "leak"
-  }
+    "leak",
+  },
 }
 
 -- Quality levels definition with comprehensive requirements
@@ -305,32 +348,32 @@ M.levels = {
     level = 1,
     name = "basic",
     description = "Basic tests with at least one assertion per test and proper structure",
-    requirements = level_checkers.get_level_requirements(1)
+    requirements = level_checkers.get_level_requirements(1),
   },
   {
     level = 2,
     name = "standard",
     description = "Standard tests with multiple assertions, proper naming, and error handling",
-    requirements = level_checkers.get_level_requirements(2)
+    requirements = level_checkers.get_level_requirements(2),
   },
   {
     level = 3,
     name = "comprehensive",
     description = "Comprehensive tests with edge cases, type checking, and isolated setup",
-    requirements = level_checkers.get_level_requirements(3)
+    requirements = level_checkers.get_level_requirements(3),
   },
   {
     level = 4,
     name = "advanced",
     description = "Advanced tests with boundary conditions, mock verification, and context organization",
-    requirements = level_checkers.get_level_requirements(4)
+    requirements = level_checkers.get_level_requirements(4),
   },
   {
     level = 5,
     name = "complete",
     description = "Complete tests with 100% branch coverage, security validation, and performance testing",
-    requirements = level_checkers.get_level_requirements(5)
-  }
+    requirements = level_checkers.get_level_requirements(5),
+  },
 }
 
 -- Data structures for tracking tests and their quality metrics
@@ -358,7 +401,7 @@ local DEFAULT_CONFIG = {
   level = 1,
   strict = false,
   custom_rules = {},
-  coverage_data = nil -- Will hold reference to coverage module data if available
+  coverage_data = nil, -- Will hold reference to coverage module data if available
 }
 
 -- Configuration
@@ -367,61 +410,63 @@ M.config = {
   level = 1,
   strict = false,
   custom_rules = {},
-  coverage_data = nil -- Will hold reference to coverage module data if available
+  coverage_data = nil, -- Will hold reference to coverage module data if available
 }
 
 -- File cache for source code analysis
 local file_cache = {}
 
---- Read a file and return its contents as an array of lines for analysis
+--- Reads a file's content and returns it as an array of lines. Uses a cache.
+---@param filename string The absolute path to the file.
+---@return string[] lines Array of lines, or an empty table if the file cannot be read.
 ---@private
----@param filename string The absolute path to the file to read
----@return string[] lines Array of lines from the file, or empty array if file can't be read
 local function read_file(filename)
   if file_cache[filename] then
     return file_cache[filename]
   end
-  
+
   -- Use filesystem module to read the file
   local content = fs.read_file(filename)
   if not content then
     return {}
   end
-  
+
   -- Split content into lines
   local lines = {}
   for line in content:gmatch("[^\r\n]+") do
     table.insert(lines, line)
   end
-  
+
   file_cache[filename] = lines
   return lines
 end
 
----@param options? {enabled?: boolean, level?: number, strict?: boolean, custom_rules?: table, coverage_data?: table, debug?: boolean, verbose?: boolean} Configuration options for the quality module
----@return QualityModule self The initialized quality module
+--- Initializes the quality module with specified options, overriding defaults and central configuration values.
+--- Registers a change listener if central configuration is available. Connects to coverage module if loaded.
+---@param options? {enabled?: boolean, level?: number, strict?: boolean, custom_rules?: table, coverage_data?: table, debug?: boolean, verbose?: boolean} Configuration options.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.init(options)
-  local central_config = get_central_config()
-  
+  -- central_config is guaranteed to be loaded due to check at top
+
   -- Start with default configuration
   for k, v in pairs(DEFAULT_CONFIG) do
     M.config[k] = v
   end
-  
+
   -- If central_config is available, get values from it first
   if central_config then
     local central_values = central_config.get("quality")
     if central_values then
-      logger.debug("Using values from central configuration system")
+      get_logger().debug("Using values from central configuration system")
       for k, v in pairs(central_values) do
         M.config[k] = v
       end
     end
-    
+
     -- Register the change listener if not already registered
     register_change_listener()
   end
-  
+
   -- Apply user options (these override both defaults and central_config)
   options = options or {}
   if next(options) then
@@ -430,15 +475,15 @@ function M.init(options)
     for _ in pairs(options) do
       option_count = option_count + 1
     end
-    
-    logger.debug("Applying user-provided options", {
-      option_count = option_count
+
+    get_logger().debug("Applying user-provided options", {
+      option_count = option_count,
     })
-    
+
     for k, v in pairs(options) do
       M.config[k] = v
     end
-    
+
     -- If central_config is available, update it with the user options
     if central_config then
       -- Update only the keys that were explicitly provided
@@ -447,34 +492,36 @@ function M.init(options)
       end
     end
   end
-  
-  logger.debug("Quality module configuration applied", {
+
+  get_logger().debug("Quality module configuration applied", {
     enabled = M.config.enabled,
     level = M.config.level,
-    strict = M.config.strict
+    strict = M.config.strict,
   })
-  
+
   -- Connect to coverage module if available
   if package.loaded["lib.coverage"] then
-    logger.debug("Connected to coverage module")
+    get_logger().debug("Connected to coverage module")
     M.config.coverage_data = package.loaded["lib.coverage"]
   else
-    logger.debug("Coverage module not available")
+    get_logger().debug("Coverage module not available")
   end
-  
+
   -- Update logging configuration based on options
   if M.config.debug or M.config.verbose then
     logging.configure_from_options("Quality", M.config)
   end
-  
+
   M.reset()
   return M
 end
 
----@return QualityModule self The reset quality module
+--- Resets the collected quality statistics (`M.stats`, `test_data`, `current_test`, `file_cache`)
+--- while preserving the current configuration (`M.config`).
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.reset()
-  logger.debug("Resetting quality module state")
-  
+  get_logger().debug("Resetting quality module state")
+
   M.stats = {
     tests_analyzed = 0,
     tests_passing_quality = 0,
@@ -488,28 +535,30 @@ function M.reset()
     coverage_score = 0,
     issues = {},
   }
-  
+
   -- Reset test data
   test_data = {}
   current_test = nil
-  
+
   -- Reset file cache
   file_cache = {}
-  
-  logger.trace("Quality module reset complete")
+
+  get_logger().trace("Quality module reset complete")
   return M
 end
 
----@return QualityModule self The fully reset quality module
+--- Performs a full reset: resets statistics (via `M.reset()`) and resets the module's
+--- configuration (`M.config`) back to the defaults (potentially reloading from central config).
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.full_reset()
   -- Reset quality data
   M.reset()
-  
+
   -- Reset configuration to defaults in central_config if available
-  local central_config = get_central_config()
+  -- central_config is guaranteed to be loaded due to check at top
   if central_config then
     central_config.reset("quality")
-    
+
     -- Sync our local config with central_config
     local central_values = central_config.get("quality")
     if central_values then
@@ -522,20 +571,21 @@ function M.full_reset()
         M.config[k] = v
       end
     end
-    
-    logger.debug("Reset quality configuration to defaults in central_config")
+
+    get_logger().debug("Reset quality configuration to defaults in central_config")
   else
     -- If central_config is not available, just use defaults
     for k, v in pairs(DEFAULT_CONFIG) do
       M.config[k] = v
     end
   end
-  
+
   return M
 end
 
----@param level? number The quality level to get requirements for (defaults to configured level)
----@return table requirements The requirements for the specified quality level
+--- Gets the requirements table for a specific quality level.
+---@param level? number The quality level number (1-5). Defaults to the currently configured `M.config.level`.
+---@return table requirements The requirements table for the specified level (defaults to Level 1 if level is invalid).
 function M.get_level_requirements(level)
   level = level or M.config.level
   for _, level_def in ipairs(M.levels) do
@@ -546,47 +596,55 @@ function M.get_level_requirements(level)
   return M.levels[1].requirements -- Default to level 1
 end
 
--- Check if a test has enough assertions
+--- Checks if a test meets the minimum/maximum assertion count requirements.
+--- Adds issues to `test_info.issues` if requirements are not met.
+---@param test_info table The test data structure containing `assertion_count` and `issues`.
+---@param requirements table The requirements table for the current level being checked.
+---@return boolean `true` if assertion count is within limits, `false` otherwise.
+---@private
 local function has_enough_assertions(test_info, requirements)
   local min_required = requirements.min_assertions_per_test or 1
   local max_allowed = (requirements.test_organization and requirements.test_organization.max_assertions_per_test) or 15
-  
+
   if test_info.assertion_count < min_required then
-    table.insert(test_info.issues, string.format(
-      "Too few assertions: found %d, need at least %d", 
-      test_info.assertion_count, 
-      min_required
-    ))
+    table.insert(
+      test_info.issues,
+      string.format("Too few assertions: found %d, need at least %d", test_info.assertion_count, min_required)
+    )
     return false
   end
-  
+
   if test_info.assertion_count > max_allowed then
-    table.insert(test_info.issues, string.format(
-      "Too many assertions: found %d, maximum is %d", 
-      test_info.assertion_count, 
-      max_allowed
-    ))
+    table.insert(
+      test_info.issues,
+      string.format("Too many assertions: found %d, maximum is %d", test_info.assertion_count, max_allowed)
+    )
     return false
   end
-  
+
   return true
 end
 
--- Check if a test uses required assertion types
+--- Checks if a test uses the minimum number of required assertion *types*.
+--- Adds issues to `test_info.issues` if requirements are not met.
+---@param test_info table The test data structure containing `assertion_types` and `issues`.
+---@param requirements table The requirements table for the current level.
+---@return boolean `true` if enough required assertion types are found, `false` otherwise.
+---@private
 local function has_required_assertion_types(test_info, requirements)
   local required_types = requirements.assertion_types_required or {}
   local min_types_required = requirements.assertion_types_required_count or 1
-  
+
   local found_types = 0
   local types_found = {}
-  
+
   for _, required_type in ipairs(required_types) do
     if test_info.assertion_types[required_type] and test_info.assertion_types[required_type] > 0 then
       found_types = found_types + 1
       types_found[required_type] = true
     end
   end
-  
+
   if found_types < min_types_required then
     local missing_types = {}
     for _, required_type in ipairs(required_types) do
@@ -594,201 +652,236 @@ local function has_required_assertion_types(test_info, requirements)
         table.insert(missing_types, required_type)
       end
     end
-    
-    table.insert(test_info.issues, string.format(
-      "Missing required assertion types: need %d type(s), found %d. Missing: %s", 
-      min_types_required, 
-      found_types,
-      table.concat(missing_types, ", ")
-    ))
+
+    table.insert(
+      test_info.issues,
+      string.format(
+        "Missing required assertion types: need %d type(s), found %d. Missing: %s",
+        min_types_required,
+        found_types,
+        table.concat(missing_types, ", ")
+      )
+    )
     return false
   end
-  
+
   return true
 end
 
--- Check if test organization meets requirements
+--- Checks if a test meets organizational requirements (e.g., describe/it blocks, naming, hooks, coverage).
+--- Adds issues to `test_info.issues` if requirements are not met.
+---@param test_info table The test data structure containing organizational flags (`has_describe`, etc.) and `issues`.
+---@param requirements table The requirements table for the current level.
+---@return boolean `true` if all applicable organizational requirements are met, `false` otherwise.
+---@private
 local function has_proper_organization(test_info, requirements)
   if not requirements.test_organization then
     return true
   end
-  
+
   local org = requirements.test_organization
   local is_valid = true
-  
+
   -- Check for describe blocks
   if org.require_describe_block and not test_info.has_describe then
     table.insert(test_info.issues, "Missing describe block")
     is_valid = false
   end
-  
+
   -- Check for it blocks
   if org.require_it_block and not test_info.has_it then
     table.insert(test_info.issues, "Missing it block")
     is_valid = false
   end
-  
+
   -- Check for proper test naming
   if org.require_test_name and not test_info.has_proper_name then
     table.insert(test_info.issues, "Test doesn't have a proper descriptive name")
     is_valid = false
   end
-  
+
   -- Check for before/after blocks
   if org.require_before_after and not test_info.has_before_after then
     table.insert(test_info.issues, "Missing setup/teardown with before/after blocks")
     is_valid = false
   end
-  
+
   -- Check for context nesting
   if org.require_context_nesting and test_info.nesting_level < 2 then
     table.insert(test_info.issues, "Insufficient context nesting (need at least 2 levels)")
     is_valid = false
   end
-  
+
   -- Check for mock verification
   if org.require_mock_verification and not test_info.has_mock_verification then
     table.insert(test_info.issues, "Missing mock/spy verification")
     is_valid = false
   end
-  
+
   -- Check for coverage threshold if coverage data is available
   if org.require_coverage_threshold and M.config.coverage_data then
     local coverage_report = M.config.coverage_data.summary_report()
     if coverage_report.overall_pct < org.require_coverage_threshold then
-      table.insert(test_info.issues, string.format(
-        "Insufficient code coverage: %.2f%% (threshold: %d%%)",
-        coverage_report.overall_pct,
-        org.require_coverage_threshold
-      ))
+      table.insert(
+        test_info.issues,
+        string.format(
+          "Insufficient code coverage: %.2f%% (threshold: %d%%)",
+          coverage_report.overall_pct,
+          org.require_coverage_threshold
+        )
+      )
       is_valid = false
     end
   end
-  
+
   -- Check for performance tests
   if org.require_performance_tests and not test_info.has_performance_tests then
     table.insert(test_info.issues, "Missing performance tests")
     is_valid = false
   end
-  
+
   -- Check for security tests
   if org.require_security_tests and not test_info.has_security_tests then
     table.insert(test_info.issues, "Missing security tests")
     is_valid = false
   end
-  
+
   return is_valid
 end
 
--- Check for required patterns
+--- Checks if a test contains required patterns (in name or potentially content).
+--- Adds issues to `test_info.issues` if required patterns are missing.
+---@param test_info table The test data structure containing `patterns_found` and `issues`.
+---@param requirements table The requirements table for the current level.
+---@return boolean `true` if all required patterns are found, `false` otherwise.
+---@private
 local function has_required_patterns(test_info, requirements)
   local required_patterns = requirements.required_patterns or {}
   if #required_patterns == 0 then
     return true
   end
-  
+
   local is_valid = true
   local missing_patterns = {}
-  
+
   for _, pattern in ipairs(required_patterns) do
     if not test_info.patterns_found[pattern] then
       table.insert(missing_patterns, pattern)
       is_valid = false
     end
   end
-  
+
   if #missing_patterns > 0 then
-    table.insert(test_info.issues, string.format(
-      "Missing required patterns: %s", 
-      table.concat(missing_patterns, ", ")
-    ))
+    table.insert(test_info.issues, string.format("Missing required patterns: %s", table.concat(missing_patterns, ", ")))
   end
-  
+
   return is_valid
 end
 
--- Check for forbidden patterns
+--- Checks if a test avoids forbidden patterns (in name or potentially content).
+--- Adds issues to `test_info.issues` if forbidden patterns are found.
+---@param test_info table The test data structure containing `patterns_found` and `issues`.
+---@param requirements table The requirements table for the current level.
+---@return boolean `true` if no forbidden patterns are found, `false` otherwise.
+---@private
 local function has_no_forbidden_patterns(test_info, requirements)
   local forbidden_patterns = requirements.forbidden_patterns or {}
   if #forbidden_patterns == 0 then
     return true
   end
-  
+
   local is_valid = true
   local found_forbidden = {}
-  
+
   for _, pattern in ipairs(forbidden_patterns) do
     if test_info.patterns_found[pattern] then
       table.insert(found_forbidden, pattern)
       is_valid = false
     end
   end
-  
+
   if #found_forbidden > 0 then
-    table.insert(test_info.issues, string.format(
-      "Found forbidden patterns: %s", 
-      table.concat(found_forbidden, ", ")
-    ))
+    table.insert(test_info.issues, string.format("Found forbidden patterns: %s", table.concat(found_forbidden, ", ")))
   end
-  
+
   return is_valid
 end
 
--- Evaluate a test against the requirements for a specific level
+--- Evaluates a single test against the requirements for a specific quality level.
+--- Calls individual requirement check functions (`has_enough_assertions`, etc.).
+---@param test_info table The test data structure to evaluate.
+---@param level number The quality level (1-5) to check against.
+---@return {passes: boolean, score: number, issues_count: number, requirements_met: number, total_requirements: number} evaluation_result Summary of the evaluation.
+---@private
 local function evaluate_test_at_level(test_info, level)
   local requirements = M.get_level_requirements(level)
-  
   -- Create a copy of issues to check how many are added at this level
   local previous_issues_count = #test_info.issues
-  
+
   -- Check each requirement type
   local passes_assertions = has_enough_assertions(test_info, requirements)
   local passes_types = has_required_assertion_types(test_info, requirements)
   local passes_organization = has_proper_organization(test_info, requirements)
   local passes_required = has_required_patterns(test_info, requirements)
   local passes_forbidden = has_no_forbidden_patterns(test_info, requirements)
-  
+
   -- For level to pass, all criteria must be met
-  local passes_level = passes_assertions and passes_types and 
-                     passes_organization and passes_required and 
-                     passes_forbidden
-  
+  local passes_level = passes_assertions
+    and passes_types
+    and passes_organization
+    and passes_required
+    and passes_forbidden
+
   -- Calculate how many requirements were met (for partial scoring)
   local requirements_met = 0
   local total_requirements = 5 -- The five main categories
-  
-  if passes_assertions then requirements_met = requirements_met + 1 end
-  if passes_types then requirements_met = requirements_met + 1 end
-  if passes_organization then requirements_met = requirements_met + 1 end
-  if passes_required then requirements_met = requirements_met + 1 end
-  if passes_forbidden then requirements_met = requirements_met + 1 end
-  
+
+  if passes_assertions then
+    requirements_met = requirements_met + 1
+  end
+  if passes_types then
+    requirements_met = requirements_met + 1
+  end
+  if passes_organization then
+    requirements_met = requirements_met + 1
+  end
+  if passes_required then
+    requirements_met = requirements_met + 1
+  end
+  if passes_forbidden then
+    requirements_met = requirements_met + 1
+  end
+
   -- Calculate score as percentage of requirements met
   local score = (requirements_met / total_requirements) * 100
-  
+
   -- Count new issues added at this level
   local new_issues = #test_info.issues - previous_issues_count
-  
+
   return {
     passes = passes_level,
     score = score,
     issues_count = new_issues,
     requirements_met = requirements_met,
-    total_requirements = total_requirements
+    total_requirements = total_requirements,
   }
 end
 
--- Determine the highest quality level a test meets
+--- Evaluates a test against all quality levels (1-5) to determine the highest level passed.
+--- Calls `evaluate_test_at_level` for each level.
+---@param test_info table The test data structure to evaluate.
+---@return {level: number, scores: table<number, number>} result The highest level passed and scores achieved at each level.
+---@private
 local function evaluate_test_quality(test_info)
   -- Start with maximum level and work down until requirements are met
   local max_level = #M.levels
   local highest_passing_level = 0
   local scores = {}
-  
+
   for level = 1, max_level do
     local evaluation = evaluate_test_at_level(test_info, level)
     scores[level] = evaluation.score
-    
+
     if evaluation.passes then
       highest_passing_level = level
     else
@@ -798,31 +891,34 @@ local function evaluate_test_quality(test_info)
       end
     end
   end
-  
+
   return {
     level = highest_passing_level,
-    scores = scores
+    scores = scores,
   }
 end
 
----@param type_name string The type of assertion being tracked
----@param test_name? string The name of the test (optional, uses current test if not provided)
----@return QualityModule self The quality module
+--- Tracks the usage of an assertion type within the currently active test (`current_test`).
+--- Increments assertion counts and updates found patterns based on the `type_name`.
+--- Starts a new test context if `current_test` is nil.
+---@param type_name string The type or name of the assertion used (e.g., "equality", "expect(x):to.be.a").
+---@param test_name? string Optional name of the test; defaults to "unnamed_test" if `current_test` is nil.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.track_assertion(type_name, test_name)
   if not M.config.enabled then
-    logger.trace("Quality module disabled, skipping assertion tracking")
+    get_logger().trace("Quality module disabled, skipping assertion tracking")
     return M
   end
-  
+
   -- Initialize test info if needed
   if not current_test then
-    logger.trace("No current test, initializing with", { test_name = test_name or "unnamed_test" })
+    get_logger().trace("No current test, initializing with", { test_name = test_name or "unnamed_test" })
     M.start_test(test_name or "unnamed_test")
   end
-  
+
   -- Update assertion count
   test_data[current_test].assertion_count = (test_data[current_test].assertion_count or 0) + 1
-  
+
   -- Track assertion type
   local pattern_type = nil
   for pat_type, patterns_list in pairs(patterns) do
@@ -831,19 +927,19 @@ function M.track_assertion(type_name, test_name)
       break
     end
   end
-  
-  logger.trace("Tracking assertion", {
+
+  get_logger().trace("Tracking assertion", {
     test = current_test,
     assertion_type = type_name,
     pattern_type = pattern_type or "unknown",
-    count = test_data[current_test].assertion_count
+    count = test_data[current_test].assertion_count,
   })
-  
+
   if pattern_type then
-    test_data[current_test].assertion_types[pattern_type] = 
-      (test_data[current_test].assertion_types[pattern_type] or 0) + 1
+    test_data[current_test].assertion_types[pattern_type] = (test_data[current_test].assertion_types[pattern_type] or 0)
+      + 1
   end
-  
+
   -- Also record the patterns in the source code
   for pat_name, pat_list in pairs(patterns) do
     for _, pattern in ipairs(pat_list) do
@@ -852,27 +948,30 @@ function M.track_assertion(type_name, test_name)
       end
     end
   end
-  
+
   return M
 end
 
----@param test_name string The name of the test to analyze
----@return QualityModule self The quality module
+--- Marks the start of analysis for a specific test.
+--- Initializes the test data structure (`test_data[test_name]`) if it doesn't exist.
+--- Records the `test_name` as the `current_test`.
+---@param test_name string The name of the test starting.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.start_test(test_name)
   if not M.config.enabled then
-    logger.trace("Quality module disabled, skipping test start")
+    get_logger().trace("Quality module disabled, skipping test start")
     return M
   end
-  
-  logger.debug("Starting test analysis", { test_name = test_name })
+
+  get_logger().debug("Starting test analysis", { test_name = test_name })
   current_test = test_name
-  
+
   -- Initialize test data
   if not test_data[current_test] then
-    logger.trace("Initializing new test data structure", { test = test_name })
-    
+    get_logger().trace("Initializing new test data structure", { test = test_name })
+
     local has_proper_name = (test_name and test_name ~= "" and test_name ~= "unnamed_test")
-    
+
     test_data[current_test] = {
       name = test_name,
       assertion_count = 0,
@@ -887,17 +986,17 @@ function M.start_test(test_name)
       has_security_tests = false,
       patterns_found = {},
       issues = {},
-      quality_level = 0
+      quality_level = 0,
     }
-    
+
     -- Check for specific patterns in the test name
     if test_name then
       -- Check for proper naming conventions
       if test_name:match("should") or test_name:match("when") then
         test_data[current_test].has_proper_name = true
-        logger.trace("Test has proper naming convention", { test = test_name })
+        get_logger().trace("Test has proper naming convention", { test = test_name })
       end
-      
+
       -- Check for different test types
       local found_patterns = {}
       for pat_type, patterns_list in pairs(patterns) do
@@ -905,7 +1004,7 @@ function M.start_test(test_name)
           if contains_pattern(test_name, pattern) then
             test_data[current_test].patterns_found[pat_type] = true
             table.insert(found_patterns, pat_type)
-            
+
             -- Mark special test types
             if pat_type == "performance" then
               test_data[current_test].has_performance_tests = true
@@ -915,98 +1014,106 @@ function M.start_test(test_name)
           end
         end
       end
-      
+
       if #found_patterns > 0 then
-        logger.trace("Found patterns in test name", { 
+        get_logger().trace("Found patterns in test name", {
           test = test_name,
-          patterns = found_patterns
+          patterns = found_patterns,
         })
       end
     end
   end
-  
+
   return M
 end
 
----@return QualityModule self The quality module
+--- Marks the end of analysis for the `current_test`.
+--- Evaluates the completed test's quality level using `evaluate_test_quality`.
+--- Updates global statistics (`M.stats`) based on the test's results.
+--- Resets `current_test` to nil.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.end_test()
   if not M.config.enabled or not current_test then
-    logger.trace("Quality module disabled or no current test, skipping test end")
+    get_logger().trace("Quality module disabled or no current test, skipping test end")
     current_test = nil
     return M
   end
-  
-  logger.debug("Ending test analysis", { test = current_test })
-  
+
+  get_logger().debug("Ending test analysis", { test = current_test })
+
   -- Evaluate test quality
   local evaluation = evaluate_test_quality(test_data[current_test])
   test_data[current_test].quality_level = evaluation.level
   test_data[current_test].scores = evaluation.scores
-  
+
   -- Log evaluation results
-  logger.debug("Test quality evaluation complete", {
+  get_logger().debug("Test quality evaluation complete", {
     test = current_test,
     quality_level = evaluation.level,
     passing = evaluation.level >= M.config.level,
     issues_count = #test_data[current_test].issues,
-    assertion_count = test_data[current_test].assertion_count
+    assertion_count = test_data[current_test].assertion_count,
   })
-  
+
   -- Update global statistics
   M.stats.tests_analyzed = M.stats.tests_analyzed + 1
   M.stats.assertions_total = M.stats.assertions_total + test_data[current_test].assertion_count
-  
+
   if test_data[current_test].quality_level >= M.config.level then
     M.stats.tests_passing_quality = M.stats.tests_passing_quality + 1
-    logger.trace("Test passed quality check", { 
-      test = current_test, 
-      level = test_data[current_test].quality_level 
+    get_logger().trace("Test passed quality check", {
+      test = current_test,
+      level = test_data[current_test].quality_level,
     })
   else
     -- Add issues to global issues list
     for _, issue in ipairs(test_data[current_test].issues) do
       table.insert(M.stats.issues, {
         test = current_test,
-        issue = issue
+        issue = issue,
       })
     end
-    
-    logger.debug("Test failed quality check", {
+
+    get_logger().debug("Test failed quality check", {
       test = current_test,
       required_level = M.config.level,
       actual_level = test_data[current_test].quality_level,
-      issues_count = #test_data[current_test].issues
+      issues_count = #test_data[current_test].issues,
     })
-    
+
     if #test_data[current_test].issues > 0 then
-      logger.trace("Test quality issues", {
+      get_logger().trace("Test quality issues", {
         test = current_test,
-        issues = test_data[current_test].issues
+        issues = test_data[current_test].issues,
       })
     end
   end
-  
+
   -- Update assertion types found
   for atype, count in pairs(test_data[current_test].assertion_types) do
     M.stats.assertion_types_found[atype] = (M.stats.assertion_types_found[atype] or 0) + count
   end
-  
+
   -- Reset current test
   current_test = nil
-  
+
   return M
 end
 
----@param file_path string The path to the test file to analyze
----@return table analysis The analysis results for the test file
+--- Performs static analysis on a test file to gather quality metrics.
+--- Reads the file, counts assertions, identifies describe/it/before/after blocks, and nesting depth.
+--- Creates test data entries for tests found via `start_test`/`end_test`.
+--- **Note:** Assertion counting and type identification are based on simple pattern matching and may not be perfectly accurate.
+---@param file_path string The path to the test file.
+---@return table analysis A table containing the analysis results for the file (tests found, counts, etc.).
 function M.analyze_file(file_path)
   if not M.config.enabled then
-    logger.trace("Quality module disabled, skipping file analysis")
+    get_logger().trace("Quality module disabled, skipping file analysis")
     return {}
   end
-  
-  logger.debug("Analyzing test file", { file_path = file_path })
-  
+
+  get_logger().debug("Analyzing test file", { file_path = file_path })
+
   local lines = read_file(file_path)
   local results = {
     file = file_path,
@@ -1019,15 +1126,15 @@ function M.analyze_file(file_path)
     issues = {},
     quality_level = 0,
   }
-  
-  logger.trace("Read file for analysis", { 
+
+  get_logger().trace("Read file for analysis", {
     file_path = file_path,
-    lines_count = #lines 
+    lines_count = #lines,
   })
-  
+
   local current_nesting = 0
   local max_nesting = 0
-  
+
   -- Analyze the file line by line
   for i, line in ipairs(lines) do
     -- Track nesting level
@@ -1038,33 +1145,33 @@ function M.analyze_file(file_path)
     elseif line:match("end%)") then
       current_nesting = math.max(0, current_nesting - 1)
     end
-    
+
     -- Check for it blocks and test names
     local it_pattern = "it%s*%(%s*[\"'](.+)[\"']"
     local it_match = line:match(it_pattern)
     if it_match then
       results.has_it = true
-      
+
       local test_name = it_match
       table.insert(results.tests, {
         name = test_name,
         line = i,
-        nesting_level = current_nesting
+        nesting_level = current_nesting,
       })
-      
-      logger.trace("Found test in file", {
+
+      get_logger().trace("Found test in file", {
         file = file_path,
         test_name = test_name,
         line = i,
-        nesting_level = current_nesting
+        nesting_level = current_nesting,
       })
     end
-    
+
     -- Check for before/after hooks
     if line:match("before%s*%(") or line:match("after%s*%(") then
       results.has_before_after = true
     end
-    
+
     -- Count assertions
     for pat_type, patterns_list in pairs(patterns) do
       for _, pattern in ipairs(patterns_list) do
@@ -1075,106 +1182,105 @@ function M.analyze_file(file_path)
       end
     end
   end
-  
+
   results.nesting_level = max_nesting
-  
-  logger.debug("Static analysis summary", {
+
+  get_logger().debug("Static analysis summary", {
     file = file_path,
     tests_found = #results.tests,
     has_describe = results.has_describe,
     has_it = results.has_it,
     has_before_after = results.has_before_after,
     max_nesting = max_nesting,
-    assertion_count = results.assertion_count
+    assertion_count = results.assertion_count,
   })
-  
+
   -- Start and end tests for each detected test
   for _, test in ipairs(results.tests) do
     M.start_test(test.name)
-    
+
     -- Set nesting level
     test_data[test.name].nesting_level = test.nesting_level
-    
+
     -- Mark as having describe and it blocks
     test_data[test.name].has_describe = results.has_describe
     test_data[test.name].has_it = results.has_it
-    
+
     -- Mark as having before/after hooks
     test_data[test.name].has_before_after = results.has_before_after
-    
+
     -- Assume equal distribution of assertions among tests
     local avg_assertions = math.floor(results.assertion_count / math.max(1, #results.tests))
     test_data[test.name].assertion_count = avg_assertions
-    
-    logger.trace("Setting static test data", {
+
+    get_logger().trace("Setting static test data", {
       test = test.name,
       nesting_level = test.nesting_level,
       has_describe = results.has_describe,
       has_it = results.has_it,
       has_before_after = results.has_before_after,
-      assigned_assertions = avg_assertions
+      assigned_assertions = avg_assertions,
     })
-    
+
     M.end_test()
   end
-  
+
   -- Calculate the file's overall quality level
   local min_quality_level = 5
   local file_tests = 0
-  
+
   for _, test in ipairs(results.tests) do
     if test_data[test.name] then
       min_quality_level = math.min(min_quality_level, test_data[test.name].quality_level)
       file_tests = file_tests + 1
     end
   end
-  
+
   results.quality_level = file_tests > 0 and min_quality_level or 0
-  
-  logger.debug("File analysis complete", {
+
+  get_logger().debug("File analysis complete", {
     file = file_path,
     quality_level = results.quality_level,
-    tests_analyzed = file_tests
+    tests_analyzed = file_tests,
   })
-  
+
   return results
 end
 
----@return {level: number, level_name: string, tests: table, summary: {tests_analyzed: number, tests_passing_quality: number, quality_percent: number, assertions_total: number, assertions_per_test_avg: number, assertion_types_found: table, issues: table[]}} report_data Structured data for quality reporting
+---@return {level: number, level_name: string, tests: table, summary: {tests_analyzed: number, tests_passing_quality: number, quality_percent: number, assertions_total: number, assertions_per_test_avg: number, assertion_types_found: table<string, number>, issues: table[]}} report_data Structured data suitable for generating reports. Includes overall summary and detailed test data.
 function M.get_report_data()
-  logger.debug("Generating quality report data")
-  
+  get_logger().debug("Generating quality report data")
+
   -- Calculate final statistics
   local total_tests = M.stats.tests_analyzed
   if total_tests > 0 then
     M.stats.assertions_per_test_avg = M.stats.assertions_total / total_tests
-    
+
     -- Find the minimum quality level achieved by all tests
     local min_level = 5
     for _, test_info in pairs(test_data) do
       min_level = math.min(min_level, test_info.quality_level)
     end
-    
+
     M.stats.quality_level_achieved = min_level
-    
-    logger.debug("Calculated final quality statistics", {
+
+    get_logger().debug("Calculated final quality statistics", {
       tests_analyzed = total_tests,
       passing_tests = M.stats.tests_passing_quality,
       quality_percent = M.stats.tests_passing_quality / total_tests * 100,
       assertions_per_test_avg = M.stats.assertions_per_test_avg,
       quality_level_achieved = min_level,
-      issues_count = #M.stats.issues
+      issues_count = #M.stats.issues,
     })
   else
     M.stats.quality_level_achieved = 0
-    logger.debug("No tests analyzed for quality")
+    get_logger().debug("No tests analyzed for quality")
   end
-  
+
   -- Build structured data
-  local quality_percent = M.stats.tests_analyzed > 0 
-    and (M.stats.tests_passing_quality / M.stats.tests_analyzed * 100) 
+  local quality_percent = M.stats.tests_analyzed > 0 and (M.stats.tests_passing_quality / M.stats.tests_analyzed * 100)
     or 0
-    
+
   local structured_data = {
     level = M.stats.quality_level_achieved,
     level_name = M.get_level_name(M.stats.quality_level_achieved),
@@ -1186,10 +1292,10 @@ function M.get_report_data()
       assertions_total = M.stats.assertions_total,
       assertions_per_test_avg = M.stats.assertions_per_test_avg,
       assertion_types_found = M.stats.assertion_types_found,
-      issues = M.stats.issues
-    }
+      issues = M.stats.issues,
+    },
   }
-  
+
   return structured_data
 end
 
@@ -1197,98 +1303,74 @@ end
 --- This function generates a formatted quality report using the reporting module.
 --- If the reporting module is not available, it returns the raw quality data structure.
 ---
----@param format? "summary"|"json"|"html" The format for the report (default is based on central_config)
----@return string|table report The formatted quality report, either as a string for text-based formats 
---- or a structured table for data formats like JSON
----
----@usage
---- -- Generate a summary report
---- local summary = quality.report("summary")
---- print(summary)
----
 --- -- Generate a JSON report
 --- local json_data = quality.report("json")
 ---
 --- -- Generate an HTML report
 --- local html = quality.report("html")
 --- fs.write_file("quality-report.html", html)
+---@param format? "summary"|"json"|"html" The format for the report (default is based on central_config)
+---@return string|table report The formatted quality report (string for "summary", "html"; table for "json"), or the raw report data table if the reporting module or formatting fails.
+---@throws table If the reporting module cannot be loaded or if formatting fails critically (errors wrapped by `pcall` are returned as the raw data table).
 function M.report(format)
-  -- Get format from central_config if available
-  local central_config = get_central_config()
   local default_format = "summary" -- summary, json, html
-  
+  local default_format = "summary" -- summary, json, html
+
   if central_config then
     -- Check for configured default format
     local configured_format = central_config.get("reporting.formats.quality.default")
     if configured_format then
       default_format = configured_format
-      logger.debug("Using format from central configuration", {format = default_format})
+      get_logger().debug("Using format from central configuration", { format = default_format })
     end
   end
-  
+
   -- User-specified format overrides default
   format = format or default_format
-  
+
   local data = M.get_report_data()
-  
+
   -- Try to load the reporting module with proper error handling
-  local reporting_module
-  local success, result_or_err = pcall(function()
-    return require("lib.reporting")
-  end)
-  
-  if success then
-    reporting_module = result_or_err
-    logger.debug("Loaded reporting module", {
-      format = format,
-      module = "lib.reporting"
-    })
-  else
-    logger.error("Failed to load reporting module", {
-      error = tostring(result_or_err),
-      module = "lib.reporting"
-    })
-    -- Return the data structure directly if reporting module isn't available
-    return data
-  end
-  
+  local reporting_module = try_require("lib.reporting")
+
   -- Check if the reporting module has the required function
   if not reporting_module.format_quality or type(reporting_module.format_quality) ~= "function" then
-    logger.error("Reporting module missing format_quality function", {
+    get_logger().error("Reporting module missing format_quality function", {
       module = "lib.reporting",
-      format = format
+      format = format,
     })
     return data
   end
-  
+
   -- Use the reporting module to format quality data with proper error handling
   local formatted_report
   local format_success, format_result = pcall(function()
     return reporting_module.format_quality(data, format)
   end)
-  
-  
+
   if format_success then
     formatted_report = format_result
-    logger.debug("Successfully formatted quality report", {
+    get_logger().debug("Successfully formatted quality report", {
       format = format,
-      result_type = type(formatted_report)
+      result_type = type(formatted_report),
     })
     return formatted_report
   else
-    logger.error("Failed to format quality report", {
+    get_logger().error("Failed to format quality report", {
       error = tostring(format_result),
-      format = format
+      format = format,
     })
     -- Return the data structure directly if formatting failed
     return data
   end
 end
 
----@return table report Simplified summary report with key metrics
+--- Generates a simplified summary report containing key quality metrics.
+--- Calls `get_report_data` internally.
+---@return {level: number, level_name: string, tests_analyzed: number, tests_passing_quality: number, quality_pct: number, assertions_total: number, assertions_per_test_avg: number, assertion_types_found: table<string, number>, issues: table[], tests: table} report A table containing summary statistics and detailed test results.
 function M.summary_report()
   local data = M.get_report_data()
-  
+
   -- Create a simplified summary structure
   return {
     level = data.level,
@@ -1300,29 +1382,31 @@ function M.summary_report()
     assertions_per_test_avg = data.summary.assertions_per_test_avg,
     assertion_types_found = data.summary.assertion_types_found,
     issues = data.summary.issues,
-    tests = data.tests
+    tests = data.tests,
   }
 end
 
----@param level? number The quality level to check against (defaults to configured level)
----@return boolean meets Whether the quality meets the specified level requirement
+--- Checks if the overall achieved quality level (`M.stats.quality_level_achieved`)
+--- meets or exceeds a specified required level.
+---@param level? number The quality level to check against (1-5). Defaults to the currently configured `M.config.level`.
+---@return boolean meets `true` if the achieved level is greater than or equal to the required level, `false` otherwise.
 function M.meets_level(level)
   level = level or M.config.level
-  
-  logger.debug("Checking if quality meets level requirement", {
+
+  get_logger().debug("Checking if quality meets level requirement", {
     required_level = level,
-    config_level = M.config.level
+    config_level = M.config.level,
   })
-  
+
   local report = M.summary_report()
   local meets = report.level >= level
-  
-  logger.debug("Quality level check result", {
+
+  get_logger().debug("Quality level check result", {
     achieved_level = report.level,
     required_level = level,
-    meets_requirement = meets
+    meets_requirement = meets,
   })
-  
+
   return meets
 end
 
@@ -1333,96 +1417,74 @@ end
 ---
 ---@param file_path string The path where to save the quality report
 ---@param format? "summary"|"json"|"html" The format for the report (default from central_config)
----@return boolean success Whether the report was successfully saved
----@return string? error Error message if saving failed
----
----@usage
---- -- Save a quality report in HTML format
---- local success, err = quality.save_report("quality-report.html", "html")
---- if not success then
----   print("Failed to save report: " .. err)
---- end
----
---- -- Save a quality report using defaults from central configuration
---- local success = quality.save_report("quality-report.json")
+---@return boolean success `true` if the report was successfully generated and saved, `false` otherwise.
+---@return string|nil error An error message string if saving failed, `nil` on success.
+---@throws table If the reporting module cannot be loaded or if saving fails critically (errors wrapped by `pcall` are returned as `false, error_message`).
 function M.save_report(file_path, format)
   -- Get format from central_config if available
-  local central_config = get_central_config()
+  -- central_config is guaranteed to be loaded due to check at top
   local default_format = "html"
-  
+  -- Get format from central_config if available
+
   if central_config then
     -- Check for configured default format
     local configured_format = central_config.get("reporting.formats.quality.default")
     if configured_format then
       default_format = configured_format
-      logger.debug("Using format from central configuration", {format = default_format})
+      get_logger().debug("Using format from central configuration", { format = default_format })
     end
-    
+
     -- Check for configured report path template
     local report_path_template = central_config.get("reporting.templates.quality")
     if report_path_template and not file_path then
       -- Generate file_path from template if none provided
       local timestamp = os.date("%Y-%m-%d-%H-%M-%S")
-      file_path = report_path_template:gsub("{timestamp}", timestamp)
-                                     :gsub("{format}", format or default_format)
-      logger.debug("Using report path from template", {file_path = file_path})
+      file_path = report_path_template:gsub("{timestamp}", timestamp):gsub("{format}", format or default_format)
+      get_logger().debug("Using report path from template", { file_path = file_path })
     end
   end
-  
+
   -- User-specified format overrides default
   format = format or default_format
-  
+
   -- Get quality data
   local data = M.get_report_data()
-  
-  logger.debug("Saving quality report", {
+
+  get_logger().debug("Saving quality report", {
     file_path = file_path,
-    format = format
+    format = format,
   })
-  
+
   -- Try to load the reporting module with proper error handling
-  local reporting_module
-  local success, result_or_err = pcall(function()
-    return require("lib.reporting")
-  end)
-  if success then
-    reporting_module = result_or_err
-    logger.debug("Using reporting module to save quality report")
-    
-    -- Check if the required function exists
-    if not reporting_module.save_quality_report or type(reporting_module.save_quality_report) ~= "function" then
-      logger.error("Reporting module missing save_quality_report function", {
-        module = "lib.reporting",
-        format = format
-      })
-      return false, "Reporting module does not support quality report saving"
-    end
-    
-    -- Use the reporting module to save the report with proper error handling
-    local save_success, save_err = pcall(function()
-      return reporting_module.save_quality_report(file_path, data, format)
-    end)
-    
-    if save_success then
-      logger.debug("Successfully saved quality report using reporting module", {
-        file_path = file_path,
-        format = format
-      })
-      return true
-    else
-      logger.error("Failed to save quality report using reporting module", {
-        file_path = file_path,
-        error = tostring(save_err),
-        format = format
-      })
-      return false, "Failed to save report: " .. tostring(save_err)
-    end
-  else
-    logger.error("Failed to load reporting module", {
-      error = tostring(result_or_err),
-      module = "lib.reporting"
+  local reporting_module = try_require("lib.reporting")
+
+  -- Check if the required function exists
+  if not reporting_module.save_quality_report or type(reporting_module.save_quality_report) ~= "function" then
+    get_logger().error("Reporting module missing save_quality_report function", {
+      module = "lib.reporting",
+      format = format,
     })
-    return false, "Reporting module not available: " .. tostring(result_or_err)
+    return false, "Reporting module does not support quality report saving"
+  end
+
+  -- Use the reporting module to save the report with proper error handling
+  local save_success, save_err = pcall(function()
+    return reporting_module.save_quality_report(file_path, data, format)
+  end)
+
+  if save_success then
+    get_logger().debug("Successfully saved quality report using reporting module", {
+      file_path = file_path,
+      format = format,
+    })
+    return true
+  else
+    get_logger().error("Failed to save quality report using reporting module", {
+      file_path = file_path,
+      error = tostring(save_err),
+      format = format,
+    })
+    return false, "Failed to save report: " .. tostring(save_err)
   end
 end
 
@@ -1455,8 +1517,9 @@ M.level_name = M.get_level_name
 ---
 ---@param file_path string The path to the test file to check
 ---@param level? number The quality level to check against (defaults to configured level)
----@return boolean meets Whether the file meets the quality requirements
----@return table issues Any quality issues found in the file
+---@return boolean meets `true` if the file meets the requirements for the specified level, `false` otherwise.
+---@return table[] issues An array of issue description tables (e.g., `{ test = "test_name", issue = "description" }`).
+---@throws table If the level checker function (from `level_checkers`) fails critically (errors wrapped by `pcall` are handled, but rethrows possible).
 ---
 ---@usage
 --- -- Check if a file meets level 3 requirements
@@ -1469,79 +1532,79 @@ M.level_name = M.get_level_name
 --- end
 function M.check_file(file_path, level)
   level = level or M.config.level
-  
-  logger.debug("Checking if file meets quality requirements", {
+
+  get_logger().debug("Checking if file meets quality requirements", {
     file_path = file_path,
-    required_level = level
+    required_level = level,
   })
-  
+
   -- Enable quality module for this check
   local previous_enabled = M.config.enabled
   M.config.enabled = true
-  
+
   -- Get coverage data if available
   local coverage_data
   if M.config.coverage_data then
     -- First check if the get_file_coverage function exists
     if type(M.config.coverage_data.get_file_coverage) ~= "function" then
-      logger.warn("Coverage module doesn't have get_file_coverage function", {
-        file_path = file_path
+      get_logger().warn("Coverage module doesn't have get_file_coverage function", {
+        file_path = file_path,
       })
     else
       -- Safely attempt to get coverage data with proper error handling
       local success, result = pcall(function()
         return M.config.coverage_data.get_file_coverage(file_path)
       end)
-      
+
       if success then
         coverage_data = result
-        logger.debug("Retrieved coverage data for file", {
+        get_logger().debug("Retrieved coverage data for file", {
           file_path = file_path,
-          has_coverage = coverage_data ~= nil
+          has_coverage = coverage_data ~= nil,
         })
       else
-        logger.warn("Failed to get coverage data for file", {
+        get_logger().warn("Failed to get coverage data for file", {
           file_path = file_path,
-          error = tostring(result)
+          error = tostring(result),
         })
       end
     end
   end
-  
+
   -- For the test files, we'll just return true for the appropriate levels
   -- Test files already have their level in their name
   local file_level = tonumber(file_path:match("quality_level_(%d)_test.lua"))
-  
+
   -- Also check for level_X_test.lua pattern which is the preferred location in tests/quality/
   if not file_level then
     file_level = tonumber(file_path:match("level_(%d)_test.lua"))
   end
-  
+
   if file_level then
     -- For any check_level <= file_level, pass
     -- For any check_level > file_level, fail
     local result = level <= file_level
-    
-    logger.debug("Found special test file with explicit level", {
+
+    get_logger().debug("Found special test file with explicit level", {
       file_path = file_path,
       file_level = file_level,
       required_level = level,
-      meets_requirements = result
+      meets_requirements = result,
     })
-    
+
     -- Restore previous enabled state
     M.config.enabled = previous_enabled
-    
+
     return result, {}
   end
-  
+
   -- For other files that don't follow our test naming convention,
   -- use static analysis
-  logger.debug("Using static analysis for file quality check", { file_path = file_path })
-  
+  get_logger().debug("Using static analysis for file quality check", { file_path = file_path })
+
   -- Analyze the file
   local analysis = M.analyze_file(file_path)
-  
+
   -- Use level_checkers for more detailed analysis if available
   local checker = level_checkers.get_level_checker(level)
   local issues = {}
@@ -1560,34 +1623,34 @@ function M.check_file(file_path, level)
       has_mock_verification = false, -- Default to false without detailed analysis
       has_performance_tests = false,
       has_security_tests = false,
-      issues = {}
+      issues = {},
     }
-    
+
     -- Call the level checker with test_info and coverage_data
     local evaluation = checker(test_info, coverage_data)
-    
-    logger.debug("Level checker evaluation", {
+
+    get_logger().debug("Level checker evaluation", {
       passes = evaluation.passes,
       score = evaluation.score,
       issues_count = #evaluation.issues,
       requirements_met = evaluation.requirements_met,
-      total_requirements = evaluation.total_requirements
+      total_requirements = evaluation.total_requirements,
     })
-    
+
     -- If evaluation adds issues, copy them to our issues list
     if not evaluation.passes and #evaluation.issues > 0 then
       for _, issue in ipairs(evaluation.issues) do
         table.insert(issues, {
           test = file_path,
-          issue = issue
+          issue = issue,
         })
       end
     end
   end
-  
+
   -- Check if the quality level meets the required level
   local meets_level = analysis.quality_level >= level
-  
+
   -- Collect issues
   local issues = {}
   for _, test in ipairs(analysis.tests) do
@@ -1595,23 +1658,23 @@ function M.check_file(file_path, level)
       for _, issue in ipairs(test_data[test.name].issues) do
         table.insert(issues, {
           test = test.name,
-          issue = issue
+          issue = issue,
         })
       end
     end
   end
-  
-  logger.debug("File quality check complete", {
+
+  get_logger().debug("File quality check complete", {
     file_path = file_path,
     analysis_level = analysis.quality_level,
     required_level = level,
     meets_requirements = meets_level,
-    issues_count = #issues
+    issues_count = #issues,
   })
-  
+
   -- Restore previous enabled state
   M.config.enabled = previous_enabled
-  
+
   return meets_level, issues
 end
 
@@ -1621,9 +1684,9 @@ end
 --- and feedback on how to improve the test if it doesn't meet requirements.
 ---
 ---@param test_name string The name of the test to validate
----@param options? {level?: number, strict?: boolean} Options for validation, including level override
----@return boolean meets Whether the test meets the quality requirements
----@return table[] issues Any quality issues found in the test
+---@param options? {level?: number, strict?: boolean} Validation options. `level` overrides the configured level. `strict` (if true) might influence evaluation behavior (currently unused here).
+---@return boolean meets `true` if the test data meets the requirements for the specified level, `false` otherwise.
+---@return table[] issues An array of issue description strings extracted from the test data.
 ---
 ---@usage
 --- -- After running a test
@@ -1643,61 +1706,62 @@ end
 function M.validate_test_quality(test_name, options)
   options = options or {}
   local level = options.level or M.config.level
-  
-  logger.debug("Validating test quality", {
+
+  get_logger().debug("Validating test quality", {
     test_name = test_name,
-    required_level = level
+    required_level = level,
   })
-  
+
   -- If there's no current test, we can't validate
   if not test_data[test_name] then
-    logger.warn("No test data available for validation", { test_name = test_name })
+    get_logger().warn("No test data available for validation", { test_name = test_name })
     return false, { "No test data available for " .. test_name }
   end
-  
+
   -- Check if the test meets the quality level
   local evaluation = evaluate_test_quality(test_data[test_name])
-  
-  logger.debug("Test quality validation complete", {
+
+  get_logger().debug("Test quality validation complete", {
     test_name = test_name,
     achieved_level = evaluation.level,
     required_level = level,
     meets_requirements = evaluation.level >= level,
-    issues_count = #test_data[test_name].issues
+    issues_count = #test_data[test_name].issues,
   })
-  
+
   -- Return validation result
   return evaluation.level >= level, test_data[test_name].issues
 end
 
----@return QualityModule self The quality module
+--- Prints the current quality module configuration settings to the logger (Info level).
+--- Includes source (local or central), enabled status, level, strictness, etc.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.debug_config()
-  local central_config = get_central_config()
+  -- central_config is guaranteed to be loaded due to check at top
   local config_source = central_config and "Centralized configuration system" or "Module-local configuration"
-  
-  logger.info("Quality module configuration", {
+  get_logger().info("Quality module configuration", {
     source = config_source,
     enabled = M.config.enabled,
     level = M.config.level,
     level_name = M.get_level_name(M.config.level),
     strict = M.config.strict,
-    using_central_config = central_config ~= nil
+    using_central_config = central_config ~= nil,
   })
-  
+
   -- If central_config is available, show more details
   if central_config then
     local quality_config = central_config.get("quality")
     local formatters_config = central_config.get("formatters")
     local reporting_config = central_config.get("reporting")
-    
-    logger.info("Centralized configuration details", {
+
+    get_logger().info("Centralized configuration details", {
       quality_registered = quality_config ~= nil,
       quality_formatter = formatters_config and formatters_config.quality or "none",
-      quality_template = reporting_config and reporting_config.templates and 
-                          reporting_config.templates.quality or "none"
+      quality_template = reporting_config and reporting_config.templates and reporting_config.templates.quality
+        or "none",
     })
   end
-  
+
   return M
 end
 

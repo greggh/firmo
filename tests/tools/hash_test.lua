@@ -1,6 +1,18 @@
--- Hash module tests
+--- Hash Module Tests
+---
+--- Verifies the functionality of the `lib.tools.hash` module, including:
+--- - Consistent hashing of identical strings (`hash_string`).
+--- - Different hashes for different strings.
+--- - Correct hashing of file content (`hash_file`) compared to string hash.
+--- - Graceful error handling for non-existent files.
+--- - Correct input type validation for `hash_string`.
+--- - Handling of empty and long strings.
+--- Uses `test_helper` for error verification and temporary file management.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
-local error_handler = require("lib.tools.error_handler")
+
 local test_helper = require("lib.tools.test_helper")
 local hash = require("lib.tools.hash")
 

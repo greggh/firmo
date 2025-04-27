@@ -1,6 +1,21 @@
--- Tests for the core assertions in firmo
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Core Assertion Tests
+---
+--- This file contains tests for the primary assertion types provided by Firmo's
+--- `expect` function, including:
+--- - Equality (`to.equal`)
+--- - Truthiness/Falsiness (`to.be_truthy`, `to.be_falsey`)
+--- - Existence (`to.exist`)
+--- - String pattern matching (`to.match`)
+--- - Function failure (`to.fail`)
+--- - Type checking (`to.be.a`)
+--- - Negation (`to_not`)
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
-local test_helper = require("lib.tools.test_helper")
+
+local test_helper = try_require("lib.tools.test_helper")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 
 describe("Core Assertions", function()
@@ -65,21 +80,21 @@ describe("Core Assertions", function()
       local _, err = test_helper.with_error_capture(function()
         fails()
       end)()
-      
+
       -- Verify we got the expected error
       expect(err).to.exist()
       expect(err.message).to.match("error message")
-      
+
       -- Also verify that a succeeding function doesn't throw
       expect(succeeds).to_not.fail()
     end)
-    
+
     -- Add a test to show that our helper.expect_error works too
     it("can use the test helper to check errors", { expect_error = true }, function()
       local function fails_with_message()
         error("specific error message")
       end
-      
+
       -- Helper automatically captures and validates the error
       local err = test_helper.expect_error(fails_with_message, "specific error")
       expect(err).to.exist()
@@ -112,5 +127,3 @@ describe("Core Assertions", function()
     end)
   end)
 end)
-
--- Tests are run by scripts/runner.lua or run_all_tests.lua, not by direct execution

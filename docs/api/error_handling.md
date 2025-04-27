@@ -80,9 +80,8 @@ local error_obj = error_handler.create(
     operation = "read_file"
   },
   original_error                -- Original error that caused this one (optional)
-)
+- `error_obj` (table): The created error object
 ```
-
 
 
 ### Specialized Error Creators
@@ -134,8 +133,12 @@ local test_err = error_handler.test_expected_error(
   "Expected test failure",
   {test_case = "should_fail_on_invalid_input"}
 )
+-- Not found error (often for validation, e.g., missing resource)
+local not_found_err = error_handler.not_found_error(
+  "File not found",
+  {path = "/path/to/missing.txt"}
+)
 ```
-
 
 
 ## Error Handling Patterns
@@ -151,13 +154,22 @@ local success, result, err = error_handler.try(function()
   -- Function that might throw an error
   return some_risky_function(arg1, arg2)
 end)
+It automatically categorizes errors (e.g., `TEST_EXPECTED` in relevant test contexts) before logging and returning them.
 if not success then
   -- Handle error (result contains the error object)
   print("Error:", result.message)
   return nil, result
 else
-  -- Use the result
-  return result
+  -- Use the result(s)
+  return result, err -- err here represents additional results from the function
+end
+
+-- With arguments:
+local success, result = error_handler.try(function(a, b)
+  return a + b
+end, 5, 10)
+-- result will be 15 if successful
+```
 end
 -- With arguments
 local success, result = error_handler.try(function(a, b)
@@ -187,6 +199,9 @@ if not content then
   })
   return nil, err
 end
+- `result` (any|nil): The result of the `operation` function (potentially transformed by `transform_result`), or `nil` on error.
+- `error_obj` (table|nil): A structured I/O error object on failure, otherwise `nil`.
+
 -- With result transformation
 local data, err = error_handler.safe_io_operation(
   function() return fs.read_file(config_path) end,
@@ -207,18 +222,28 @@ local data, err = error_handler.safe_io_operation(
 
 ```lua
 -- Assert that a condition is true, or throw an error
+error_handler.assert(condition, message, category?, context?, cause?)
+```
+**Parameters:**
+- `condition` (any): The condition to check.
+- `message` (string): The error message if the condition fails.
+- `category` (string, optional): The error category (defaults to `VALIDATION`).
+- `context` (table, optional): Additional context for the error.
+- `cause` (any, optional): The original error or value that caused this assertion failure.
+**Returns:**
+- `true` if the `condition` is truthy (the function does not throw).
+**Throws:** `table` A structured error object (or its message if `use_assertions=false`) if the `condition` is falsey.
+
+**Example:**
+```lua
 error_handler.assert(
   type(value) == "string",
   "Value must be a string",
   error_handler.CATEGORY.VALIDATION,
   {parameter = "value", provided_type = type(value)}
 )
--- Assertions can be used as expressions
-local name = error_handler.assert(
-  config.name,
-  "Name is required",
-  error_handler.CATEGORY.VALIDATION
-)
+
+local name = error_handler.assert(config.name, "Name is required")
 ```
 
 
@@ -235,12 +260,20 @@ error_handler.throw(
   error_handler.SEVERITY.ERROR,
   {operation = "process_data"}
 )
+```
+**Returns:** `nil` (Never actually returns).
+**Throws:** `table` Always throws the created error object (or its message).
+
+### Rethrowing Errors
+```lua
 -- Rethrow an existing error with additional context
 error_handler.rethrow(
   original_error,
   {additional_context = "value"}
 )
 ```
+**Returns:** `nil` (Never actually returns).
+**Throws:** `table` Always throws an error based on `original_error`, potentially adding context.
 
 
 
@@ -254,9 +287,11 @@ error_handler.rethrow(
 ```lua
 -- Set error handler to test mode
 error_handler.set_test_mode(true)
--- Check if in test mode
+- Check if in test mode
+-- Returns: boolean is_test_mode
 local in_test_mode = error_handler.is_test_mode()
 -- Check if test logs are being suppressed
+-- Returns: boolean is_suppressed
 local logs_suppressed = error_handler.is_suppressing_test_logs()
 ```
 
@@ -272,9 +307,11 @@ error_handler.set_current_test_metadata({
   name = "test_function_name",
   expect_error = true  -- Flag that this test expects errors
 })
--- Get current test metadata
+- Get current test metadata
+-- Returns: table metadata
 local metadata = error_handler.get_current_test_metadata()
 -- Check if current test expects errors
+-- Returns: boolean expects_errors
 local expects_errors = error_handler.current_test_expects_errors()
 ```
 
@@ -285,11 +322,14 @@ local expects_errors = error_handler.current_test_expects_errors()
 
 
 ```lua
--- Check if an error is an expected test error
+- Check if an error is an expected test error
+-- Returns: boolean is_expected
 local is_expected = error_handler.is_expected_test_error(err)
 -- Get all expected errors captured during tests
+-- Returns: table[] errors
 local expected_errors = error_handler.get_expected_test_errors()
 -- Clear the collection of expected errors
+-- Returns: boolean success
 error_handler.clear_expected_test_errors()
 ```
 
@@ -356,8 +396,11 @@ error_handler.configure({
   in_test_run = false,           -- Are we currently running tests
   suppress_test_assertions = true -- Suppress validation errors in tests
 })
+-- Returns: ErrorHandler self
+
 -- Configure from central_config
 error_handler.configure_from_config()
+-- Returns: ErrorHandler self
 ```
 
 
@@ -370,7 +413,7 @@ error_handler.configure_from_config()
 -- Check if a value is an error object
 local is_error = error_handler.is_error(value)
 -- Log an error using the logging system
-error_handler.log_error(error_obj)
+error_handler.log_error(error_obj) -- Returns: nil
 ```
 
 

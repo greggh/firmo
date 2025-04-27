@@ -25,23 +25,16 @@ Discovers test files in a directory based on configured patterns.
 
 
 - `dir` (string, optional): Directory to search in (default: "tests")
-- `pattern` (string, optional): Additional pattern to filter test files by
+- `pattern` (string, optional): Additional Lua pattern to further filter matched files by path.
 
 **Returns:**
 
 
-- `table|nil`: Discovery result with the following structure:
-
-  ```lua
-  {
-    files = {"path/to/test1.lua", "path/to/test2.lua", ...}, -- Array of matched test files
-    matched = 5, -- Number of files matched by both test patterns and additional pattern filter
-    total = 10   -- Total number of test files found before additional pattern filtering
-  }
-  ```
-
-
-- `table|nil`: Error object if discovery failed
+- `discovery_result` (table|nil): Discovery result table or `nil` on error. Structure:
+  - `files` (string[]): Array of absolute file paths matching all criteria (include/exclude/extension/pattern).
+  - `matched` (number): Number of files in the `files` array (matching all criteria).
+  - `total` (number): Total number of files found matching *only* the configured include/exclude/extension rules (before the optional `pattern` argument was applied).
+- `error` (table|nil): An error object (from `error_handler`) if directory validation or file listing failed, otherwise `nil`.
 
 **Example:**
 
@@ -53,12 +46,14 @@ if result then
   for _, file in ipairs(result.files) do
     print("Found test file: " .. file)
   end
-  print(string.format("Found %d/%d matching test files", result.matched, result.total))
+  print(string.format("Found %d matching test files (out of %d initially considered)", result.matched, result.total))
 else
-  print("Error discovering tests: " .. err.message)
+  -- Use error_handler formatting if available
+  local error_handler = pcall(require, "lib.tools.error_handler") and require("lib.tools.error_handler")
+  print("Error discovering tests: " .. (error_handler and error_handler.format_error(err) or tostring(err)))
 end
 ```
-
+**Throws:** Can throw errors if filesystem operations fail critically (though most are returned).
 
 
 ### is_test_file(path)
@@ -106,7 +101,9 @@ Configures discovery options for customizing test file discovery.
 **Returns:**
 
 
-- `table`: The module instance for method chaining
+- The `TestDiscovery` module instance for method chaining.
+
+**Throws:** Can throw errors if options validation fails (currently minimal).
 
 **Example:**
 
@@ -136,7 +133,7 @@ Adds a pattern to include in test file discovery.
 **Returns:**
 
 
-- `table`: The module instance for method chaining
+- The `TestDiscovery` module instance for method chaining.
 
 **Example:**
 
@@ -161,7 +158,7 @@ Adds a pattern to exclude from test file discovery.
 **Returns:**
 
 
-- `table`: The module instance for method chaining
+- The `TestDiscovery` module instance for method chaining.
 
 **Example:**
 

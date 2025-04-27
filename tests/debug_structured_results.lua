@@ -1,11 +1,19 @@
--- Debug test file for structured test results
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Debug Test for Structured Results
+---
+--- Contains various test cases (pass, fail, expected error, skipped) to help debug
+--- the structured test result collection and reporting within Firmo's
+--- `test_definition` module. Includes an `after` hook to print final state.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
-local test_helper = require("lib.tools.test_helper")
-local error_handler = require("lib.tools.error_handler")
 
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
+
+local test_helper = require("lib.tools.test_helper")
 
 describe("Structured Results Debug", function()
   it("should pass normally", function()

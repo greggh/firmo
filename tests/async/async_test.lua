@@ -1,4 +1,17 @@
--- Tests for the async testing functionality
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Asynchronous Testing Functionality Tests
+---
+--- Verifies the core features of Firmo's asynchronous testing support, including:
+--- - `async()` function wrapper for async execution.
+--- - `await()` for pausing execution within async tests.
+--- - `wait_until()` for pausing until a condition becomes true.
+--- - `parallel_async()` for concurrent execution of async functions.
+--- - `it_async()` convenience function for defining async tests.
+--- - Error handling when async functions are used outside their context.
+--- - Use of `test_helper.expect_error` for validating expected errors.
+---
+--- @author Firmo Team
+--- @test
 package.path = "../?.lua;" .. package.path
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
@@ -8,7 +21,6 @@ local await = firmo.await
 local wait_until = firmo.wait_until
 local parallel_async = firmo.parallel_async
 local test_helper = require("lib.tools.test_helper")
-local error_handler = require("lib.tools.error_handler")
 
 describe("Asynchronous Testing", function()
   -- Verify basic async functionality
@@ -62,7 +74,7 @@ describe("Asynchronous Testing", function()
         ---@diagnostic disable-next-line: redundant-parameter
         await(10)
       end, "can only be called within an async test")
-      
+
       expect(err).to.exist()
     end)
   end)
@@ -96,7 +108,7 @@ describe("Asynchronous Testing", function()
           ---@diagnostic disable-next-line: redundant-parameter
         end, 50, 5)
       end)
-      
+
       expect(err).to.exist()
       expect(err.message).to.match("timed out")
     end)
@@ -108,7 +120,7 @@ describe("Asynchronous Testing", function()
           return true
         end)
       end, "can only be called within an async test")
-      
+
       expect(err).to.exist()
     end)
   end)
@@ -182,7 +194,7 @@ describe("Asynchronous Testing", function()
         ---@diagnostic disable-next-line: redundant-parameter
         return parallel_async({ op1, op2, op3 })
       end)
-      
+
       expect(err).to.exist()
       expect(err.message).to.match("One or more parallel operations failed")
       -- Only check for partial match because line numbers may vary
@@ -196,7 +208,7 @@ describe("Asynchronous Testing", function()
         ---@diagnostic disable-next-line: redundant-parameter
         parallel_async({ function() end })
       end, "can only be called within an async test")
-      
+
       expect(err).to.exist()
     end)
   end)

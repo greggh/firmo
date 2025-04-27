@@ -1,24 +1,12 @@
 # Coverage Module
 
+---@diagnostic disable: unused-local
 
-The Coverage module provides comprehensive code coverage tracking and reporting for Lua code. It uses a debug hook-based approach to efficiently track which lines of code are executed during test execution.
+The Coverage module provides comprehensive code coverage tracking for Lua code. It uses a LuaCov-inspired debug hook system for line execution tracking, integrated with Firmo's framework components like central configuration, filesystem, error handling, and logging.
 
 ## Overview
 
-
 The coverage system leverages Lua's debug hook mechanism to provide reliable and efficient code coverage tracking. By using debug hooks instead of source code instrumentation, the system offers better performance, improved reliability with coroutines, and seamless integration with firmo's reporting capabilities.
-
-### Three-State Coverage Model
-
-
-The coverage system tracks three distinct states for each line of code:
-
-
-1. **Covered** (Green): Lines that are both executed AND verified by assertions
-2. **Executed** (Orange): Lines that are executed during tests but NOT verified by assertions
-3. **Not Covered** (Red): Lines that are not executed at all
-
-This distinction helps identify code that is running but not actually being tested properly.
 
 ## Architecture
 
@@ -39,9 +27,8 @@ The coverage system consists of several integrated components:
    - **Pattern Matching**: Flexible file include/exclude with pattern matching
    - **Threshold Configuration**: Configurable coverage thresholds
 4. **Reporting System**:
-   - **Multiple Formatters**: Support for HTML, JSON, LCOV, TAP, CSV, JUnit, Cobertura, and Summary formats
-   - **Data Normalization**: Coverage data normalized for consistent reporting
-   - **Integration**: Seamless integration with firmo's reporting system
+   - **Integration**: Integration with Firmo's main reporting system (`lib.reporting`) for report generation in various formats.
+   - **Data Normalization**: Internal coverage data is processed into a standard structure before being passed to the reporting system.
 
 
 ## API Reference
@@ -61,15 +48,61 @@ local coverage = require("lib.coverage")
 
 
 
-- `coverage.start()`: Starts coverage tracking using debug hooks
-- `coverage.stop()`: Stops coverage tracking, unregisters hooks, and collects data
-- `coverage.reset()`: Resets coverage data
-- `coverage.is_active()`: Checks if coverage is active
-- `coverage.get_data()`: Gets the current coverage data
-- `coverage.save_stats(filename)`: Saves coverage statistics to a file
-- `coverage.load_stats(filename)`: Loads coverage statistics from a file
-- `coverage.generate_report(options)`: Generates coverage reports in specified formats
-- `coverage.validate_thresholds(data)`: Validates coverage against configured thresholds
+- `coverage.init()`
+  - **Description:** Initializes the coverage system and hooks. Resets state, compiles patterns, sets hooks.
+  - **Returns:** `boolean` (success, always true).
+  - **Throws:** Errors if pattern compilation fails.
+
+- `coverage.has_hook_per_thread()`
+  - **Description:** Checks if per-thread hooks are used (this implementation always patches coroutines).
+  - **Returns:** `boolean` (always true).
+
+- `coverage.pause()`
+  - **Description:** Pauses coverage collection. Line hits will not be recorded. Idempotent.
+  - **Returns:** `boolean` (success, true if system was running and is now paused).
+
+- `coverage.get_stats_file()`
+  - **Description:** Gets the configured path for the statistics file.
+  - **Returns:** `string|nil` (The configured path or nil).
+
+- `coverage.get_current_data()`
+  - **Description:** Gets the current in-memory coverage data. Intended for debugging. Structure: `{[filename] = { [line]=hits, max=maxline, max_hits=maxhits }}`.
+  - **Returns:** `table` (The raw coverage data).
+
+- `coverage.resume()`
+  - **Description:** Resumes coverage collection if paused. Line hits will be recorded again. Idempotent.
+  - **Returns:** `boolean` (success, true if system was paused and is now running).
+
+- `coverage.save_stats()`
+  - **Description:** Saves collected stats to the configured file (`coverage.statsfile`). Uses atomic write (temp file + rename). Tracks write failures and pauses coverage if threshold reached.
+  - **Returns:** `boolean` (success), `string|nil` (error message for non-critical errors like threshold reached).
+  - **Throws:** `table` Error object if critical filesystem operations fail.
+
+- `coverage.load_stats()`
+  - **Description:** Loads coverage stats from the configured file. Merges with existing data if coverage is initialized. Returns empty table if file not found/empty/invalid header.
+  - **Returns:** `table` (Loaded coverage data).
+  - **Throws:** `table` Error object if critical filesystem operations fail.
+
+- `coverage.shutdown()`
+  - **Description:** Shuts down the coverage system. Attempts to save stats, removes hooks, resets state.
+  - **Returns:** `nil`.
+
+- `coverage.start()`
+  - **Description:** Convenience function. Ensures system is initialized (`init`) and resumed (`resume`).
+  - **Returns:** `boolean` (success).
+
+- `coverage.stop()`
+  - **Description:** Convenience function. Performs a full shutdown (`shutdown`).
+  - **Returns:** `boolean` (success, always true).
+
+- `coverage.is_paused()`
+  - **Description:** Checks if coverage collection is currently paused.
+  - **Returns:** `boolean` (paused state).
+
+- `coverage.process_line_hit(filename, line_nr)`
+  - **Description:** Manually records a line hit. Primarily for testing the coverage module itself.
+  - **Parameters:** `filename` (string, normalized path), `line_nr` (number).
+  - **Returns:** `nil`.
 
 
 ### Configuration
@@ -84,39 +117,23 @@ return {
   coverage = {
     enabled = true,                -- Enable coverage tracking
 
-    -- Include/exclude patterns
-    include_patterns = {
-      ".*%.lua$",                  -- Include all .lua files
-      "lib/.*"                     -- Include all files in lib directory
-    },
-
-    exclude_patterns = {
-      "tests/.*",                  -- Exclude test files
-      ".*_test%.lua$",             -- Exclude files ending with _test.lua
-      "vendor/.*"                  -- Exclude vendor files
+    -- Include/exclude patterns (Lua patterns)
+    include = { ".*%.lua$" },       -- Include all .lua files by default
+    exclude = {                      -- Exclude tests and vendor files
+      "tests/.*",
+      ".*_test%.lua$",
+      "vendor/.*"
     },
 
     -- Stats file settings
-    statsfile = "./.coverage-stats", -- Path to save coverage statistics
+    statsfile = ".coverage-stats",   -- Path to save/load coverage statistics
+    savestepsize = 100,              -- Save stats approx every N line hits (used if tick=true)
+    tick = false,                    -- Use hit count saving trigger (vs buffer size)
+    max_write_failures = 3,          -- Pause coverage after N consecutive save failures
 
-    -- Threshold settings
-    thresholds = {
-      line = 75,                    -- Minimum line coverage percentage
-      function = 80,                -- Minimum function coverage percentage
-      fail_on_threshold = true      -- Fail tests if thresholds not met
-    },
-
-    -- Report settings
-    report = {
-      formats = {"html", "json"},    -- Report formats to generate
-      dir = "./coverage-reports",    -- Report output directory
-      title = "Coverage Report",     -- Report title
-      colors = {
-        covered = "#00FF00",         -- Green for covered lines
-        executed = "#FFA500",        -- Orange for executed lines
-        not_covered = "#FF0000"      -- Red for not covered lines
-      }
-    }
+    -- Other settings
+    codefromstrings = false,         -- Track code loaded from strings (usually false)
+    threshold = 90,                  -- Coverage threshold % (used by quality module)
   }
 }
 ```
@@ -131,26 +148,26 @@ return {
 
 
 ```lua
+-- Load necessary modules
+local coverage = require("lib.coverage")
+local firmo = require("firmo") -- Or your test runner entry point
+
+-- Optionally load previous stats
+coverage.load_stats() -- Errors are thrown on critical IO failure
+
 -- Start coverage tracking
 coverage.start()
+
 -- Run tests
--- ...
--- Stop coverage tracking
+-- firmo.run_tests(...)
+
+-- Stop coverage tracking (implicitly saves stats via shutdown)
 coverage.stop()
--- Generate reports in multiple formats
-coverage.generate_report({
-  formats = {"html", "json"},
-  dir = "./coverage-reports"
-})
--- Validate coverage against thresholds
-local passed = coverage.validate_thresholds()
-if not passed then
-  print("Coverage thresholds not met")
-end
--- Save stats for future runs
-coverage.save_stats("./.coverage-stats")
+
+-- Note: Report generation and threshold validation are handled by
+-- the `lib.reporting` and `lib.quality` modules, typically
+---invoked by the test runner script based on configuration.
+-- Example (conceptual, usually in runner script):
+-- local reporting = require("lib.reporting")
+-- reporting.save_coverage_report(coverage.get_current_data(), "html", "./coverage-reports/report.html")
 ```
-
-
-
-### Integration with Test Runner

@@ -49,64 +49,65 @@
 
 ## List of files to review for updates
 
-- [ ] docs/api/knowledge.md
-- [ ] docs/firmo/knowledge.md
-- [ ] docs/guides/configuration-details/knowledge.md
-- [ ] docs/guides/knowledge.md
-- [ ] docs/knowledge.md
-- [ ] examples/knowledge.md
-- [ ] knowledge.md
-- [ ] lib/assertion/knowledge.md
-- [ ] lib/async/knowledge.md
-- [ ] lib/core/knowledge.md
-- [ ] lib/coverage/knowledge.md
-- [ ] lib/knowledge.md
-- [ ] lib/mocking/knowledge.md
-- [ ] lib/quality/knowledge.md
-- [ ] lib/reporting/formatters/backup/knowledge.md
-- [ ] lib/reporting/formatters/knowledge.md
-- [ ] lib/reporting/knowledge.md
-- [ ] lib/samples/knowledge.md
-- [ ] lib/tools/benchmark/knowledge.md
-- [ ] lib/tools/cli/knowledge.md
-- [ ] ib/tools/codefix/knowledge.md
-- [ ] lib/tools/date/knowledge.md
-- [ ] lib/tools/discover/knowledge.md
-- [ ] lib/tools/error_handler/knowledge.md
-- [ ] lib/tools/filesystem/knowledge.md
-- [ ] lib/tools/hash/knowledge.md
-- [ ] lib/tools/interactive/knowledge.md
-- [ ] lib/tools/json/knowledge.md
-- [ ] lib/tools/knowledge.md
-- [ ] lib/tools/logging/knowledge.md
-- [ ] lib/tools/markdown/knowledge.md
-- [ ] lib/tools/parallel/knowledge.md
-- [ ] lib/tools/parser/knowledge.md
-- [ ] lib/tools/test_helper/knowledge.md
-- [ ] lib/tools/vendor/knowledge.md
-- [ ] lib/tools/vendor/lpeglabel/knowledge.md
-- [ ] lib/tools/vendor/lpeglabel/test/knowledge.md
-- [ ] lib/tools/watcher/knowledge.md
-- [ ] reports/knowledge.md
-- [ ] scripts/knowledge.md
-- [ ] scripts/utilities/knowledge.md
-- [ ] tests/assertions/knowledge.md
-- [ ] tests/async/knowledge.md
-- [ ] tests/core/knowledge.md
-- [ ] tests/coverage/knowledge.md
-- [ ] tests/discovery/knowledge.md
-- [ ] tests/error_handling/knowledge.md
-- [ ] tests/fixtures/knowledge.md
-- [ ] tests/fixtures/modules/knowledge.md
-- [ ] tests/integration/knowledge.md
-- [ ] tests/knowledge.md
-- [ ] tests/mocking/knowledge.md
-- [ ] tests/parallel/knowledge.md
-- [ ] tests/performance/knowledge.md
-- [ ] tests/quality/knowledge.md
-- [ ] tests/reporting/knowledge.md
-- [ ] tests/tools/filesystem/knowledge.md
-- [ ] tests/tools/knowledge.md
-- [ ] tests/tools/logging/knowledge.md
-- [ ] tests/tools/vendor/knowledge.md
-- [ ] tests/tools/watcher/knowledge.md
+- [x] docs/api/knowledge.md
+- [x] docs/firmo/knowledge.md
+- [x] docs/guides/configuration-details/knowledge.md
+- [x] docs/guides/knowledge.md
+- [x] docs/knowledge.md
+- [x] examples/knowledge.md
+- [x] knowledge.md
+- [x] lib/assertion/knowledge.md
+- [x] lib/async/knowledge.md
+- [x] lib/core/knowledge.md
+- [x] lib/coverage/knowledge.md
+- [x] lib/knowledge.md
+- [x] lib/mocking/knowledge.md
+- [x] lib/quality/knowledge.md
+- [x] lib/reporting/formatters/backup/knowledge.md
+- [x] lib/reporting/formatters/knowledge.md
+- [x] lib/reporting/knowledge.md
+- [x] lib/samples/knowledge.md
+- [x] lib/tools/benchmark/knowledge.md
+- [x] lib/tools/cli/knowledge.md
+- [x] lib/tools/codefix/knowledge.md
+- [x] lib/tools/date/knowledge.md
+- [x] lib/tools/discover/knowledge.md
+- [x] lib/tools/error_handler/knowledge.md
+- [x] lib/tools/filesystem/knowledge.md
+- [x] lib/tools/hash/knowledge.md
+- [x] lib/tools/interactive/knowledge.md
+- [x] lib/tools/json/knowledge.md
+- [x] lib/tools/knowledge.md
+- [x] lib/tools/logging/knowledge.md
+- [x] lib/tools/markdown/knowledge.md
+- [x] lib/tools/parallel/knowledge.md
+- [x] lib/tools/parser/knowledge.md
+- [x] lib/tools/test_helper/knowledge.md
+- [x] lib/tools/vendor/knowledge.md
+- [x] lib/tools/vendor/lpeglabel/knowledge.md
+- [x] lib/tools/vendor/lpeglabel/test/knowledge.md
+- [x] lib/tools/utils/knowledge.md
+- [x] lib/tools/watcher/knowledge.md
+- [x] reports/knowledge.md
+- [x] scripts/knowledge.md
+- [x] scripts/utilities/knowledge.md
+- [x] tests/assertions/knowledge.md
+- [x] tests/async/knowledge.md
+- [x] tests/core/knowledge.md
+- [x] tests/coverage/knowledge.md
+- [x] tests/discovery/knowledge.md
+- [x] tests/error_handling/knowledge.md
+- [x] tests/fixtures/knowledge.md
+- [x] tests/fixtures/modules/knowledge.md
+- [x] tests/integration/knowledge.md
+- [x] tests/knowledge.md
+- [x] tests/mocking/knowledge.md
+- [x] tests/parallel/knowledge.md
+- [x] tests/performance/knowledge.md
+- [x] tests/quality/knowledge.md
+- [x] tests/reporting/knowledge.md
+- [x] tests/tools/filesystem/knowledge.md
+- [x] tests/tools/knowledge.md
+- [x] tests/tools/logging/knowledge.md
+- [x] tests/tools/vendor/knowledge.md
+- [x] tests/tools/watcher/knowledge.md

@@ -1,43 +1,105 @@
----@class ReportingSchema
----@field _VERSION string Module version
----@field COVERAGE_SCHEMA table Schema definition for internal coverage data structure
----@field TEST_RESULTS_SCHEMA table Schema definition for test results data structure
----@field QUALITY_SCHEMA table Schema definition for quality validation data structure
----@field HTML_COVERAGE_SCHEMA table Schema definition for HTML coverage format
----@field JSON_COVERAGE_SCHEMA table Schema definition for JSON coverage format
----@field LCOV_COVERAGE_SCHEMA table Schema definition for LCOV coverage format
----@field COBERTURA_COVERAGE_SCHEMA table Schema definition for Cobertura XML coverage format
----@field TAP_RESULTS_SCHEMA table Schema definition for TAP test results format
----@field JUNIT_RESULTS_SCHEMA table Schema definition for JUnit XML test results format
----@field CSV_RESULTS_SCHEMA table Schema definition for CSV test results format
----@field validate fun(data: any, schema_name: string): boolean, string? Validate data against a named schema
----@field get_schema fun(schema_name: string): table|nil, string? Get a schema definition by name
----@field detect_schema fun(data: any): string? Automatically detect which schema matches the data
----@field validate_format fun(data: any, format: string): boolean, string? Validate data against a specific output format
----@field format_validation_error fun(err: string): string Format a validation error message for better readability
----@field create_schema fun(schema_def: table): table Create a new validation schema with proper metatable
--- Schema module for validating coverage reports and test results against defined schemas
--- Used to ensure data structures are properly formatted before processing or outputting
+--- Reporting Data Schema Validation
+---
+--- Defines schemas for core data structures (coverage, test results, quality) and
+--- various output formats (HTML, JSON, LCOV, etc.). Provides functions to
+--- validate data against these schemas.
+---
+--- @module lib.reporting.schema
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 0.1.0
+
+---@class ReportingSchema The public API of the schema validation module.
+---@field _VERSION string Module version.
+---@field COVERAGE_SCHEMA table Schema definition for internal coverage data structure (`CoverageReportData`).
+---@field TEST_RESULTS_SCHEMA table Schema definition for test results data structure (e.g., for JUnit/TAP).
+---@field QUALITY_SCHEMA table Schema definition for quality validation data structure (`QualityData`).
+---@field HTML_COVERAGE_SCHEMA table Schema definition for basic HTML coverage format validation.
+---@field JSON_COVERAGE_SCHEMA table Schema definition for JSON coverage format (currently same as internal `COVERAGE_SCHEMA`).
+---@field LCOV_COVERAGE_SCHEMA table Schema definition for LCOV coverage format string validation.
+---@field COBERTURA_COVERAGE_SCHEMA table Schema definition for Cobertura XML coverage format string validation.
+---@field TAP_RESULTS_SCHEMA table Schema definition for TAP test results format string validation.
+---@field JUNIT_RESULTS_SCHEMA table Schema definition for JUnit XML test results format string validation.
+---@field CSV_RESULTS_SCHEMA table Schema definition for CSV test results format string validation.
+---@field validate fun(data: any, schema_name: string): boolean, string? Validates data against a named schema defined in this module. Returns `success, error_message?`.
+---@field detect_schema fun(data: any): string? Attempts to automatically detect which schema (`COVERAGE_SCHEMA`, `TEST_RESULTS_SCHEMA`, etc.) matches the given data. Returns schema name string or `nil`.
+---@field validate_format fun(data: any, format: string): boolean, string? Validates data against the schema associated with a specific output `format` name (e.g., "html", "json", "lcov"). Returns `success, error_message?`.
+
 local M = {}
 
--- Import logging module
-local logging = require("lib.tools.logging")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging
 
--- Create logger for this module
-local logger = logging.get_logger("Reporting:Schema")
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
 
--- Configure module logging
-logging.configure_from_config("Reporting:Schema")
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
 
--- Schema for coverage data structure
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("Reporting:Schema")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+--- Module version
+M._VERSION = "0.1.0"
+
+--- Schema definition for internal coverage data structure (`CoverageReportData`).
 M.COVERAGE_SCHEMA = {
   type = "table",
   required = { "files", "summary" },
   properties = {
     files = {
       type = "table",
-      description = "Table containing coverage data for each file",
+      description = "Table mapping normalized file paths to file statistics",
       dynamic_properties = {
+        -- Schema for each file entry within the 'files' table
         type = "table",
         required = { "total_lines", "covered_lines", "line_coverage_percent" },
         properties = {
@@ -58,13 +120,28 @@ M.COVERAGE_SCHEMA = {
       type = "table",
       required = { "total_files", "total_lines", "covered_lines", "line_coverage_percent" },
       properties = {
-        total_files = { type = "number", minimum = 0 },
+        total_files = { type = "number", minimum = 0, description = "Total number of files analyzed" },
         covered_files = { type = "number", minimum = 0, optional = true },
         total_lines = { type = "number", minimum = 0 },
-        covered_lines = { type = "number", minimum = 0 },
-        executable_lines = { type = "number", minimum = 0, optional = true },
-        line_coverage_percent = { type = "number", minimum = 0, maximum = 100 },
-        total_functions = { type = "number", minimum = 0, optional = true },
+        covered_lines = { type = "number", minimum = 0, description = "Total lines covered across all files" },
+        executable_lines = {
+          type = "number",
+          minimum = 0,
+          optional = true,
+          description = "Total executable lines across all files",
+        },
+        line_coverage_percent = {
+          type = "number",
+          minimum = 0,
+          maximum = 100,
+          description = "Overall line coverage percentage",
+        },
+        total_functions = {
+          type = "number",
+          minimum = 0,
+          optional = true,
+          description = "Total functions across all files",
+        },
         covered_functions = { type = "number", minimum = 0, optional = true },
         function_coverage_percent = { type = "number", minimum = 0, maximum = 100, optional = true },
         total_blocks = { type = "number", minimum = 0, optional = true },
@@ -76,8 +153,9 @@ M.COVERAGE_SCHEMA = {
     original_files = {
       type = "table",
       optional = true,
-      description = "Original source files used for coverage analysis",
+      description = "Optional: Original source file contents used for coverage analysis (potentially large)",
       dynamic_properties = {
+        -- Schema for each file entry within the 'original_files' table
         type = "table",
         properties = {
           source = { type = "any" }, -- Can be string or table of lines
@@ -92,7 +170,7 @@ M.COVERAGE_SCHEMA = {
   },
 }
 
--- Schema for test results data structure
+--- Schema definition for test results data structure (e.g., for JUnit/TAP).
 M.TEST_RESULTS_SCHEMA = {
   type = "table",
   required = { "name", "tests" },
@@ -143,7 +221,7 @@ M.TEST_RESULTS_SCHEMA = {
   },
 }
 
--- Schema for quality data structure
+--- Schema definition for quality validation data structure (`QualityData`).
 M.QUALITY_SCHEMA = {
   type = "table",
   required = { "level", "summary" },
@@ -178,56 +256,57 @@ M.QUALITY_SCHEMA = {
   },
 }
 
--- Schema for HTML coverage format
+--- Schema definition for basic HTML coverage format validation (checks start tag).
 M.HTML_COVERAGE_SCHEMA = {
   type = "string",
-  pattern = "^<!DOCTYPE html>",
+  pattern = "^<!DOCTYPE html>", -- Check if it starts like an HTML file
 }
 
--- Schema for JSON coverage format
+--- Schema definition for JSON coverage format (currently same as internal `COVERAGE_SCHEMA`).
 M.JSON_COVERAGE_SCHEMA = {
   type = "table",
   required = { "files", "summary" },
-  -- Same structure as COVERAGE_SCHEMA
+  -- Note: Ideally, this would reference M.COVERAGE_SCHEMA or copy its properties
+  -- For simplicity now, we assume structure is identical
 }
 
--- Schema for LCOV coverage format
+--- Schema definition for LCOV coverage format string validation (checks start).
 M.LCOV_COVERAGE_SCHEMA = {
   type = "string",
-  pattern = "^TN:",
+  pattern = "^TN:", -- Check if it starts with Test Name marker
 }
 
--- Schema for Cobertura XML coverage format
+--- Schema definition for Cobertura XML coverage format string validation (checks start).
 M.COBERTURA_COVERAGE_SCHEMA = {
   type = "string",
-  pattern = "^<%?xml",
+  pattern = "^<%?xml", -- Check if it starts like an XML file
 }
 
--- Schema for TAP test results format
+--- Schema definition for TAP test results format string validation (checks start).
 M.TAP_RESULTS_SCHEMA = {
   type = "string",
-  pattern = "^TAP version ",
+  pattern = "^TAP version ", -- Check for TAP version header
 }
 
--- Schema for JUnit XML test results format
+--- Schema definition for JUnit XML test results format string validation (checks start).
 M.JUNIT_RESULTS_SCHEMA = {
   type = "string",
-  pattern = "^<%?xml",
+  pattern = "^<%?xml", -- Check if it starts like an XML file
 }
 
--- Schema for CSV test results format
+--- Schema definition for CSV test results format string validation (checks expected header start).
 M.CSV_RESULTS_SCHEMA = {
   type = "string",
-  pattern = "^[\"']?test[\"']?,",
+  pattern = "^[\"']?test[\"']?,", -- Check if it likely starts with a header like "test",...
 }
 
--- Utility functions for schema validation
---- Validate that a value matches the required type and constraints in a schema
+--- Validates a single value against type and constraints defined in a schema property.
+--- Checks type, optionality, string patterns, enums, and number ranges.
+---@param value any The value to validate.
+---@param schema {type: string, optional?: boolean, pattern?: string, enum?: string[], minimum?: number, maximum?: number} The schema definition for this specific value/property.
+---@return boolean success `true` if the value matches the schema requirements.
+---@return string? error_message An error message string if validation failed, `nil` otherwise.
 ---@private
----@param value any The value to validate against the schema
----@param schema {type: string, optional?: boolean, pattern?: string, enum?: string[], minimum?: number, maximum?: number} The schema definition with type and constraints
----@return boolean success Whether the value matches the schema type and constraints
----@return string? error_message Error message if validation failed, nil otherwise
 local function validate_type(value, schema)
   -- Check for nil values
   if value == nil then
@@ -282,13 +361,15 @@ local function validate_type(value, schema)
   end
 end
 
---- Recursively validate a value against a schema, including nested properties
+--- Recursively validates a value (especially tables) against a schema definition.
+--- Checks required properties, property types/schemas, array item schemas, and dynamic properties.
+--- Uses `validate_type` for individual property type checks.
+---@param value any The value to validate.
+---@param schema {type: string, optional?: boolean, required?: string[], properties?: table<string, table>, array_of?: table, dynamic_properties?: table} The schema definition.
+---@param path? string The current dot-separated path within the data structure (used for error reporting). Defaults to "".
+---@return boolean success `true` if the value conforms to the schema.
+---@return string? error_message An error message describing the first validation failure found, including the path, or `nil` if validation succeeded.
 ---@private
----@param value any The value to validate against the schema
----@param schema {type: string, optional?: boolean, required?: string[], properties?: table<string, table>, array_of?: table, dynamic_properties?: table} The schema definition with type and structure requirements
----@param path? string The current path in the validation tree (for error messages)
----@return boolean success Whether the value conforms to the schema structure
----@return string? error_message Error message if validation failed, including the path to the failure point
 local function validate_schema(value, schema, path)
   path = path or ""
 
@@ -358,20 +439,20 @@ end
 ---@param data any The data to validate
 ---@param schema_name string The name of the schema to validate against
 ---@return boolean success Whether the data is valid
----@return string? error_message Error message if validation failed
+---@return string? error_message An error message string if validation failed, `nil` otherwise.
 function M.validate(data, schema_name)
-  logger.debug("Validating data against schema", { schema = schema_name })
+  get_logger().debug("Validating data against schema", { schema = schema_name })
 
   local schema = M[schema_name]
   if not schema then
-    logger.error("Schema not found", { schema_name = schema_name })
+    get_logger().error("Schema not found", { schema_name = schema_name })
     return false, "Schema not found: " .. schema_name
   end
 
   -- For string validation that needs to test file contents
   if schema.type == "string" and type(data) == "string" then
     if schema.pattern and not data:sub(1, 50):match(schema.pattern) then
-      logger.warn("String validation failed", {
+      get_logger().warn("String validation failed", {
         schema = schema_name,
         pattern = schema.pattern,
         data_sample = data:sub(1, 50) .. "...",
@@ -385,38 +466,38 @@ function M.validate(data, schema_name)
   local is_valid, err = validate_schema(data, schema)
 
   if not is_valid then
-    logger.warn("Schema validation failed", {
+    get_logger().warn("Schema validation failed", {
       schema = schema_name,
       error = err,
     })
     return false, err
   end
 
-  logger.debug("Schema validation successful", { schema = schema_name })
+  get_logger().debug("Schema validation successful", { schema = schema_name })
   return true
 end
 
 ---@param data any The data to detect schema for
----@return string? schema_name The detected schema name or nil if no match
+---@return string? schema_name The name of the detected schema (e.g., "COVERAGE_SCHEMA", "HTML_COVERAGE_SCHEMA") or `nil` if no specific schema could be confidently identified based on data type and content signatures.
 function M.detect_schema(data)
-  logger.debug("Detecting schema for data")
+  get_logger().debug("Detecting schema for data")
 
   if type(data) == "table" then
     -- Check for coverage data
     if data.files and data.summary then
-      logger.debug("Detected coverage data")
+      get_logger().debug("Detected coverage data")
       return "COVERAGE_SCHEMA"
     end
 
     -- Check for test results data
     if data.name and data.tests then
-      logger.debug("Detected test results data")
+      get_logger().debug("Detected test results data")
       return "TEST_RESULTS_SCHEMA"
     end
 
     -- Check for quality data
     if data.level and data.summary and data.summary.quality_percent then
-      logger.debug("Detected quality data")
+      get_logger().debug("Detected quality data")
       return "QUALITY_SCHEMA"
     end
   elseif type(data) == "string" then
@@ -424,39 +505,39 @@ function M.detect_schema(data)
     local first_line = data:match("^([^\n]+)")
 
     if first_line:match("^<!DOCTYPE html") then
-      logger.debug("Detected HTML format")
+      get_logger().debug("Detected HTML format")
       return "HTML_COVERAGE_SCHEMA"
     elseif first_line:match("^<%?xml") then
       -- Need to check if it's JUnit or Cobertura
       if data:match("testsuites") or data:match("testsuite") then
-        logger.debug("Detected JUnit XML format")
+        get_logger().debug("Detected JUnit XML format")
         return "JUNIT_RESULTS_SCHEMA"
       else
-        logger.debug("Detected Cobertura XML format")
+        get_logger().debug("Detected Cobertura XML format")
         return "COBERTURA_COVERAGE_SCHEMA"
       end
     elseif first_line:match("^TN:") then
-      logger.debug("Detected LCOV format")
+      get_logger().debug("Detected LCOV format")
       return "LCOV_COVERAGE_SCHEMA"
     elseif first_line:match("^TAP version") then
-      logger.debug("Detected TAP format")
+      get_logger().debug("Detected TAP format")
       return "TAP_RESULTS_SCHEMA"
     elseif first_line:match("^[\"']?test[\"']?,") then
-      logger.debug("Detected CSV format")
+      get_logger().debug("Detected CSV format")
       return "CSV_RESULTS_SCHEMA"
     end
   end
 
-  logger.warn("Unable to detect schema for data")
+  get_logger().warn("Unable to detect schema for data")
   return nil
 end
 
 ---@param data any The data to validate
 ---@param format string The format name to validate against
----@return boolean success Whether the data is valid for the given format
----@return string? error_message Error message if validation failed
+---@return boolean success `true` if the data is valid for the specified format's schema.
+---@return string? error_message An error message string if validation failed, `nil` otherwise.
 function M.validate_format(data, format)
-  logger.debug("Validating format", { format = format })
+  get_logger().debug("Validating format", { format = format })
 
   -- Map format names to schemas
   local format_schema_map = {
@@ -475,7 +556,7 @@ function M.validate_format(data, format)
     schema_name = M.detect_schema(data)
 
     if not schema_name then
-      logger.warn("Unknown format", { format = format })
+      get_logger().warn("Unknown format", { format = format })
       return false, "Unknown format: " .. format
     end
   end

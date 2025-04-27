@@ -1,210 +1,48 @@
-# Vendor Knowledge
-
+# lib/tools/vendor Knowledge
 
 ## Purpose
 
+The `lib/tools/vendor` directory serves as the designated location within the Firmo source code repository for including third-party libraries directly. This practice, known as "vendoring," ensures that specific, known-working versions of essential external dependencies are always available to the framework during development, testing, and distribution, without requiring users to install them separately via external package managers (like LuaRocks) or system repositories.
 
-Third-party dependencies used by the framework.
+## Key Concepts
 
-## Integration Pattern
+- **Dependency Management:** Vendoring is a strategy to bundle dependencies with the main project. It provides greater control over the exact versions used and guarantees their availability, simplifying the build and deployment process for Firmo itself and potentially for projects using Firmo.
+- **Version Control:** The specific versions of the libraries included in the `vendor` directory are managed and tracked directly within Firmo's Git repository. Updates to vendored libraries are handled as deliberate code changes.
+- **Immutability (No Direct Modification):** A critical principle is that the code within the `vendor` subdirectories should generally be treated as immutable. Direct modifications should be avoided. If changes or patches are absolutely necessary, they should ideally be contributed back to the original upstream project. If local patches are maintained, they must be clearly documented and potentially kept separate to facilitate easier updates of the underlying vendor library later.
 
+## Usage Examples / Patterns
 
+### Requiring a Vendored Library
 
 ```lua
--- Safe module loading
-local function load_vendor_module(name)
-  local success, module = error_handler.try(function()
-    return require("lib.tools.vendor." .. name)
-  end)
+--[[
+  Standard pattern for requiring a library included in the vendor directory.
+  Use the full path starting from 'lib.tools.vendor'.
+]]
+-- Example: Requiring the vendored LPegLabel library
+local lpeglabel, load_err = pcall(require, "lib.tools.vendor.lpeglabel")
 
-  if not success then
-    logger.error("Failed to load vendor module", {
-      module = name,
-      error = module
-    })
-    return nil, module
-  end
-
-  return module
-end
--- Version compatibility check
-local function check_version_compatibility(module, min_version)
-  if not module.VERSION then
-    return false, "No version information"
-  end
-
-  return semver.gte(module.VERSION, min_version)
-end
--- Complex vendor integration
-local function setup_vendor_module()
-  -- Version locking
-  local versions = {
-    lpeglabel = "1.6.1",
-    other_dep = "2.0.0"
-  }
-
-  -- Load and verify modules
-  local modules = {}
-  for name, required in pairs(versions) do
-    -- Load module
-    local module = load_vendor_module(name)
-    if not module then
-      return nil, string.format(
-        "Failed to load %s module",
-        name
-      )
-    end
-
-    -- Check version
-    local compatible = check_version_compatibility(
-      module, required
-    )
-    if not compatible then
-      return nil, string.format(
-        "%s version mismatch (need %s)",
-        name, required
-      )
-    end
-
-    modules[name] = module
-  end
-
-  return modules
+if not lpeglabel then
+  -- Handle the error (e.g., log it) - this shouldn't happen if vendoring is correct
+  print("Critical Error: Failed to load vendored library lpeglabel: " .. tostring(load_err))
+else
+  -- Now use functions provided by the loaded library
+  local P, V = lpeglabel.P, lpeglabel.V
+  -- ... use P, V to define LPegLabel patterns ...
 end
 ```
 
+## Related Components / Modules
 
+This directory currently contains the following vendored libraries:
 
-## LPegLabel Integration
+- **`lib/tools/vendor/lpeglabel/knowledge.md`**: Provides the LPegLabel library, an extension for the LPeg parsing library, which is crucially used by Firmo's Lua parser (`lib/tools/parser`).
 
+*(If other libraries are added to the `vendor` directory in the future, they should be listed here with a link to their respective `knowledge.md` file.)*
 
+## Best Practices / Critical Rules
 
-```lua
--- Basic usage
-local lpeg = require("lib.tools.vendor.lpeglabel")
-local P, V, C, Ct = lpeg.P, lpeg.V, lpeg.C, lpeg.Ct
--- Simple grammar test
-local grammar = P{
-  "S";
-  S = Ct(C(P"a"^1) * P"," * C(P"b"^1))
-}
--- Grammar with labels
-local grammar = P{
-  "S";
-  S = Ct(C(P"a"^1) * P"," * C(P"b"^1)) + 
-      lpeg.T(ErrLabel)  -- Custom error label
-}
--- Complex parsing example
-local function create_parser()
-  -- Define grammar
-  local grammar = P{
-    "Block";
-    Block = V"Stmt" * (P";" * V"Stmt")^0;
-    Stmt = V"Assign" + V"If" + V"While";
-    Assign = C(V"Id") * P"=" * C(V"Expr");
-    If = P"if" * V"Expr" * P"then" * V"Block" * P"end";
-    While = P"while" * V"Expr" * P"do" * V"Block" * P"end";
-    Expr = V"Term" * ((P"+" + P"-") * V"Term")^0;
-    Term = V"Factor" * ((P"*" + P"/") * V"Factor")^0;
-    Factor = V"Number" + V"Id" + (P"(" * V"Expr" * P")");
-    Number = C(P"-"^-1 * P"0" + R"19" * R"09"^0);
-    Id = C(R"az"^1)
-  }
-
-  return grammar
-end
-```
-
-
-
-## Error Handling
-
-
-
-```lua
--- Safe module loading
-local function safe_load_vendor()
-  -- Try to load binary first
-  local success, module = error_handler.try(function()
-    return require("lib.tools.vendor.lpeglabel")
-  end)
-
-  if success then
-    return module
-  end
-
-  -- Try compilation
-  success, module = error_handler.try(function()
-    return compile_and_load_module()
-  end)
-
-  if not success then
-    -- Fall back to pure Lua implementation
-    return require("lib.tools.vendor.lpeglabel.fallback")
-  end
-
-  return module
-end
--- Version verification
-local function verify_versions()
-  for name, required in pairs(versions) do
-    local module = load_vendor_module(name)
-    if not module then
-      return false, "Failed to load " .. name
-    end
-
-    local compatible = check_version_compatibility(
-      module, required
-    )
-    if not compatible then
-      return false, name .. " version mismatch"
-    end
-  end
-  return true
-end
-```
-
-
-
-## Critical Rules
-
-
-
-- NEVER modify vendor code
-- Document all patches
-- Track versions
-- Test updates
-- Keep minimal
-- Handle errors
-- Clean up state
-- Monitor usage
-
-
-## Best Practices
-
-
-
-- Lock versions
-- Document requirements
-- Track upstream
-- Test compatibility
-- Update systematically
-- Isolate code
-- Handle conflicts
-- Document deps
-- Test integration
-- Monitor updates
-
-
-## Performance Tips
-
-
-
-- Cache module loads
-- Check versions once
-- Handle failures
-- Monitor updates
-- Test thoroughly
-- Document changes
-- Profile usage
-- Handle timeouts
+- **Require via Full Path:** Always use the full Lua path starting from `lib.tools.vendor.` when requiring a vendored library (e.g., `require("lib.tools.vendor.lpeglabel")`). Avoid relying on global modifications to `package.path`.
+- **Do Not Modify Vendor Code:** Treat the contents of subdirectories within `lib/tools/vendor` as read-only. If you encounter a bug or need a feature, report it or contribute to the library's original upstream source repository. Avoid making direct local changes.
+- **Refer to Original Documentation:** For detailed information on how to *use* a specific vendored library (its API, features, limitations), consult the library's original documentation. The `knowledge.md` file within its vendor subdirectory might provide a brief overview and links.
+- **Check Licensing:** Be aware of and comply with the software license terms of each library included in the `vendor` directory. License information should typically be included within the library's subdirectory (e.g., in a `LICENSE` or `COPYING` file).

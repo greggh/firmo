@@ -35,8 +35,8 @@ Gets a configuration value from the specified path.
 **Returns:**
 
 
-- `value` (any): The configuration value at the specified path, or the default value if not found.
-- `error` (table|nil): An error object if an error occurred.
+- `value` (any): A **deep copy** of the configuration value found at `path`, or the `default` value if not found. Returns `nil` if not found and no default is provided (error will also be returned).
+- `error` (table|nil): An error object (conforming to `error_handler` structure with `message` and `context`) if the path is invalid or not found (and no default was provided), otherwise `nil`.
 
 **Examples:**
 
@@ -63,7 +63,7 @@ central_config.set(path, value)
 ```
 
 
-Sets a configuration value at the specified path.
+Sets a configuration value at the specified path. Note: If `value` is a table, a deep copy is made before storing to prevent modifications by reference. If `path` is nil or empty, the entire configuration is replaced (value must be a table).
 **Parameters:**
 
 
@@ -74,6 +74,7 @@ Sets a configuration value at the specified path.
 
 
 - `central_config`: The module instance for method chaining.
+**Note:** Logs a warning internally if the path is invalid or setting fails, but does not throw an error.
 
 **Examples:**
 
@@ -158,6 +159,7 @@ Registers a callback to be notified when a configuration value changes.
 
 
 - `central_config`: The module instance for method chaining.
+**Note:** Logs a warning internally if arguments are invalid.
 
 **Examples:**
 
@@ -196,7 +198,9 @@ Notifies listeners about a configuration change.
 - `old_value` (any): The previous value.
 - `new_value` (any): The new value.
 
-**Returns:** None
+**Returns:** `nil`
+**Note:** Listener callbacks are executed safely using `error_handler.try`; errors within callbacks are logged but do not stop other listeners or the configuration system. Logs a warning internally if arguments are invalid.
+
 **Examples:**
 
 
@@ -231,6 +235,7 @@ Registers a module with the configuration system, providing its schema and defau
 
 
 - `central_config`: The module instance for method chaining.
+**Note:** The provided `schema` and `defaults` tables are deeply copied (`serialize`) internally before being stored. Logs an error or warning internally if arguments are invalid.
 
 **Examples:**
 
@@ -415,7 +420,8 @@ Validates configuration against registered schemas.
 
 
 - `valid` (boolean): Whether the configuration is valid.
-- `error` (table|nil): An error object if validation failed.
+- `error` (table|nil): An error object if validation failed, otherwise `nil`. The `error.context` field contains detailed failure information, typically under `context.errors` (for single module) or `context.modules` (for all modules).
+**Note:** Logs a warning internally if `module_name` argument is invalid.
 
 **Examples:**
 
@@ -453,7 +459,7 @@ local config, err = central_config.load_from_file(path)
 ```
 
 
-Loads configuration from a file and merges it with the existing configuration.
+Loads configuration from a file and merges it with the existing configuration. If the file is not found, it logs an informational message and returns `nil, error`. Changes resulting from merging the loaded file will trigger registered `on_change` listeners.
 **Parameters:**
 
 
@@ -492,7 +498,7 @@ local success, err = central_config.save_to_file(path)
 ```
 
 
-Saves the current configuration to a file.
+Saves the current configuration to a file. The configuration is serialized internally using `central_config.serialize` and written safely using `error_handler.safe_io_operation`.
 **Parameters:**
 
 
@@ -534,7 +540,7 @@ central_config.reset(module_name)
 ```
 
 
-Resets configuration values to their defaults. The system includes recursive reset protection to prevent infinite loops when configurations reference each other.
+Resets configuration values to their defaults. The system includes recursive reset protection to prevent infinite loops when configurations reference each other. If defaults were registered for the module, the configuration is reset to those defaults; otherwise, the module's configuration section is cleared. Changes trigger `on_change` listeners.
 **Parameters:**
 
 
@@ -544,6 +550,7 @@ Resets configuration values to their defaults. The system includes recursive res
 
 
 - `central_config`: The module instance for method chaining.
+**Note:** Logs a warning internally if `module_name` is provided but invalid.
 
 **Examples:**
 
@@ -585,7 +592,7 @@ central_config.configure_from_options(options)
 
 
 ```text
-Configures the system from a table of options, typically from command-line arguments.
+Configures the system from a table of options, typically from command-line arguments. It only processes options where the key follows the `\"module.setting\"` dot notation format, ignoring other entries. Setting attempts are performed safely; errors are logged as warnings.
 **Parameters:**
 
 
@@ -625,7 +632,7 @@ central_config.configure_from_config(global_config)
 
 
 ```text
-Configures the system from a complete configuration object.
+Configures the system from a complete configuration object. Uses `central_config.merge` internally. Errors during merging are logged.
 **Parameters:**
 
 
@@ -691,7 +698,7 @@ local copy = central_config.serialize(obj)
 ```
 
 
-Creates a deep copy of an object.
+Creates a deep copy of an object, safely handling cycles.
 **Parameters:**
 
 
@@ -733,6 +740,7 @@ Deeply merges two tables together.
 
 
 - `merged` (table): The merged result.
+**Note:** Errors during the merge process are logged internally, and the original `target` table is returned in case of failure.
 
 **Examples:**
 

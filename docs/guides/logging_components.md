@@ -1,11 +1,8 @@
 # Logging Components Guide
 
-
 This guide provides detailed information on using the various components of firmo's logging system, including the core logging module, export functionality, search capabilities, and formatter integration.
 
 ## Table of Contents
-
-
 
 1. [Introduction](#introduction)
 2. [Core Logging Module](#core-logging-module)
@@ -15,12 +12,9 @@ This guide provides detailed information on using the various components of firm
 6. [Component Interaction Examples](#component-interaction-examples)
 7. [Best Practices](#best-practices)
 
-
 ## Introduction
 
-
 The firmo logging system is modular and consists of several integrated components:
-
 
 1. **Core Logging Module** (`lib/tools/logging.lua`): The main interface for logging, providing logger creation, configuration, and log output.
 2. **Export Module** (`lib/tools/logging/export.lua`): Handles exporting logs to external platforms like Elasticsearch, Logstash, Splunk, Datadog, and Loki.
@@ -31,29 +25,20 @@ These components can be used independently or together, depending on your needs.
 
 ## Core Logging Module
 
-
 The core logging module is the primary interface that most users will interact with. It provides logger creation, configuration, and basic logging functionality.
 
 ### Setting Up a Logger
-
-
 
 ```lua
 -- Import the logging module
 local logging = require("lib.tools.logging")
 -- Create a logger for your module
 local logger = logging.get_logger("my_module")
--- Configure the logger from central config (recommended)
-logging.configure_from_config("my_module")
 -- Or configure directly
 logging.set_module_level("my_module", logging.LEVELS.DEBUG)
 ```
 
-
-
 ### Logging at Different Levels
-
-
 
 ```lua
 -- General information
@@ -70,13 +55,9 @@ logger.fatal("System cannot continue", {reason = "Out of disk space"})
 logger.trace("Function entered", {function = "process_data", args = {...}})
 ```
 
-
-
 ### Log Buffers for Performance
 
-
 When dealing with high-volume logging, use the buffer capabilities to improve performance:
-
 
 ```lua
 -- Configure buffering globally
@@ -98,13 +79,9 @@ end
 metrics_logger.flush()
 ```
 
-
-
 ### Structured Logging with Parameters
 
-
 Always use structured logging with separate parameters for variable data:
-
 
 ```lua
 -- BAD: Embedding variable data in messages
@@ -117,21 +94,16 @@ logger.info("User logged in", {
 })
 ```
 
-
 The structured parameters are:
-
 
 - Available for filtering and searching
 - Properly formatted in JSON logs
 - Displayed in a consistent format in text logs
 - Machine-readable for log analysis tools
 
-
 ### Performance Optimization
 
-
 To avoid expensive operations when logging is disabled:
-
 
 ```lua
 if logger.is_debug_enabled() then
@@ -141,25 +113,19 @@ if logger.is_debug_enabled() then
 end
 ```
 
-
 This is especially important when:
-
 
 - Generating debug information is computationally expensive
 - The debug information involves formatting large data structures
 - You're in a tight loop or performance-critical section
 
-
 ## Export Module for External Platforms
-
 
 The export module allows you to integrate your logs with external logging platforms and analysis tools.
 
 ### Supported Platforms
 
-
 The export module supports these popular logging platforms:
-
 
 1. **Elasticsearch**: JSON-based search and analytics engine
 2. **Logstash**: Log collection, parsing, and forwarding
@@ -167,10 +133,7 @@ The export module supports these popular logging platforms:
 4. **Datadog**: Cloud monitoring and analytics
 5. **Loki**: Grafana's log aggregation system
 
-
 ### Exporting Logs to External Platforms
-
-
 
 ```lua
 -- Import the export module
@@ -206,11 +169,7 @@ local formatted_entries, err = log_export.export_to_platform(
 -- (Use an HTTP client or other mechanism to send the data)
 ```
 
-
-
 ### Creating Platform Configuration Files
-
-
 
 ```lua
 -- Create a configuration file for Elasticsearch
@@ -233,11 +192,7 @@ local result, err = log_export.create_platform_config(
 )
 ```
 
-
-
 ### Converting Log Files to Platform Formats
-
-
 
 ```lua
 -- Convert an existing log file to Logstash format
@@ -260,13 +215,9 @@ local result, err = log_export.create_platform_file(
 -- }
 ```
 
-
-
 ### Creating Real-Time Exporters
 
-
 For real-time export of log data to external platforms:
-
 
 ```lua
 -- Create a real-time exporter for Datadog
@@ -294,8 +245,8 @@ local log_entry = {
 local formatted = exporter.export(log_entry)
 -- The exporter also provides HTTP endpoint details
 local endpoint = exporter.http_endpoint
--- { 
---   method = "POST", 
+-- {
+--   method = "POST",
 --   url = "https://http-intake.logs.datadoghq.com/v1/input",
 --   headers = {
 --     ["Content-Type"] = "application/json",
@@ -307,16 +258,11 @@ local endpoint = exporter.http_endpoint
 -- http.request(endpoint.method, endpoint.url, endpoint.headers, formatted)
 ```
 
-
-
 ## Search Module for Log Analysis
-
 
 The search module provides tools for searching, analyzing, and exporting log files.
 
 ### Searching Log Files
-
-
 
 ```lua
 -- Import the search module
@@ -334,9 +280,9 @@ local results = log_search.search_logs({
 -- Process the results
 print("Found " .. results.count .. " matching log entries")
 for i, entry in ipairs(results.entries) do
-  print(string.format("[%s] %s: %s", 
-    entry.timestamp, 
-    entry.level, 
+  print(string.format("[%s] %s: %s",
+    entry.timestamp,
+    entry.level,
     entry.message))
 end
 -- Check if results were truncated
@@ -345,11 +291,7 @@ if results.truncated then
 end
 ```
 
-
-
 ### Analyzing Log Statistics
-
-
 
 ```lua
 -- Get statistics about a log file
@@ -381,11 +323,7 @@ for i, module in ipairs(modules_by_errors) do
 end
 ```
 
-
-
 ### Exporting Logs to Different Formats
-
-
 
 ```lua
 -- Export logs to CSV format
@@ -411,11 +349,7 @@ local result = log_search.export_logs(
 )
 ```
 
-
-
 ### Real-Time Log Processing
-
-
 
 ```lua
 -- Create a processor for real-time log filtering
@@ -453,16 +387,11 @@ processor.process({
 processor.close()
 ```
 
-
-
 ## Formatter Integration for Tests
-
 
 The formatter integration module connects the logging system with firmo's test reporting system, providing test-aware logging capabilities.
 
 ### Enhancing Test Formatters
-
-
 
 ```lua
 -- Import the formatter integration module
@@ -471,11 +400,7 @@ local formatter_integration = require("lib.tools.logging.formatter_integration")
 formatter_integration.enhance_formatters()
 ```
 
-
-
 ### Creating Test-Specific Loggers
-
-
 
 ```lua
 -- Create a test-specific logger with context
@@ -527,18 +452,13 @@ describe("Calculator", function()
 end)
 ```
 
-
 The resulting logs include rich context information:
-
 
 - `[INFO] [test.Calculator_Test_Suite] Initializing calculator test suite (component=calculator, test_type=unit)`
 - `[DEBUG] [test.Calculator_Test_Suite] Testing addition (component=calculator, test_type=unit, step=Addition Test, a=2, b=3, expected=5)`
 - `[INFO] [test.Calculator_Test_Suite] Addition test passed (component=calculator, test_type=unit, step=Addition Test)`
 
-
 ### Capturing and Attaching Logs to Test Results
-
-
 
 ```lua
 -- Capture logs for a specific test
@@ -564,7 +484,7 @@ local logs = formatter_integration.capture_end("test_db_123")
 -- Display the captured logs
 print("Captured " .. #logs .. " log entries:")
 for _, log in ipairs(logs) do
-  print(string.format("[%s] %s: %s", 
+  print(string.format("[%s] %s: %s",
     log.timestamp or "",
     log.level or "",
     log.message or ""))
@@ -588,11 +508,7 @@ local enhanced_results = formatter_integration.attach_logs_to_results(
 -- }
 ```
 
-
-
 ### Creating a Log-Friendly Formatter
-
-
 
 ```lua
 -- Create a specialized formatter for log output
@@ -606,11 +522,7 @@ log_formatter:init({
 local result = log_formatter:format(test_results)
 ```
 
-
-
 ### Integrating with the Reporting System
-
-
 
 ```lua
 -- Integrate logging with the test reporting system
@@ -622,24 +534,18 @@ local reporting = formatter_integration.integrate_with_reporting({
 })
 ```
 
-
-
 ## Component Interaction Examples
-
 
 The following examples show how the different logging components can work together.
 
 ### Example 1: Comprehensive Test Logging and Export
-
-
 
 ```lua
 -- Set up the components
 local logging = require("lib.tools.logging")
 local formatter_integration = require("lib.tools.logging.formatter_integration")
 local log_export = require("lib.tools.logging.export")
--- Configure logging from the global config
-logging.configure_from_config("test_module")
+
 -- Enhance test formatters
 formatter_integration.enhance_formatters()
 -- Create a test-specific logger
@@ -692,11 +598,7 @@ describe("API", function()
 end)
 ```
 
-
-
 ### Example 2: Log Analysis Workflow
-
-
 
 ```lua
 -- Set up the components
@@ -760,14 +662,9 @@ log_export.create_platform_file(
 )
 ```
 
-
-
 ## Best Practices
 
-
 ### General Logging Practices
-
-
 
 1. **Use module-specific loggers**: Create a separate logger for each module
 
@@ -775,13 +672,11 @@ log_export.create_platform_file(
    local logger = logging.get_logger("module_name")
    ```
 
-
 2. **Configure from central config**: Use the central configuration system
 
    ```lua
    logging.configure_from_config("module_name")
    ```
-
 
 3. **Separate message from parameters**: Keep messages simple and put variable data in parameters
 
@@ -792,7 +687,6 @@ log_export.create_platform_file(
    -- Good: Separated data
    logger.info("Found items", {count = count, category = category})
    ```
-
 
 4. **Include context in parameters**: Provide enough information for troubleshooting
 
@@ -805,7 +699,6 @@ log_export.create_platform_file(
    })
    ```
 
-
 5. **Check level before expensive operations**:
 
    ```lua
@@ -815,8 +708,6 @@ log_export.create_platform_file(
    ```
 
 ### Using the Export Module
-
-
 
 1. **Be consistent with platform options**: Use the same option names and values for all exports to ensure consistency
 2. **Check for errors**: Always check for errors when using export functions
@@ -828,14 +719,10 @@ log_export.create_platform_file(
    end
    ```
 
-
 3. **Use platform-specific formats wisely**: Each platform has different field requirements - use the appropriate adapter
 4. **For high-volume exports**, use buffering or paging to avoid memory issues
 
-
 ### Using the Search Module
-
-
 
 1. **Use specific search criteria**: Narrower searches are more efficient
 
@@ -853,15 +740,11 @@ log_export.create_platform_file(
    })
    ```
 
-
 2. **Set reasonable limits**: Use the `limit` parameter to prevent loading too many entries into memory
 3. **For large log files**, use the `format` option to specify the format explicitly rather than autodetect
 4. **Export to HTML** for human review, **JSON** for machine processing, and **CSV** for spreadsheet analysis
 
-
 ### Using the Formatter Integration Module
-
-
 
 1. **Create step-specific loggers** to provide better context in test logs
 2. **Attach logs to results** to keep logs with their relevant test results

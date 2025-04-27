@@ -1,90 +1,142 @@
----@class CLI
----@field _VERSION string Version of the CLI module
----@field version string Version string from lib.core.version (read-only)
----@field parse_args fun(args?: table): table Parse command line arguments into structured options
----@field show_help fun(): nil Display help information about available commands and options
----@field run fun(args?: table): boolean Run tests from command line with specified options
----@field watch fun(options: table): boolean Run tests in watch mode for continuous testing
----@field interactive fun(options: table): boolean Run tests in interactive mode with TUI interface
----@field report fun(options: table): boolean Generate reports in various formats
----@field configure fun(options: table): CLI Configure CLI behavior and defaults
----@field register_command fun(name: string, handler: function, help: string): boolean Register a custom command
----@field process_command fun(command: string, args: table): boolean Process a specific command
----@field get_supported_options fun(): table Get list of all supported command line options
----@field colorize fun(text: string, color: string): string Apply ANSI color codes to text
----@field format_error fun(err: table|string): string Format error messages for display
----@field get_version fun(): string Get CLI version information
----@field validate_args fun(args: table, schema: table): boolean, string? Validate arguments against schema
+--- Command Line Interface (CLI) Module for Firmo
+---
+--- Provides a comprehensive command line interface for the Firmo testing framework,
+--- handling argument parsing, command execution, and user interaction. The module
+--- supports various testing modes (normal, watch, interactive) and integrates with
+--- other framework components.
+---
+--- Features:
+--- - Command argument parsing (`parse_args`).
+--- - Help display (`show_help`).
+--- - Core test execution (`run`).
+--- - Watch mode (`watch`).
+--- - Interactive mode (`interactive`).
+--- - Report generation trigger (`report`).
+--- - Integration with core modules (config, runner, coverage, etc.).
+---
+--- @module lib.tools.cli
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
---[[
-Command Line Interface (CLI) Module for Firmo
-
-Provides a comprehensive command line interface for the Firmo testing framework,
-handling argument parsing, command execution, and user interaction. The module
-supports various testing modes (normal, watch, interactive) and integrates with
-all framework components through a unified interface.
-
-Features:
-- Command argument parsing with validation
-- Help and documentation display
-- Watch mode for continuous testing
-- Interactive TUI for guided test execution
-- Report generation in multiple formats
-- Color terminal output with fallback
-- Extensible command registration
-]]
+---@class CLI The public API of the CLI module.
+---@field _VERSION string Version of the CLI module.
+---@field version string Version string from `lib.core.version` (read-only).
+---@field parse_args fun(args?: table): CommandLineOptions Parses command line arguments into a structured options table.
+---@field show_help fun(): nil Displays help information to the console. (Note: Implemented but not exported on `M`).
+---@field run fun(args?: table): boolean Executes tests based on parsed command line arguments. Main entry point. Returns overall success.
+---@field watch fun(options: CommandLineOptions): boolean Runs tests in watch mode. Returns success (usually doesn't return if successful).
+---@field interactive fun(options: CommandLineOptions): boolean Runs tests in interactive mode. Returns success (usually doesn't return if successful).
+---@field report fun(options: CommandLineOptions): boolean Generates reports based on options. Returns success.
 
 local M = {}
 
--- Load required modules
----@type ErrorHandler
-local error_handler = require("lib.tools.error_handler")
----@type Logging
-local logging = require("lib.tools.logging")
----@type Logger
-local logger = logging.get_logger("CLI")
+--- Module version
+M._VERSION = "1.0.0"
 
---- Safely require a module without raising an error if it doesn't exist
----@param name string The name of the module to require
----@return table|nil The loaded module or nil if it couldn't be loaded
-local function try_require(name)
-  local success, mod = pcall(require, name)
-  if success then
-    return mod
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
   end
-  return nil
+  return result
 end
 
--- Optional modules
-local central_config = try_require("lib.core.central_config")
-local coverage_module = try_require("lib.coverage")
-local quality_module = try_require("lib.quality")
-local watcher_module = try_require("lib.tools.watcher")
-local interactive_module = try_require("lib.tools.interactive")
-local parallel_module = try_require("lib.tools.parallel")
-local runner_module = try_require("lib.core.runner")
-local discover_module = try_require("lib.tools.discover")
-local version_module = try_require("lib.core.version")
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
 
----@diagnostic disable-next-line: need-check-nil
-M.version = version_module.string
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("CLI")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+-- Load required modules
+local central_config, coverage_module, quality_module, watcher_module, interactive_module, parallel_module, runner_module, discover_module, version_module
+
+local function load_modules()
+  central_config = try_require("lib.core.central_config")
+  coverage_module = try_require("lib.coverage")
+  quality_module = try_require("lib.quality")
+  watcher_module = try_require("lib.tools.watcher")
+  interactive_module = try_require("lib.tools.interactive")
+  parallel_module = try_require("lib.tools.parallel")
+  runner_module = try_require("lib.core.runner")
+  discover_module = try_require("lib.tools.discover")
+  version_module = try_require("lib.core.version")
+  ---@diagnostic disable-next-line: need-check-nil
+  M.version = version_module.string
+end
 
 --- Command line options for test execution
 ---@class CommandLineOptions
----@field pattern string|nil Pattern to filter test files
----@field dir string Directory to search for test files
----@field files table[] List of specific test files to run
----@field coverage boolean Whether to track code coverage
----@field report boolean Whether to generate reports
----@field watch boolean Whether to run in watch mode
----@field interactive boolean Whether to run in interactive mode
----@field verbose boolean Whether to show verbose output
----@field quality boolean Whether to run quality validation
----@field parallel boolean Whether to run tests in parallel
----@field help boolean Whether to show help information
----@field format string Output format (default, dot, summary, etc)
----@field report_format string|nil Format for coverage report
----@field quality_level number Quality validation level (1-3)
+---@field pattern string|nil Lua pattern to filter tests/files by name (e.g., "core").
+---@field dir string Directory to search for tests (default "tests").
+---@field files string[] List of specific test files/directories provided on command line.
+---@field coverage boolean Enable code coverage tracking (`--coverage` or `-c`).
+---@field report boolean Generate reports after test run (`--report` or `-r`).
+---@field watch boolean Enable watch mode (`--watch` or `-w`).
+---@field interactive boolean Enable interactive mode (`--interactive` or `-i`).
+---@field verbose boolean Enable verbose output (`--verbose` or `-v`).
+---@field quality boolean Enable quality validation (`--quality` or `-q`).
+---@field parallel boolean Enable parallel test execution (`--parallel` or `-p`).
+---@field help boolean Show help message (`--help` or `-h`).
+---@field version boolean Show version information (`--version` or `-V`).
+---@field format string Console output format ("default", "dot", "summary", etc.).
+---@field report_format string|nil Format for generated reports (e.g., "html", "junit").
+---@field quality_level number Quality validation level (1-5, default 1).
 
 -- Default options
 local default_options = {
@@ -106,8 +158,11 @@ local default_options = {
 }
 
 --- Parse command line arguments
----@param args? table Command line arguments (defaults to arg global)
----@return table Parsed options
+--- Parses command line arguments into a structured options table.
+--- Handles flags (e.g., `--coverage`), options with values (e.g., `--pattern=foo`),
+--- key-value pairs (`--key=value`), and positional file/directory arguments.
+---@param args? table Optional array of argument strings (defaults to Lua's global `arg` table).
+---@return CommandLineOptions options A table containing parsed options, merged with defaults.
 function M.parse_args(args)
   args = args or arg or {}
 
@@ -175,12 +230,12 @@ function M.parse_args(args)
           local success, err = central_config.load_from_file(config_path)
 
           if not success then
-            logger.warn("Failed to load config file", {
+            get_logger().warn("Failed to load config file", {
               path = config_path,
-              error = err and error_handler.format_error(err) or "unknown error",
+              error = err and get_error_handler().format_error(err) or "unknown error",
             })
           else
-            logger.info("Loaded configuration from " .. config_path)
+            get_logger().info("Loaded configuration from " .. config_path)
           end
         end
 
@@ -191,7 +246,7 @@ function M.parse_args(args)
           central_config.save_to_file()
           os.exit(0)
         else
-          logger.error("Cannot create config file - central_config module not available")
+          get_logger().error("Cannot create config file - central_config module not available")
           os.exit(1)
         end
 
@@ -237,8 +292,7 @@ function M.parse_args(args)
     for _, file in ipairs(files) do
       -- Try to detect if it's a directory
       local success, is_dir = pcall(function()
-        local fs = require("lib.tools.filesystem")
-        return fs.is_directory(file)
+        return get_fs().is_directory(file)
       end)
 
       if success and is_dir then
@@ -260,7 +314,7 @@ function M.parse_args(args)
   return options
 end
 
---- Display help information for command line usage
+--- Displays help information for the command line interface to the console.
 ---@return nil
 function M.show_help()
   print("firmo test runner - Enhanced Lua test framework")
@@ -290,10 +344,15 @@ function M.show_help()
   print("  lua test.lua tests/unit/ tests/file.lua Run specified tests")
 end
 
---- Run tests from command line with provided arguments
----@param args? table[] Command line arguments (defaults to the global 'arg' variable)
----@return boolean success Whether all tests passed successfully
+--- Main entry point for running tests via the CLI.
+--- Parses arguments, shows help/version if requested, configures modules,
+--- and delegates execution to the appropriate mode (run, watch, interactive).
+---@param args? table Optional array of command line argument strings (defaults to global `arg`).
+---@return boolean success Overall success status of the test run (`true` if all tests passed, `false` otherwise or if execution failed).
 function M.run(args)
+  -- Load required modules
+  load_modules()
+
   -- Parse arguments
   local options = M.parse_args(args)
 
@@ -353,7 +412,7 @@ function M.run(args)
       timeout = 30000, -- Default timeout
     })
   else
-    logger.warn("Runner module not available", {
+    get_logger().warn("Runner module not available", {
       message = "Using fallback runner - not all features may be available",
       action = "continuing with limited functionality",
     })
@@ -371,13 +430,13 @@ function M.run(args)
       })
     else
       -- Fallback without runner module - limited functionality
-      logger.warn("Running tests without runner module", {
+      get_logger().warn("Running tests without runner module", {
         file_count = #options.files,
         message = "Limited functionality available",
       })
 
       for _, file in ipairs(options.files) do
-        logger.info("Running test file: " .. file)
+        get_logger().info("Running test file: " .. file)
         success = false -- Without the runner, we can't know if tests passed
       end
     end
@@ -386,7 +445,7 @@ function M.run(args)
     if discover_module and runner_module then
       success = runner_module.run_discovered(options.dir, options.pattern)
     else
-      logger.error("Cannot run discovered tests", {
+      get_logger().error("Cannot run discovered tests", {
         reason = "Required modules not available",
         runner_available = runner_module ~= nil,
         discover_available = discover_module ~= nil,
@@ -403,13 +462,15 @@ function M.run(args)
   return success
 end
 
---- Run tests in watch mode, automatically re-running when files change
----@param options table Configuration options for watch mode including directories to watch
----@return boolean success Whether watch mode was successfully started
+--- Runs tests in watch mode using the `lib.tools.watcher` module.
+--- Monitors specified directories/files and re-runs tests on changes.
+--- Requires `watcher` and `runner` modules to be available.
+---@param options CommandLineOptions Parsed command line options.
+---@return boolean success `false` if required modules are missing, otherwise this function typically doesn't return as the watcher takes over.
 function M.watch(options)
   -- Check if watcher module is available
   if not watcher_module then
-    logger.error("Watch mode not available", {
+    get_logger().error("Watch mode not available", {
       reason = "Required module not found",
       component = "watcher",
       action = "exiting with error",
@@ -420,7 +481,7 @@ function M.watch(options)
 
   -- Check if runner module is available
   if not runner_module then
-    logger.error("Watch mode requires runner module", {
+    get_logger().error("Watch mode requires runner module", {
       reason = "Required module not found",
       component = "runner",
       action = "exiting with error",
@@ -453,7 +514,7 @@ function M.watch(options)
 
   -- Watch for changes
   watcher_module.watch(function(changed_files)
-    logger.info("Files changed, rerunning tests", {
+    get_logger().info("Files changed, rerunning tests", {
       files = changed_files,
     })
 
@@ -476,13 +537,15 @@ function M.watch(options)
   return true
 end
 
---- Run tests in interactive mode with a command prompt interface
----@param options table Configuration options for interactive mode
----@return boolean success Whether interactive mode was successfully started
+--- Runs tests in interactive mode using the `lib.tools.interactive` module.
+--- Provides a TUI for selecting and running tests.
+--- Requires `interactive` module to be available.
+---@param options CommandLineOptions Parsed command line options.
+---@return boolean success `false` if the interactive module is missing, otherwise this function typically doesn't return as the interactive mode takes over.
 function M.interactive(options)
   -- Check if interactive module is available
   if not interactive_module then
-    logger.error("Interactive mode not available", {
+    get_logger().error("Interactive mode not available", {
       reason = "Required module not found",
       component = "interactive",
       action = "exiting with error",
@@ -505,14 +568,13 @@ function M.interactive(options)
   return true
 end
 
---- Generate test reports (coverage, quality) based on configuration options
----@param options table Options for report generation including format
----@field options.coverage boolean Whether to generate coverage reports
----@field options.quality boolean Whether to generate quality reports
----@field options.report_format string|nil Format for coverage report output
----@return boolean success Whether reports were successfully generated
+--- Triggers the generation of reports based on CLI options.
+--- Calls `report()` methods on `coverage` and `quality` modules if available and enabled.
+---@param options CommandLineOptions Parsed command line options (uses `coverage`, `quality`, `report_format`).
+---@return boolean success `true` if all requested reports were generated successfully (or if no reports were requested), `false` otherwise.
+---@throws table If coverage/quality module interaction fails critically (though handled by `error_handler.try`).
 function M.report(options)
-  logger.info("Generating reports", {
+  get_logger().info("Generating reports", {
     coverage = options.coverage,
     format = options.report_format or "html",
   })
@@ -521,24 +583,24 @@ function M.report(options)
   if options.coverage and coverage_module then
     local format = options.report_format or "html"
 
-    local success, err = error_handler.try(function()
+    local success, err = get_error_handler().try(function()
       return coverage_module.report(format)
     end)
 
     if not success then
-      logger.error("Failed to generate coverage report: " .. error_handler.format_error(err))
+      get_logger().error("Failed to generate coverage report: " .. get_error_handler().format_error(err))
       return false
     end
   end
 
   -- Generate quality report if enabled
   if options.quality and quality_module then
-    local success, err = error_handler.try(function()
+    local success, err = get_error_handler().try(function()
       return quality_module.report()
     end)
 
     if not success then
-      logger.error("Failed to generate quality report: " .. error_handler.format_error(err))
+      get_logger().error("Failed to generate quality report: " .. get_error_handler().format_error(err))
       return false
     end
   end

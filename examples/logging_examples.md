@@ -1,11 +1,8 @@
 # Logging Module Examples
 
-
 This document provides practical examples for using firmo's logging system components. These examples demonstrate real-world usage patterns and can be used as templates for your own implementations.
 
 ## Table of Contents
-
-
 
 1. [Core Logging Examples](#core-logging-examples)
 2. [Export Module Examples](#export-module-examples)
@@ -13,21 +10,22 @@ This document provides practical examples for using firmo's logging system compo
 4. [Formatter Integration Examples](#formatter-integration-examples)
 5. [Complete Application Examples](#complete-application-examples)
 
+<!--
+  Core Logging Examples
+  Demonstrates basic setup, configuration, and usage patterns for the core logging module.
+-->
 
 ## Core Logging Examples
 
-
 ### Basic Logger Setup and Usage
-
-
 
 ```lua
 -- example_basic_logging.lua
 local logging = require("lib.tools.logging")
+local central_config = require("lib.core.central_config") -- Needed for configure_from_config
+
 -- Create a logger for your module
 local logger = logging.get_logger("my_module")
--- Configure from central config (recommended)
-logging.configure_from_config("my_module")
 -- Basic logging at different levels
 logger.info("Application starting")
 logger.debug("Configuration loaded", {config_file = "config.lua"})
@@ -54,11 +52,7 @@ logger.error("Failed to connect to external API", {
 })
 ```
 
-
-
 ### Conditional Logging and Performance Optimization
-
-
 
 ```lua
 -- example_conditional_logging.lua
@@ -83,6 +77,17 @@ function process_data(data_items)
 
   logger.info("Data processing complete", {count = #data_items})
 end
+
+--- Simulates a potentially expensive calculation, demonstrating how to
+-- check if a specific log level is enabled before performing costly work.
+-- @param data table The data to analyze.
+-- @return table metrics The calculated detailed metrics.
+local function calculate_detailed_metrics(data)
+  -- Simulate expensive work
+  local metrics = { calculated = true, items = #data }
+  return metrics
+end
+
 -- Avoid expensive operations when logging is disabled
 function analyze_performance(data)
   if logger.is_debug_enabled() then
@@ -93,16 +98,24 @@ function analyze_performance(data)
 
   -- Continue with normal processing...
 end
+
+--- Creates a buffered logger.
+-- NOTE: Assumes `logging.create_buffered_logger` exists. Verify against actual implementation.
+-- @param name string Logger name.
+-- @param config table Configuration options (buffer_size, flush_interval, etc.).
+-- @return table logger The buffered logger instance.
 -- Example of a buffered logger for high-volume metrics
 local metrics_logger = logging.create_buffered_logger("metrics", {
   buffer_size = 500,        -- Buffer up to 500 messages
   flush_interval = 10,      -- Flush every 10 seconds
   output_file = "metrics.log"
 })
--- Function that generates many log entries
+})
+
+--- Generates a high volume of log entries over a duration, using a buffered logger.
+-- @param duration_seconds number How long to generate metrics for.
 function collect_metrics(duration_seconds)
-  local start_time = os.time()
-  local count = 0
+  local start_time = 1678886400 -- Static start time
 
   logger.info("Starting metrics collection", {
     duration_seconds = duration_seconds
@@ -111,7 +124,7 @@ function collect_metrics(duration_seconds)
   while os.time() - start_time < duration_seconds do
     -- Generate a metric
     local metric = {
-      timestamp = os.time(),
+      timestamp = 1678886400 + count, -- Incrementing static timestamp
       cpu_usage = math.random(10, 90),
       memory_mb = math.random(100, 500),
       active_connections = math.random(1, 100)
@@ -121,29 +134,31 @@ function collect_metrics(duration_seconds)
     metrics_logger.debug("System metric", metric)
 
     count = count + 1
-    -- Sleep briefly
-    os.execute("sleep 0.01")
+    count = count + 1
+    -- Simulate brief delay
+    local delay_start = os.clock() while os.clock() - delay_start < 0.01 do end
   end
 
   -- Flush remaining metrics when done
+  -- NOTE: Assumes metrics_logger.flush() exists. Verify against actual implementation.
   metrics_logger.flush()
 
   logger.info("Metrics collection complete", {
     count = count,
-    duration_seconds = os.time() - start_time
+    duration_seconds = 1678886400 + duration_seconds - start_time -- Calculate duration based on static time
   })
-end
 ```
 
-
-
 ### Custom Configuration Example
-
-
 
 ```lua
 -- example_custom_logging_config.lua
 local logging = require("lib.tools.logging")
+local os = require("os") -- Needed for os.getenv
+
+--- Example demonstrating custom logging configuration using `logging.configure`.
+-- NOTE: Assumes `logging.filter_module` and `logging.remove_from_blacklist` exist.
+-- Verify against actual implementation.
 -- Set up custom configuration
 logging.configure({
   -- Global default log level
@@ -199,19 +214,25 @@ ui_logger.error("UI error occurred")           -- Will show (ERROR level and in 
 metrics_logger.error("Metrics error occurred") -- Will show (no longer blacklisted)
 ```
 
-
+<!--
+  Export Module Examples
+  Demonstrates exporting log data to formats compatible with external systems
+  (Elasticsearch, Splunk, Datadog, etc.).
+-->
 
 ## Export Module Examples
 
-
 ### Basic Log Export
-
-
 
 ```lua
 -- example_basic_export.lua
 local log_export = require("lib.tools.logging.export")
 local fs = require("lib.tools.filesystem")
+local json = require("lib.tools.json") -- Assuming JSON module exists
+
+--- Example demonstrating basic log export to various platform formats.
+-- NOTE: Assumes `log_export.get_supported_platforms` and `log_export.export_to_platform` exist.
+-- Verify against actual implementation.
 -- Get list of supported platforms
 local platforms = log_export.get_supported_platforms()
 print("Supported platforms: " .. table.concat(platforms, ", "))
@@ -270,7 +291,7 @@ for _, platform in ipairs(platforms) do
     local content = "[\n"
     for i, entry in ipairs(formatted) do
       -- Convert table to JSON
-      local json_str = "  " 
+      local json_str = "  "
       if type(entry) == "table" then
         -- Very simple table to JSON conversion
         json_str = json_str .. "{"
@@ -307,11 +328,7 @@ for _, platform in ipairs(platforms) do
 end
 ```
 
-
-
 ### Converting Log Files for External Systems
-
-
 
 ```lua
 -- example_log_file_conversion.lua
@@ -325,11 +342,11 @@ local sample_log = [[
 2025-03-26 14:33:15 | DEBUG | request | Processing request (request_id=req-12345, path=/api/users, method=GET)
 2025-03-26 14:33:20 | ERROR | payment | Transaction failed (transaction_id=tx-67890, amount=99.99, currency=USD, reason=insufficient_funds)
 ]]
+]]
 -- Write sample log to a file
-fs.ensure_directory_exists("logs")
+-- Ensure 'logs/' directory exists for this example.
 fs.write_file("logs/sample.log", sample_log)
 -- Convert the log file to different platform formats
--- Elasticsearch format
 local es_result, es_err = log_export.create_platform_file(
   "logs/sample.log",
   "elasticsearch",
@@ -384,18 +401,17 @@ else
 end
 ```
 
-
-
 ### Creating Platform Configuration Files
-
-
 
 ```lua
 -- example_platform_config.lua
 local log_export = require("lib.tools.logging.export")
 local fs = require("lib.tools.filesystem")
--- Ensure the config directory exists
-fs.ensure_directory_exists("config")
+
+--- Example demonstrating the creation of configuration files needed for
+-- shipping logs to various external platforms (Elasticsearch, Logstash, etc.).
+-- NOTE: Assumes `log_export.create_platform_config` exists. Verify against actual implementation.
+-- Ensure the config directory exists for this example.
 -- Create configuration files for different platforms
 -- Elasticsearch configuration
 local es_result, es_err = log_export.create_platform_config(
@@ -434,7 +450,7 @@ if splunk_result then
 else
   print("Failed to create Splunk config: " .. tostring(splunk_err))
 end
--- Datadog configuration  
+-- Datadog configuration
 local dd_result, dd_err = log_export.create_platform_config(
   "datadog",
   "config/datadog.yaml",
@@ -460,16 +476,18 @@ else
 end
 ```
 
-
-
 ### Real-Time Log Exporter Example
-
-
 
 ```lua
 -- example_realtime_exporter.lua
 local log_export = require("lib.tools.logging.export")
 local logging = require("lib.tools.logging")
+local os = require("os") -- For os.clock
+
+--- Example demonstrating a real-time log exporter, configured for Datadog.
+-- Shows how to format logs and simulate sending them (in a real app, an HTTP client would be used).
+-- NOTE: Assumes `log_export.create_realtime_exporter` and the `exporter.export` method exist.
+-- Verify against actual implementation.
 -- Create a real-time exporter for Datadog
 local exporter, err = log_export.create_realtime_exporter(
   "datadog",
@@ -493,11 +511,16 @@ for k, v in pairs(exporter.http_endpoint.headers or {}) do
 end
 -- Create a logger that sends to Datadog
 local logger = logging.get_logger("datadog_example")
--- Function to simulate HTTP requests
+--- Simulates handling an API request and logging the event,
+-- then formatting it for real-time export.
+-- @param path string The request path.
+-- @param method string The HTTP method.
+-- @param duration_ms number Simulated request duration.
+-- @param status_code number Simulated HTTP status code.
 local function simulate_request(path, method, duration_ms, status_code)
   -- Log the event
   local log_entry = {
-    timestamp = os.date("%Y-%m-%dT%H:%M:%S"),
+    timestamp = "2025-01-01T00:00:00Z", -- Static timestamp
     level = (status_code >= 400) and "ERROR" or "INFO",
     module = "api",
     message = "API " .. method .. " request to " .. path,
@@ -541,24 +564,29 @@ for i = 1, 5 do
 
   simulate_request(path, method, duration, status)
 
-  -- Sleep briefly between requests
-  os.execute("sleep 0.5")
+  -- Simulate brief delay
+  local delay_start = os.clock() while os.clock() - delay_start < 0.5 do end
 end
 ```
 
-
+<!--
+  Search Module Examples
+  Demonstrates searching, analyzing, and exporting log data from files.
+-->
 
 ## Search Module Examples
 
-
 ### Basic Log Search and Analysis
-
-
 
 ```lua
 -- example_log_search.lua
 local log_search = require("lib.tools.logging.search")
 local fs = require("lib.tools.filesystem")
+
+--- Example demonstrating basic log searching (by level, module, pattern)
+-- and retrieving log file statistics.
+-- NOTE: Assumes `log_search.search_logs` and `log_search.get_log_stats` exist.
+-- Verify against actual implementation.
 -- Create a sample log file
 local sample_log = [[
 2025-03-26 14:32:45 | ERROR | database | Connection failed (host=db.example.com, port=5432, error=Connection refused)
@@ -572,18 +600,18 @@ local sample_log = [[
 2025-03-26 14:34:15 | WARN | authentication | Password expiring soon (username=user123, days_remaining=5)
 2025-03-26 14:34:30 | INFO | application | User logged out (username=user123, session_id=sess-abcdef)
 ]]
+]]
 -- Write sample log to a file
-fs.ensure_directory_exists("logs")
+-- Ensure 'logs/' directory exists for this example.
 fs.write_file("logs/sample.log", sample_log)
 -- Search the log file
-print("Searching for ERROR logs...")
 local errors = log_search.search_logs({
   log_file = "logs/sample.log",
   level = "ERROR"
 })
 print("Found " .. errors.count .. " ERROR logs:")
 for i, entry in ipairs(errors.entries) do
-  print(string.format("%d) [%s] %s: %s", 
+  print(string.format("%d) [%s] %s: %s",
     i,
     entry.timestamp or "",
     entry.module or "",
@@ -597,7 +625,7 @@ local db_logs = log_search.search_logs({
 })
 print("Found " .. db_logs.count .. " database logs:")
 for i, entry in ipairs(db_logs.entries) do
-  print(string.format("%d) [%s] %s: %s", 
+  print(string.format("%d) [%s] %s: %s",
     i,
     entry.timestamp or "",
     entry.level or "",
@@ -611,7 +639,7 @@ local failed_logs = log_search.search_logs({
 })
 print("Found " .. failed_logs.count .. " logs with 'failed':")
 for i, entry in ipairs(failed_logs.entries) do
-  print(string.format("%d) [%s] %s | %s: %s", 
+  print(string.format("%d) [%s] %s | %s: %s",
     i,
     entry.timestamp or "",
     entry.level or "",
@@ -636,16 +664,16 @@ for module, count in pairs(stats.by_module or {}) do
 end
 ```
 
-
-
 ### Log Export to Different Formats
-
-
 
 ```lua
 -- example_log_export_formats.lua
 local log_search = require("lib.tools.logging.search")
 local fs = require("lib.tools.filesystem")
+
+--- Example demonstrating exporting log data from a file to different
+-- formats (CSV, JSON, HTML).
+-- NOTE: Assumes `log_search.export_logs` exists. Verify against actual implementation.
 -- Create a sample log file if it doesn't exist
 if not fs.file_exists("logs/sample.log") then
   local sample_log = [[
@@ -655,11 +683,10 @@ if not fs.file_exists("logs/sample.log") then
 2025-03-26 14:33:15 | DEBUG | request | Processing request (request_id=req-12345, path=/api/users, method=GET)
 2025-03-26 14:33:20 | ERROR | payment | Transaction failed (transaction_id=tx-67890, amount=99.99, currency=USD, reason=insufficient_funds)
 ]]
-  fs.ensure_directory_exists("logs")
+  -- Ensure 'logs/' directory exists for this example.
   fs.write_file("logs/sample.log", sample_log)
 end
--- Ensure reports directory exists
-fs.ensure_directory_exists("reports")
+-- Ensure 'reports/' directory exists for this example.
 -- Export to CSV format
 local csv_result = log_search.export_logs(
   "logs/sample.log",
@@ -717,18 +744,18 @@ else
 end
 ```
 
-
-
 ### Real-Time Log Processor
-
-
 
 ```lua
 -- example_realtime_log_processor.lua
 local log_search = require("lib.tools.logging.search")
 local fs = require("lib.tools.filesystem")
--- Ensure the output directory exists
-fs.ensure_directory_exists("processed_logs")
+
+--- Example demonstrating a real-time log processor that filters and formats
+-- log entries as they are processed, potentially writing to an output file.
+-- NOTE: Assumes `log_search.get_log_processor` and its methods exist.
+-- Verify against actual implementation.
+-- Ensure the output directory exists for this example.
 -- Create a log processor for real-time filtering
 local processor = log_search.get_log_processor({
   -- Output configuration
@@ -799,15 +826,15 @@ processor.close()
 print("\nProcessor closed. Output written to: processed_logs/filtered.json")
 ```
 
-
-
 ### Creating Export Adapters
-
-
 
 ```lua
 -- example_export_adapters.lua
 local log_search = require("lib.tools.logging.search")
+
+--- Example demonstrating the creation of log export adapters, which format
+-- individual log entries for specific external platforms.
+-- NOTE: Assumes `log_search.create_export_adapter` exists. Verify against actual implementation.
 -- Create an example log entry
 local log_entry = {
   timestamp = "2025-03-26 14:32:45",
@@ -861,19 +888,23 @@ for platform, adapter in pairs(adapters) do
 end
 ```
 
-
+<!--
+  Formatter Integration Examples
+  Demonstrates integrating logging with Firmo's test formatters for richer reports.
+-->
 
 ## Formatter Integration Examples
 
-
 ### Test-Specific Logger Example
-
-
 
 ```lua
 -- example_test_specific_logger.lua
 local formatter_integration = require("lib.tools.logging.formatter_integration")
 local logging = require("lib.tools.logging")
+
+--- Example demonstrating the creation of a test-specific logger, which
+-- automatically includes test suite and step context in log messages.
+-- NOTE: Assumes `formatter_integration.create_test_logger` exists. Verify against actual implementation.
 -- Configure logging
 logging.configure({
   level = logging.LEVELS.DEBUG,
@@ -994,16 +1025,17 @@ end
 test_logger.info("Calculator test suite completed")
 ```
 
-
-
 ### Log Capture and Attachment Example
-
-
 
 ```lua
 -- example_log_capture.lua
 local formatter_integration = require("lib.tools.logging.formatter_integration")
 local logging = require("lib.tools.logging")
+
+--- Example demonstrating how to capture log entries generated during a specific test run
+-- and attach them to the test results data structure.
+-- NOTE: Assumes `formatter_integration.capture_start`, `capture_end`, and
+-- `attach_logs_to_results` exist. Verify against actual implementation.
 -- Configure logging
 logging.configure({
   level = logging.LEVELS.DEBUG,
@@ -1070,7 +1102,7 @@ local enhanced_results = formatter_integration.attach_logs_to_results(
 -- Display the captured logs
 print("\nCaptured " .. #logs .. " log entries:")
 for i, log in ipairs(logs) do
-  print(string.format("%d) [%s] %s: %s", 
+  print(string.format("%d) [%s] %s: %s",
     i,
     log.timestamp or "",
     log.level or "",
@@ -1086,17 +1118,18 @@ print("  - File: " .. enhanced_results.file)
 print("  - Logs: " .. #enhanced_results.logs .. " entries")
 ```
 
-
-
 ### Test Formatter Integration Example
-
-
 
 ```lua
 -- example_formatter_integration.lua
 local formatter_integration = require("lib.tools.logging.formatter_integration")
 local logging = require("lib.tools.logging")
 local fs = require("lib.tools.filesystem")
+
+--- Example demonstrating how to enhance Firmo's test result formatters
+-- to include captured logs within the final report output.
+-- NOTE: Assumes `formatter_integration.enhance_formatters`, `create_log_formatter`,
+-- and `integrate_with_reporting` exist. Verify against actual implementation.
 -- Initialize
 logging.configure({
   level = logging.LEVELS.DEBUG,
@@ -1203,7 +1236,7 @@ for _, test in ipairs(test_results.tests) do
 end
 -- Format the test results with the log formatter
 print("Formatting test results...")
-fs.ensure_directory_exists("reports")
+-- Ensure 'reports/' directory exists for this example.
 local result = log_formatter:format(test_results)
 if result then
   print("Test results formatted successfully")
@@ -1226,14 +1259,14 @@ else
 end
 ```
 
-
+<!--
+  Complete Application Examples
+  Shows more integrated examples of using the logging system components together.
+-->
 
 ## Complete Application Examples
 
-
 ### Comprehensive Logging System Example
-
-
 
 ```lua
 -- example_comprehensive_logging.lua
@@ -1243,10 +1276,11 @@ local log_export = require("lib.tools.logging.export")
 local log_search = require("lib.tools.logging.search")
 local formatter_integration = require("lib.tools.logging.formatter_integration")
 local fs = require("lib.tools.filesystem")
--- Ensure directories exist
-fs.ensure_directory_exists("logs")
-fs.ensure_directory_exists("reports")
-fs.ensure_directory_exists("config")
+
+--- Example showing a more complete integration of logging, search, export,
+-- and formatter integration features used together.
+-- NOTE: Assumes various logging API functions exist. Verify against actual implementation.
+-- Ensure directories exist for this example.
 -- Configure the logging system
 logging.configure({
   level = logging.LEVELS.DEBUG,
@@ -1434,11 +1468,7 @@ print("Formatted test results with logs: reports/test_logs.json")
 print("\n=== Comprehensive Logging Example Complete ===")
 ```
 
-
-
 ### Real-World API Service with Logging
-
-
 
 ```lua
 -- example_api_service.lua
@@ -1446,8 +1476,13 @@ print("\n=== Comprehensive Logging Example Complete ===")
 local logging = require("lib.tools.logging")
 local log_export = require("lib.tools.logging.export")
 local fs = require("lib.tools.filesystem")
--- Ensure logs directory exists
-fs.ensure_directory_exists("logs")
+local os = require("os") -- For os.clock
+
+--- Example simulating a real-world API service using various logging system
+-- features for different modules (database, cache, auth, api), including
+-- real-time export simulation.
+-- NOTE: Assumes various logging API functions exist. Verify against actual implementation.
+-- Ensure logs directory exists for this example.
 -- Configure logging
 logging.configure({
   level = logging.LEVELS.INFO,
@@ -1498,9 +1533,11 @@ local cache = {
 }
 -- Authenticated users
 local authenticated_users = {}
--- Function to simulate database connection
+
+--- Simulates connecting to a database, logging relevant events.
+-- @return string|nil conn_id The connection ID on success, or nil.
+-- @return string|nil err Error message on failure.
 local function db_connect()
-  db_logger.debug("Opening database connection")
 
   if db_pool.active_connections >= db_pool.max_connections then
     db_logger.warn("Connection pool limit reached", {
@@ -1524,7 +1561,7 @@ local function db_connect()
   local conn_id = "conn-" .. math.random(1000, 9999)
   db_pool.connections[conn_id] = {
     id = conn_id,
-    created_at = os.time()
+    created_at = 1678886400 -- Static timestamp
   }
   db_pool.active_connections = db_pool.active_connections + 1
 
@@ -1535,7 +1572,12 @@ local function db_connect()
 
   return conn_id
 end
--- Function to simulate database query
+--- Simulates executing a database query, logging relevant events.
+-- @param conn_id string The connection ID.
+-- @param query string The SQL query.
+-- @param params table Query parameters.
+-- @return table|nil result Simulated result (rows, time) on success, or nil.
+-- @return string|nil err Error message on failure.
 local function db_query(conn_id, query, params)
   db_logger.debug("Executing database query", {
     connection_id = conn_id,
@@ -1578,12 +1620,14 @@ local function db_query(conn_id, query, params)
     execution_time_ms = execution_time
   }
 end
--- Function to simulate cache operations
+--- Simulates retrieving an item from a cache, logging hits/misses/expiry.
+-- @param key string The cache key.
+-- @return any|nil value The cached value if found and not expired, otherwise nil.
 local function cache_get(key)
   cache_logger.debug("Cache lookup", {key = key})
 
   if cache.items[key] then
-    if cache.items[key].expires_at < os.time() then
+    if cache.items[key].expires_at < 1678886400 then -- Static timestamp
       -- Cache item expired
       cache_logger.debug("Cache item expired", {key = key})
       cache.items[key] = nil
@@ -1612,7 +1656,10 @@ local function cache_get(key)
   })
   return nil
 end
--- Function to set cache
+--- Simulates setting an item in the cache with a TTL, logging cache status.
+-- @param key string The cache key.
+-- @param value any The value to cache.
+-- @param ttl number|nil Time-to-live in seconds (default: 300).
 local function cache_set(key, value, ttl)
   cache_logger.debug("Cache set", {
     key = key,
@@ -1621,8 +1668,8 @@ local function cache_set(key, value, ttl)
 
   cache.items[key] = {
     value = value,
-    created_at = os.time(),
-    expires_at = os.time() + (ttl or 300)
+    created_at = 1678886400, -- Static timestamp
+    expires_at = 1678886400 + (ttl or 300) -- Static timestamp
   }
 
   -- Log cache size periodically
@@ -1638,7 +1685,11 @@ local function cache_set(key, value, ttl)
     })
   end
 end
--- Function to authenticate a user
+--- Simulates authenticating a user, logging attempts and results.
+-- @param username string The username.
+-- @param password string The password.
+-- @return string|nil session_id The session ID on success, or nil.
+-- @return string|nil err Error message on failure.
 local function authenticate(username, password)
   auth_logger.info("Authentication attempt", {
     username = username,
@@ -1650,8 +1701,8 @@ local function authenticate(username, password)
     local session_id = "sess-" .. math.random(1000, 9999)
     authenticated_users[session_id] = {
       username = username,
-      authenticated_at = os.time(),
-      expires_at = os.time() + 3600
+      authenticated_at = 1678886400, -- Static timestamp
+      expires_at = 1678886400 + 3600 -- Static timestamp
     }
 
     auth_logger.info("Authentication successful", {
@@ -1670,7 +1721,9 @@ local function authenticate(username, password)
 
   return nil, "Invalid credentials"
 end
--- Function to verify a session
+--- Simulates verifying a user session, checking for validity and expiry.
+-- @param session_id string The session ID to verify.
+-- @return boolean valid True if the session is valid, false otherwise.
 local function verify_session(session_id)
   auth_logger.debug("Verifying session", {
     session_id = session_id
@@ -1683,7 +1736,7 @@ local function verify_session(session_id)
     return false
   end
 
-  if authenticated_users[session_id].expires_at < os.time() then
+  if authenticated_users[session_id].expires_at < 1678886400 then -- Static timestamp
     auth_logger.warn("Expired session", {
       session_id = session_id,
       username = authenticated_users[session_id].username
@@ -1694,7 +1747,10 @@ local function verify_session(session_id)
 
   return true
 end
--- API request handler
+--- Simulates handling an incoming API request, including authentication,
+-- caching, database interaction, and logging.
+-- @param request table The request object (containing path, method, ip, session_id, body).
+-- @return table response The simulated HTTP response (status, body).
 local function handle_request(request)
   local request_id = "req-" .. math.random(1000, 9999)
 
@@ -1898,7 +1954,7 @@ for i, request in ipairs(requests) do
   -- Export metrics to monitoring system if available
   if exporter then
     local log_entry = {
-      timestamp = os.date("%Y-%m-%dT%H:%M:%S"),
+      timestamp = "2025-01-01T00:00:00Z", -- Static timestamp
       level = response.status >= 400 and "ERROR" or "INFO",
       module = "api",
       message = "API Request",
@@ -1926,6 +1982,5 @@ for _, request in ipairs(requests) do
 end
 app_logger.info("API service example completed")
 ```
-
 
 These examples demonstrate how to use the various components of the firmo logging system in different scenarios, from basic logging to complex real-world applications.

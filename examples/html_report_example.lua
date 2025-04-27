@@ -1,22 +1,38 @@
---[[
-  html_report_example.lua
-  
-  Example demonstrating HTML output format for test results
-  in firmo, including syntax highlighting and detailed statistics.
-]]
+--- html_report_example.lua
+--
+-- This example demonstrates generating HTML format test result reports using
+-- Firmo's reporting module, specifically focusing on the `auto_save_reports`
+-- function and configuring HTML options via `central_config`.
+--
+-- It shows:
+-- - Generating an HTML report using `reporting.auto_save_reports`.
+-- - Passing mock test result data to the function.
+-- - Configuring HTML-specific options (theme, title) within the `auto_save_reports` call.
+-- - Using `test_helper` to manage the temporary output directory.
+--
+-- Run embedded tests: lua test.lua examples/html_report_example.lua
+--
 
-package.path = "../?.lua;" .. package.path
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+local before, after = firmo.before, firmo.after -- Import before/after for setup
 
--- Import the filesystem module
-local fs = require("lib.tools.filesystem")
+-- Import required modules
+local error_handler = require("lib.tools.error_handler")
+local fs = require("lib.tools.filesystem") -- Keep for path joining if needed
 local reporting = require("lib.reporting")
+local test_helper = require("lib.tools.test_helper")
+local logging = require("lib.tools.logging")
+local central_config = require("lib.core.central_config") -- For consistency
+local temp_file = require("lib.tools.filesystem.temp_file") -- For cleanup
+
+-- Setup logger
+local logger = logging.get_logger("HTMLReportExample")
 
 -- Mock test results data
 local test_results = {
   name = "HTML Report Example",
-  timestamp = os.date("!%Y-%m-%dT%H:%M:%S"),
+  timestamp = "2025-01-01T00:00:00Z", -- Static timestamp
   tests = 8,
   failures = 1,
   errors = 1,
@@ -27,25 +43,25 @@ local test_results = {
       name = "addition works correctly",
       classname = "Calculator.BasicMath",
       time = 0.001,
-      status = "pass"
+      status = "pass",
     },
     {
       name = "subtraction works correctly",
       classname = "Calculator.BasicMath",
       time = 0.001,
-      status = "pass"
+      status = "pass",
     },
     {
       name = "multiplication works correctly",
       classname = "Calculator.BasicMath",
       time = 0.001,
-      status = "pass"
+      status = "pass",
     },
     {
       name = "division works correctly",
       classname = "Calculator.BasicMath",
       time = 0.001,
-      status = "pass"
+      status = "pass",
     },
     {
       name = "division by zero throws error",
@@ -55,8 +71,8 @@ local test_results = {
       failure = {
         message = "Expected error not thrown",
         type = "AssertionError",
-        details = "Expected function to throw 'Division by zero' error\nBut no error was thrown"
-      }
+        details = "Expected function to throw 'Division by zero' error\nBut no error was thrown",
+      },
     },
     {
       name = "square root of negative numbers",
@@ -66,140 +82,69 @@ local test_results = {
       error = {
         message = "Runtime error in test",
         type = "Error",
-        details = "attempt to call nil value (method 'sqrt')"
-      }
+        details = "attempt to call nil value (method 'sqrt')",
+      },
     },
     {
       name = "logarithm calculations",
       classname = "Calculator.AdvancedMath",
       time = 0.000,
       status = "skipped",
-      skip_message = "Advanced math module not implemented"
+      skip_message = "Advanced math module not implemented",
     },
     {
       name = "rounding behavior",
       classname = "Calculator.AdvancedMath",
       time = 0.001,
-      status = "pass"
-    }
-  }
+      status = "pass",
+    },
+  },
 }
 
--- Use the existing reports directory structure
-local reports_base_dir = "examples/reports/html-report-examples"
-fs.ensure_directory_exists(reports_base_dir)
-
--- Run a simple test for demonstration
+--- Test suite demonstrating HTML report generation for test results.
 describe("HTML Report Generator", function()
-  it("generates JUnit XML for test results", function()
-    -- Generate JUnit XML
-    local junit_xml = reporting.format_results(test_results, "junit")
-    
-    -- Save the generated JUnit XML to a file using filesystem module
-    local xml_file_path = fs.join_paths(reports_base_dir, "test-results.xml")
-    fs.write_file(xml_file_path, junit_xml)
-    
-    -- Display a preview of the XML
-    print("\n=== JUnit XML Preview ===\n")
-    print(junit_xml:sub(1, 500) .. "...\n")
-    
-    -- Verify that the file was created successfully
-    expect(junit_xml).to.match("<testsuite")
-    expect(junit_xml).to.match("HTML Report Example")
-    expect(junit_xml).to.match("<testcase")
-    
-    print("JUnit XML report saved to: " .. xml_file_path)
+  local temp_dir
+
+  -- Create a temp directory before tests
+  before(function()
+    temp_dir = test_helper.create_temp_test_directory()
   end)
-  
-  it("generates TAP format for test results", function()
-    -- Generate TAP output
-    local tap_output = reporting.format_results(test_results, "tap")
-    
-    -- Save the TAP output to a file using filesystem module
-    local tap_file_path = fs.join_paths(reports_base_dir, "test-results.tap")
-    fs.write_file(tap_file_path, tap_output)
-    
-    -- Display a preview of the TAP output
-    print("\n=== TAP Output Preview ===\n")
-    print(tap_output:sub(1, 500) .. "...\n")
-    
-    -- Verify that the file was created successfully
-    expect(tap_output).to.match("TAP version 13")
-    expect(tap_output).to.match("1..8")
-    expect(tap_output).to.match("ok 1 -")
-    
-    print("TAP report saved to: " .. tap_file_path)
+
+  -- Clean up temp directory reference after tests
+  after(function()
+    temp_dir = nil
   end)
-  
-  it("generates CSV format for test results", function()
-    -- Generate CSV output
-    local csv_output = reporting.format_results(test_results, "csv")
-    
-    -- Save the CSV output to a file using filesystem module
-    local csv_file_path = fs.join_paths(reports_base_dir, "test-results.csv")
-    fs.write_file(csv_file_path, csv_output)
-    
-    -- Display a preview of the CSV output
-    print("\n=== CSV Output Preview ===\n")
-    print(csv_output:sub(1, 500) .. "...\n")
-    
-    -- Verify that the file was created successfully
-    expect(csv_output).to.match("test_id,test_suite,test_name,status")
-    expect(csv_output).to.match("Calculator.BasicMath")
-    
-    print("CSV report saved to: " .. csv_file_path)
-  end)
-  
-  it("demonstrates auto_save_reports with filesystem integration", function()
-    -- Create a structured reports directory using filesystem module
-    local reports_dir = fs.join_paths(reports_base_dir, "auto-generated")
-    fs.ensure_directory_exists(reports_dir)
-    
-    -- Create a timestamp directory for better organization
-    local timestamp = os.date("%Y-%m-%d_%H-%M-%S")
-    local timestamped_dir = fs.join_paths(reports_dir, timestamp)
-    fs.ensure_directory_exists(timestamped_dir)
-    
-    -- Advanced configuration with templates
+
+  it("generates HTML report using auto_save_reports with config", function()
+    -- Configure HTML report options
     local config = {
-      report_dir = timestamped_dir,
-      report_suffix = "-v1.0",
-      timestamp_format = "%Y-%m-%d",
-      results_path_template = "results-{format}{suffix}",
-      verbose = true
+      report_dir = temp_dir.path,
+      formats = { "html" }, -- Only generate HTML
+      results_path_template = "test-results-{format}", -- Custom filename pattern
+      html = {
+        theme = "dark",
+        title = "HTML Test Results",
+        syntax_highlighting = false, -- Example: disable syntax highlighting
+      },
     }
-    
-    -- Save all report formats using auto_save_reports
+
+    -- Save HTML report using auto_save_reports
+    -- Pass nil for coverage/quality data, pass test_results data, pass config
+    logger.info("Generating HTML report using auto_save_reports...")
     local results = reporting.auto_save_reports(nil, nil, test_results, config)
-    
-    -- Verify that all the reports were created successfully
-    expect(results.junit.success).to.be.truthy()
-    expect(results.tap.success).to.be.truthy()
-    expect(results.csv.success).to.be.truthy()
-    
-    print("\n=== All Reports Generated Using Filesystem Module ===")
-    print("Reports saved to directory: " .. timestamped_dir)
-    print("Reports generated: JUnit XML, TAP, CSV")
-    
-    -- Print the normalized paths to demonstrate filesystem module usage
-    print("Normalized path example: " .. fs.normalize_path(timestamped_dir))
-  end)
-  
-  it("demonstrates HTML report generation with stylesheet customization", function()
-    -- Generate HTML output for test results
-    -- HTML formatter is coming from lib/reporting/formatters/html.lua and uses the filesystem module internally
-    local html_results = reporting.format_results(test_results, "html")
-    
-    -- Create a directory for HTML reports using filesystem module
-    local html_dir = fs.join_paths(reports_base_dir, "html")
-    fs.ensure_directory_exists(html_dir)
-    
-    -- Save the HTML output to a file
-    local html_file_path = fs.join_paths(html_dir, "test-results.html")
-    fs.write_file(html_file_path, html_results)
-    
-    print("\n=== HTML Report Generated ===")
-    print("HTML report saved to: " .. html_file_path)
-    print("HTML length: " .. #html_results .. " bytes")
+
+    -- Verify the HTML report was created successfully
+    expect(results.html).to.exist("HTML results entry should exist")
+    expect(results.html.success).to.be_truthy("HTML report saving should succeed")
+
+    if results.html.success then
+      logger.info("HTML report saved to directory: " .. temp_dir.path)
+      logger.info("HTML report file: " .. results.html.path)
+    else
+      logger.error("Failed to generate HTML report", { error = results.html.error })
+    end
   end)
 end)
+
+-- Add cleanup for temp_file module at the end
+temp_file.cleanup_all()

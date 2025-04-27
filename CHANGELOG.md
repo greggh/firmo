@@ -132,8 +132,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error reporting with detailed diagnostic output
 - File path normalization for better pattern matching
 - Command-line interface with more options and better help documentation
-
-
+- Updated `CLAUDE.md` internal documentation:
+  - Revised assertion documentation to match current `expect`-style implementation, including many newly documented assertions (numeric, string, table, error, date, async, etc.).
+  - Corrected "Test Directory Structure" to reflect the actual layout.
+  - Updated "Project Structure" with a detailed overview.
+  - Rewrote "Coverage Module Architecture" to describe the current debug hook system, replacing the outdated instrumentation description.
+- Initiated a comprehensive refactoring of all example files (`examples/*.lua`, `examples/*.md`) based on the inventory in `docs/firmo/examples_inventory.md` to align with current project standards. Key updates include:
+  - Adding missing JSDoc comments.
+  - Standardizing configuration via `lib.core.central_config`.
+  - Replacing manual temporary file/directory management with `lib.tools.filesystem.temp_file` or `lib.tools.test_helper`.
+  - Removing direct modifications of `package.path`.
+  - Removing direct usage of `lib.coverage`, deferring to the test runner.
+  - Ensuring consistent use of `expect`-style assertions.
+  - Updating module usage (e.g., `fs`, `error_handler`) per current APIs.
+  - Updating CLI examples to use the standard `lua test.lua ...` pattern.
 ## [0.7.4] - 2025-03-18
 
 

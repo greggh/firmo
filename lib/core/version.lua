@@ -1,42 +1,50 @@
---- Version module for Firmo
+--- Firmo Version Module
+---
 --- This module serves as the single source of truth for the Firmo project version.
---- It provides semantic versioning capabilities, version parsing, comparison, and
---- compatibility checking functions. The module follows the semantic versioning
---- specification (https://semver.org/) and helps ensure version consistency across
---- the project.
+--- It defines the current MAJOR.MINOR.PATCH version components and provides functions
+--- for parsing and comparing semantic version strings according to the SemVer 2.0.0 specification.
+--- See: https://semver.org/
 ---
---- This module is used by:
---- - Documentation generators to display current version information
---- - Package managers to establish dependencies and compatibility
---- - Release scripts to automate version updates and releases
---- - Runtime code to validate version requirements and compatibility
----
---- @version 0.7.5
+--- @module lib.core.version
 --- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 0.7.5
 
----@class version
----@field MAJOR number Major version component
----@field MINOR number Minor version component
----@field PATCH number Patch version component
----@field _VERSION string Combined version string
----@field parse fun(version_string: string): {major: number, minor: number, patch: number, prerelease?: string, buildmetadata?: string}|nil, table? Parse a version string into components
----@field compare fun(version1: string|table, version2: string|table): number|nil, table? Compare two versions (-1, 0, 1)
----@field satisfies_requirement fun(version: string|table, required_version: string|table): boolean|nil, table? Check if version satisfies requirement
----@field get_version fun(): string Get full version string
----@field get_version_table fun(): {major: number, minor: number, patch: number, prerelease?: string, buildmetadata?: string} Get version as table
----@field check_version fun(min_version: string|table): boolean|nil, table? Check if current version meets minimum required
----@field is_compatible fun(other_version: string|table): boolean|nil, table? Check compatibility with another version
----@field compare_versions fun(version_a: string|table, version_b: string|table): number|nil, table? Compare two version strings (-1, 0, 1)
----@field format fun(version_table: table): string Format a version table as a string
----@field has_breaking_changes fun(version1: string|table, version2: string|table): boolean|nil, table? Check if versions have breaking changes
----@field LUA_VERSION {major: number, minor: number, is_luajit: boolean, is_51_compatible: boolean} Information about the Lua runtime version
+---@class version The public API of the version module.
+---@field major number Major version component (e.g., 0).
+---@field minor number Minor version component (e.g., 7).
+---@field patch number Patch version component (e.g., 5).
+---@field string string Combined version string (e.g., "0.7.5").
+---@field parse fun(version_string: string): {major: number, minor: number, patch: number, string: string}|nil, table? Parses a "MAJOR.MINOR.PATCH" string into a table. Returns `version_table, nil` on success, `nil, error_object` on failure. Throws error on validation failure.
+---@throws table If validation fails.
+---@field compare fun(version1: string|table, version2: string|table): number|nil, table? Compares two versions. Returns `-1` (v1 < v2), `0` (v1 == v2), `1` (v1 > v2), or `nil, error_object` on failure. Throws error on validation failure.
+---@throws table If validation fails.
+---@field satisfies_requirement fun(required_version: string|table): boolean|nil, table? Checks if the current module version (`M`) is >= `required_version`. Returns `true/false, nil` on success, `nil, error_object` on failure. Throws error on validation failure.
+---@throws table If validation fails.
 
--- Require error handler for comprehensive error handling
-local error_handler = require("lib.tools.error_handler")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler
 
--- Initialize logging
-local logging = require("lib.tools.logging")
-local log = logging.get_logger("core.version")
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
 
 ---@type version
 local M = {}
@@ -56,7 +64,8 @@ M.string = string.format("%d.%d.%d", M.major, M.minor, M.patch)
 ---
 ---@param version_string string Version string to parse in format "MAJOR.MINOR.PATCH"
 ---@return table|nil parsed_version Table with major, minor, patch components or nil on error
----@return table|nil error Error object if operation failed
+---@return table|nil error Error object if operation failed (e.g., invalid format).
+---@throws table If `version_string` validation fails (nil or wrong type).
 ---
 ---@usage
 --- -- Parse a version string
@@ -76,20 +85,20 @@ M.string = string.format("%d.%d.%d", M.major, M.minor, M.patch)
 function M.parse(version_string)
   -- Parameter validation
   if version_string == nil then
-    local err = error_handler.validation_error("Version string cannot be nil", { function_name = "version.parse" })
+    local err = get_error_handler().validation_error("Version string cannot be nil", { function_name = "version.parse" })
     log.debug("version.parse validation failed", {
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   if type(version_string) ~= "string" then
-    local err = error_handler.validation_error("Version string must be a string", {
+    local err = get_error_handler().validation_error("Version string must be a string", {
       function_name = "version.parse",
       provided_type = type(version_string),
     })
     log.debug("version.parse validation failed", {
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
       provided_type = type(version_string),
     })
     return nil, err
@@ -98,13 +107,13 @@ function M.parse(version_string)
   -- Parse semantic version
   local major, minor, patch = version_string:match("^(%d+)%.(%d+)%.(%d+)$")
   if not (major and minor and patch) then
-    local err = error_handler.validation_error("Invalid version format, must be MAJOR.MINOR.PATCH", {
+    local err = get_error_handler().validation_error("Invalid version format, must be MAJOR.MINOR.PATCH", {
       function_name = "version.parse",
       provided_version = version_string,
       expected_format = "MAJOR.MINOR.PATCH",
     })
     log.debug("version.parse invalid format", {
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
       version_string = version_string,
     })
     return nil, err
@@ -138,7 +147,8 @@ end
 ---@param version1 string|table First version to compare (string or version table)
 ---@param version2 string|table Second version to compare (string or version table)
 ---@return number|nil comparison -1 if v1 < v2, 0 if equal, 1 if v1 > v2, nil on error
----@return table|nil error Error object if operation failed
+---@return table|nil error Error object if operation failed (e.g., invalid format in input versions).
+---@throws table If `version1` or `version2` validation fails (nil or wrong type/structure).
 ---
 ---@usage
 --- -- Compare two version strings
@@ -166,17 +176,17 @@ end
 function M.compare(version1, version2)
   -- Parameter validation
   if version1 == nil then
-    local err = error_handler.validation_error("First version cannot be nil", { function_name = "version.compare" })
+    local err = get_error_handler().validation_error("First version cannot be nil", { function_name = "version.compare" })
     log.debug("version.compare validation failed", {
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   if version2 == nil then
-    local err = error_handler.validation_error("Second version cannot be nil", { function_name = "version.compare" })
+    local err = get_error_handler().validation_error("Second version cannot be nil", { function_name = "version.compare" })
     log.debug("version.compare validation failed", {
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
@@ -193,12 +203,12 @@ function M.compare(version1, version2)
   elseif type(version1) == "table" and version1.major and version1.minor and version1.patch then
     v1 = version1
   else
-    local err = error_handler.validation_error("First version must be a string or a properly formatted version table", {
+    local err = get_error_handler().validation_error("First version must be a string or a properly formatted version table", {
       function_name = "version.compare",
       provided_type = type(version1),
     })
     log.debug("version.compare validation failed", {
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
       version1 = version1,
     })
     return nil, err
@@ -213,12 +223,12 @@ function M.compare(version1, version2)
     v2 = version2
   else
     local err =
-      error_handler.validation_error("Second version must be a string or a properly formatted version table", {
+      get_error_handler().validation_error("Second version must be a string or a properly formatted version table", {
         function_name = "version.compare",
         provided_type = type(version2),
       })
     log.debug("version.compare validation failed", {
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
       version2 = version2,
     })
     return nil, err
@@ -258,7 +268,8 @@ end
 ---
 ---@param required_version string|table Minimum required version (string or version table)
 ---@return boolean|nil satisfies True if current version satisfies requirement, nil on error
----@return table|nil error Error object if operation failed
+---@return table|nil error Error object if operation failed (e.g., invalid format in `required_version`).
+---@throws table If `required_version` validation fails (nil or wrong type/structure).
 ---
 ---@usage
 --- -- Check if current version is compatible with a requirement
@@ -289,12 +300,12 @@ end
 function M.satisfies_requirement(required_version)
   -- Parameter validation
   if required_version == nil then
-    local err = error_handler.validation_error(
+    local err = get_error_handler().validation_error(
       "Required version cannot be nil",
       { function_name = "version.satisfies_requirement" }
     )
     log.debug("version.satisfies_requirement validation failed", {
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end

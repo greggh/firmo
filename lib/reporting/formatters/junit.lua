@@ -1,12 +1,67 @@
 --- JUnit XML Formatter for Coverage Reports
--- Generates JUnit XML format coverage reports
--- @module reporting.formatters.junit
--- @author Firmo Team
+---
+--- Generates coverage reports in JUnit XML format, treating each file's coverage
+--- and the overall coverage against configured thresholds as individual "test cases".
+--- This allows CI systems to track coverage metrics alongside test results.
+---
+--- @module lib.reporting.formatters.junit
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
-local Formatter = require("lib.reporting.formatters.base")
-local error_handler = require("lib.tools.error_handler")
-local central_config = require("lib.core.central_config")
-local filesystem = require("lib.tools.filesystem")
+--- @class CoverageReportFileStats Simplified structure expected by this formatter.
+--- @field name string File path.
+--- @field path string Same as name.
+--- @field summary { coverage_percent: number, total_lines: number, covered_lines: number, executed_lines: number, not_covered_lines: number } File summary stats.
+--- @field lines? table<number, { covered?: boolean, executed?: boolean, execution_count?: number }> Optional line details for failure messages.
+
+--- @class CoverageReportSummary Simplified structure expected by this formatter.
+--- @field coverage_percent number Overall coverage percentage.
+--- @field total_files number Total number of files.
+--- @field total_lines number Total lines across all files.
+--- @field covered_lines number Total covered lines across all files.
+--- @field executed_lines number Total executed lines across all files.
+
+--- @class CoverageReportData Expected structure for coverage data input (simplified).
+--- @field summary CoverageReportSummary Overall summary statistics.
+--- @field files table<string, CoverageReportFileStats> Map of file paths to file statistics.
+
+---@class JUnitFormatter : Formatter JUnit XML Formatter for coverage reports.
+--- Treats each file's coverage and overall coverage as a test case, generating
+--- a JUnit XML report suitable for CI systems.
+---@field _VERSION string Module version.
+---@field validate fun(self: JUnitFormatter, coverage_data: CoverageReportData): boolean, table? Validates coverage data. Returns `true` or `false, error`.
+---@field format fun(self: JUnitFormatter, coverage_data: CoverageReportData, options?: { threshold?: number, file_threshold?: number, suite_name?: string, timestamp?: string, hostname?: string, include_uncovered_lines?: boolean, properties?: table<string, string> }): string|nil, table? Formats coverage data as a JUnit XML string. Returns `xml_string, nil` or `nil, error`.
+---@field build_junit_xml fun(self: JUnitFormatter, data: CoverageReportData, options: table): string Builds the JUnit XML content. Returns XML string.
+---@field group_consecutive_lines fun(self: JUnitFormatter, line_numbers: number[]): {start: number, end_: number}[] Groups consecutive line numbers into ranges. Returns array of range tables.
+---@field write fun(self: JUnitFormatter, xml_content: string, output_path: string, options?: table): boolean, table? Writes the XML content to a file. Returns `true, nil` or `false, error`. @throws table If writing fails critically.
+---@field register fun(formatters: table): boolean, table? Registers the JUnit formatter with the main registry. Returns `true, nil` or `false, error`. @throws table If validation fails.
+
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+local Formatter = try_require("lib.reporting.formatters.base")
 
 -- Create JUnit formatter class
 local JUnitFormatter = Formatter.extend("junit", "xml")
@@ -23,7 +78,10 @@ local xml_escape_chars = {
   ["'"] = "&apos;",
 }
 
--- Escape a string for XML output
+--- Escapes special XML characters in a string.
+---@param s string|any The input string (or value convertible to string).
+---@return string The escaped string.
+---@private
 local function xml_escape(s)
   if type(s) ~= "string" then
     s = tostring(s)
@@ -32,7 +90,11 @@ local function xml_escape(s)
   return s:gsub("[&<>'\"]", xml_escape_chars)
 end
 
--- Validate coverage data structure for JUnit formatter
+--- Validates the coverage data structure. Inherits base validation.
+---@param self JUnitFormatter The formatter instance.
+---@param coverage_data CoverageReportData The coverage data to validate.
+---@return boolean success `true` if validation passes.
+---@return table? error Error object if validation failed.
 function JUnitFormatter:validate(coverage_data)
   -- Call base class validation first
   local valid, err = Formatter.validate(self, coverage_data)
@@ -45,11 +107,24 @@ function JUnitFormatter:validate(coverage_data)
   return true
 end
 
--- Format coverage data as JUnit XML
+--- Formats coverage data into a JUnit XML string.
+--- Treats overall coverage and each file's coverage as separate test cases.
+---@param self JUnitFormatter The formatter instance.
+---@param coverage_data CoverageReportData The coverage data structure.
+---@param options? { threshold?: number, file_threshold?: number, suite_name?: string, timestamp?: string, hostname?: string, include_uncovered_lines?: boolean, properties?: table<string, string> } Formatting options:
+---  - `threshold` (number, default 80): Overall coverage percentage required to pass.
+---  - `file_threshold` (number, default: same as `threshold`): Per-file coverage percentage required.
+---  - `suite_name` (string, default "CoverageTests"): Name for the `<testsuite>`.
+---  - `timestamp` (string): ISO 8601 timestamp for the report. Defaults to current time.
+---  - `hostname` (string): Hostname for the report. Defaults to system hostname.
+---  - `include_uncovered_lines` (boolean, default false): Include lists of uncovered lines in failure messages.
+---  - `properties` (table): Additional `<property>` tags to include in the report.
+---@return string|nil xml_content The generated JUnit XML content as a single string, or `nil` on validation error.
+---@return table? error Error object if validation failed.
 function JUnitFormatter:format(coverage_data, options)
   -- Parameter validation
   if not coverage_data then
-    return nil, error_handler.validation_error("Coverage data is required", { formatter = self.name })
+    return nil, get_error_handler().validation_error("Coverage data is required", { formatter = self.name })
   end
 
   -- Apply options with defaults
@@ -68,10 +143,13 @@ function JUnitFormatter:format(coverage_data, options)
   return xml_content
 end
 
--- Build JUnit XML format content
+--- Builds the main JUnit XML structure based on formatted coverage data.
+---@param self JUnitFormatter The formatter instance.
+---@param data CoverageReportData The normalized coverage data (requires `summary`, `files`).
+---@param options table Formatting options (passed from `format` method).
+---@return string xml_content The generated JUnit XML string.
 function JUnitFormatter:build_junit_xml(data, options)
   local lines = {}
-
   -- Add XML header
   table.insert(lines, '<?xml version="1.0" encoding="UTF-8" ?>')
 
@@ -280,7 +358,11 @@ function JUnitFormatter:build_junit_xml(data, options)
   return table.concat(lines, "\n")
 end
 
--- Group consecutive line numbers into ranges
+--- Helper function to group sorted consecutive line numbers into ranges for more readable output.
+--- E.g., {1, 2, 3, 5, 6, 8} becomes `{{start=1, end_=3}, {start=5, end_=6}, {start=8, end_=8}}`.
+---@param self JUnitFormatter The formatter instance.
+---@param line_numbers number[] A sorted array of line numbers.
+---@return {start: number, end_: number}[] ranges An array of range tables.
 function JUnitFormatter:group_consecutive_lines(line_numbers)
   if not line_numbers or #line_numbers == 0 then
     return {}
@@ -306,16 +388,27 @@ function JUnitFormatter:group_consecutive_lines(line_numbers)
   return ranges
 end
 
--- Write the report to the filesystem
+--- Writes the generated JUnit XML content to a file.
+--- Inherits the write logic (including directory creation) from the base `Formatter`.
+---@param self JUnitFormatter The formatter instance.
+---@param xml_content string The XML content string to write.
+---@param output_path string The path to the output file.
+---@param options? table Optional options passed to the base `write` method (currently unused by base).
+---@return boolean success `true` if writing succeeded.
+---@return table? error Error object if writing failed.
+---@throws table If writing fails critically.
 function JUnitFormatter:write(xml_content, output_path, options)
   return Formatter.write(self, xml_content, output_path, options)
 end
---- Register the JUnit formatter with the formatters registry
--- @param formatters table The formatters registry
--- @return boolean success Whether registration was successful
+
+--- Registers the JUnit formatter with the main formatters registry.
+---@param formatters table The main formatters registry object (must contain `results` table).
+---@return boolean success `true` if registration succeeded.
+---@return table? error Error object if validation failed.
+---@throws table If validation fails critically.
 function JUnitFormatter.register(formatters)
   if not formatters or type(formatters) ~= "table" then
-    local err = error_handler.validation_error("Invalid formatters registry", {
+    local err = get_error_handler().validation_error("Invalid formatters registry", {
       operation = "register",
       formatter = "junit",
       provided_type = type(formatters),

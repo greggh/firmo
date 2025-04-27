@@ -1,24 +1,31 @@
---[[
-  Watch Mode Test Suite
-
-  This file tests the functionality of the watcher module in the firmo framework.
-  The watcher module provides file system monitoring capabilities for the
-  watch mode feature of the test runner.
-
-  @module tests.tools.watcher.watch_mode_test
-  @copyright 2025
-  @license MIT
---]]
+--- Watch Mode Test Suite (`lib.tools.watcher`)
+---
+--- This file tests the functionality of the watcher module (`lib.tools.watcher`),
+--- which provides file system monitoring capabilities for the watch mode feature
+--- of the test runner.
+--- Tests cover:
+--- - Module loading and initialization.
+--- - Basic API availability.
+--- - Initialization with single/multiple directories and exclude patterns.
+--- - Configuration updates (`configure`, `set_check_interval`, `add_patterns`).
+--- - Error handling for invalid inputs (paths, intervals, patterns).
+--- - Basic change detection (`check_for_changes`).
+--- - Reset functionality (`reset`, `full_reset`).
+--- - Debug configuration inspection (`debug_config`).
+--- Uses `before`/`after` hooks for setup/teardown and `test_helper` for error verification.
+---
+--- @author Firmo Team
+--- @test
 
 -- Load dependencies
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
+local error_handler = require("lib.tools.error_handler")
 
 local fs = require("lib.tools.filesystem")
 local temp_file = require("lib.tools.filesystem.temp_file")
 local test_helper = require("lib.tools.test_helper")
-local error_handler = require("lib.tools.error_handler")
 
 -- Initialize proper logging
 local logging = require("lib.tools.logging")
@@ -470,8 +477,3 @@ describe("Watch Mode", function()
     end)
   end)
 end)
-
--- Final logging to help with debugging
-if logger then
-  logger.info("Watch mode tests completed")
-end

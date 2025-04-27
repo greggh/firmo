@@ -1,57 +1,123 @@
---[[
-Benchmarking Module for Firmo
-
-Provides comprehensive utilities for measuring and analyzing test and code performance
-with statistical analysis, memory tracking, and comparative benchmarking capabilities.
-
-The module enables precise performance measurement through:
-- Multiple iterations with statistical analysis (mean, median, min/max, standard deviation)
-- Memory usage tracking (before/after measurements)
-- Function call overhead compensation
-- Warmup runs to prime caches and JIT compilation
-- Suite-based benchmarking for comparing multiple implementations
-- Asynchronous performance measurement
-- Human-readable formatting of results
-]]
+--- Firmo Benchmarking Module
+---
+--- Provides utilities for measuring and analyzing code performance with statistical
+--- analysis, memory tracking (basic), and comparison capabilities.
+---
+--- Features:
+--- - Measure function execution time over multiple iterations (`measure`).
+--- - Statistical analysis (mean, min, max, stddev).
+--- - Optional memory usage tracking using `collectgarbage("count")`.
+--- - Warmup runs.
+--- - Run benchmark suites defined in tables (`suite`).
+--- - Compare results of two benchmarks (`compare`).
+--- - Basic console output for results (`print_result`).
+--- - Generate large dummy test suites for benchmarking the framework (`generate_large_test_suite`).
+---
+--- @module lib.tools.benchmark
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
 ---@class benchmark_module
----@field _VERSION string Module version (following semantic versioning)
----@field options {iterations?: number, warmup?: number, gc_collect?: boolean, measure_memory?: boolean, time_unit?: string, sort_by?: string, show_memory?: boolean, show_median?: boolean, show_min_max?: boolean, show_stddev?: boolean, precision?: number, compensate_overhead?: boolean, confidence_interval?: number} Configuration options for benchmarking behavior
----@field time fun(func: function, ...): {time: number, iterations: number, memory_before: number, memory_after: number, memory_used: number, median: number, min: number, max: number, stddev: number, samples: number[], unit: string, confidence_interval: table} Measure execution time of a function with detailed performance metrics
----@field run fun(name: string, func: function, options?: table, ...): {name: string, time: number, iterations: number, memory_before: number, memory_after: number, memory_used: number, median: number, min: number, max: number, stddev: number, samples: number[], unit: string, confidence_interval: table} Run a named benchmark with options and arguments
----@field compare fun(benchmarks: table): {fastest: string, slowest: string, memory_efficient: string, comparisons: table<string, table>, summary: table, relative_performance: table<string, number>, statistical_significance: table<string, boolean>} Compare multiple benchmark results with statistical analysis
----@field print_results fun(results: table, format?: string): nil Print formatted benchmark results in various formats (text, markdown, table)
----@field save_results fun(results: table, file_path: string, format?: string): boolean|nil, string? Save benchmark results to a file in the specified format
----@field load_results fun(file_path: string): table|nil, string? Load benchmark results from a file with format auto-detection
----@field gc fun(): nil Force garbage collection before benchmarking to reduce interference
----@field memory fun(): number Get current memory usage in kilobytes with high precision
----@field configure fun(options: table): benchmark_module Configure benchmark options for customized measurement
----@field reset fun(): benchmark_module Reset benchmark options to defaults for consistent behavior
----@field stats fun(results: table): {mean: number, median: number, min: number, max: number, stddev: number, variance: number, samples: number, confidence_interval: table} Calculate comprehensive statistics for benchmark results
----@field suite fun(suite_name: string, benchmarks: table<string, function>, options?: table): table Run a suite of benchmarks for convenient multiple function comparison
----@field async_time fun(func: function, callback: function, ...): nil Measure execution time asynchronously for non-blocking operations
----@field human_size fun(bytes: number, precision?: number): string Format a size in bytes to human-readable form with appropriate units
----@field human_time fun(time: number, unit?: string, precision?: number): string Format a time value to human-readable form with appropriate time units
----@field measure_call_overhead fun(): number Measure function call overhead for more accurate benchmarking
----@field histogram fun(results: table, buckets?: number): table Generate a histogram of benchmark results for visualization
----@field is_significant fun(benchmark1: table, benchmark2: table, confidence?: number): boolean Determine if performance difference is statistically significant
----@field plot fun(results: table, options?: table): string Generate ASCII or markdown chart of benchmark results
+---@field _VERSION string Module version (following semantic versioning).
+---@field options {iterations: number, warmup: number, precision: number, report_memory: boolean, report_stats: boolean, gc_before: boolean, include_warmup: boolean} Default configuration options.
+---@field measure fun(func: function, args?: table, options?: {iterations?: number, warmup?: number, gc_before?: boolean, include_warmup?: boolean, label?: string}): table|nil, table? Measures performance of a function. Returns results table or `nil, error`. @throws table If validation fails critically.
+---@field suite fun(suite_def: { name?: string, benchmarks: {name?: string, func: function, args?: table, options?: table}[] }, options?: { quiet?: boolean }): table Runs a suite of benchmarks. Returns suite results table. @throws table If validation fails critically.
+---@field compare fun(benchmark1: table, benchmark2: table, options?: { silent?: boolean }): table|nil, table? Compares results of two benchmarks. Returns comparison table or `nil, error`. @throws table If validation fails critically.
+---@field print_result fun(result: table, options?: { precision?: number, report_memory?: boolean, report_stats?: boolean, quiet?: boolean }): nil Prints a single benchmark result to console. @throws table If validation fails.
+---@field generate_large_test_suite fun(options?: { file_count?: number, tests_per_file?: number, nesting_level?: number, output_dir?: string, silent?: boolean }): table|nil, table? Generates a large set of test files for benchmarking the test runner. Returns summary table or `nil, error`. @throws table If validation or IO fails critically.
+---@field register_with_firmo fun(firmo: table): table Registers the benchmark module with the firmo instance. @throws table If validation fails.
+---@field time fun(...) [Not Implemented] Measure execution time of a function.
+---@field run fun(...) [Not Implemented] Run a named benchmark.
+---@field print_results fun(...) [Not Implemented] Print formatted benchmark results.
+---@field save_results fun(...) [Not Implemented] Save benchmark results to a file.
+---@field load_results fun(...) [Not Implemented] Load benchmark results from a file.
+---@field gc fun(...) [Not Implemented] Force garbage collection.
+---@field memory fun(...) [Not Implemented] Get current memory usage.
+---@field configure fun(...) [Not Implemented] Configure benchmark options.
+---@field reset fun(...) [Not Implemented] Reset benchmark options.
+---@field stats fun(...) [Not Implemented] Calculate comprehensive statistics.
+---@field async_time fun(...) [Not Implemented] Measure execution time asynchronously.
+---@field human_size fun(...) [Not Implemented] Format size in bytes.
+---@field human_time fun(...) [Not Implemented] Format time value (use `format_time` instead, currently internal).
+---@field measure_call_overhead fun(...) [Not Implemented] Measure function call overhead.
+---@field histogram fun(...) [Not Implemented] Generate a histogram.
+---@field is_significant fun(...) [Not Implemented] Determine statistical significance.
+---@field plot fun(...) [Not Implemented] Generate chart of results.
 
 local benchmark = {}
----@type Logging
-local logging = require("lib.tools.logging")
----@type ErrorHandler
-local error_handler = require("lib.tools.error_handler")
----@type Filesystem
-local fs = require("lib.tools.filesystem")
+
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("benchmark")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
 
 -- Compatibility function for table unpacking (works with both Lua 5.1 and 5.2+)
 local unpack_table = table.unpack or unpack
-
--- Initialize module logger
----@type Logger
-local logger = logging.get_logger("benchmark")
-logging.configure_from_config("benchmark")
 
 -- Default configuration
 benchmark.options = {
@@ -69,9 +135,13 @@ local has_socket, socket = pcall(require, "socket")
 ---@diagnostic disable-next-line: unused-local
 local has_ffi, ffi = pcall(require, "ffi")
 
+--- Gets high-resolution time using socket.gettime() if available, falling back to os.clock().
+--- Handles potential errors during socket call.
+---@return number time Time in seconds. Precision depends on availability (socket > os.clock > os.time).
+---@private
 local function high_res_time()
   ---@diagnostic disable-next-line: unused-local
-  local success, time, err = error_handler.try(function()
+  local success, time, err = get_error_handler().try(function()
     if has_socket then
       return socket.gettime()
     elseif has_ffi then
@@ -84,8 +154,8 @@ local function high_res_time()
   end)
 
   if not success then
-    logger.warn("Failed to get high-resolution time", {
-      error = error_handler.format_error(time),
+    get_logger().warn("Failed to get high-resolution time", {
+      error = get_error_handler().format_error(time),
       fallback = "using os.time()",
     })
     return os.time()
@@ -94,7 +164,11 @@ local function high_res_time()
   return time
 end
 
--- Calculate statistics for a series of measurements
+--- Calculates basic statistics (mean, min, max, stddev, count, total) for an array of numbers.
+--- Handles empty/invalid input and calculation errors gracefully.
+---@param measurements number[] Array of numerical measurements.
+---@return {mean: number, min: number, max: number, std_dev: number, count: number, total: number} stats A table containing calculated statistics. Returns zeros if input is empty or calculations fail.
+---@private
 local function calculate_stats(measurements)
   if not measurements or #measurements == 0 then
     return {
@@ -103,11 +177,11 @@ local function calculate_stats(measurements)
       max = 0,
       std_dev = 0,
       count = 0,
-      total = 0
+      total = 0,
     }
   end
 
-  local success, stats = error_handler.try(function()
+  local success, stats = get_error_handler().try(function()
     local sum = 0
     local min = measurements[1]
     local max = measurements[1]
@@ -134,13 +208,13 @@ local function calculate_stats(measurements)
       max = max,
       std_dev = std_dev,
       count = #measurements,
-      total = sum
+      total = sum,
     }
   end)
 
   if not success then
-    logger.error("Failed to calculate statistics", {
-      error = error_handler.format_error(stats),
+    get_logger().error("Failed to calculate statistics", {
+      error = get_error_handler().format_error(stats),
       measurements_count = #measurements,
     })
 
@@ -158,14 +232,18 @@ local function calculate_stats(measurements)
   return stats
 end
 
--- Deep table clone helper
+--- Performs a deep clone (recursive copy) of a table.
+--- Handles nested tables but currently does **not** handle cycles.
+---@param t table The table to clone.
+---@return table copy The deep copy of the table. Returns an empty table if cloning fails.
+---@private
 local function deep_clone(t)
   if type(t) ~= "table" then
     return t
   end
 
   ---@diagnostic disable-next-line: unused-local
-  local success, copy, err = error_handler.try(function()
+  local success, copy, err = get_error_handler().try(function()
     local result = {}
     for k, v in pairs(t) do
       if type(v) == "table" then
@@ -178,8 +256,8 @@ local function deep_clone(t)
   end)
 
   if not success then
-    logger.warn("Failed to deep clone table", {
-      error = error_handler.format_error(copy),
+    get_logger().warn("Failed to deep clone table", {
+      error = get_error_handler().format_error(copy),
       table_type = type(t),
       fallback = "returning empty table",
     })
@@ -189,34 +267,40 @@ local function deep_clone(t)
   return copy
 end
 
--- Measure function execution time
 --- Measure the execution time and performance metrics of a function
 ---@param func function The function to benchmark
----@param args table Arguments to pass to the function
----@param options? table Benchmark options (iterations, warmup, etc.)
----@return table results Detailed benchmark results including timing and stats
---- 
+---@param args? table Array-like table of arguments to pass to `func`.
+---@param options? {iterations?: number, warmup?: number, gc_before?: boolean, include_warmup?: boolean, label?: string} Optional benchmarking settings:
+---  - `iterations`: Number of times to run the main measurement loop.
+---  - `warmup`: Number of initial runs to discard (for JIT, cache).
+---  - `gc_before`: If true, run `collectgarbage` before each iteration.
+---  - `include_warmup`: If true, include warmup runs in the final statistics.
+---  - `label`: A name for this specific benchmark run.
+---@return table|nil results A table containing raw times (`times`), memory deltas (`memory`), configuration (`label`, `iterations`, `warmup`), and calculated statistics (`time_stats`, `memory_stats`). Returns `nil` if critical validation fails.
+---@return table? error Error object if measurement or calculation failed critically.
+---@throws table If `func` validation fails critically (via `error_handler.assert`).
+---
 --- The function safely measures both execution time and memory usage with robust
 --- error handling for memory measurement. If memory measurement fails, appropriate
 --- fallback values are used and warnings are logged.
 function benchmark.measure(func, args, options)
   -- Validate required parameters
-  error_handler.assert(
+  get_error_handler().assert(
     func ~= nil,
     "benchmark.measure requires a function to benchmark",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { func_provided = func ~= nil }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     type(func) == "function",
     "benchmark.measure requires a function to benchmark",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { func_type = type(func) }
   )
 
   -- Initialize options with defaults
-  local process_options_success, processed_options = error_handler.try(function()
+  local process_options_success, processed_options = get_error_handler().try(function()
     options = options or {}
 
     return {
@@ -229,8 +313,8 @@ function benchmark.measure(func, args, options)
   end)
 
   if not process_options_success then
-    logger.warn("Failed to process benchmark options", {
-      error = error_handler.format_error(processed_options),
+    get_logger().warn("Failed to process benchmark options", {
+      error = get_error_handler().format_error(processed_options),
       fallback = "using default options",
     })
 
@@ -263,7 +347,7 @@ function benchmark.measure(func, args, options)
   }
 
   -- Log benchmark start
-  logger.debug("Starting benchmark execution", {
+  get_logger().debug("Starting benchmark execution", {
     label = label,
     iterations = iterations,
     warmup = warmup,
@@ -274,84 +358,82 @@ function benchmark.measure(func, args, options)
   -- Warmup phase
   for i = 1, warmup do
     if gc_before then
-      error_handler.try(function()
+      get_error_handler().try(function()
         collectgarbage("collect")
       end)
     end
 
     -- Measure execution
     local start_time = high_res_time()
-    
+
     -- Properly handle start memory measurement
-    local start_memory_success, start_memory_value = error_handler.try(function()
+    local start_memory_success, start_memory_value = get_error_handler().try(function()
       return collectgarbage("count")
     end)
-    
+
     -- Use start_memory_value only when successful and numeric, otherwise default to 0
-    local start_memory = start_memory_success and type(start_memory_value) == "number" 
-      and start_memory_value or 0
-      
+    local start_memory = start_memory_success and type(start_memory_value) == "number" and start_memory_value or 0
+
     if not start_memory_success or type(start_memory_value) ~= "number" then
-      logger.warn("Failed to measure start memory", {
+      get_logger().warn("Failed to measure start memory", {
         label = label,
         iteration = i,
         memory_success = start_memory_success,
         memory_type = type(start_memory_value),
-        fallback = "using default 0 value"
+        fallback = "using default 0 value",
       })
     end
 
     -- Execute function with arguments
     ---@diagnostic disable-next-line: unused-local
-    local success, result, exec_err = error_handler.try(function()
+    local success, result, exec_err = get_error_handler().try(function()
       ---@diagnostic disable-next-line: param-type-mismatch
       return func(unpack_table(args_clone))
     end)
 
     if not success then
-      logger.warn("Benchmark function execution failed", {
-        error = error_handler.format_error(result),
+      get_logger().warn("Benchmark function execution failed", {
+        error = get_error_handler().format_error(result),
         label = label,
         iteration = i,
       })
     end
 
     local end_time = high_res_time()
-    
+
     -- Properly handle end memory measurement
-    local end_memory_success, end_memory_value = error_handler.try(function()
-      return collectgarbage("count") 
+    local end_memory_success, end_memory_value = get_error_handler().try(function()
+      return collectgarbage("count")
     end)
-    
+
     -- Use end_memory_value only when successful and numeric, otherwise fallback to start_memory
-    local end_memory = end_memory_success and type(end_memory_value) == "number" 
-      and end_memory_value or start_memory
-      
+    local end_memory = end_memory_success and type(end_memory_value) == "number" and end_memory_value or start_memory
+
     if not end_memory_success or type(end_memory_value) ~= "number" then
-      logger.warn("Failed to measure end memory", {
+      get_logger().warn("Failed to measure end memory", {
         label = label,
         iteration = i,
         memory_success = end_memory_success,
         memory_type = type(end_memory_value),
-        fallback = "using start_memory value"
+        fallback = "using start_memory value",
       })
     end
 
     -- Validate both memory values before arithmetic
-    local memory_diff = type(end_memory) == "number" and type(start_memory) == "number" 
-      and (end_memory - start_memory) or 0
-      
+    local memory_diff = type(end_memory) == "number" and type(start_memory) == "number" and (end_memory - start_memory)
+      or 0
+
     if type(end_memory) ~= "number" or type(start_memory) ~= "number" then
-      logger.warn("Invalid memory measurement values during warmup", {
+      get_logger().warn("Invalid memory measurement values during warmup", {
         label = label,
         iteration = i,
         warmup = true,
         end_memory_type = type(end_memory),
         start_memory_type = type(start_memory),
-        fallback = "using 0 as memory difference"
+        fallback = "using 0 as memory difference",
       })
     end
-    
+
     -- Store results with validated numeric values
     table.insert(results.times, end_time - start_time)
     table.insert(results.memory, memory_diff)
@@ -366,80 +448,78 @@ function benchmark.measure(func, args, options)
   -- Main benchmark phase
   for i = 1, iterations do
     if gc_before then
-      error_handler.try(function()
+      get_error_handler().try(function()
         collectgarbage("collect")
       end)
     end
 
-  -- Measure execution
+    -- Measure execution
     local start_time = high_res_time()
-    
+
     -- Properly handle start memory measurement
-    local start_memory_success, start_memory_value = error_handler.try(function()
+    local start_memory_success, start_memory_value = get_error_handler().try(function()
       return collectgarbage("count")
     end)
-    
+
     -- Use start_memory_value only when successful and numeric, otherwise default to 0
-    local start_memory = start_memory_success and type(start_memory_value) == "number" 
-      and start_memory_value or 0
-      
+    local start_memory = start_memory_success and type(start_memory_value) == "number" and start_memory_value or 0
+
     if not start_memory_success or type(start_memory_value) ~= "number" then
-      logger.warn("Failed to measure start memory", {
+      get_logger().warn("Failed to measure start memory", {
         label = label,
         iteration = i,
         memory_success = start_memory_success,
         memory_type = type(start_memory_value),
-        fallback = "using default 0 value"
+        fallback = "using default 0 value",
       })
     end
 
     -- Execute function with arguments
     ---@diagnostic disable-next-line: unused-local
-    local success, result, exec_err = error_handler.try(function()
+    local success, result, exec_err = get_error_handler().try(function()
       ---@diagnostic disable-next-line: param-type-mismatch
       return func(unpack_table(args_clone))
     end)
 
     if not success then
-      logger.warn("Benchmark function execution failed", {
-        error = error_handler.format_error(result),
+      get_logger().warn("Benchmark function execution failed", {
+        error = get_error_handler().format_error(result),
         label = label,
         iteration = i,
       })
     end
 
     local end_time = high_res_time()
-    
+
     -- Properly handle end memory measurement
-    local end_memory_success, end_memory_value = error_handler.try(function()
-      return collectgarbage("count") 
+    local end_memory_success, end_memory_value = get_error_handler().try(function()
+      return collectgarbage("count")
     end)
-    
+
     -- Use end_memory_value only when successful and numeric, otherwise fallback to start_memory
-    local end_memory = end_memory_success and type(end_memory_value) == "number" 
-      and end_memory_value or start_memory
-      
+    local end_memory = end_memory_success and type(end_memory_value) == "number" and end_memory_value or start_memory
+
     if not end_memory_success or type(end_memory_value) ~= "number" then
-      logger.warn("Failed to measure end memory", {
+      get_logger().warn("Failed to measure end memory", {
         label = label,
         iteration = i,
         memory_success = end_memory_success,
         memory_type = type(end_memory_value),
-        fallback = "using start_memory value"
+        fallback = "using start_memory value",
       })
     end
-    
+
     -- Validate both memory values before arithmetic
-    local memory_diff = type(end_memory) == "number" and type(start_memory) == "number" 
-      and (end_memory - start_memory) or 0
-      
+    local memory_diff = type(end_memory) == "number" and type(start_memory) == "number" and (end_memory - start_memory)
+      or 0
+
     if type(end_memory) ~= "number" or type(start_memory) ~= "number" then
-      logger.warn("Invalid memory measurement values", {
+      get_logger().warn("Invalid memory measurement values", {
         label = label,
         iteration = i,
         end_memory_type = type(end_memory),
         start_memory_type = type(start_memory),
-        fallback = "using 0 as memory difference"
+        fallback = "using 0 as memory difference",
       })
     end
 
@@ -449,14 +529,14 @@ function benchmark.measure(func, args, options)
   end
 
   -- Calculate statistics
-  local time_stats_success, time_stats = error_handler.try(function()
+  local time_stats_success, time_stats = get_error_handler().try(function()
     return calculate_stats(results.times)
   end)
-  
+
   if not time_stats_success then
-    logger.error("Failed to calculate time statistics", {
-      error = error_handler.format_error(time_stats),
-      times_count = #results.times
+    get_logger().error("Failed to calculate time statistics", {
+      error = get_error_handler().format_error(time_stats),
+      times_count = #results.times,
     })
     time_stats = {
       mean = 0,
@@ -464,19 +544,19 @@ function benchmark.measure(func, args, options)
       max = 0,
       std_dev = 0,
       count = #results.times,
-      total = 0
+      total = 0,
     }
   end
-  
+
   -- Calculate memory statistics
-  local memory_stats_success, memory_stats = error_handler.try(function()
+  local memory_stats_success, memory_stats = get_error_handler().try(function()
     return calculate_stats(results.memory)
   end)
-  
+
   if not memory_stats_success then
-    logger.error("Failed to calculate memory statistics", {
-      error = error_handler.format_error(memory_stats),
-      memory_samples_count = #results.memory
+    get_logger().error("Failed to calculate memory statistics", {
+      error = get_error_handler().format_error(memory_stats),
+      memory_samples_count = #results.memory,
     })
     memory_stats = {
       mean = 0,
@@ -484,43 +564,50 @@ function benchmark.measure(func, args, options)
       max = 0,
       std_dev = 0,
       count = #results.memory,
-      total = 0
+      total = 0,
     }
   end
-  
+
   -- Add stats to results
   results.time_stats = time_stats
   results.memory_stats = memory_stats
-  
-  return results
 
--- Suite function to run multiple benchmarks
+  return results
+end
+
+--- Runs a suite of benchmarks defined in a table.
+--- Each benchmark in the suite can have its own function, arguments, and options,
+--- merged with suite-level options. Prints results to console unless `options.quiet` is true.
+---@param suite_def { name?: string, benchmarks: {name?: string, func: function, args?: table, options?: table}[] } Definition of the suite. `benchmarks` is an array of benchmark definitions.
+---@param options? { quiet?: boolean } Options for the suite run. `quiet` suppresses console output.
+---@return table results A table summarizing the suite run: `{ name, benchmarks = {benchmark_results[]}, start_time, options, errors = {error_details[]}, end_time, duration }`.
+---@throws table If validation of `suite_def` or benchmark definitions fails critically.
 function benchmark.suite(suite_def, options)
   -- Validate suite definition
-  error_handler.assert(
+  get_error_handler().assert(
     suite_def ~= nil,
     "suite_def must be provided",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { suite_def_provided = suite_def ~= nil }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     type(suite_def) == "table",
     "suite_def must be a table",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { suite_def_type = type(suite_def) }
   )
 
   -- Process options and suite definition
-  local success, config = error_handler.try(function()
+  local success, config = get_error_handler().try(function()
     options = options or {}
     local suite_name = suite_def.name or "Benchmark Suite"
     local benchmarks = suite_def.benchmarks or {}
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(benchmarks) == "table",
       "suite_def.benchmarks must be a table",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { benchmarks_type = type(benchmarks) }
     )
 
@@ -533,8 +620,8 @@ function benchmark.suite(suite_def, options)
   end)
 
   if not success then
-    logger.error("Failed to process benchmark suite configuration", {
-      error = error_handler.format_error(config),
+    get_logger().error("Failed to process benchmark suite configuration", {
+      error = get_error_handler().format_error(config),
       fallback = "using default values",
     })
 
@@ -557,38 +644,38 @@ function benchmark.suite(suite_def, options)
   }
 
   -- Log suite start
-  logger.info("Running benchmark suite", { name = config.suite_name })
+  get_logger().info("Running benchmark suite", { name = config.suite_name })
 
   -- Print header for console output using safe output
   if not config.quiet then
-    local io_success = error_handler.safe_io_operation(function()
+    local io_success = get_error_handler().safe_io_operation(function()
       io.write("\n" .. string.rep("-", 80) .. "\n")
       io.write("Running benchmark suite: " .. config.suite_name .. "\n")
       io.write(string.rep("-", 80) .. "\n")
     end, "console", { operation = "write_header" })
 
     if not io_success then
-      logger.warn("Failed to write benchmark header to console")
+      get_logger().warn("Failed to write benchmark header to console")
     end
   end
 
   -- Run each benchmark
   for idx, benchmark_def in ipairs(config.benchmarks) do
-    local bench_success, bench_result = error_handler.try(function()
+    local bench_success, bench_result = get_error_handler().try(function()
       -- Extract benchmark definition
       local name = (benchmark_def.name or "Benchmark #") .. idx
 
-      error_handler.assert(
+      get_error_handler().assert(
         benchmark_def.func ~= nil,
         "Benchmark function is required",
-        error_handler.CATEGORY.VALIDATION,
+        get_error_handler().CATEGORY.VALIDATION,
         { benchmark_name = name }
       )
 
-      error_handler.assert(
+      get_error_handler().assert(
         type(benchmark_def.func) == "function",
         "Benchmark function must be a function",
-        error_handler.CATEGORY.VALIDATION,
+        get_error_handler().CATEGORY.VALIDATION,
         { benchmark_name = name, func_type = type(benchmark_def.func) }
       )
 
@@ -603,11 +690,11 @@ function benchmark.suite(suite_def, options)
       bench_options.label = name
 
       -- Log benchmark start
-      logger.debug("Running benchmark", { name = name, index = idx })
+      get_logger().debug("Running benchmark", { name = name, index = idx })
 
       -- Print to console if not quiet
       if not config.quiet then
-        error_handler.safe_io_operation(function()
+        get_error_handler().safe_io_operation(function()
           io.write("\nRunning: " .. name .. "\n")
         end, "console", { operation = "write_benchmark_name", benchmark_name = name })
       end
@@ -623,9 +710,9 @@ function benchmark.suite(suite_def, options)
     end)
 
     if not bench_success then
-      logger.error("Failed to execute benchmark", {
+      get_logger().error("Failed to execute benchmark", {
         index = idx,
-        error = error_handler.format_error(bench_result),
+        error = get_error_handler().format_error(bench_result),
       })
 
       -- Record the error
@@ -641,7 +728,7 @@ function benchmark.suite(suite_def, options)
   results.duration = results.end_time - results.start_time
 
   -- Log suite completion
-  logger.info("Benchmark suite completed", {
+  get_logger().info("Benchmark suite completed", {
     name = config.suite_name,
     duration_seconds = results.duration,
     benchmark_count = #results.benchmarks,
@@ -650,7 +737,7 @@ function benchmark.suite(suite_def, options)
 
   -- Print suite summary to console if not quiet
   if not config.quiet then
-    error_handler.safe_io_operation(function()
+    get_error_handler().safe_io_operation(function()
       io.write("\n" .. string.rep("-", 80) .. "\n")
       io.write("Suite complete: " .. config.suite_name .. "\n")
       io.write("Total runtime: " .. results.duration .. " seconds\n")
@@ -664,72 +751,73 @@ function benchmark.suite(suite_def, options)
   return results
 end
 
--- Comparison function for benchmarks
 --- Compare two benchmark results and calculate performance differences
----@param benchmark1 table First benchmark result
----@param benchmark2 table Second benchmark result
----@param options? table Comparison options
----@return table comparison Detailed comparison between benchmarks
+---@param benchmark1 table Benchmark result table (output from `benchmark.measure`).
+---@param benchmark2 table Second benchmark result table.
+---@param options? { silent?: boolean } Comparison options. `silent` suppresses console output.
+---@return table|nil comparison A table summarizing the comparison: `{ benchmarks, time_ratio, memory_ratio, faster, less_memory, time_percent, memory_percent }`, or `nil` on error.
+---@return table? error Error object if validation or comparison calculation fails.
+---@throws table If validation fails critically (via `error_handler.assert`).
 function benchmark.compare(benchmark1, benchmark2, options)
   -- Validate required parameters
-  error_handler.assert(
+  get_error_handler().assert(
     benchmark1 ~= nil,
     "benchmark.compare requires two benchmark results to compare",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { benchmark1_provided = benchmark1 ~= nil }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     benchmark2 ~= nil,
     "benchmark.compare requires two benchmark results to compare",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { benchmark2_provided = benchmark2 ~= nil }
   )
 
   -- Process options
-  local success, config = error_handler.try(function()
+  local success, config = get_error_handler().try(function()
     options = options or {}
 
     -- Validate benchmark objects
-    error_handler.assert(
+    get_error_handler().assert(
       type(benchmark1) == "table",
       "benchmark1 must be a benchmark result table",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { benchmark1_type = type(benchmark1) }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(benchmark2) == "table",
       "benchmark2 must be a benchmark result table",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { benchmark2_type = type(benchmark2) }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(benchmark1.time_stats) == "table",
       "benchmark1.time_stats must be a table",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { has_time_stats = type(benchmark1.time_stats) == "table" }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(benchmark2.time_stats) == "table",
       "benchmark2.time_stats must be a table",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { has_time_stats = type(benchmark2.time_stats) == "table" }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(benchmark1.memory_stats) == "table",
       "benchmark1.memory_stats must be a table",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { has_memory_stats = type(benchmark1.memory_stats) == "table" }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(benchmark2.memory_stats) == "table",
       "benchmark2.memory_stats must be a table",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { has_memory_stats = type(benchmark2.memory_stats) == "table" }
     )
 
@@ -744,63 +832,63 @@ function benchmark.compare(benchmark1, benchmark2, options)
   end)
 
   if not success then
-    logger.error("Failed to process benchmark comparison parameters", {
-      error = error_handler.format_error(config),
+    get_logger().error("Failed to process benchmark comparison parameters", {
+      error = get_error_handler().format_error(config),
     })
 
     -- Return an error result
     return nil,
-      error_handler.create(
+      get_error_handler().create(
         "Failed to process benchmark comparison parameters",
-        error_handler.CATEGORY.VALIDATION,
-        error_handler.SEVERITY.ERROR,
+        get_error_handler().CATEGORY.VALIDATION,
+        get_error_handler().SEVERITY.ERROR,
         { original_error = config }
       )
   end
 
   -- Calculate comparison
-  local compare_success, comparison = error_handler.try(function()
+  local compare_success, comparison = get_error_handler().try(function()
     -- Ensure stats have mean values
-    error_handler.assert(
+    get_error_handler().assert(
       type(config.benchmark1.time_stats.mean) == "number",
       "benchmark1.time_stats.mean must be a number",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { mean_type = type(config.benchmark1.time_stats.mean) }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(config.benchmark2.time_stats.mean) == "number",
       "benchmark2.time_stats.mean must be a number",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { mean_type = type(config.benchmark2.time_stats.mean) }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(config.benchmark1.memory_stats.mean) == "number",
       "benchmark1.memory_stats.mean must be a number",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { mean_type = type(config.benchmark1.memory_stats.mean) }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(config.benchmark2.memory_stats.mean) == "number",
       "benchmark2.memory_stats.mean must be a number",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { mean_type = type(config.benchmark2.memory_stats.mean) }
     )
 
     -- Avoid division by zero
-    error_handler.assert(
+    get_error_handler().assert(
       config.benchmark2.time_stats.mean ~= 0,
       "benchmark2.time_stats.mean cannot be zero",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { mean = config.benchmark2.time_stats.mean }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       config.benchmark2.memory_stats.mean ~= 0,
       "benchmark2.memory_stats.mean cannot be zero",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { mean = config.benchmark2.memory_stats.mean }
     )
 
@@ -819,22 +907,22 @@ function benchmark.compare(benchmark1, benchmark2, options)
   end)
 
   if not compare_success then
-    logger.error("Failed to calculate benchmark comparison", {
-      error = error_handler.format_error(comparison),
+    get_logger().error("Failed to calculate benchmark comparison", {
+      error = get_error_handler().format_error(comparison),
     })
 
     -- Return an error result
     return nil,
-      error_handler.create(
+      get_error_handler().create(
         "Failed to calculate benchmark comparison",
-        error_handler.CATEGORY.RUNTIME,
-        error_handler.SEVERITY.ERROR,
+        get_error_handler().CATEGORY.RUNTIME,
+        get_error_handler().SEVERITY.ERROR,
         { original_error = comparison }
       )
   end
 
   -- Log comparison results
-  logger.info("Benchmark comparison", {
+  get_logger().info("Benchmark comparison", {
     benchmark1 = config.label1,
     benchmark2 = config.label2,
     time_ratio = comparison.time_ratio,
@@ -847,7 +935,7 @@ function benchmark.compare(benchmark1, benchmark2, options)
 
   -- Print comparison to console if not silent
   if not config.silent then
-    error_handler.safe_io_operation(function()
+    get_error_handler().safe_io_operation(function()
       io.write("\n" .. string.rep("-", 80) .. "\n")
       io.write("Benchmark Comparison: " .. config.label1 .. " vs " .. config.label2 .. "\n")
       io.write(string.rep("-", 80) .. "\n")
@@ -885,41 +973,46 @@ function benchmark.compare(benchmark1, benchmark2, options)
   return comparison
 end
 
--- Print benchmark results
 --- Print formatted benchmark results to the console
----@param result table Benchmark result to print
----@param options? table Formatting options
+---@param result table Benchmark result table (output from `benchmark.measure`).
+---@param options? { precision?: number, report_memory?: boolean, report_stats?: boolean, quiet?: boolean } Formatting options:
+---  - `precision`: Decimal places for time/memory values.
+---  - `report_memory`: Include memory stats in output.
+---  - `report_stats`: Include min/max/stddev stats in output.
+---  - `quiet`: Suppress console output completely.
+---@return nil
+---@throws table If `result` validation fails critically.
 function benchmark.print_result(result, options)
   -- Validate required parameters
-  error_handler.assert(
+  get_error_handler().assert(
     result ~= nil,
     "benchmark.print_result requires a result table",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { result_provided = result ~= nil }
   )
 
   -- Process options and validate result
-  local success, config = error_handler.try(function()
+  local success, config = get_error_handler().try(function()
     options = options or {}
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(result) == "table",
       "result must be a table",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { result_type = type(result) }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(result.time_stats) == "table",
       "result.time_stats must be a table",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { has_time_stats = type(result.time_stats) == "table" }
     )
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(result.memory_stats) == "table",
       "result.memory_stats must be a table",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { has_memory_stats = type(result.memory_stats) == "table" }
     )
 
@@ -935,8 +1028,8 @@ function benchmark.print_result(result, options)
   end)
 
   if not success then
-    logger.error("Failed to process benchmark result printing parameters", {
-      error = error_handler.format_error(config),
+    get_logger().error("Failed to process benchmark result printing parameters", {
+      error = get_error_handler().format_error(config),
     })
 
     -- Cannot proceed with invalid parameters
@@ -944,8 +1037,8 @@ function benchmark.print_result(result, options)
   end
 
   -- Log benchmark results using safe access
-  local log_success = error_handler.try(function()
-    logger.debug("Benchmark result", {
+  local log_success = get_error_handler().try(function()
+    get_logger().debug("Benchmark result", {
       label = config.label,
       mean_time_seconds = config.result.time_stats.mean,
       min_time_seconds = config.result.time_stats.min,
@@ -958,7 +1051,7 @@ function benchmark.print_result(result, options)
   end)
 
   if not log_success then
-    logger.warn("Failed to log benchmark result details", {
+    get_logger().warn("Failed to log benchmark result details", {
       label = config.label,
     })
   end
@@ -969,7 +1062,7 @@ function benchmark.print_result(result, options)
   end
 
   -- Print results using safe I/O operations
-  error_handler.safe_io_operation(function()
+  get_error_handler().safe_io_operation(function()
     -- Basic execution time
     io.write(string.format("  Mean execution time: %s\n", format_time(config.result.time_stats.mean)))
 
@@ -1010,13 +1103,21 @@ end
 
 -- Load the filesystem module has been moved to the top of the file
 
--- Generate benchmark data for large test suites
---- Generate a large test suite for benchmarking purposes
----@param options? table Generation options
----@return table suite Generated test suite definition
+--- Generates a potentially large number of dummy Lua test files containing nested
+--- `describe` and `it` blocks. Useful for benchmarking the test runner itself.
+--- Writes files to the specified `output_dir`.
+---@param options? { file_count?: number, tests_per_file?: number, nesting_level?: number, output_dir?: string, silent?: boolean } Generation options:
+---  - `file_count`: Number of test files to generate.
+---  - `tests_per_file`: Target number of `it` blocks per file (approximate due to nesting).
+---  - `nesting_level`: Depth of nested `describe` blocks.
+---  - `output_dir`: Directory to write the generated files into.
+---  - `silent`: Suppress console output during generation.
+---@return table|nil summary A table summarizing the generation: `{ output_dir, file_count, successful_files, failed_files, tests_per_file, total_tests }`, or `nil` on error.
+---@return table? error Error object if validation or file I/O fails.
+---@throws table If validation or critical file I/O operations fail.
 function benchmark.generate_large_test_suite(options)
   -- Process options
-  local success, config = error_handler.try(function()
+  local success, config = get_error_handler().try(function()
     options = options or {}
 
     return {
@@ -1029,22 +1130,22 @@ function benchmark.generate_large_test_suite(options)
   end)
 
   if not success then
-    logger.error("Failed to process benchmark test suite generation options", {
-      error = error_handler.format_error(config),
+    get_logger().error("Failed to process benchmark test suite generation options", {
+      error = get_error_handler().format_error(config),
     })
 
     -- Return error
     return nil,
-      error_handler.create(
+      get_error_handler().create(
         "Failed to process benchmark test suite generation options",
-        error_handler.CATEGORY.VALIDATION,
-        error_handler.SEVERITY.ERROR,
+        get_error_handler().CATEGORY.VALIDATION,
+        get_error_handler().SEVERITY.ERROR,
         { original_error = config }
       )
   end
 
   -- Log generation start
-  logger.debug("Generating benchmark test suite", {
+  get_logger().debug("Generating benchmark test suite", {
     file_count = config.file_count,
     tests_per_file = config.tests_per_file,
     nesting_level = config.nesting_level,
@@ -1052,20 +1153,20 @@ function benchmark.generate_large_test_suite(options)
   })
 
   -- Ensure output directory exists
-  local dir_success, dir_err = error_handler.safe_io_operation(function()
-    return fs.ensure_directory_exists(config.output_dir)
+  local dir_success, dir_err = get_error_handler().safe_io_operation(function()
+    return get_fs().ensure_directory_exists(config.output_dir)
   end, config.output_dir, { operation = "ensure_directory_exists" })
 
   if not dir_success then
-    local error_obj = error_handler.io_error("Failed to create output directory", error_handler.SEVERITY.ERROR, {
+    local error_obj = get_error_handler().io_error("Failed to create output directory", get_error_handler().SEVERITY.ERROR, {
       directory = config.output_dir,
       operation = "ensure_directory_exists",
       original_error = dir_err,
     })
 
-    logger.error("Failed to create output directory", {
+    get_logger().error("Failed to create output directory", {
       directory = config.output_dir,
-      error = error_handler.format_error(error_obj),
+      error = get_error_handler().format_error(error_obj),
     })
 
     return nil, error_obj
@@ -1073,7 +1174,7 @@ function benchmark.generate_large_test_suite(options)
 
   -- Create test generator function with error handling
   local function generate_tests(level, prefix)
-    return error_handler.try(function()
+    return get_error_handler().try(function()
       if level <= 0 then
         return ""
       end
@@ -1116,22 +1217,22 @@ function benchmark.generate_large_test_suite(options)
   -- Create test files
   for i = 1, config.file_count do
     -- Generate file path
-    local file_path_success, file_path = error_handler.try(function()
-      return fs.join_paths(config.output_dir, "test_" .. i .. ".lua")
+    local file_path_success, file_path = get_error_handler().try(function()
+      return get_fs().join_paths(config.output_dir, "test_" .. i .. ".lua")
     end)
 
     if not file_path_success then
-      logger.error("Failed to generate file path", {
+      get_logger().error("Failed to generate file path", {
         index = i,
         output_dir = config.output_dir,
-        error = error_handler.format_error(file_path),
+        error = get_error_handler().format_error(file_path),
       })
       failure_count = failure_count + 1
       goto continue
     end
 
     -- Generate file content
-    local content_success, content = error_handler.try(function()
+    local content_success, content = get_error_handler().try(function()
       local header = "-- Generated large test suite file #"
         .. i
         .. "\n"
@@ -1151,29 +1252,29 @@ function benchmark.generate_large_test_suite(options)
     end)
 
     if not content_success then
-      logger.error("Failed to generate test file content", {
+      get_logger().error("Failed to generate test file content", {
         index = i,
         file_path = file_path,
-        error = error_handler.format_error(content),
+        error = get_error_handler().format_error(content),
       })
       failure_count = failure_count + 1
       goto continue
     end
 
     -- Write the file
-    logger.debug("Writing benchmark test file", {
+    get_logger().debug("Writing benchmark test file", {
       file_path = file_path,
       content_size = #content,
     })
 
-    local write_success, write_err = error_handler.safe_io_operation(function()
-      return fs.write_file(file_path, content)
+    local write_success, write_err = get_error_handler().safe_io_operation(function()
+      return get_fs().write_file(file_path, content)
     end, file_path, { operation = "write_file", content_size = #content })
 
     if not write_success then
-      logger.error("Failed to write test file", {
+      get_logger().error("Failed to write test file", {
         path = file_path,
-        error = error_handler.format_error(write_err),
+        error = get_error_handler().format_error(write_err),
       })
       failure_count = failure_count + 1
     else
@@ -1184,7 +1285,7 @@ function benchmark.generate_large_test_suite(options)
   end
 
   -- Log test generation results
-  logger.info("Generated test files for benchmark", {
+  get_logger().info("Generated test files for benchmark", {
     file_count = config.file_count,
     successful_files = success_count,
     failed_files = failure_count,
@@ -1194,7 +1295,7 @@ function benchmark.generate_large_test_suite(options)
 
   -- Print to console if not silent
   if not config.silent then
-    error_handler.safe_io_operation(function()
+    get_error_handler().safe_io_operation(function()
       io.write(
         "Generated "
           .. success_count
@@ -1221,23 +1322,23 @@ function benchmark.generate_large_test_suite(options)
   }
 end
 
--- Register the module with firmo
 --- Register benchmark functionality with the firmo framework
----@param firmo table The firmo framework instance
----@return benchmark_module The benchmark module instance
+---@param firmo table The firmo framework instance.
+---@return table firmo The `firmo` instance passed in (potentially modified if registration adds `firmo.benchmark`). Returns input `firmo` even on failure.
+---@throws table If `firmo` validation fails critically (via `error_handler.assert`).
 function benchmark.register_with_firmo(firmo)
   -- Validate input
-  error_handler.assert(
+  get_error_handler().assert(
     firmo ~= nil,
     "firmo must be provided",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { firmo_provided = firmo ~= nil }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     type(firmo) == "table",
     "firmo must be a table",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { firmo_type = type(firmo) }
   )
 
@@ -1245,17 +1346,17 @@ function benchmark.register_with_firmo(firmo)
   benchmark.firmo = firmo
 
   -- Add benchmarking capabilities to firmo
-  local success = error_handler.try(function()
+  local success = get_error_handler().try(function()
     firmo.benchmark = benchmark
     return true
   end)
 
   if not success then
-    logger.error("Failed to register benchmark module with firmo")
+    get_logger().error("Failed to register benchmark module with firmo")
     return firmo
   end
 
-  logger.debug("Benchmark module registered with firmo")
+  get_logger().debug("Benchmark module registered with firmo")
   return firmo
 end
 

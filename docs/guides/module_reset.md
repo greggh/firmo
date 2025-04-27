@@ -1,77 +1,24 @@
 # Module Reset Guide
 
-
 This guide explains how to use firmo's module reset functionality to improve test isolation and prevent test state from leaking between test cases.
 
 ## Why Module Reset Matters
 
-
 In Lua, modules are typically singletons - a module is loaded once and cached in `package.loaded`. This is normally efficient, but can cause problems in testing:
 
-
-1. **State Leakage**: If one test modifies a module's state, subsequent tests might see those modifications
-2. **Initialization Side Effects**: Modules with initialization side effects (database connections, file handles) may persist between tests
-3. **Memory Growth**: Long-running test suites can accumulate memory if modules hold references to large data structures
+1.  **State Leakage**: If one test modifies a module's state, subsequent tests might see those modifications
+2.  **Initialization Side Effects**: Modules with initialization side effects (database connections, file handles) may persist between tests
+3.  **Memory Growth**: Long-running test suites can accumulate memory if modules hold references to large data structures
 
 The module reset system solves these problems by providing ways to reload modules with fresh state.
+## Module Reset System (`lib.core.module_reset`)
 
-## Simple Module Reset Functions
-
-
-firmo provides two simple functions for resetting individual modules:
-
-### `firmo.reset_module(module_name)`
-
-
-This function resets a specific module by removing it from `package.loaded` and re-requiring it.
-
-
-```lua
--- Reset the database module before each test
-local db
-before_each(function()
-  db = firmo.reset_module("app.database")
-end)
-it("connects to the database", function()
-  -- Each test gets a fresh database module
-  expect(db.connect()).to.be_truthy()
-end)
-```
-
-
-
-### `firmo.with_fresh_module(module_name, function)`
-
-
-This function temporarily resets a module, runs your function with the fresh module, and then restores the original module state:
-
-
-```lua
-it("works with a clean configuration", function()
-  firmo.with_fresh_module("app.config", function(config)
-    -- The config module is fresh within this function
-    expect(config.initialized).to.equal(false)
-    config.set("debug", true)
-    expect(config.get("debug")).to.equal(true)
-  end)
-
-  -- Outside the function, the original module state is restored
-end)
-```
-
-
-
-## Enhanced Module Reset System
-
-
-For more comprehensive control, firmo includes the `module_reset` system which manages all modules and provides features like:
-
+For comprehensive control, firmo includes the `module_reset` system which manages all modules and provides features like:
 
 - Automatic module reset between test files
 - Selective module reset by pattern
 - Protection of core modules from reset
 - Memory usage tracking
-
 
 ### Basic Setup
 
@@ -170,10 +117,14 @@ When testing database operations, reset the database module before each test:
 describe("User database", function()
   local db
 
-  before_each(function()
-    -- Get a fresh database module
-    db = firmo.reset_module("app.database")
+  before(function()
+    -- Get a fresh database module (Assuming db module exists)
+    -- NOTE: firmo.reset_module does not exist; this demonstrates the *concept*.
+    -- In practice, you'd use the enhanced module_reset system or other isolation techniques.
+    local db_module = require("app.database") -- Placeholder
 
+    -- Connect to test database
+    db = db_module.connect({
     -- Connect to test database
     db.connect({
       driver = "sqlite",
@@ -184,9 +135,9 @@ describe("User database", function()
     db.execute("CREATE TABLE users (id INTEGER, name TEXT)")
   end)
 
-  after_each(function()
+  after(function()
     -- Clean up
-    db.disconnect()
+    if db then db:disconnect() end
   end)
 
   it("creates a user", function()
@@ -222,10 +173,13 @@ describe("Application with different configs", function()
   local config
   local app
 
-  before_each(function()
-    -- Reset both the config and app modules
-    config = firmo.reset_module("app.config")
-    app = firmo.reset_module("app.core")
+  before(function()
+    -- Reset both the config and app modules (Conceptual example)
+    -- NOTE: firmo.reset_module does not exist. Use enhanced system or other techniques.
+    local config_module = require("app.config") -- Placeholder
+    local app_module = require("app.core") -- Placeholder
+    config = config_module -- Use fresh instance
+    app = app_module -- Use fresh instance
   end)
 
   it("works in development mode", function()
@@ -258,9 +212,11 @@ When a module has dependencies, reset the highest-level module to ensure all dep
 describe("Authentication service", function()
   local auth
 
-  before_each(function()
-    -- This will cause all dependencies to be re-required
-    auth = firmo.reset_module("app.services.auth")
+  before(function()
+    -- This will cause all dependencies to be re-required (Conceptual example)
+    -- NOTE: firmo.reset_module does not exist. Use enhanced system.
+    local auth_module = require("app.services.auth") -- Placeholder
+    auth = auth_module -- Use fresh instance
   end)
 
   it("authenticates valid users", function()
@@ -371,7 +327,7 @@ module_reset.configure({
   verbose = os.getenv("VERBOSE") == "1"
 })
 -- This will now automatically reset modules between test files
-firmo.run_test_files(test_files)
+firmo.run_tests(test_files)
 ```
 
 
@@ -398,12 +354,4 @@ module_reset.reset_pattern("app%.controllers%.")
 
 ## Summary
 
-
-Module reset functionality is a powerful tool for maintaining test isolation and preventing test contamination. Use:
-
-
-- `firmo.reset_module` for basic per-test module reset
-- `firmo.with_fresh_module` for temporary isolated module usage 
-- `module_reset` system for comprehensive module management
-
-The right approach depends on your testing needs - from simple reset of individual modules to complete isolation between test files.
+The `module_reset` system (`lib/core/module_reset.lua`) provides powerful tools for managing module state and test isolation, including automatic reset between files, selective reset, and memory tracking. By integrating it into your test runner setup, you can significantly improve the reliability and independence of your tests.

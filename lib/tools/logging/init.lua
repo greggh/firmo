@@ -1,82 +1,93 @@
---[[
-    Centralized Logging System for the Firmo Framework
+--- Centralized Logging System for the Firmo Framework
+---
+--- This module provides a comprehensive, structured logging system with support
+--- for multiple output formats, log levels, and context-enriched messages. It
+--- integrates with the central configuration system and supports both global
+--- and per-module logging configuration.
+---
+--- Features:
+--- - Named logger instances (`get_logger`) with independent configuration.
+--- - Hierarchical log levels (`DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `TRACE`).
+--- - Structured logging with context tables (`params`).
+--- - Configurable output formats (`text`, `json`) and destinations (console, file).
+--- - Color-coded console output.
+--- - File logging with size-based rotation.
+--- - Module filtering (whitelist/blacklist).
+--- - Log buffering for performance.
+--- - Integration with other tools (search, export, formatter_integration).
+--- - Test-aware log suppression.
+---
+--- @module lib.tools.logging
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
-    This module provides a comprehensive, structured logging system with support
-    for multiple output formats, log levels, and context-enriched messages. It
-    integrates with the central configuration system and supports both global
-    and per-module logging configuration.
+---@class logger_instance Represents a logger instance bound to a specific module name.
+--- Provides methods for logging at different levels and checking if levels are enabled.
+---@field fatal fun(message: string, params?: table): boolean Logs a message at FATAL level.
+---@field error fun(message: string, params?: table): boolean Logs a message at ERROR level.
+---@field warn fun(message: string, params?: table): boolean Logs a message at WARN level.
+---@field info fun(message: string, params?: table): boolean Logs a message at INFO level.
+---@field debug fun(message: string, params?: table): boolean Logs a message at DEBUG level.
+---@field trace fun(message: string, params?: table): boolean Logs a message at TRACE level.
+---@field verbose fun(message: string, params?: table): boolean Logs a message at TRACE level (alias for trace).
+---@field log fun(level: number, message: string, params?: table): boolean Logs a message at a specific numeric level.
+---@field would_log fun(level: string|number): boolean Checks if a log at a level would be output for this logger.
+---@field is_fatal_enabled fun(): boolean Checks if FATAL level is enabled.
+---@field is_error_enabled fun(): boolean Checks if ERROR level is enabled.
+---@field is_warn_enabled fun(): boolean Checks if WARN level is enabled.
+---@field is_info_enabled fun(): boolean Checks if INFO level is enabled.
+---@field is_debug_enabled fun(): boolean Checks if DEBUG level is enabled.
+---@field is_trace_enabled fun(): boolean Checks if TRACE level is enabled.
+---@field is_verbose_enabled fun(): boolean Checks if TRACE level is enabled (alias).
+---@field get_level fun(): number Gets the effective numeric log level for this logger instance.
+---@field get_name fun(): string Gets the name of this logger instance.
+---@field set_level fun(level: number|string): logger_instance Sets the log level specifically for this logger instance. @throws error If level is invalid.
+---@field with_context fun(context: table): logger_instance Creates a new logger instance that includes the provided context in all its log entries.
 
-    Features:
-    - Named logger instances with independent configuration
-    - Hierarchical log levels (DEBUG, INFO, WARN, ERROR, FATAL)
-    - Structured logging with context objects
-    - Configurable output formats and destinations
-    - Color-coded console output
-    - File logging with rotation
-    - Log search and filtering capabilities
-    - Integration with external logging systems
-    - Context inheritance and enrichment
-    - Source location tracking
-    - Performance-optimized logging
-    - Test-aware log suppression
-
-    The logging system serves as a foundation for debugging, monitoring, and
-    diagnostics throughout the framework, providing consistent log formatting
-    and centralized control over verbosity.
-
-    @module logging
-    @author Firmo Team
-    @license MIT
-    @copyright 2023-2025
-    @version 1.0.0
-]]
-
----@class logging
----@field _VERSION string Module version
----@field DEBUG number Debug log level (most verbose)
----@field INFO number Info log level
----@field WARN number Warning log level
----@field ERROR number Error log level (least verbose)
----@field get_logger fun(name: string): logger_instance Create a named logger instance
----@field get_configured_logger fun(name: string): logger_instance Create and configure a named logger instance
----@field configure fun(options: {level?: number|string, file?: string, format?: string, console?: boolean, max_file_size?: number, include_source?: boolean, include_timestamp?: boolean, include_level?: boolean, include_colors?: boolean, colors?: table<string, string>}): logging Configure the logging system
----@field configure_from_config fun(config_key: string): logging Configure logging from central config
----@field reset fun(): logging Reset logging to defaults
----@field disable fun(): logging Disable all logging
----@field enable fun(): logging Re-enable logging
----@field is_enabled fun(): boolean Check if logging is enabled
----@field get_level fun(): number Get current log level
----@field get_current_config fun(): table Get current logging configuration
----@field formats table<string, string> Built-in formatting patterns
----@field register_formatter fun(name: string, formatter: fun(log_entry: table): string): boolean Register a custom formatter
----@field log fun(level: number, message: string, context?: table, source?: string): boolean Log a message with level
----@field debug fun(message: string, context?: table, source?: string): boolean Log a debug message
----@field info fun(message: string, context?: table, source?: string): boolean Log an info message
----@field warn fun(message: string, context?: table, source?: string): boolean Log a warning message
----@field error fun(message: string, context?: table, source?: string): boolean Log an error message
----@field search_logs fun(pattern: string, options?: table): table Search logs for a pattern
----@field flush fun(): boolean Flush pending log messages
-
----@class logger_instance
----@field debug fun(message: string, context?: table): boolean Log a debug message
----@field info fun(message: string, context?: table): boolean Log an info message
----@field warn fun(message: string, context?: table): boolean Log a warning message
----@field error fun(message: string, context?: table): boolean Log an error message
----@field is_debug_enabled fun(): boolean Check if debug logging is enabled
----@field is_info_enabled fun(): boolean Check if info logging is enabled
----@field is_warn_enabled fun(): boolean Check if warning logging is enabled
----@field is_error_enabled fun(): boolean Check if error logging is enabled
----@field set_level fun(level: number|string): logger_instance Set log level for this logger instance
----@field get_level fun(): number Get log level for this logger instance
----@field get_name fun(): string Get logger name
----@field configure fun(options: table): logger_instance Configure this logger instance
----@field log fun(level: number, message: string, context?: table): boolean Log a message with level
----@field with_context fun(context: table): logger_instance Create a logger with predefined context
+---@class logging The public API of the logging module.
+---@field _VERSION string Module version.
+---@field LEVELS table<string, number> Log level constants: FATAL=0, ERROR=1, WARN=2, INFO=3, DEBUG=4, TRACE=5, VERBOSE=5.
+---@field FATAL number Fatal log level constant (0).
+---@field ERROR number Error log level constant (1).
+---@field WARN number Warning log level constant (2).
+---@field INFO number Info log level constant (3).
+---@field DEBUG number Debug log level constant (4).
+---@field TRACE number Trace log level constant (5).
+---@field VERBOSE number Verbose log level constant (5, alias for TRACE).
+---@field get_logger fun(module_name: string): logger_instance Creates or retrieves a logger instance for a specific module name with optional error handler configuration.
+---@field get_configured_logger fun(module_name: string): logger_instance Alias for `get_logger` (configuration is now applied automatically).
+---@field configure fun(options?: {level?: number|string, module_levels?: table<string, number|string>, timestamps?: boolean, use_colors?: boolean, output_file?: string|nil, log_dir?: string, silent?: boolean, max_file_size?: number, max_log_files?: number, date_pattern?: string, format?: "text"|"json", json_file?: string|nil, module_filter?: string|string[]|nil, module_blacklist?: string[], buffer_size?: numblocal M = {}
 
 local M = {}
 
--- Try to import filesystem module (might not be available during first load)
-local fs
+--- Module version
+M._VERSION = "1.0.0"
+
+-- Local helper for safe requires without dependency on error_handler
+--- @private
+--- @return table|nil a module
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+-- Load optional components (lazy loading to avoid circular dependencies)
+local error_handler_module, fs_module, search_module, export_module, formatter_integration_module
+
+--- gets the error handler for the filesystem module
+local function get_error_handler()
+  if not error_handler_module then
+    error_handler_module = try_require("lib.tools.error_handler")
+  end
+  return error_handler_module
+end
+
 --- Get the filesystem module using lazy loading
 --- This helper function implements lazy loading for the filesystem module,
 --- which is needed for all file operations like writing logs, creating
@@ -84,16 +95,13 @@ local fs
 --- dependencies and improves module initialization time.
 ---
 --- @private
---- @return table The filesystem module
+--- @return table|nil The filesystem module
 local function get_fs()
-  if not fs then
-    fs = require("lib.tools.filesystem")
+  if not fs_module then
+    fs_module = try_require("lib.tools.filesystem")
   end
-  return fs
+  return fs_module
 end
-
--- Load optional components (lazy loading to avoid circular dependencies)
-local search_module, export_module, formatter_integration_module
 
 --- Get the search module for log searching functionality using lazy loading
 --- This helper function lazily loads the log search module, which provides
@@ -104,10 +112,7 @@ local search_module, export_module, formatter_integration_module
 --- @return table|nil The search module or nil if not available
 local function get_search()
   if not search_module then
-    local success, module = pcall(require, "lib.tools.logging.search")
-    if success then
-      search_module = module
-    end
+    local search_module = try_require("lib.tools.logging.search")
   end
   return search_module
 end
@@ -122,10 +127,7 @@ end
 --- @return table|nil The export module or nil if not available
 local function get_export()
   if not export_module then
-    local success, module = pcall(require, "lib.tools.logging.export")
-    if success then
-      export_module = module
-    end
+    local export_module = try_require("lib.tools.logging.export")
   end
   return export_module
 end
@@ -139,17 +141,15 @@ end
 --- @return table|nil The formatter integration module or nil if not available
 local function get_formatter_integration()
   if not formatter_integration_module then
-    local success, module = pcall(require, "lib.tools.logging.formatter_integration")
-    if success then
-      formatter_integration_module = module
-    end
+    local formatter_integration_module = try_require("lib.tools.logging.formatter_integration")
   end
   return formatter_integration_module
 end
 
 --- Convert a log level from string or number to its numeric value
---- @param level string|number The log level to normalize
---- @return number|nil The numeric log level value, or nil if invalid
+---@param level string|number The log level to normalize (e.g., "INFO", M.LEVELS.INFO).
+---@return number|nil The numeric log level value, or `nil` if invalid.
+---@private
 local function normalize_log_level(level)
   if type(level) == "number" then
     -- Verify it's a valid level number
@@ -241,16 +241,18 @@ local buffer = {
   last_flush_time = os.time(),
 }
 
---- Get current timestamp formatted for logs
----@return string The formatted timestamp
+--- Gets the current timestamp formatted as "YYYY-MM-DD HH:MM:SS".
+---@return string The formatted timestamp string.
+---@private
 local function get_timestamp()
   return os.date("%Y-%m-%d %H:%M:%S")
 end
 
 --- Check if logging is enabled for a specific level and module
----@param level number The log level to check
----@param module_name? string The module name to check
----@return boolean Whether logging is enabled for this level and module
+---@param level number The numeric log level to check.
+---@param module_name? string The optional module name to check against specific levels/filters.
+---@return boolean `true` if logging is enabled for this level and module context, `false` otherwise.
+---@private
 local function is_enabled(level, module_name)
   if config.silent then
     return false
@@ -344,12 +346,13 @@ local function is_enabled(level, module_name)
   return level <= global_level
 end
 
---- Format a log message for text output
----@param level number The log level
----@param module_name? string The module name
----@param message string The log message
----@param params? table Additional parameters to include in the log
----@return string The formatted log message
+--- Includes timestamp, level (colorized if enabled), module name, message, and parameters.
+---@param level number The numeric log level.
+---@param module_name? string The optional module name.
+---@param message string The log message.
+---@param params? table Additional context parameters.
+---@return string The formatted log message string.
+---@private
 local function format_log(level, module_name, message, params)
   local parts = {}
 
@@ -375,7 +378,7 @@ local function format_log(level, module_name, message, params)
   end
 
   -- Add the message
-  table.insert(parts, message or "")
+  table.insert(parts, tostring(message or ""))
 
   -- Add parameters as a formatted string if provided
   if params and type(params) == "table" and next(params) ~= nil then
@@ -401,17 +404,24 @@ local function format_log(level, module_name, message, params)
   return table.concat(parts, " | ")
 end
 
---- Ensure the log directory exists before writing log files
---- This helper function checks if the configured log directory exists
---- and creates it if necessary. It handles any errors that might occur
---- during directory creation by printing a warning to the console.
----
---- @private
---- @return boolean Whether the directory exists or was successfully created
+--- Ensures the configured log directory exists, creating it if necessary.
+---@return boolean `true` if the directory exists or was successfully created, `false` otherwise (logs warning).
+---@private
 local function ensure_log_dir()
-  local fs = get_fs()
   if config.log_dir then
-    local success, err = fs.ensure_directory_exists(config.log_dir)
+    local success, err
+    local fs = get_fs()
+    if fs then
+      success, err = get_error_handler().safe_io_operation(function()
+        return fs.ensure_directory_exists(config.log_dir)
+      end, config.log_dir, { operation = "ensure_log_dir" })
+    elseif fs then
+      success, err = pcall(fs.ensure_directory_exists, config.log_dir)
+      if not success then
+        err = tostring(err)
+      end
+    end
+
     if not success then
       print("Warning: Failed to create log directory: " .. (err or "unknown error"))
       return false
@@ -421,13 +431,9 @@ local function ensure_log_dir()
   return true -- No directory configured means no need to create
 end
 
---- Get the full path to the log file, considering absolute and relative paths
---- This helper function resolves the configured log file path, handling both
---- absolute paths and paths relative to the log directory. It ensures consistent
---- path handling throughout the logging system.
----
---- @private
---- @return string|nil The full path to the log file or nil if not configured
+--- Gets the fully resolved path to the main text log file based on configuration.
+---@return string|nil The absolute or relative path string, or `nil` if `config.output_file` is not set.
+---@private
 local function get_log_file_path()
   if not config.output_file then
     return nil
@@ -454,17 +460,16 @@ end
 --- - Current log: logfile.log
 --- - Previous logs: logfile.log.1, logfile.log.2, etc.
 --- - Oldest logs are deleted when rotation count exceeds max_log_files
----
---- @private
---- @return boolean Whether rotation was successful
+---@return boolean `true` if rotation was performed successfully, `false` if rotation was not needed or failed.
+---@private
 local function rotate_log_files()
-  local fs = get_fs()
   local log_path = get_log_file_path()
   if not log_path then
     return false
   end
 
   -- Check if we need to rotate
+  local fs = get_fs()
   if not fs.file_exists(log_path) then
     return false
   end
@@ -487,19 +492,16 @@ local function rotate_log_files()
   return fs.move_file(log_path, log_path .. ".1")
 end
 
---- Encode a Lua value as a JSON string
---- This helper function implements a lightweight JSON encoder that converts
---- Lua values (strings, numbers, booleans, tables) to their JSON representation.
---- It handles special cases like NaN and Infinity, and truncates large tables
---- to prevent excessive output. This function is used for structured logging
---- to generate JSON-formatted log entries.
----
---- @private
---- @param val any The Lua value to encode as JSON
---- @return string The JSON string representation of the value
+--- Encodes a Lua value to its JSON string representation. Handles basic types and tables.
+--- Limits table depth/items for performance.
+---@param val any The Lua value to encode.
+---@return string The JSON string representation. Returns string representation of type for unsupported types.
+---@private
 local function json_encode_value(val)
   local json_type = type(val)
-  if json_type == "string" then
+  if json_type == "nil" then
+    return "null"
+  elseif json_type == "string" then
     -- Escape special characters in strings
     return '"'
       .. val
@@ -574,28 +576,22 @@ local function json_encode_value(val)
       end
       result = result .. "}"
     end
-
     return result
-  elseif json_type == "nil" then
-    return "null"
+  -- Moved nil check to the beginning
   else
     -- Function, userdata, thread, etc. can't be directly represented in JSON
     return '"' .. tostring(val):gsub('"', '\\"') .. '"'
   end
 end
 
---- Format a log entry as a JSON string for structured logging
---- This helper function creates a JSON representation of a log entry, including
---- standard fields (timestamp, level, module, message) and any additional
---- context parameters. The resulting JSON string can be written to log files
---- or sent to external logging systems that consume structured logs.
----
---- @private
---- @param level number The numeric log level
---- @param module_name? string The module name that generated the log
---- @param message string The log message text
---- @param params? table Additional context parameters to include
---- @return string The JSON string representation of the log entry
+--- Formats a log entry into a JSON string.
+--- Includes standard fields (timestamp, level, module, message) and merges standard metadata and call parameters.
+---@param level number The numeric log level.
+---@param module_name? string The optional module name.
+---@param message string The log message.
+---@param params? table Additional context parameters.
+---@return string The JSON string representation of the log entry.
+---@private
 local function format_json(level, module_name, message, params)
   -- Use ISO8601-like timestamp format for JSON logs
   local timestamp = os.date("%Y-%m-%dT%H:%M:%S")
@@ -627,13 +623,9 @@ local function format_json(level, module_name, message, params)
   return "{" .. table.concat(json_parts, ",") .. "}"
 end
 
---- Get the full path to the JSON log file
---- This helper function resolves the configured JSON log file path, handling
---- both absolute paths and paths relative to the log directory. It works
---- similarly to get_log_file_path() but for the structured JSON logs.
----
---- @private
---- @return string|nil The full path to the JSON log file or nil if not configured
+--- Gets the fully resolved path to the JSON log file based on configuration.
+---@return string|nil The absolute or relative path string, or `nil` if `config.json_file` is not set.
+---@private
 local function get_json_log_file_path()
   if not config.json_file then
     return nil
@@ -652,17 +644,16 @@ end
 --- This helper function implements log rotation for JSON-formatted log files,
 --- which prevents them from growing too large. It works similarly to
 --- rotate_log_files() but specifically for structured JSON logs.
----
---- @private
---- @return boolean Whether rotation was successful
+---@return boolean `true` if rotation was performed successfully, `false` if rotation was not needed or failed.
+---@private
 local function rotate_json_log_files()
-  local fs = get_fs()
   local log_path = get_json_log_file_path()
   if not log_path then
     return false
   end
 
   -- Check if we need to rotate
+  local fs = get_fs()
   if not fs.file_exists(log_path) then
     return false
   end
@@ -685,21 +676,17 @@ local function rotate_json_log_files()
   return fs.move_file(log_path, log_path .. ".1")
 end
 
---- Flush buffered log messages to disk
---- This helper function writes all buffered log messages to the configured
---- output files. It's called automatically when the buffer fills up or after
---- the flush interval elapses, and can also be called manually via the flush()
---- public method. Buffering improves performance by reducing I/O operations.
----
---- @private
---- @return boolean Whether the flush operation was successful
+--- Writes all buffered log entries to configured output files (text and/or JSON).
+--- Clears the buffer afterwards. Logs warnings if file writing fails.
+---@return boolean `true` if flush was successful (or nothing to flush), `false` if any write operation failed.
+---@private
 local function flush_buffer()
   if buffer.count == 0 then
     return true -- Nothing to flush is considered successful
   end
 
-  local fs = get_fs()
   local success = true
+  local fs = get_fs()
 
   -- Regular log file
   if config.output_file then
@@ -712,7 +699,18 @@ local function flush_buffer()
     end
 
     -- Append to log file
-    local file_success, err = fs.append_file(log_path, content)
+    local file_success, err
+    if fs then
+      file_success, err = get_error_handler().safe_io_operation(function()
+        return fs.append_file(log_path, content)
+      end, log_path, { operation = "append_text_log" })
+    elseif fs then
+      file_success, err = pcall(fs.append_file, log_path, content)
+      if not file_success then
+        err = tostring(err)
+      end
+    end
+
     if not file_success then
       print("Warning: Failed to write to log file: " .. (err or "unknown error"))
       success = false
@@ -730,12 +728,14 @@ local function flush_buffer()
     end
 
     -- Append to JSON log file
-    local json_success, err = fs.append_file(json_log_path, json_content)
+    local json_success, err = get_error_handler().safe_io_operation(function()
+      return fs.append_file(json_log_path, json_content)
+    end, json_log_path, { operation = "append_json_log" }) or fs.append_file(json_log_path, json_content) -- Use safe op if available
     if not json_success then
       print("Warning: Failed to write to JSON log file: " .. (err or "unknown error"))
       success = false
     end
-  end
+  end -- Added missing end for 'if config.json_file then'
 
   -- Reset buffer
   buffer.entries = {}
@@ -743,41 +743,14 @@ local function flush_buffer()
   buffer.last_flush_time = os.time()
 
   return success
-end
+end -- This closes flush_buffer function correctly
 
---- Lazy-load the error_handler module to avoid circular dependencies
---- This helper function implements lazy loading for the error_handler module,
---- which helps prevent circular dependencies that can occur during module
---- initialization. It attempts to load the module only when needed and
---- caches the result to avoid repeated require attempts.
----
---- @private
---- @return table|nil The error_handler module or nil if it couldn't be loaded
-local _error_handler
-local function get_error_handler()
-  if not _error_handler then
-    local success, module = pcall(require, "lib.tools.error_handler")
-    if success then
-      _error_handler = module
-    end
-  end
-  return _error_handler
-end
-
---- Check if the current test is designed to expect errors
---- This helper function integrates with the error_handler module to determine
---- if the current running test is marked as expecting errors. This allows the
---- logging system to handle error logs differently during tests that are
---- deliberately testing error conditions.
----
---- @private
---- @return boolean Whether the current test expects errors
+---@return boolean `true` if the current test expects errors, `false` otherwise.
+---@private
 local function current_test_expects_errors()
-  local error_handler = get_error_handler()
-
   -- If error_handler is loaded and has the function, call it
-  if error_handler and error_handler.current_test_expects_errors then
-    return error_handler.current_test_expects_errors()
+  if get_error_handler().current_test_expects_errors then
+    return get_error_handler().current_test_expects_errors()
   end
 
   -- Default to false if we couldn't determine
@@ -806,35 +779,20 @@ end
 --- buffering, and rotation. All public logging methods ultimately call this
 --- function to perform the actual logging operation.
 ---
---- @private
---- @param level number The numeric log level for this message
---- @param module_name? string The module name (source) of the log message
---- @param message string The log message text
---- @param params? table Additional context parameters to include with the log
---- @return boolean Whether the log message was output
+---@param level number The numeric log level for this message.
+---@param module_name? string The module name (source) of the log message.
+---@param message string The log message text.
+---@param params? table Additional context parameters to include with the log.
+---@return boolean `true` if the log message was processed (not necessarily written yet if buffered), `false` if filtered out.
+---@private
 local function log(level, module_name, message, params)
   -- For expected errors in tests, either filter or log expected errors
   if level <= M.LEVELS.WARN then
     if current_test_expects_errors() then
-      -- Prefix message to indicate this is an expected error
-      message = "[EXPECTED] " .. message
-
-      -- Store the error in the global error repository for potential debugging
-      local error_handler = get_error_handler()
-      if error_handler then
-        _G._firmo_test_expected_errors = _G._firmo_test_expected_errors or {}
-        table.insert(_G._firmo_test_expected_errors, {
-          level = level,
-          module = module_name,
-          message = message,
-          params = params,
-          timestamp = os.time(),
-        })
-      end
+      -- Expected error handling (downgrading level or debug override) happens below
 
       -- In debug mode (--debug flag), make all expected errors visible regardless of module
       if _G._firmo_debug_mode then
-        -- Override the level check below for expected errors
         -- Force immediate logging - we do this by keeping the original level (ERROR or WARN)
         -- but setting a special flag that skips the is_enabled() check
         params = params or {}
@@ -843,7 +801,7 @@ local function log(level, module_name, message, params)
         -- Downgrade to DEBUG level - which may or may not be visible depending on module config
         level = M.LEVELS.DEBUG
       end
-    end
+    end -- End of 'if current_test_expects_errors() then'
   end
 
   -- Check if this log should be shown (unless it's an expected error with debug override)
@@ -897,7 +855,6 @@ local function log(level, module_name, message, params)
     return true
   end
 
-  -- Direct file output (no buffering)
   local fs = get_fs()
 
   -- Output to regular text log file if configured
@@ -916,7 +873,9 @@ local function log(level, module_name, message, params)
     end
 
     -- Append to the log file
-    local success, err = fs.append_file(log_path, formatted_text .. "\n")
+    local success, err = get_error_handler().safe_io_operation(function()
+      return fs.append_file(log_path, formatted_text .. "\n")
+    end, log_path, { operation = "append_text_log_direct" }) or fs.append_file(log_path, formatted_text .. "\n") -- Use safe op if available
     if not success then
       print("Warning: Failed to write to log file: " .. (err or "unknown error"))
     end
@@ -938,7 +897,12 @@ local function log(level, module_name, message, params)
     end
 
     -- Append to the JSON log file
-    local success, err = fs.append_file(json_log_path, formatted_json .. "\n")
+    local success, err = get_error_handler().safe_io_operation(function()
+      return fs.append_file(json_log_path, formatted_json .. "\n")
+    end, json_log_path, { operation = "append_json_log_direct" }) or fs.append_file(
+      json_log_path,
+      formatted_json .. "\n"
+    ) -- Use safe op if available
     if not success then
       print("Warning: Failed to write to JSON log file: " .. (err or "unknown error"))
     end
@@ -952,14 +916,10 @@ end
 --- formatting options, log levels, and filtering. This is typically called
 --- once at application startup to establish logging behavior.
 ---
---- @param options? {level?: number|string, file?: string, format?: string, console?: boolean,
----                  max_file_size?: number, include_source?: boolean, include_timestamp?: boolean,
----                  include_level?: boolean, include_colors?: boolean, colors?: table<string, string>,
----                  module_levels?: table<string, number>, module_filter?: string|string[],
----                  silent?: boolean, buffer_size?: number, json_logs?: boolean} Configuration options
---- @return logging The logging module for method chaining
+---@param options? {level?: number|string, file?: string, format?: string, console?: boolean, max_file_size?: number, include_source?: boolean, include_timestamp?: boolean, include_level?: boolean, include_colors?: boolean, colors?: table<string, string>, module_levels?: table<string, number|string>, module_filter?: string|string[]|nil, silent?: boolean, buffer_size?: number, json_logs?: boolean, json_file?: string|nil, log_dir?: string, date_pattern?: string, standard_metadata?: table, buffer_flush_interval?: number, max_log_files?: number, module_blacklist?: string[]} Configuration options.
+---@return logging self The logging module (`M`) for method chaining.
 ---
---- @usage
+---@usage
 --- -- Configure basic logging
 --- logging.configure({
 ---   level = logging.DEBUG,        -- Set global log level
@@ -1074,10 +1034,10 @@ end
 --- Each logger instance encapsulates the module name and provides level-specific logging
 --- methods as well as utility methods for checking log levels and configuration.
 ---
---- @param module_name string The name of the module this logger is for
---- @return logger_instance A logger instance bound to the specified module
+---@param module_name string The name of the module this logger is for (used for context and level filtering).
+---@return logger_instance A logger instance bound to the specified module.
 ---
---- @usage
+---@usage
 --- -- Create a logger for a specific module
 --- local logger = logging.get_logger("Database")
 ---
@@ -1095,7 +1055,7 @@ end
 --- end
 function M.get_logger(module_name)
   -- First configure the logger from central config
-  M.configure_from_config(module_name)
+  M.configure_from_config("central_config")
 
   local logger = {}
 
@@ -1218,10 +1178,10 @@ end
 --- applies any relevant configuration from .firmo-config.lua. This ensures consistent
 --- logging behavior across all modules.
 ---
---- @param module_name string The name of the module this logger is for
---- @return logger_instance A configured logger instance bound to the specified module
+---@param module_name string The name of the module this logger is for.
+---@return logger_instance A configured logger instance bound to the specified module.
 ---
---- @usage
+---@usage
 --- -- Get a configured logger for a module
 --- local logger = logging.get_configured_logger("Database")
 ---
@@ -1243,10 +1203,10 @@ end
 --- log level settings.
 ---
 --- @param message string The message to log
---- @param params? table Additional context parameters to include
---- @return boolean Whether the message was logged
+---@param params? table Additional context parameters to include.
+---@return boolean `true` if the message was logged (or buffered), `false` if filtered out.
 ---
---- @usage
+---@usage
 --- logging.fatal("Application initialization failed", {error_code = 500})
 function M.fatal(message, params)
   log(M.LEVELS.FATAL, nil, message, params)
@@ -1257,10 +1217,10 @@ end
 --- of a component or subsystem, but may not crash the entire application.
 ---
 --- @param message string The message to log
---- @param params? table Additional context parameters to include
---- @return boolean Whether the message was logged
+---@param params? table Additional context parameters to include.
+---@return boolean `true` if the message was logged (or buffered), `false` if filtered out.
 ---
---- @usage
+---@usage
 --- logging.error("Failed to open configuration file", {
 ---   file_path = "/etc/app/config.json",
 ---   error = "Permission denied"
@@ -1274,10 +1234,10 @@ end
 --- don't prevent normal operation but may lead to problems in the future.
 ---
 --- @param message string The message to log
---- @param params? table Additional context parameters to include
---- @return boolean Whether the message was logged
+---@param params? table Additional context parameters to include.
+---@return boolean `true` if the message was logged (or buffered), `false` if filtered out.
 ---
---- @usage
+---@usage
 --- logging.warn("Configuration using default values", {
 ---   reason = "Config file not found",
 ---   config_path = "/etc/app/config.json"
@@ -1291,10 +1251,10 @@ end
 --- state and significant events during normal execution.
 ---
 --- @param message string The message to log
---- @param params? table Additional context parameters to include
---- @return boolean Whether the message was logged
+---@param params? table Additional context parameters to include.
+---@return boolean `true` if the message was logged (or buffered), `false` if filtered out.
 ---
---- @usage
+---@usage
 --- logging.info("Application started successfully", {
 ---   version = "1.2.3",
 ---   environment = "production"
@@ -1308,10 +1268,10 @@ end
 --- and troubleshooting, but typically too verbose for production use.
 ---
 --- @param message string The message to log
---- @param params? table Additional context parameters to include
---- @return boolean Whether the message was logged
+---@param params? table Additional context parameters to include.
+---@return boolean `true` if the message was logged (or buffered), `false` if filtered out.
 ---
---- @usage
+---@usage
 --- logging.debug("Processing user request", {
 ---   user_id = 12345,
 ---   request_path = "/api/data",
@@ -1326,10 +1286,10 @@ end
 --- used for step-by-step tracing of program execution or algorithm internals.
 ---
 --- @param message string The message to log
---- @param params? table Additional context parameters to include
---- @return boolean Whether the message was logged
+---@param params? table Additional context parameters to include.
+---@return boolean `true` if the message was logged (or buffered), `false` if filtered out.
 ---
---- @usage
+---@usage
 --- logging.trace("Function enter", {
 ---   function_name = "process_data",
 ---   arguments = {id = 123, options = {validate = true}}
@@ -1343,10 +1303,10 @@ end
 --- maintained for backward compatibility with older code.
 ---
 --- @param message string The message to log
---- @param params? table Additional context parameters to include
---- @return boolean Whether the message was logged
+---@param params? table Additional context parameters to include.
+---@return boolean `true` if the message was logged (or buffered), `false` if filtered out.
 ---
---- @usage
+---@usage
 --- logging.verbose("Detailed execution information", {
 ---   context = "initialization",
 ---   modules_loaded = {"core", "ui", "network"}
@@ -1356,7 +1316,7 @@ function M.verbose(message, params)
 end
 
 --- Flush buffered logs to output
----@return table The logging module for chaining
+---@return logging self The logging module instance (`M`) for chaining.
 function M.flush()
   flush_buffer()
   return M
@@ -1409,8 +1369,8 @@ end
 --- @param module_name string The module name to change the level for
 --- @param level string|number The log level to use temporarily
 --- @param func function The function to execute with the temporary log level
---- @return any The result from the executed function
---- @error Any error raised by the executed function
+---@return any result The results returned by `func`.
+---@throws error If `func` raises an error, it is re-thrown after restoring the log level.
 ---
 --- @usage
 --- -- Temporarily increase log level for a section of code
@@ -1467,10 +1427,10 @@ end
 --- levels override the global log level.
 ---
 --- @param module_name string The name of the module to configure
---- @param level number The log level to set for the module
---- @return table The logging module for chaining
+---@param level number|string The log level number (e.g., `M.LEVELS.DEBUG`) or name (e.g., `"DEBUG"`).
+---@return logging self The logging module instance (`M`) for chaining.
 ---
---- @usage
+---@usage
 --- -- Set the Database module to show only ERROR and above
 --- logging.set_module_level("Database", logging.LEVELS.ERROR)
 ---
@@ -1494,10 +1454,10 @@ end
 --- that don't have a specific level set via set_module_level(). This
 --- provides a simple way to control overall logging verbosity.
 ---
---- @param level number The log level to set globally
---- @return table The logging module for chaining
+---@param level number|string The log level number (e.g., `M.LEVELS.WARN`) or name (e.g., `"WARN"`).
+---@return logging self The logging module instance (`M`) for chaining.
 ---
---- @usage
+---@usage
 --- -- Reduce global verbosity to just warnings and errors
 --- logging.set_level(logging.LEVELS.WARN)
 ---
@@ -1644,8 +1604,8 @@ end
 --- or configuration objects.
 ---
 --- @param module_name string The module name to configure
---- @param options table The options object with debug/verbose flags
---- @return number The configured log level
+---@param options table The options table (typically parsed CLI args) containing `level`, `debug`, or `verbose` fields.
+---@return number level The determined log level number based on options.
 ---
 --- @usage
 --- -- Configure log level from command-line args
@@ -1690,8 +1650,8 @@ end
 --- from modules matching the filter will be displayed. This is useful for
 --- focusing on specific components during debugging.
 ---
---- @param module_pattern string The module pattern to add to the filter (supports "*" wildcard suffix)
---- @return table The logging module for chaining
+---@param module_pattern string The module pattern to add to the filter (supports `*` wildcard suffix).
+---@return logging self The logging module instance (`M`) for chaining.
 ---
 --- @usage
 --- -- Show logs only from the Database module
@@ -1728,9 +1688,9 @@ end
 --- This function removes any previously set module filters, effectively
 --- enabling logs from all modules (subject to log level and blacklist settings).
 ---
---- @return table The logging module for chaining
+---@return logging self The logging module instance (`M`) for chaining.
 ---
---- @usage
+---@usage
 --- -- First filter to specific modules
 --- logging.filter_module("Database").filter_module("Auth")
 ---
@@ -1746,8 +1706,8 @@ end
 --- any pattern in the blacklist will never log, regardless of log level or
 --- filter settings. This is useful for suppressing noisy modules.
 ---
---- @param module_pattern string The module pattern to blacklist (supports "*" wildcard suffix)
---- @return table The logging module for chaining
+---@param module_pattern string The module pattern to blacklist (supports `*` wildcard suffix).
+---@return logging self The logging module instance (`M`) for chaining.
 ---
 --- @usage
 --- -- Prevent logs from a noisy HTTP client module
@@ -1777,8 +1737,8 @@ end
 --- was previously added with blacklist_module(), it will be removed and logs
 --- from matching modules will be shown again (subject to normal filtering rules).
 ---
---- @param module_pattern string The module pattern to remove from the blacklist
---- @return table The logging module for chaining
+---@param module_pattern string The module pattern to remove from the blacklist.
+---@return logging self The logging module instance (`M`) for chaining.
 ---
 --- @usage
 --- -- First blacklist a module
@@ -1803,9 +1763,9 @@ end
 --- logs from all previously blacklisted modules (subject to normal filter and
 --- log level settings).
 ---
---- @return table The logging module for chaining
+---@return logging self The logging module instance (`M`) for chaining.
 ---
---- @usage
+---@usage
 --- -- Set up multiple blacklist entries
 --- logging.blacklist_module("Metrics")
 ---   .blacklist_module("Statistics*")
@@ -1823,9 +1783,9 @@ end
 --- allowing inspection of all settings in effect. This is useful for
 --- diagnosing logging behavior or understanding the current system state.
 ---
---- @return table A copy of the current configuration settings
+---@return table config_copy A deep copy of the current configuration table.
 ---
---- @usage
+---@usage
 --- -- Check current logging configuration
 --- local config = logging.get_config()
 --- print("Current log level: " .. config.global_level)
@@ -1849,8 +1809,8 @@ end
 --- log_debug() pattern instead of the current debug() pattern.
 ---
 --- @param message string The message to log
---- @param module_name? string The optional module name
---- @return boolean Whether the message was logged
+---@param module_name? string Optional module name.
+---@return boolean `true` if the message was logged (or buffered), `false` if filtered out.
 ---
 --- @usage
 --- -- Old style logging with module name
@@ -1864,8 +1824,8 @@ end
 --- log_verbose() pattern instead of the current verbose() pattern.
 ---
 --- @param message string The message to log
---- @param module_name? string The optional module name
---- @return boolean Whether the message was logged
+---@param module_name? string Optional module name.
+---@return boolean `true` if the message was logged (or buffered), `false` if filtered out.
 ---
 --- @usage
 --- -- Old style verbose logging
@@ -1879,10 +1839,10 @@ end
 --- historical logs to be searched and analyzed. The search module provides
 --- pattern-based, level-based, and time-based search capabilities.
 ---
---- @return table The log search module interface
---- @error If the search module couldn't be loaded
+---@return table search_module The log search module interface (`lib.tools.logging.search`).
+---@throws error If the search module couldn't be loaded.
 ---
---- @usage
+---@usage
 --- -- Search for all error logs containing "database"
 --- local search = logging.search()
 --- local results = search.find("database", {
@@ -1896,11 +1856,7 @@ end
 ---   print(entry.timestamp, entry.module, entry.message)
 --- end
 function M.search()
-  local search = get_search()
-  if not search then
-    error("Log search module not available")
-  end
-  return search
+  return get_search()
 end
 
 --- Get the log export module for exporting logs to different formats
@@ -1908,10 +1864,7 @@ end
 --- convert logs to various formats like CSV, JSON, or custom formats for
 --- integration with external systems.
 ---
---- @return table The log export module interface
---- @error If the export module couldn't be loaded
----
---- @usage
+---@usage
 --- -- Export today's logs to CSV
 --- local export = logging.export()
 --- local csv_content = export.to_csv({
@@ -1925,11 +1878,7 @@ end
 --- file:write(csv_content)
 --- file:close()
 function M.export()
-  local export = get_export()
-  if not export then
-    error("Log export module not available")
-  end
-  return export
+  return get_export()
 end
 
 --- Get the formatter integration module for custom log formatting
@@ -1937,10 +1886,10 @@ end
 --- which allows custom log formatting patterns and output styles to be defined
 --- and used with the logging system.
 ---
---- @return table The formatter integration module interface
---- @error If the formatter integration module couldn't be loaded
+---@return table fi_module The formatter integration module interface (`lib.tools.logging.formatter_integration`).
+---@throws error If the formatter integration module couldn't be loaded.
 ---
---- @usage
+---@usage
 --- -- Register a custom formatter
 --- local fi = logging.formatter_integration()
 --- fi.register("compact", function(entry)
@@ -1958,11 +1907,7 @@ end
 ---   format = "compact"
 --- })
 function M.formatter_integration()
-  local formatter_integration = get_formatter_integration()
-  if not formatter_integration then
-    error("Formatter integration module not available")
-  end
-  return formatter_integration
+  return get_formatter_integration()
 end
 
 --- Create a buffered logger for high-volume logging scenarios
@@ -1972,10 +1917,10 @@ end
 --- operations for each log message would be too expensive.
 ---
 --- @param module_name string The module name for the logger
---- @param options? {buffer_size?: number, flush_interval?: number, output_file?: string} Options for the buffered logger
---- @return logger_instance The buffered logger instance with flush capability
+---@param options? {buffer_size?: number, flush_interval?: number, output_file?: string} Options specific to this buffered logger instance.
+---@return logger_instance The buffered logger instance. Includes an additional `flush()` method specific to this instance.
 ---
---- @usage
+---@usage
 --- -- Create a buffered logger for high-volume metrics
 --- local metrics_logger = logging.create_buffered_logger("Metrics", {
 ---   buffer_size = 1000,       -- Buffer up to 1000 messages

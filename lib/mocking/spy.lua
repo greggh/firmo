@@ -1,95 +1,161 @@
---- Function spying implementation for firmo
+--- Firmo Function Spying Implementation
 ---
 --- Provides powerful spy functionality for testing:
---- - Create standalone spy functions for tracking calls
---- - Spy on object methods while preserving their behavior
---- - Track function call arguments, return values, and call order
---- - Support for call verification and assertions
---- - Advanced call sequence tracking for verifying execution order
---- - Full error handling with detailed context information
+--- - Create standalone spy functions for tracking calls (`spy.new`).
+--- - Spy on object methods while preserving their original behavior (`spy.on`).
+--- - Track function call arguments, results (return value or error), timestamps, and call order.
+--- - Provide methods for inspecting call history (`get_call`, `get_calls`, `last_call`).
+--- - Provide methods for verifying calls (`called_with`, `called_times`, `not_called`, `called_once`, `called_before`, `called_after`).
+--- - Integrate with `error_handler` for robust error reporting.
 ---
---- Spies don't change the behavior of the spied function but record all
---- interactions for later verification. This is useful for ensuring functions
---- are called with the expected arguments and in the expected order.
+--- Spies are non-invasive: they record interactions without altering the underlying function's execution (unless configured otherwise via chainable methods like `and_call_fake`, `and_return`, `and_throw`).
 ---
---- @version 1.0.0
+--- @module lib.mocking.spy
 --- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
 ---@class spy_module
----@field _VERSION string Module version identifier
----@field new fun(fn?: function): spy_object Create a new standalone spy function that wraps the provided function
----@field on fun(obj: table, method_name: string): spy_object|nil, table? Create a spy on an object method, replacing it with the spy while preserving behavior
----@field assert fun(spy_obj: table): spy_assert Helper to create assertion functions for a spy
----@field is_spy fun(obj: any): boolean Check if an object is a spy created by this module
----@field get_all_spies fun(): table<number, spy_object> Get all spy objects created during the current test run
----@field reset_all fun(): boolean Reset all created spy objects, clearing their call history
----@field wrap fun(fn: function, options?: table): spy_object Create a spy that wraps a function with additional options
----@field _next_sequence number Internal counter for tracking call order
----@field _new_sequence fun(): number Internal function to generate unique sequence numbers
+---@field _VERSION string Module version identifier.
+---@field new fun(fn?: function): spy_object|nil, table? Creates a new standalone spy function, optionally wrapping `fn`. Returns `spy_object, nil` on success, or `nil, error_object` on failure. @throws table If spy creation fails critically.
+---@field on fun(obj: table, method_name: string): spy_object|nil, table? Creates a spy on an object's method. Returns `spy_object, nil` on success, or `nil, error_object` on failure. @throws table If validation or spy creation fails critically.
+---@field assert fun(spy_obj: spy_object): spy_assert|nil, table? Creates an assertion helper object for the given spy. Returns `spy_assert, nil` on success, or `nil, error_object` on failure. @throws table If validation fails.
+---@field is_spy fun(obj: any): boolean Checks if an object is a spy created by this module.
+---@field get_all_spies fun(): table<number, spy_object> Returns a list of all spies created by this module.
+---@field reset_all fun(): boolean, table? Resets call history for all spies. Returns `true, nil` on success, `false, error_object` on failure. @throws table If reset process fails critically.
+---@field wrap fun(fn: function, options?: { callThrough?: boolean, callFake?: function, returnValue?: any, throwError?: any }): spy_object|nil, table? Creates a spy wrapping `fn` with optional behavior modifiers. Returns `spy_object, nil` on success, or `nil, error_object` on failure. @throws table If validation or spy creation fails critically.
+---@field _spies table<number, spy_object> List of all spies created by this module. Internal.
+---@field _next_sequence number Internal counter for tracking call order. Internal.
+---@field _new_sequence fun(): number|nil, table? Internal function to generate unique sequence numbers. Returns `number, nil` on success, or `nil, error_object` on error. @private
 
 ---@class spy_object
----@field calls table<number, {args: table, returned: table, threw: boolean|nil, error: any, this: any}> Record of all calls to the spy with arguments and results
----@field call_count number Number of times the spy was called during the test
----@field called boolean Whether the spy was called at least once (true if call_count > 0)
----@field call_sequence table<number, number> Sequence numbers for each call, used to track order across multiple spies
----@field call_history table<number, table> Legacy/compatibility field with call arguments history
----@field reset fun(): spy_object Reset the spy's call history and counters but maintain configuration
----@field and_call_through fun(): spy_object Configure spy to also call the original function when invoked
----@field and_call_fake fun(fn: function): spy_object Configure spy to call a fake implementation function
----@field and_return fun(value: any): spy_object Configure spy to return a specific value without calling original
----@field and_throw fun(error: any): spy_object Configure spy to throw a specific error when called
----@field call_count_by_args fun(args: table): number Get count of calls with specific argument values
----@field get_call fun(index: number): table|nil Get details of a specific call by index
----@field get_calls fun(): table<number, table> Get all call details including arguments and results
----@field called_with fun(...): boolean|{result: boolean, call_index: number} Check if spy was called with specific arguments
----@field called_times fun(n: number): boolean Check if spy was called exactly n times
----@field not_called fun(): boolean Check if spy was never called (call_count == 0)
----@field called_once fun(): boolean Check if spy was called exactly once (call_count == 1)
----@field last_call fun(): table|nil Get the arguments from the most recent call
----@field called_before fun(other_spy: spy_object, call_index?: number): boolean Check if this spy was called before another spy
----@field called_after fun(other_spy: spy_object, call_index?: number): boolean Check if this spy was called after another spy
----@field target table|nil For method spies, the target object containing the spied method
----@field name string|nil For method spies, the name of the spied method on the target
----@field original function|nil For method spies, the original method implementation
----@field restore fun(): boolean|nil, table? For method spies, restore the original method implementation
----@field _is_firmo_spy boolean Flag indicating this is a spy object created by firmo
----@field _original_fn function|nil The original wrapped function, if any
+---@field calls table<number, {args: table, timestamp: number, result?: any, error?: any}> Record of calls with arguments, timestamp, result or error.
+---@field call_count number Number of times the spy was called.
+---@field called boolean Whether the spy was called at least once (`call_count > 0`).
+---@field call_sequence table<number, number> Sequence numbers for each call, used for `called_before`/`called_after`.
+---@field call_history table<number, table> DEPRECATED: Use `calls` field instead. History of call arguments.
+---@field reset fun(self: spy_object): spy_object Resets call history (`calls`, `call_count`, `called`, `call_sequence`) but maintains configuration. Returns self for chaining.
+---@field and_call_through fun(self: spy_object): spy_object Configures the spy to call the original wrapped function (if any). Returns self for chaining.
+---@field and_call_fake fun(self: spy_object, fn: function): spy_object Configures the spy to call a fake implementation function instead of the original. Returns self for chaining.
+---@field and_return fun(self: spy_object, value: any): spy_object Configures the spy to return a fixed value without calling the original/fake function. Returns self for chaining.
+---@field and_throw fun(self: spy_object, error: any): spy_object Configures the spy to throw a specific error when called. Returns self for chaining.
+---@field call_count_by_args fun(self: spy_object, args: table): number|nil, table? Gets the count of calls matching specific arguments. Returns `count, nil` or `nil, error`. @throws table If validation or comparison fails critically.
+---@field get_call fun(self: spy_object, index: number): table|nil Returns the call record for the Nth call (1-based index) or `nil`.
+---@field get_calls fun(self: spy_object): table<number, {args: table, timestamp: number, result?: any, error?: any}> Returns a deep copy of the `calls` table.
+---@field called_with fun(self: spy_object, ...): boolean|{result: boolean, call_index: number}|nil, table? Checks if spy was called with specific arguments. Returns `true`/result object if match found, `false` otherwise, `nil` on error, plus optional error. @throws table If validation or comparison fails critically.
+---@field called_times fun(self: spy_object, n: number): boolean|nil, table? Checks if spy was called exactly `n` times. Returns `true`/`false`, or `nil` on error, plus optional error. @throws table If validation fails.
+---@field not_called fun(self: spy_object): boolean|nil, table? Checks if spy was never called. Returns `true`/`false`, or `nil` on error, plus optional error.
+---@field called_once fun(self: spy_object): boolean|nil, table? Checks if spy was called exactly once. Returns `true`/`false`, or `nil` on error, plus optional error.
+---@field last_call fun(self: spy_object): table|nil Gets the record of the most recent call, or `nil` if never called or on error, plus optional error object.
+---@field called_before fun(self: spy_object, other_spy: spy_object, call_index?: number): boolean|nil, table? Checks if this spy was called before another spy's Nth call. Returns `true`/`false`, or `nil` on error, plus optional error. @throws table If validation or comparison fails critically.
+---@field called_after fun(self: spy_object, other_spy: spy_object, call_index?: number): boolean|nil, table? Checks if this spy was called after another spy's Nth call. Returns `true`/`false`, or `nil` on error, plus optional error. @throws table If validation or comparison fails critically.
+---@field target table|nil For method spies (`spy.on`), the target object.
+---@field name string|nil For method spies, the name of the spied method.
+---@field original function|nil For method spies, the original method implementation.
+---@field restore fun(self: spy_object): boolean|nil, table? For method spies, restores the original method. Returns `true`/`false`, or `nil` on error, plus optional error. @throws table If restoration fails critically.
+---@field _is_firmo_spy boolean Internal flag identifying this as a spy object.
+---@field _original_fn function|nil The original wrapped function (from `new` or `on`).
+---@field _fake_fn function|nil The fake implementation function set by `and_call_fake`.
+---@field _return_value any The fixed return value set by `and_return`.
+---@field _throw_error any The error to throw set by `and_throw`.
+---@field _call_through boolean Flag indicating whether to call the original function.
 
 ---@class spy_assert
----@field was_called fun(times?: number): boolean Assert the spy was called at least once or a specific number of times
----@field was_not_called fun(): boolean Assert the spy was never called during the test
----@field was_called_with fun(...): boolean Assert the spy was called with the specified arguments at least once
----@field was_called_times fun(times: number): boolean Assert the spy was called exactly the specified number of times
----@field was_called_before fun(other_spy: spy_object, index?: number): boolean Assert this spy was called before another spy
----@field was_called_after fun(other_spy: spy_object, index?: number): boolean Assert this spy was called after another spy
----@field has_returned fun(value: any): boolean Assert the spy returned a specific value at least once
----@field has_thrown fun(error_value?: any): boolean Assert the spy threw an error (optionally matching a specific value)
+---@field was_called fun(times?: number): boolean|nil, table? Asserts the spy was called at least once, or optionally `times` times. @throws table
+---@field was_not_called fun(): boolean|nil, table? Asserts the spy was never called. @throws table
+---@field was_called_with fun(...): boolean|nil, table? Asserts the spy was called with the specified arguments. @throws table
+---@field was_called_times fun(times: number): boolean|nil, table? Asserts the spy was called exactly `times` times. @throws table
+---@field was_called_before fun(other_spy: spy_object, index?: number): boolean|nil, table? Asserts this spy was called before `other_spy`'s Nth call. @throws table
+---@field was_called_after fun(other_spy: spy_object, index?: number): boolean|nil, table? Asserts this spy was called after `other_spy`'s Nth call. @throws table
+---@field has_returned fun(value: any): boolean|nil, table? Asserts the spy returned a specific value. @throws table
+---@field has_thrown fun(error_value?: any): boolean|nil, table? Asserts the spy threw an error (optionally matching `error_value`). @throws table
 
-local logging = require("lib.tools.logging")
-local error_handler = require("lib.tools.error_handler")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("spy")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
 
 -- Compatibility function for table unpacking (works with both Lua 5.1 and 5.2+)
 local unpack_table = table.unpack or unpack
-
--- Initialize module logger
-local logger = logging.get_logger("spy")
-logging.configure_from_config("spy")
 
 local spy = {
   -- Module version
   _VERSION = "1.0.0",
 }
 
--- Helper functions
+--- Checks if an object is a spy created by this module.
+---@param obj any The object to check.
+---@return boolean `true` if it's a spy, `false` otherwise.
+---@private
 local function is_spy(obj)
   return type(obj) == "table" and obj._is_firmo_spy == true
 end
 
--- Deep comparison of tables for equality
+--- Performs a deep recursive equality check between two tables.
+--- Handles cycles (implicitly via recursive calls, needs explicit check if cycles are problematic).
+---@param t1 table The first table.
+---@param t2 table The second table.
+---@return boolean `true` if tables are deeply equal, `false` otherwise.
+---@private
 local function tables_equal(t1, t2)
   -- Input validation with fallback
   if t1 == nil or t2 == nil then
-    logger.debug("Comparing with nil value", {
+    get_logger().debug("Comparing with nil value", {
       function_name = "tables_equal",
       t1_nil = t1 == nil,
       t2_nil = t2 == nil,
@@ -102,7 +168,7 @@ local function tables_equal(t1, t2)
   end
 
   -- Use protected call to catch any errors during comparison
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     -- Check each key-value pair in t1
     for k, v in pairs(t1) do
       if not tables_equal(v, t2[k]) then
@@ -121,9 +187,9 @@ local function tables_equal(t1, t2)
   end)
 
   if not success then
-    logger.warn("Error during table comparison", {
+    get_logger().warn("Error during table comparison", {
       function_name = "tables_equal",
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
     -- Fallback to simple equality check on error
     return false
@@ -132,14 +198,20 @@ local function tables_equal(t1, t2)
   return result
 end
 
--- Helper to check if value matches another value with matcher support
+--- Checks if an `actual` value matches an `expected` value.
+--- Supports deep table comparison via `tables_equal` and custom matchers
+--- (tables with `_is_matcher=true` and a `match` function).
+---@param expected any The expected value or matcher object.
+---@param actual any The actual value received.
+---@return boolean `true` if values match, `false` otherwise.
+---@private
 local function matches_arg(expected, actual)
   -- Use protected call to catch any errors during matching
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     -- If expected is a matcher, use its match function
     if type(expected) == "table" and expected._is_matcher then
       if type(expected.match) ~= "function" then
-        logger.warn("Invalid matcher object (missing match function)", {
+        get_logger().warn("Invalid matcher object (missing match function)", {
           function_name = "matches_arg",
           matcher_type = type(expected),
         })
@@ -158,11 +230,11 @@ local function matches_arg(expected, actual)
   end)
 
   if not success then
-    logger.warn("Error during argument matching", {
+    get_logger().warn("Error during argument matching", {
       function_name = "matches_arg",
       expected_type = type(expected),
       actual_type = type(actual),
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
     -- Fallback to direct equality check on error
     return expected == actual
@@ -171,11 +243,16 @@ local function matches_arg(expected, actual)
   return result
 end
 
--- Check if args match a set of expected args
+--- Checks if an array of actual arguments matches an array of expected arguments.
+--- Uses `matches_arg` for individual argument comparison, supporting matchers and deep equality.
+---@param expected_args table An array-like table of expected arguments or matchers.
+---@param actual_args table An array-like table of actual arguments received.
+---@return boolean `true` if argument counts match and all arguments match according to `matches_arg`, `false` otherwise.
+---@private
 local function args_match(expected_args, actual_args)
   -- Input validation with fallback
   if expected_args == nil or actual_args == nil then
-    logger.warn("Nil args in comparison", {
+    get_logger().warn("Nil args in comparison", {
       function_name = "args_match",
       expected_nil = expected_args == nil,
       actual_nil = actual_args == nil,
@@ -184,7 +261,7 @@ local function args_match(expected_args, actual_args)
   end
 
   if type(expected_args) ~= "table" or type(actual_args) ~= "table" then
-    logger.warn("Non-table args in comparison", {
+    get_logger().warn("Non-table args in comparison", {
       function_name = "args_match",
       expected_type = type(expected_args),
       actual_type = type(actual_args),
@@ -193,7 +270,7 @@ local function args_match(expected_args, actual_args)
   end
 
   -- Use protected call to catch any errors during matching
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     if #expected_args ~= #actual_args then
       return false
     end
@@ -208,11 +285,11 @@ local function args_match(expected_args, actual_args)
   end)
 
   if not success then
-    logger.warn("Error during args matching", {
+    get_logger().warn("Error during args matching", {
       function_name = "args_match",
       expected_count = #expected_args,
       actual_count = #actual_args,
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
     -- Fallback to false on error
     return false
@@ -221,13 +298,14 @@ local function args_match(expected_args, actual_args)
   return result
 end
 
--- Create a new spy function
---- Create a new standalone spy function
----@param fn? function Optional function to spy on
----@return spy_object spy A spy object that records calls
+--- Creates a spy that wraps a given function, allowing optional configuration of its behavi---@param fn? function Optional function to wrap and spy on. If omitted, the spy acts as a simple call counter.
+---@return spy_object|nil spy The created spy object, or `nil` on error.
+---@return table|nil error Error object if spy creation failed.
+---@throws table If spy creation fails critically.
 function spy.new(fn)
   -- Input validation with fallback
-  logger.debug("Creating new spy function", {
+  get_logger().debug("Creating new spy function", {
+    function_name = "spy.new",
     fn_type = type(fn),
   })
 
@@ -235,7 +313,7 @@ function spy.new(fn)
   fn = fn or function() end
 
   -- Use protected call to create the spy object
-  local success, spy_obj, err = error_handler.try(function()
+  local success, spy_obj, err = get_error_handler().try(function()
     local obj = {
       _is_firmo_spy = true,
       calls = {},
@@ -249,7 +327,7 @@ function spy.new(fn)
   end)
 
   if not success then
-    local error_obj = error_handler.runtime_error(
+    local error_obj = get_error_handler().runtime_error(
       "Failed to create spy object",
       {
         function_name = "spy.new",
@@ -257,16 +335,21 @@ function spy.new(fn)
       },
       spy_obj -- On failure, spy_obj contains the error
     )
-    logger.error(error_obj.message, error_obj.context)
+    get_logger().error(error_obj.message, error_obj.context)
     return nil, error_obj
   end
 
-  -- Function that captures all calls
+  --- The core function wrapper that captures calls and executes original/fake logic.
+  --- Records arguments, timestamp, results/errors, and updates call count/sequence.
+  --- Executes the original function (`fn`), fake function (`_fake_fn`), returns a fixed value (`_return_value`), or throws an error (`_throw_error`) based on spy configuration.
+  ---@param ... any Arguments passed to the spy.
+  ---@return ... any Returns values from the original/fake function, or the configured fixed value.
+  ---@throws any Throws the configured error or an error from the original/fake function.
+  ---@private
   local function capture(...)
     -- Use protected call to track the call
-    -- Use protected call to track the call
     local args = { ... } -- Capture args here before the protected call
-    local call_success, _, call_err = error_handler.try(function()
+    local call_success, _, call_err = get_error_handler().try(function()
       -- Update call tracking state
       spy_obj.called = true
       spy_obj.call_count = spy_obj.call_count + 1
@@ -278,7 +361,7 @@ function spy.new(fn)
         result = nil, -- Will be set after function call
         error = nil, -- Will be set if function throws
       }
-      
+
       -- Set up metatable to support direct argument access via numeric indices
       setmetatable(call_record, {
         __index = function(t, k)
@@ -288,13 +371,13 @@ function spy.new(fn)
           end
           -- Otherwise use normal table access
           return rawget(t, k)
-        end
+        end,
       })
-      
+
       -- Store the call record
       table.insert(spy_obj.calls, call_record)
       table.insert(spy_obj.call_history, args) -- Keep this for backward compatibility
-      logger.debug("Spy function called", {
+      get_logger().debug("Spy function called", {
         call_count = spy_obj.call_count,
         arg_count = #args,
         has_args_field = call_record.args ~= nil,
@@ -318,22 +401,22 @@ function spy.new(fn)
     end)
 
     if not call_success then
-      logger.error("Error during spy call tracking", {
+      get_logger().error("Error during spy call tracking", {
         function_name = "spy.capture",
         call_count = spy_obj.call_count,
-        error = error_handler.format_error(call_err),
+        error = get_error_handler().format_error(call_err),
       })
       -- Continue despite the error - we still want to call the original function
     end
 
-    logger.debug("Calling original function through spy", {
+    get_logger().debug("Calling original function through spy", {
       call_count = spy_obj.call_count,
     })
 
     -- Call the original function with protected call
     -- Create args table outside the try scope
     local args = { ... }
-    local fn_success, fn_result, fn_err = error_handler.try(function()
+    local fn_success, fn_result, fn_err = get_error_handler().try(function()
       -- For method calls, ensure the first argument is treated as 'self'
       -- We need to return multiple values, so we use a wrapper table
       local results
@@ -343,7 +426,7 @@ function spy.new(fn)
         results = { fn(unpack_table(args)) }
       else
         -- This should never happen, but we handle it just in case
-        logger.warn("Function in spy is not callable", {
+        get_logger().warn("Function in spy is not callable", {
           fn_type = type(fn),
         })
         results = {}
@@ -356,8 +439,8 @@ function spy.new(fn)
       -- See if we have access to error_handler's test mode
       local is_test_mode = error_handler
         and type(error_handler) == "table"
-        and type(error_handler.is_test_mode) == "function"
-        and error_handler.is_test_mode()
+        and type(get_error_handler().is_test_mode) == "function"
+        and get_error_handler().is_test_mode()
 
       -- Check if this is a test-related error, based on structured properties
       local is_expected_in_test = is_test_mode
@@ -368,23 +451,23 @@ function spy.new(fn)
 
       if is_expected_in_test then
         -- This is likely an intentional error for testing purposes
-        logger.debug("Function error captured by spy (expected in test)", {
+        get_logger().debug("Function error captured by spy (expected in test)", {
           function_name = "spy.capture",
-          error = error_handler.format_error(fn_result),
+          error = get_error_handler().format_error(fn_result),
         })
       else
         -- Check if we're suppressing logs in tests
         if
           not (
             error_handler
-            and type(error_handler.is_suppressing_test_logs) == "function"
-            and error_handler.is_suppressing_test_logs()
+            and type(get_error_handler().is_suppressing_test_logs) == "function"
+            and get_error_handler().is_suppressing_test_logs()
           )
         then
           -- This is an unexpected error, log at warning level
-          logger.warn("Original function threw an error", {
+          get_logger().warn("Original function threw an error", {
             function_name = "spy.capture",
-            error = error_handler.format_error(fn_result),
+            error = get_error_handler().format_error(fn_result),
           })
         end
       end
@@ -397,7 +480,7 @@ function spy.new(fn)
   end
 
   -- Set up the spy's call method with error handling
-  local mt_success, _, mt_err = error_handler.try(function()
+  local mt_success, _, mt_err = get_error_handler().try(function()
     setmetatable(spy_obj, {
       __call = function(_, ...)
         return capture(...)
@@ -407,11 +490,11 @@ function spy.new(fn)
   end)
 
   if not mt_success then
-    local error_obj = error_handler.runtime_error("Failed to set up spy metatable", {
+    local error_obj = get_error_handler().runtime_error("Failed to set up spy metatable", {
       function_name = "spy.new",
       fn_type = type(fn),
     }, mt_err)
-    logger.error(error_obj.message, error_obj.context)
+    get_logger().error(error_obj.message, error_obj.context)
     return nil, error_obj
   end
 
@@ -420,39 +503,39 @@ function spy.new(fn)
   local function make_method_callable_prop(obj, method_name, method_fn)
     -- Input validation
     if obj == nil then
-      local err = error_handler.validation_error("Cannot add method to nil object", {
+      local err = get_error_handler().validation_error("Cannot add method to nil object", {
         function_name = "make_method_callable_prop",
         parameter_name = "obj",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       error(err.message)
     end
 
     if type(method_name) ~= "string" then
-      local err = error_handler.validation_error("Method name must be a string", {
+      local err = get_error_handler().validation_error("Method name must be a string", {
         function_name = "make_method_callable_prop",
         parameter_name = "method_name",
         provided_type = type(method_name),
         provided_value = tostring(method_name),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       error(err.message)
     end
 
     if type(method_fn) ~= "function" then
-      local err = error_handler.validation_error("Method function must be a function", {
+      local err = get_error_handler().validation_error("Method function must be a function", {
         function_name = "make_method_callable_prop",
         parameter_name = "method_fn",
         provided_type = type(method_fn),
         provided_value = tostring(method_fn),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       error(err.message)
     end
 
     -- Use protected call to set up the method
-    local success, result, err = error_handler.try(function()
+    local success, result, err = get_error_handler().try(function()
       -- Create metatable with call function
       local mt = {}
       mt.__call = function(_, ...)
@@ -469,7 +552,7 @@ function spy.new(fn)
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to create callable property",
         {
           function_name = "make_method_callable_prop",
@@ -478,19 +561,24 @@ function spy.new(fn)
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       error(error_obj.message)
     end
   end
 
-  -- Define the called_with method with error handling
+  --- Checks if the spy was called with the specified arguments.
+  --- Supports deep comparison and matchers for arguments.
+  ---@param self spy_object
+  ---@param ... any Expected arguments.
+  ---@return boolean|{result: boolean, call_index: number}|nil, table? Returns `true` or a result object `{result=true, call_index=N}` if a match is found, `false` otherwise, `nil` on critical error during comparison, plus optional error object.
+  ---@throws table If validation or comparison fails critically.
   function spy_obj:called_with(...)
     local expected_args = { ... }
     local found = false
     local matching_call_index = nil
 
     -- Use protected call to search for matching calls
-    local success, search_result, err = error_handler.try(function()
+    local success, search_result, err = get_error_handler().try(function()
       for i, call_record in ipairs(self.calls) do
         -- Extract args from the call record
         local call_args = call_record.args
@@ -502,11 +590,11 @@ function spy.new(fn)
     end)
 
     if not success then
-      logger.warn("Error during called_with search", {
+      get_logger().warn("Error during called_with search", {
         function_name = "spy_obj:called_with",
         expected_args_count = #expected_args,
         calls_count = #self.calls,
-        error = error_handler.format_error(search_result),
+        error = get_error_handler().format_error(search_result),
       })
       -- Fallback to false on error
       return false
@@ -528,7 +616,7 @@ function spy.new(fn)
     }
 
     -- Make it work in boolean contexts with error handling
-    local mt_success, _, mt_err = error_handler.try(function()
+    local mt_success, _, mt_err = get_error_handler().try(function()
       setmetatable(result, {
         __call = function()
           return true
@@ -541,9 +629,9 @@ function spy.new(fn)
     end)
 
     if not mt_success then
-      logger.warn("Failed to set up result metatable", {
+      get_logger().warn("Failed to set up result metatable", {
         function_name = "spy_obj:called_with",
-        error = error_handler.format_error(mt_err),
+        error = get_error_handler().format_error(mt_err),
       })
       -- Return a simple boolean true as fallback
       return true
@@ -553,24 +641,28 @@ function spy.new(fn)
   end
 
   -- Add the callable property with error handling
-  local method_success, method_err = error_handler.try(function()
+  local method_success, method_err = get_error_handler().try(function()
     make_method_callable_prop(spy_obj, "called_with", spy_obj.called_with)
     return true
   end)
 
   if not method_success then
-    logger.warn("Failed to set up called_with method", {
+    get_logger().warn("Failed to set up called_with method", {
       function_name = "spy.new",
-      error = error_handler.format_error(method_err),
+      error = get_error_handler().format_error(method_err),
     })
     -- We continue despite this error - the method will still work as a method
   end
 
-  -- Define the called_times method with error handling
+  --- Checks if the spy was called exactly `n` times.
+  ---@param self spy_object
+  ---@param n number The expected number of calls.
+  ---@return boolean|nil, table? `true` if call count matches `n`, `false` otherwise, or `nil` on error, plus optional error object.
+  ---@throws table If validation fails (e.g., `n` is not a number).
   function spy_obj:called_times(n)
     -- Input validation
     if n == nil then
-      logger.warn("Missing required parameter in called_times", {
+      get_logger().warn("Missing required parameter in called_times", {
         function_name = "spy_obj:called_times",
         parameter_name = "n",
         provided_value = "nil",
@@ -579,7 +671,7 @@ function spy.new(fn)
     end
 
     if type(n) ~= "number" then
-      logger.warn("Invalid parameter type in called_times", {
+      get_logger().warn("Invalid parameter type in called_times", {
         function_name = "spy_obj:called_times",
         parameter_name = "n",
         provided_type = type(n),
@@ -589,15 +681,15 @@ function spy.new(fn)
     end
 
     -- Use protected call to safely check call count
-    local success, result = error_handler.try(function()
+    local success, result = get_error_handler().try(function()
       return self.call_count == n
     end)
 
     if not success then
-      logger.warn("Error during called_times check", {
+      get_logger().warn("Error during called_times check", {
         function_name = "spy_obj:called_times",
         expected_count = n,
-        error = error_handler.format_error(result),
+        error = get_error_handler().format_error(result),
       })
       -- Fallback to false on error
       return false
@@ -607,21 +699,23 @@ function spy.new(fn)
   end
 
   -- Add the callable property with error handling
-  error_handler.try(function()
+  get_error_handler().try(function()
     make_method_callable_prop(spy_obj, "called_times", spy_obj.called_times)
   end)
 
-  -- Define the not_called method with error handling
+  --- Checks if the spy was never called (call count is 0).
+  ---@param self spy_object
+  ---@return boolean|nil, table? `true` if call count is 0, `false` otherwise, or `nil` on error, plus optional error object.
   function spy_obj:not_called()
     -- Use protected call to safely check call count
-    local success, result = error_handler.try(function()
+    local success, result = get_error_handler().try(function()
       return self.call_count == 0
     end)
 
     if not success then
-      logger.warn("Error during not_called check", {
+      get_logger().warn("Error during not_called check", {
         function_name = "spy_obj:not_called",
-        error = error_handler.format_error(result),
+        error = get_error_handler().format_error(result),
       })
       -- Fallback to false on error
       return false
@@ -631,21 +725,23 @@ function spy.new(fn)
   end
 
   -- Add the callable property with error handling
-  error_handler.try(function()
+  get_error_handler().try(function()
     make_method_callable_prop(spy_obj, "not_called", spy_obj.not_called)
   end)
 
-  -- Define the called_once method with error handling
+  --- Checks if the spy was called exactly one time.
+  ---@param self spy_object
+  ---@return boolean|nil, table? `true` if call count is 1, `false` otherwise, or `nil` on error, plus optional error object.
   function spy_obj:called_once()
     -- Use protected call to safely check call count
-    local success, result = error_handler.try(function()
+    local success, result = get_error_handler().try(function()
       return self.call_count == 1
     end)
 
     if not success then
-      logger.warn("Error during called_once check", {
+      get_logger().warn("Error during called_once check", {
         function_name = "spy_obj:called_once",
-        error = error_handler.format_error(result),
+        error = get_error_handler().format_error(result),
       })
       -- Fallback to false on error
       return false
@@ -655,14 +751,16 @@ function spy.new(fn)
   end
 
   -- Add the callable property with error handling
-  error_handler.try(function()
+  get_error_handler().try(function()
     make_method_callable_prop(spy_obj, "called_once", spy_obj.called_once)
   end)
 
-  -- Define the last_call method with error handling
+  --- Gets the call record object for the most recent call to the spy.
+  ---@param self spy_object
+  ---@return table|nil call_record The last call record (from `calls` field), or `nil` if never called or on error, plus optional error object. The record contains `{args, timestamp, result?, error?}`.
   function spy_obj:last_call()
     -- Use protected call to safely get the last call
-    local success, result = error_handler.try(function()
+    local success, result = get_error_handler().try(function()
       if self.calls and #self.calls > 0 then
         -- Return the last call record
         return self.calls[#self.calls]
@@ -671,9 +769,9 @@ function spy.new(fn)
     end)
 
     if not success then
-      logger.warn("Error during last_call check", {
+      get_logger().warn("Error during last_call check", {
         function_name = "spy_obj:last_call",
-        error = error_handler.format_error(result),
+        error = get_error_handler().format_error(result),
       })
       -- Fallback to nil on error
       return nil
@@ -683,20 +781,26 @@ function spy.new(fn)
   end
 
   -- Add the callable property with error handling
-  error_handler.try(function()
+  get_error_handler().try(function()
     make_method_callable_prop(spy_obj, "last_call", spy_obj.last_call)
   end)
 
-  -- Check if this spy was called before another spy, with error handling
+  --- Checks if *any* call to this spy occurred before the Nth call to `other_spy`.
+  --- Uses the global call sequence counter.
+  ---@param self spy_object
+  ---@param other_spy spy_object The other spy object to compare against.
+  ---@param call_index? number The 1-based index of the call on `other_spy` to check against (default: 1).
+  ---@return boolean|nil, table? `true` if this spy was called before the specified call to `other_spy`, `false` otherwise, or `nil` on error, plus optional error object.
+  ---@throws table If validation or comparison fails critically.
   function spy_obj:called_before(other_spy, call_index)
     -- Input validation
     if other_spy == nil then
-      local err = error_handler.validation_error("Cannot check call order with nil spy", {
+      local err = get_error_handler().validation_error("Cannot check call order with nil spy", {
         function_name = "spy_obj:called_before",
         parameter_name = "other_spy",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return false
     end
 
@@ -704,27 +808,27 @@ function spy.new(fn)
 
     -- Safety checks with proper error handling
     if type(other_spy) ~= "table" then
-      local err = error_handler.validation_error("called_before requires a spy object as argument", {
+      local err = get_error_handler().validation_error("called_before requires a spy object as argument", {
         function_name = "spy_obj:called_before",
         parameter_name = "other_spy",
         provided_type = type(other_spy),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return false
     end
 
     if not other_spy.call_sequence then
-      local err = error_handler.validation_error("called_before requires a spy object with call_sequence", {
+      local err = get_error_handler().validation_error("called_before requires a spy object with call_sequence", {
         function_name = "spy_obj:called_before",
         parameter_name = "other_spy",
         is_spy = other_spy._is_firmo_spy or false,
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return false
     end
 
     -- Use protected call for the actual comparison
-    local success, result = error_handler.try(function()
+    local success, result = get_error_handler().try(function()
       -- Make sure both spies have been called
       if self.call_count == 0 or other_spy.call_count == 0 then
         return false
@@ -752,12 +856,12 @@ function spy.new(fn)
     end)
 
     if not success then
-      logger.warn("Error during called_before check", {
+      get_logger().warn("Error during called_before check", {
         function_name = "spy_obj:called_before",
         self_call_count = self.call_count,
         other_call_count = other_spy.call_count,
         call_index = call_index,
-        error = error_handler.format_error(result),
+        error = get_error_handler().format_error(result),
       })
       -- Fallback to false on error
       return false
@@ -767,20 +871,26 @@ function spy.new(fn)
   end
 
   -- Add the callable property with error handling
-  error_handler.try(function()
+  get_error_handler().try(function()
     make_method_callable_prop(spy_obj, "called_before", spy_obj.called_before)
   end)
 
-  -- Check if this spy was called after another spy, with error handling
+  --- Checks if the *last* call to this spy occurred after the Nth call to `other_spy`.
+  --- Uses the global call sequence counter.
+  ---@param self spy_object
+  ---@param other_spy spy_object The other spy object to compare against.
+  ---@param call_index? number The 1-based index of the call on `other_spy` to check against (default: 1).
+  ---@return boolean|nil, table? `true` if this spy's last call was after the specified call to `other_spy`, `false` otherwise, or `nil` on error, plus optional error object.
+  ---@throws table If validation or comparison fails critically.
   function spy_obj:called_after(other_spy, call_index)
     -- Input validation
     if other_spy == nil then
-      local err = error_handler.validation_error("Cannot check call order with nil spy", {
+      local err = get_error_handler().validation_error("Cannot check call order with nil spy", {
         function_name = "spy_obj:called_after",
         parameter_name = "other_spy",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return false
     end
 
@@ -788,27 +898,27 @@ function spy.new(fn)
 
     -- Safety checks with proper error handling
     if type(other_spy) ~= "table" then
-      local err = error_handler.validation_error("called_after requires a spy object as argument", {
+      local err = get_error_handler().validation_error("called_after requires a spy object as argument", {
         function_name = "spy_obj:called_after",
         parameter_name = "other_spy",
         provided_type = type(other_spy),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return false
     end
 
     if not other_spy.call_sequence then
-      local err = error_handler.validation_error("called_after requires a spy object with call_sequence", {
+      local err = get_error_handler().validation_error("called_after requires a spy object with call_sequence", {
         function_name = "spy_obj:called_after",
         parameter_name = "other_spy",
         is_spy = other_spy._is_firmo_spy or false,
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return false
     end
 
     -- Use protected call for the actual comparison
-    local success, result = error_handler.try(function()
+    local success, result = get_error_handler().try(function()
       -- Make sure both spies have been called
       if self.call_count == 0 or other_spy.call_count == 0 then
         return false
@@ -835,12 +945,12 @@ function spy.new(fn)
     end)
 
     if not success then
-      logger.warn("Error during called_after check", {
+      get_logger().warn("Error during called_after check", {
         function_name = "spy_obj:called_after",
         self_call_count = self.call_count,
         other_call_count = other_spy.call_count,
         call_index = call_index,
-        error = error_handler.format_error(result),
+        error = get_error_handler().format_error(result),
       })
       -- Fallback to false on error
       return false
@@ -850,12 +960,12 @@ function spy.new(fn)
   end
 
   -- Add the callable property with error handling
-  error_handler.try(function()
+  get_error_handler().try(function()
     make_method_callable_prop(spy_obj, "called_after", spy_obj.called_after)
   end)
 
   -- Final check to make sure all required properties are set
-  local final_check_success, _ = error_handler.try(function()
+  local final_check_success, _ = get_error_handler().try(function()
     if not spy_obj.calls then
       spy_obj.calls = {}
     end
@@ -869,7 +979,7 @@ function spy.new(fn)
   end)
 
   if not final_check_success then
-    logger.warn("Failed to ensure all spy properties are set", {
+    get_logger().warn("Failed to ensure all spy properties are set", {
       function_name = "spy.new",
     })
     -- Continue despite this warning - the spy should still work
@@ -878,82 +988,89 @@ function spy.new(fn)
   return spy_obj
 end
 
--- Create a spy on an object method
+--- Creates a spy on an existing object method.
+--- Replaces the method with a spy wrapper that records calls while still executing the original method.
+--- Adds a `restore()` method to the returned spy object.
+---@param obj table The target object.
+---@param method_name string The name of the method to spy on.
+---@return spy_object|nil spy The spy object wrapping the method, or `nil` on error.
+---@return table|nil error Error object if validation or spy creation fails.
+---@throws table If validation or spy creation fails critically.
 function spy.on(obj, method_name)
   -- Input validation
   if obj == nil then
-    local err = error_handler.validation_error("Cannot create spy on nil object", {
+    local err = get_error_handler().validation_error("Cannot create spy on nil object", {
       function_name = "spy.on",
       parameter_name = "obj",
       provided_value = "nil",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   if method_name == nil then
-    local err = error_handler.validation_error("Method name cannot be nil", {
+    local err = get_error_handler().validation_error("Method name cannot be nil", {
       function_name = "spy.on",
       parameter_name = "method_name",
       provided_value = "nil",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Creating spy on object method", {
+  get_logger().debug("Creating spy on object method", {
     obj_type = type(obj),
     method_name = method_name,
   })
 
   if type(obj) ~= "table" then
-    local err = error_handler.validation_error("spy.on requires a table as its first argument", {
+    local err = get_error_handler().validation_error("spy.on requires a table as its first argument", {
       function_name = "spy.on",
       parameter_name = "obj",
       expected = "table",
       actual = type(obj),
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   if type(method_name) ~= "string" then
-    local err = error_handler.validation_error("Method name must be a string", {
+    local err = get_error_handler().validation_error("Method name must be a string", {
       function_name = "spy.on",
       parameter_name = "method_name",
       provided_type = type(method_name),
       provided_value = tostring(method_name),
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   -- Check if method exists
   if obj[method_name] == nil then
-    local err = error_handler.validation_error("Method does not exist on object", {
+    local err = get_error_handler().validation_error("Method does not exist on object", {
       function_name = "spy.on",
       parameter_name = "method_name",
       method_name = method_name,
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   if type(obj[method_name]) ~= "function" then
-    local err = error_handler.validation_error("Method exists but is not a function", {
+    local err = get_error_handler().validation_error("Method exists but is not a function", {
       function_name = "spy.on",
       parameter_name = "method_name",
       method_name = method_name,
       actual_type = type(obj[method_name]),
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   -- Store the original function
   local original_fn = obj[method_name]
   -- Create the spy with error handling
-  local success, spy_obj, err = error_handler.try(function()
+  local success, spy_obj, err = get_error_handler().try(function()
     -- Create a simple spy for tracking calls
     local spy_object = spy.new(function() end)
 
@@ -964,7 +1081,7 @@ function spy.on(obj, method_name)
       local args = { ... }
 
       -- Log received arguments for debugging
-      logger.debug("Spy method_wrapper received arguments", {
+      get_logger().debug("Spy method_wrapper received arguments", {
         method_name = method_name,
         args_count = #args,
         is_first_arg_obj = args[1] == obj,
@@ -1051,10 +1168,10 @@ function spy.on(obj, method_name)
       spy = spy_object,
       wrapper = method_wrapper,
     }
-  end) -- Close the error_handler.try function here
+  end) -- Close the get_error_handler().try function here
 
   if not success then
-    local error_obj = error_handler.runtime_error(
+    local error_obj = get_error_handler().runtime_error(
       "Failed to create spy",
       {
         function_name = "spy.on",
@@ -1063,12 +1180,12 @@ function spy.on(obj, method_name)
       },
       spy_obj -- On failure, spy_obj contains the error
     )
-    logger.error(error_obj.message, error_obj.context)
+    get_logger().error(error_obj.message, error_obj.context)
     return nil, error_obj
   end
 
   -- Configure the spy with contextual information
-  success, err = error_handler.try(function()
+  success, err = get_error_handler().try(function()
     spy_obj.target = obj
     spy_obj.name = method_name
     spy_obj.original = original_fn
@@ -1076,35 +1193,40 @@ function spy.on(obj, method_name)
   end)
 
   if not success then
-    local error_obj = error_handler.runtime_error("Failed to configure spy", {
+    local error_obj = get_error_handler().runtime_error("Failed to configure spy", {
       function_name = "spy.on",
       method_name = method_name,
       target_type = type(obj),
     }, err)
-    logger.error(error_obj.message, error_obj.context)
+    get_logger().error(error_obj.message, error_obj.context)
     return nil, error_obj
   end
 
-  -- Add restore method with error handling
+  --- Restores the original method that was replaced by this spy.
+  --- Only applies to spies created with `spy.on`.
+  ---@param self spy_object
+  ---@return boolean|nil success `true` if restored successfully, `false` otherwise, or `nil` on critical error.
+  ---@return table|nil error Error object if restoration failed.
+  ---@throws table If restoration fails critically.
   function spy_obj:restore()
-    logger.debug("Restoring original method", {
+    get_logger().debug("Restoring original method", {
       target_type = type(self.target),
       method_name = self.name,
     })
 
     -- Validate target and name
     if self.target == nil or self.name == nil then
-      local err = error_handler.validation_error("Cannot restore spy with nil target or name", {
+      local err = get_error_handler().validation_error("Cannot restore spy with nil target or name", {
         function_name = "spy_obj:restore",
         has_target = self.target ~= nil,
         has_name = self.name ~= nil,
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return false, err
     end
 
     -- Use protected call to restore the original method
-    local success, result, err = error_handler.try(function()
+    local success, result, err = get_error_handler().try(function()
       if self.target and self.name then
         self.target[self.name] = self.original
         return true
@@ -1113,7 +1235,7 @@ function spy.on(obj, method_name)
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to restore original method",
         {
           function_name = "spy_obj:restore",
@@ -1122,12 +1244,12 @@ function spy.on(obj, method_name)
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return false, error_obj
     end
 
     if result == false then
-      logger.warn("Could not restore method - missing target or method name", {
+      get_logger().warn("Could not restore method - missing target or method name", {
         function_name = "spy_obj:restore",
       })
       return false
@@ -1136,7 +1258,7 @@ function spy.on(obj, method_name)
     return true
   end
 
-  -- Get wrapper from the result returned by error_handler.try
+  -- Get wrapper from the result returned by get_error_handler().try
   local wrapper = spy_obj.wrapper
   local spy_object = spy_obj.spy
 
@@ -1144,23 +1266,23 @@ function spy.on(obj, method_name)
   spy_object.restore = spy_obj.restore
 
   -- Replace the method with our spy wrapper
-  success, err = error_handler.try(function()
+  success, err = get_error_handler().try(function()
     obj[method_name] = wrapper
     return true
   end)
 
   if not success then
     -- Try to restore original method, but don't worry if it fails
-    error_handler.try(function()
+    get_error_handler().try(function()
       obj[method_name] = original_fn
     end)
 
-    local error_obj = error_handler.runtime_error("Failed to replace method with spy", {
+    local error_obj = get_error_handler().runtime_error("Failed to replace method with spy", {
       function_name = "spy.on",
       method_name = method_name,
       target_type = type(obj),
     }, err)
-    logger.error(error_obj.message, error_obj.context)
+    get_logger().error(error_obj.message, error_obj.context)
     return nil, error_obj
   end
 
@@ -1172,23 +1294,28 @@ function spy.on(obj, method_name)
   return spy_object
 end
 
--- Create and record the call sequence used for spy.on and spy.new methods, with error handling
+--- Internal global counter for call sequence tracking.
+---@private
 spy._next_sequence = 0
+
+--- Generates the next unique call sequence number using a global counter.
+---@return number|nil, table? The next sequence number, or `nil` on error, plus optional error object.
+---@private
 spy._new_sequence = function()
   -- Use protected call to safely increment sequence
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     spy._next_sequence = spy._next_sequence + 1
     return spy._next_sequence
   end)
 
   if not success then
-    logger.warn("Error incrementing sequence counter", {
+    get_logger().warn("Error incrementing sequence counter", {
       function_name = "spy._new_sequence",
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
     -- Use a fallback value based on timestamp to ensure uniqueness
     local fallback_value = os.time() * 1000 + math.random(1000)
-    logger.debug("Using fallback sequence value", {
+    get_logger().debug("Using fallback sequence value", {
       value = fallback_value,
     })
     return fallback_value
@@ -1198,7 +1325,7 @@ spy._new_sequence = function()
 end
 
 -- Before returning the module, set up a module-level error handler
-local module_success, module_err = error_handler.try(function()
+local module_success, module_err = get_error_handler().try(function()
   -- Add basic error handling to module functions
   local original_functions = {}
 
@@ -1217,7 +1344,7 @@ local module_success, module_err = error_handler.try(function()
       local args = { ... }
 
       -- Use error handler to safely call the original function
-      local success, result, err = error_handler.try(function()
+      local success, result, err = get_error_handler().try(function()
         -- Create an inner function to handle the actual call
         local function safe_call(...)
           return original_fn(...)
@@ -1227,9 +1354,9 @@ local module_success, module_err = error_handler.try(function()
 
       -- Handle errors consistently
       if not success then
-        logger.error("Unhandled error in spy module function", {
+        get_logger().error("Unhandled error in spy module function", {
           function_name = "spy." .. k,
-          error = error_handler.format_error(result),
+          error = get_error_handler().format_error(result),
         })
         return nil, result
       end
@@ -1245,8 +1372,8 @@ local module_success, module_err = error_handler.try(function()
 end)
 
 if not module_success then
-  logger.warn("Failed to set up module-level error handling", {
-    error = error_handler.format_error(module_err),
+  get_logger().warn("Failed to set up module-level error handling", {
+    error = get_error_handler().format_error(module_err),
   })
   -- Continue regardless - the individual function error handling should still work
 end

@@ -32,8 +32,8 @@ Parses Lua source code into an Abstract Syntax Tree (AST).
 **Returns:**
 
 
-- `ast` (table|nil): The AST representing the Lua code, or nil if there was an error
-- `error_info` (table|nil): Error information if parsing failed
+- `ast` (table|nil): The AST representing the Lua code, or `nil` if there was an error.
+- `error_message` (string|nil): Error message string if parsing failed.
 
 **Example:**
 
@@ -66,8 +66,8 @@ Parses a Lua file into an Abstract Syntax Tree (AST).
 **Returns:**
 
 
-- `ast` (table|nil): The AST representing the Lua code, or nil if there was an error
-- `error_info` (table|nil): Error information if parsing failed
+- `ast` (table|nil): The AST representing the Lua code, or `nil` if there was an error.
+- `error_message` (string|nil): Error message string if reading or parsing failed.
 
 **Example:**
 
@@ -81,10 +81,9 @@ end
 
 
 
-### `parser.pretty_print(ast)`
+### `parser.to_string(ast)`
 
-
-Converts an AST to a human-readable string representation for debugging.
+Converts an AST to a human-readable string representation (using the pretty-printer).
 **Parameters:**
 
 
@@ -100,7 +99,7 @@ Converts an AST to a human-readable string representation for debugging.
 
 ```lua
 local ast = parser.parse(source)
-print(parser.pretty_print(ast))
+print(parser.to_string(ast))
 ```
 
 
@@ -117,8 +116,8 @@ Validates that an AST is properly structured.
 **Returns:**
 
 
-- `is_valid` (boolean): Whether the AST is valid
-- `error_info` (table|nil): Error information if validation failed
+- `is_valid` (boolean): Whether the AST is valid.
+- `error_message` (string|nil): Error message string if validation failed.
 
 **Example:**
 
@@ -204,15 +203,14 @@ Creates a detailed map of a Lua source code file including AST, executable lines
 
 **Returns:**
 
-
-- `code_map` (table|nil): The code map containing AST and analysis, or nil on error
-  - `source` (string): Original source code
-  - `ast` (table): Parsed abstract syntax tree
-  - `lines` (table): Source code split into lines
-  - `source_lines` (number): Number of lines in the source
-  - `executable_lines` (table): Map of executable line numbers
-  - `functions` (table): Array of function information tables
-  - `valid` (boolean): Whether the code map is valid
+- `code_map` (table|{error: string, valid: boolean}): The code map containing AST and analysis, or an error table `{error, valid=false}` if mapping failed. The code map includes:
+  - `source` (string): Original source code.
+  - `ast` (table): Parsed abstract syntax tree.
+  - `lines` (string[]): Source code split into lines.
+  - `source_lines` (number): Number of lines in the source.
+  - `executable_lines` (table<number, boolean>): Map of executable line numbers to `true`.
+  - `functions` (table[]): Array of function information tables.
+  - `valid` (boolean): `true` if parsing and analysis were successful.
 - `error_info` (table|nil): Error information if mapping failed
 
 **Example:**
@@ -246,8 +244,7 @@ Creates a detailed map of a Lua file including AST, executable lines, and functi
 **Returns:**
 
 
-- `code_map` (table|nil): The code map containing AST and analysis, or nil on error
-- `error_info` (table|nil): Error information if mapping failed
+- `code_map` (table|{error: string, valid: boolean}): The code map containing AST and analysis, or an error table `{error, valid=false}` if reading or mapping failed. See `create_code_map` for structure details.
 
 **Example:**
 

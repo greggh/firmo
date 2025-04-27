@@ -1,77 +1,135 @@
----@class TempFileModule
----@field _VERSION string Module version (following semantic versioning)
----@field create_with_content fun(content: string, extension?: string): string|nil, table? Create a temporary file with specified content and register for automatic cleanup
----@field create_temp_directory fun(): string|nil, table? Create a temporary directory and register for automatic cleanup
----@field get_temp_dir fun(): string Get the base temporary directory path used by the module
----@field register_file fun(file_path: string, context?: string|table): boolean Register an existing file for automatic cleanup with optional context
----@field register_directory fun(dir_path: string, context?: string|table): boolean Register an existing directory for automatic cleanup with optional context
----@field remove fun(file_path: string): boolean, string? Safely remove a temporary file with proper error handling
----@field remove_directory fun(dir_path: string, recursive?: boolean): boolean, string? Safely remove a temporary directory with proper error handling
----@field with_temp_file fun(content: string, callback: fun(temp_path: string): any, extension?: string): any|nil, table? Create and use a temporary file with automatic cleanup after callback finishes
----@field with_temp_directory fun(callback: fun(dir_path: string): any): any|nil, table? Create and use a temporary directory with automatic cleanup after callback finishes
----@field cleanup_test_context fun(context?: string|table): boolean, table[] Clean up files and directories associated with a specific test context
----@field cleanup_all fun(): boolean, table[], table Clean up all registered temporary files and directories with detailed statistics
----@field get_stats fun(): {registered_files: number, registered_directories: number, cleanup_errors: number, contexts: table<string, number>, orphaned_files: number, total_size: number, oldest_file_age: number} Get comprehensive statistics about temporary file management
----@field set_current_test_context fun(context: table|string): boolean Set the current test context for automatic registration
----@field clear_current_test_context fun(): boolean Clear the current test context after tests complete
----@field configure fun(options: {temp_dir?: string, force_cleanup?: boolean, file_prefix?: string, auto_register?: boolean, cleanup_on_exit?: boolean, track_orphans?: boolean, cleanup_delay?: number}): TempFileModule Configure temp file behavior with various options
----@field set_temp_dir fun(dir_path: string): boolean, string? Set a custom temporary directory path (must be writable)
----@field get_registered_files fun(): table<string, {context: string, created: number, size: number, accessed: number, modified: number}> Get detailed information about all registered temporary files
----@field get_registered_directories fun(): table<string, {context: string, created: number, file_count: number, total_size: number}> Get detailed information about all registered temporary directories
----@field create_nested_directory fun(path: string): string|nil, table? Create a nested directory structure within the temp directory
----@field is_registered fun(path: string): boolean Check if a file or directory is registered for cleanup
----@field get_context_for_file fun(file_path: string): string|nil Get the context a specific file was registered with
----@field get_current_test_context fun(): string|table|nil Get the current test context being used for file registration
----@field copy_to_temp fun(source_path: string, extension?: string): string|nil, table? Copy an existing file to a temporary location
----@field find_orphans fun(): table Find orphaned temporary files not properly registered or cleaned
+--- Temporary File Management Utility
+---
+--- Provides functions for creating and managing temporary files and directories
+--- during tests, with automatic tracking, registration, and cleanup.
+--- Integrates with the test runner (via `temp_file_integration`) to associate
+--- temp files with specific tests and ensure cleanup after test completion.
+---
+--- @module lib.tools.filesystem.temp_file
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
---[[
-Temporary File Management Utility
-
-This module provides comprehensive functions for creating and managing temporary files and directories
-during tests, with automatic tracking, registration, and cleanup when tests complete. The system
-integrates with the test runner to ensure proper cleanup based on test context.
-
-Features:
-- Automatic cleanup of files when tests complete
-- Context-aware file tracking by test
-- Safe directory and file creation/removal
-- Detailed statistics and orphan detection
-- Configurable cleanup policies
-- Integration with test frameworks
-]]
+---@class TempFileModule The public API for the temporary file management module.
+---@field _VERSION string Module version (following semantic versioning).
+---@field create_with_content fun(content: string, extension?: string): string|nil, table? Creates a temporary file, writes content, registers it, and returns the path. Returns `path, nil` or `nil, error`. @throws string If unique filename generation fails.
+---@field create_temp_directory fun(): string|nil, table? Creates a temporary directory and registers it. Returns `path, nil` or `nil, error`. @throws string If unique directory name generation fails.
+---@field get_temp_dir fun(): string [Not Implemented] Get the base temporary directory path.
+---@field register_file fun(file_path: string): string Registers an existing file for automatic cleanup. Returns the path.
+---@field register_directory fun(dir_path: string): string Registers an existing directory for automatic cleanup. Returns the path.
+---@field remove fun(file_path: string): boolean, string? Safely removes a temporary file. Returns `success, error_message?`. @throws table If validation fails.
+---@field remove_directory fun(dir_path: string): boolean, string? Safely removes a temporary directory recursively. Returns `success, error_message?`. @throws table If validation fails.
+---@field with_temp_file fun(content: string, callback: fun(temp_path: string): any, extension?: string): any|nil, table? Creates, uses (via callback), and cleans up a temporary file. Returns `callback_result, nil` or `nil, error`. @throws string If `create_with_content` fails critically.
+---@field with_temp_directory fun(callback: fun(dir_path: string): any): any|nil, table? Creates, uses (via callback), and cleans up a temporary directory. Returns `callback_result, nil` or `nil, error`. @throws string If `create_temp_directory` fails critically.
+---@field cleanup_test_context fun(context?: string|table): boolean, table[] Cleans up resources associated with a context (currently hardcoded). Returns `success, errors_array`.
+---@field cleanup_all fun(): boolean, table[], table Cleans up all registered resources. Returns `success, errors_array, stats_table`.
+---@field get_stats fun(): {contexts: number, total_resources: number, files: number, directories: number, resources_by_context: table<string, {files: number, directories: number, total: number}>} Gets statistics about registered resources.
+---@field set_current_test_context fun(context: table|string): nil Sets the current test context globally for implicit registration.
+---@field clear_current_test_context fun(): nil Clears the current test context.
+---@field configure fun(options: {temp_dir?: string, force_cleanup?: boolean, file_prefix?: string, auto_register?: boolean, cleanup_on_exit?: boolean, track_orphans?: boolean, cleanup_delay?: number}): TempFileModule [Not Implemented] Configure temp file behavior. Returns self.
+---@field set_temp_dir fun(dir_path: string): boolean, string? [Not Implemented] Set a custom temporary directory path.
+---@field get_registered_files fun(): table<string, {context: string, created: number, size: number, accessed: number, modified: number}> [Not Implemented] Get details of registered files.
+---@field get_registered_directories fun(): table<string, {context: string, created: number, file_count: number, total_size: number}> [Not Implemented] Get details of registered directories.
+---@field create_nested_directory fun(path: string): string|nil, table? [Not Implemented] Create a nested directory in temp.
+---@field is_registered fun(path: string): boolean [Not Implemented] Check if registered.
+---@field get_context_for_file fun(file_path: string): string|nil [Not Implemented] Get context for a file.
+---@field get_current_test_context fun(): string|table|nil [Not Implemented] Get current test context.
+---@field copy_to_temp fun(source_path: string, extension?: string): string|nil, table? [Not Implemented] Copy file to temp location.
+---@field find_orphans fun(): table [Not Implemented] Find orphaned temp files.
+---@field generate_temp_path fun(extension?: string): string Generates a unique temporary file path. @throws string If unable to generate unique name.
 
 local M = {}
 
-local fs = require("lib.tools.filesystem")
-local error_handler = require("lib.tools.error_handler")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
 
----@type Logging
--- Load logging module directly - this is required
-local logging = require("lib.tools.logging")
----@type Logger
-local logger = logging.get_logger("temp_file")
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("filesystem")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
 
 -- Global registry of temporary files by test context
 -- Using weak keys so test contexts can be garbage collected
 local _temp_file_registry = setmetatable({}, { __mode = "k" })
 
---- Get current test context - simplified to use hardcoded context
+--- Returns the current test context identifier.
+--- NOTE: This implementation is simplified and always returns a hardcoded string.
+--- Full context tracking is intended to be managed by `temp_file_integration`.
+---@return string context The hardcoded test context identifier ("_SIMPLE_STRING_CONTEXT_").
 ---@private
----@return string context The hardcoded test context identifier
 local function get_current_test_context()
   -- For simplicity, we've moved to using a single hardcoded context
   -- This avoids complexity and potential issues with different context types
-  logger.debug("Using hardcoded test context")
+  get_logger().debug("Using hardcoded test context")
   return "_SIMPLE_STRING_CONTEXT_"
 end
 
 --- Register a file with the current test context for automatic cleanup
----@param file_path string Path to the file to register for cleanup
----@return string registered_path The registered file path (for chaining)
----@return table|nil error Error information if registration failed
+---@param file_path string Path to the file to register.
+---@return string registered_path The `file_path` passed in.
 function M.register_file(file_path)
-  logger.debug("Registering file", { path = file_path })
+  get_logger().debug("Registering file", { path = file_path })
 
   -- Create simple string context to avoid complex objects
   -- Note: We're hardcoding this to avoid potential issues with table serialization
@@ -90,11 +148,10 @@ function M.register_file(file_path)
 end
 
 --- Register a directory with the current test context for automatic cleanup
----@param dir_path string Path to the directory to register for cleanup
----@return string registered_path The registered directory path (for chaining)
----@return table|nil error Error information if registration failed
+---@param dir_path string Path to the directory to register.
+---@return string registered_path The `dir_path` passed in.
 function M.register_directory(dir_path)
-  logger.debug("Registering directory", { path = dir_path })
+  get_logger().debug("Registering directory", { path = dir_path })
 
   -- Use same simplified context as register_file
   local context = "_SIMPLE_STRING_CONTEXT_"
@@ -111,73 +168,76 @@ function M.register_directory(dir_path)
   return dir_path
 end
 
+--- Generates a unique temporary file path based on `os.tmpname()`.
+--- Tries multiple times with random suffixes if collisions occur.
+---@param extension? string File extension (without the dot, default "tmp").
+---@return string temp_path The generated unique temporary file path.
+---@throws string If unable to generate a unique filename after multiple attempts.
 ---@private
----@param extension? string File extension (without the dot)
----@return string temp_path Temporary file path
--- Generate a temporary file path with specified extension
 function M.generate_temp_path(extension)
   extension = extension or "tmp"
   -- Ensure extension doesn't start with a dot
   if extension:sub(1, 1) == "." then
     extension = extension:sub(2)
   end
-  
+
   -- Maximum number of attempts to generate a unique filename
   local max_attempts = 10
   local temp_path = nil
-  
+
   for attempt = 1, max_attempts do
     temp_path = os.tmpname()
-    
+
     -- Some os.tmpname() implementations include an extension, remove it
     if temp_path:match("%.") then
       temp_path = temp_path:gsub("%.[^%.]+$", "")
     end
-    
+
     -- Add our extension
     temp_path = temp_path .. "." .. extension
-    
+
     -- Check if the file already exists
-    if not fs.file_exists(temp_path) and not fs.directory_exists(temp_path) then
-      logger.debug("Generated unique temp path", { path = temp_path, attempt = attempt })
+    if not get_fs().file_exists(temp_path) and not get_fs().directory_exists(temp_path) then
+      get_logger().debug("Generated unique temp path", { path = temp_path, attempt = attempt })
       return temp_path
     end
-    
+
     -- If we're having collisions, add a random suffix to increase uniqueness
     if attempt > 1 then
       -- Use time and random number to create more unique filenames
       local suffix = tostring(os.time()) .. "_" .. tostring(math.random(10000))
       temp_path = temp_path:gsub("%." .. extension .. "$", "_" .. suffix .. "." .. extension)
-      
+
       -- Check again after adding the random suffix
-      if not fs.file_exists(temp_path) and not fs.directory_exists(temp_path) then
-        logger.debug("Generated unique temp path with suffix", { 
-          path = temp_path, 
+      if not get_fs().file_exists(temp_path) and not get_fs().directory_exists(temp_path) then
+        get_logger().debug("Generated unique temp path with suffix", {
+          path = temp_path,
           attempt = attempt,
-          suffix = suffix
+          suffix = suffix,
         })
         return temp_path
       end
     end
-    
-    logger.debug("Temp path collision, retrying", { path = temp_path, attempt = attempt })
+
+    get_logger().debug("Temp path collision, retrying", { path = temp_path, attempt = attempt })
   end
-  
+
   -- If we've exhausted our attempts, throw an error
   error("Unable to generate a unique filename after " .. max_attempts .. " attempts")
 end
+
 ---@param content string Content to write to the file
 ---@param extension? string File extension (without the dot)
 ---@return string|nil temp_path Path to the created temporary file, or nil on error
----@return table? error Error object if file creation failed
--- Create a temporary file with the given content (enhanced with registration)
+---@return table? error Error object from `error_handler.try` if writing or registration failed.
+---@throws string If `generate_temp_path` fails to create a unique path.
 function M.create_with_content(content, extension)
   local temp_path = M.generate_temp_path(extension)
 
-  local success, result, err = error_handler.try(function()
-    local ok, write_err = fs.write_file(temp_path, content)
+  local success, result, err = get_error_handler().try(function()
+    local ok, write_err = get_fs().write_file(temp_path, content)
     if not ok then
-      return nil, write_err or error_handler.io_error("Failed to write to temporary file", { file_path = temp_path })
+      return nil, write_err or get_error_handler().io_error("Failed to write to temporary file", { file_path = temp_path })
     end
 
     -- Register the file for automatic cleanup
@@ -195,15 +255,17 @@ end
 
 ---@return string|nil dir_path Path to the created temporary directory, or nil on error
 ---@return table? error Error object if directory creation failed
--- Create a temporary directory (enhanced with registration)
+---@return table? error Error object from `error_handler.try` if directory creation or registration failed.
+---@throws string If `os.tmpname` fails (unlikely) or if directory name generation has persistent collisions (highly unlikely).
 function M.create_temp_directory()
-  local temp_dir = os.tmpname() .. "_dir"
+  -- Generate a potential path using os.tmpname()
+  local temp_dir = M.generate_temp_path("dir") -- Use generate_temp_path for uniqueness retry logic
 
-  local success, result, err = error_handler.try(function()
-    local ok, mkdir_err = fs.create_directory(temp_dir)
+  local success, result, err = get_error_handler().try(function()
+    local ok, mkdir_err = get_fs().create_directory(temp_dir)
     if not ok then
       return nil,
-        mkdir_err or error_handler.io_error("Failed to create temporary directory", { directory_path = temp_dir })
+        mkdir_err or get_error_handler().io_error("Failed to create temporary directory", { directory_path = temp_dir })
     end
 
     -- Register the directory for automatic cleanup
@@ -221,47 +283,47 @@ end
 
 ---@param file_path string Path to the temporary file to remove
 ---@return boolean success Whether the file was successfully removed
----@return string? error Error message if removal failed
--- Remove a temporary file
+---@return string? error Error message string from `get_fs().delete_file` if removal failed.
+---@throws table If `file_path` validation fails (e.g., nil).
 function M.remove(file_path)
   if not file_path then
     return false,
-      error_handler.validation_error("Missing file path for temporary file removal", { operation = "remove_temp_file" })
+      get_error_handler().validation_error("Missing file path for temporary file removal", { operation = "remove_temp_file" })
   end
 
-  return fs.delete_file(file_path)
+  return get_fs().delete_file(file_path)
 end
 
 ---@param dir_path string Path to the temporary directory to remove
 ---@return boolean success Whether the directory was successfully removed
----@return string? error Error message if removal failed
--- Remove a temporary directory
+---@return string? error Error message string from `get_fs().delete_directory` if removal failed.
+---@throws table If `dir_path` validation fails (e.g., nil).
 function M.remove_directory(dir_path)
   if not dir_path then
     return false,
-      error_handler.validation_error(
+      get_error_handler().validation_error(
         "Missing directory path for temporary directory removal",
         { operation = "remove_temp_directory" }
       )
   end
 
   -- Use the standard function name - this should always exist
-  return fs.delete_directory(dir_path, true) -- Use recursive deletion
+  return get_fs().delete_directory(dir_path, true) -- Use recursive deletion
 end
 
 ---@param content string Content to write to the file
 ---@param callback fun(temp_path: string): any Function to call with the temporary file path
 ---@param extension? string File extension (without the dot)
 ---@return any|nil result Result from the callback function, or nil on error
----@return table? error Error object if operation failed
--- Create a temporary file, use it with a callback, and then remove it
+---@return table? error Error object if creation, callback execution, or cleanup (non-critical) failed.
+---@throws string If `create_with_content` fails critically (e.g., generating unique path).
 function M.with_temp_file(content, callback, extension)
   local temp_path, create_err = M.create_with_content(content, extension)
   if not temp_path then
     return nil, create_err
   end
 
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     return callback(temp_path)
   end)
 
@@ -270,7 +332,7 @@ function M.with_temp_file(content, callback, extension)
   if remove_err then
     -- Just log the error, don't fail the operation due to cleanup issues
     -- This is a best-effort cleanup
-    error_handler.log_error(remove_err, error_handler.LOG_LEVEL.DEBUG)
+    get_error_handler().log_error(remove_err, get_error_handler().LOG_LEVEL.DEBUG)
   end
 
   if not success then
@@ -282,15 +344,15 @@ end
 
 ---@param callback fun(dir_path: string): any Function to call with the temporary directory path
 ---@return any|nil result Result from the callback function, or nil on error
----@return table? error Error object if operation failed
--- Create a temporary directory, use it with a callback, and then remove it
+---@return table? error Error object if creation, callback execution, or cleanup (non-critical) failed.
+---@throws string If `create_temp_directory` fails critically.
 function M.with_temp_directory(callback)
   local dir_path, create_err = M.create_temp_directory()
   if not dir_path then
     return nil, create_err
   end
 
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     return callback(dir_path)
   end)
 
@@ -298,7 +360,7 @@ function M.with_temp_directory(callback)
   local _, remove_err = M.remove_directory(dir_path)
   if remove_err then
     -- Just log the error, don't fail the operation due to cleanup issues
-    error_handler.log_error(remove_err, error_handler.LOG_LEVEL.DEBUG)
+    get_error_handler().log_error(remove_err, get_error_handler().LOG_LEVEL.DEBUG)
   end
 
   if not success then
@@ -308,13 +370,12 @@ function M.with_temp_directory(callback)
   return result
 end
 
----@private
 ---@param path string Path to file or directory to remove
 ---@param resource_type string "file" or "directory"
 ---@param max_retries number Maximum number of retries
 ---@return boolean success Whether the resource was successfully removed
----@return string? err Error message if removal failed
--- Helper function to remove a resource with retry logic
+---@return string? err Error message string if removal failed after retries.
+---@private
 local function remove_with_retry(path, resource_type, max_retries)
   max_retries = max_retries or 3
   local success = false
@@ -322,7 +383,7 @@ local function remove_with_retry(path, resource_type, max_retries)
 
   for retry = 1, max_retries do
     if resource_type == "file" then
-      -- For files, try with both os.remove and fs.delete_file
+      -- For files, try with both os.remove and get_fs().delete_file
       -- os.remove is often more reliable for temp files
       local ok1 = os.remove(path)
       if ok1 then
@@ -330,8 +391,8 @@ local function remove_with_retry(path, resource_type, max_retries)
         break
       end
 
-      -- If os.remove failed, try fs.delete_file
-      local ok2, delete_err = fs.delete_file(path)
+      -- If os.remove failed, try get_fs().delete_file
+      local ok2, delete_err = get_fs().delete_file(path)
       if ok2 then
         success = true
         break
@@ -339,7 +400,7 @@ local function remove_with_retry(path, resource_type, max_retries)
       err = delete_err or "Failed to remove file"
     else
       -- For directories, always use recursive deletion
-      local ok, delete_err = fs.delete_directory(path, true)
+      local ok, delete_err = get_fs().delete_directory(path, true)
       if ok then
         success = true
         break
@@ -350,7 +411,7 @@ local function remove_with_retry(path, resource_type, max_retries)
     if not success and retry < max_retries then
       -- Wait briefly before retrying (increasing delay)
       local delay = 0.1 * retry
-      logger.debug(
+      get_logger().debug(
         "Retry " .. retry .. " failed for " .. resource_type .. ", waiting " .. delay .. "s",
         { path = path }
       )
@@ -365,19 +426,18 @@ local function remove_with_retry(path, resource_type, max_retries)
   return success, err
 end
 
----@param context? string Test context identifier (optional)
----@return boolean success Whether all files were cleaned up successfully
----@return table[] errors Array of resources that could not be cleaned up
--- Clean up all temporary files and directories for a specific test context
+---@param context? string|table Optional test context identifier (currently ignored, uses hardcoded context).
+---@return boolean success `true` if all registered resources for the context were successfully removed.
+---@return table[] errors Array of tables `{path, type}` for resources that could not be cleaned up.
 function M.cleanup_test_context(context)
-  logger.debug("Cleaning up test context")
+  get_logger().debug("Cleaning up test context")
 
   -- Use hardcoded context to match our simplified registration
   context = "_SIMPLE_STRING_CONTEXT_"
 
   local resources = _temp_file_registry[context] or {}
 
-  logger.debug("Found resources to clean up", { count = #resources })
+  get_logger().debug("Found resources to clean up", { count = #resources })
 
   local errors = {}
 
@@ -407,9 +467,9 @@ function M.cleanup_test_context(context)
     -- Check if the resource still exists before attempting removal
     local exists = false
     if resource.type == "file" then
-      exists = fs.file_exists(resource.path)
+      exists = get_fs().file_exists(resource.path)
     else
-      exists = fs.directory_exists(resource.path)
+      exists = get_fs().directory_exists(resource.path)
     end
 
     local success = not exists -- Consider it successful if the resource doesn't exist
@@ -424,7 +484,7 @@ function M.cleanup_test_context(context)
         path = resource.path,
         type = resource.type,
       })
-      logger.debug("Failed to clean up resource", {
+      get_logger().debug("Failed to clean up resource", {
         path = resource.path,
         type = resource.type,
       })
@@ -437,14 +497,14 @@ function M.cleanup_test_context(context)
   -- Clear the registry for this context if all resources were removed
   if #resources == 0 then
     _temp_file_registry[context] = nil
-    logger.debug("All resources cleaned up, removed context from registry")
+    get_logger().debug("All resources cleaned up, removed context from registry")
   end
 
   return #errors == 0, errors
 end
 
----@return table stats Statistics about temporary files and their contexts
--- Get statistics about temporary files
+--- Gets statistics about currently registered temporary files and directories across all contexts.
+---@return {contexts: number, total_resources: number, files: number, directories: number, resources_by_context: table<string, {files: number, directories: number, total: number}>} stats Statistics table.
 function M.get_stats()
   local stats = {
     contexts = 0,
@@ -481,12 +541,10 @@ function M.get_stats()
   return stats
 end
 
----@return boolean success Whether all files were cleaned up successfully
----@return table[] errors Array of resources that could not be cleaned up
----@return table stats Statistics about the cleanup operation
--- Clean up all temporary files across all contexts
+---@return table stats A simplified statistics table `{ total_resources, cleaned }`.
+---@return table[] errors Array of resources that could not be cleaned up.
 function M.cleanup_all()
-  logger.debug("Cleaning up all temporary files")
+  get_logger().debug("Cleaning up all temporary files")
 
   -- Simplified version that just calls cleanup_test_context with our hardcoded context
   local success, errors = M.cleanup_test_context("_SIMPLE_STRING_CONTEXT_")
@@ -500,9 +558,9 @@ function M.cleanup_all()
   return success, errors, stats
 end
 
----@param context table|string The test context to set
----@return nil
 -- Set the current test context (for use by test runners)
+---@param context table|string The test context to set (e.g., `{ type="test", name="..." }` or a simple string).
+---@return nil
 function M.set_current_test_context(context)
   -- If we can modify firmo, use it
   if _G.firmo then
@@ -513,8 +571,8 @@ function M.set_current_test_context(context)
   _G._current_temp_file_context = context
 end
 
----@return nil
 -- Clear the current test context (for use by test runners)
+---@return nil
 function M.clear_current_test_context()
   -- If we can modify firmo, use it
   if _G.firmo then

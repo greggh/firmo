@@ -1,58 +1,38 @@
-# Library Knowledge
+# Firmo Library (`lib/`) Knowledge
 
+## Purpose
 
-## Module Organization
+This document provides a high-level overview of the `lib/` directory structure, which contains all core framework modules and tools for Firmo. It also outlines key principles for developers working within this directory.
 
+## Key Components (Subdirectories)
 
+The `lib/` directory is organized into several key areas:
 
-- assertion.lua: Standalone assertion module
-- core/: Core utilities (type checking, fix_expect, version)
-- async/: Asynchronous testing functionality
-- coverage/: Code coverage tracking
-- quality/: Quality validation
-- reporting/: Test reporting system
-- tools/: Utilities and helpers
-- mocking/: Mocking system (spy, stub, mock)
+-   **`core/`:** Fundamental framework components including the central configuration (`central_config`), error handling (`error_handler`), test definition (`test_definition`), core runner logic (`runner`), module reset (`module_reset`), type checking (`type_checking`), and versioning (`version`).
+-   **`assertion/`:** The standalone expect-style assertion system (`expect`).
+-   **`async/`:** Asynchronous testing utilities (`it_async`, `await`, `wait_until`, `parallel_async`).
+-   **`coverage/`:** Code coverage tracking system (based on LuaCov debug hooks).
+-   **`mocking/`:** Mocking system providing spies, stubs, and mocks.
+-   **`quality/`:** Test quality validation framework (partially implemented).
+-   **`reporting/`:** Report generation system with various formatters (HTML, JSON, JUnit, LCOV, etc.).
+-   **`tools/`:** General-purpose utility modules including `benchmark`, `cli`, `codefix`, `date`, `discover`, `filesystem` (with `temp_file`), `hash`, `interactive`, `json`, `logging` (with `export`, `search`, `formatter_integration`), `markdown`, `parallel`, `parser`, `test_helper`, and `watcher`. Also contains `vendor/` for third-party libraries.
 
+## Core Principles / Guidelines
 
-## Critical Rules
+When developing modules within the `lib/` directory, adhere to the following:
 
+-   **Central Configuration:** ALWAYS use `lib/core/central_config` for all configuration settings. Provide defaults and register module schemas. NEVER use module-specific config tables or hardcoded values.
+-   **Error Handling:** ALWAYS use the `lib/core/error_handler` system. Return `nil, error_object` for failures. Use `error_handler.try` or `safe_io_operation` for risky calls. Validate inputs.
+-   **No Special Cases:** Ensure solutions are general-purpose and handle all inputs consistently. AVOID code specific to certain files or scenarios. Fix root causes, don't add workarounds.
+-   **Focused Modules:** Keep modules focused on a single responsibility. Use clean abstractions and well-defined interfaces between modules.
+-   **Documentation:** Document all public APIs using JSDoc/Luau-style annotations (`---@class`, `---@field`, `---@param`, `---@return`, etc.). Update documentation when changing code.
+-   **Testing:** Add comprehensive tests for all public functionality, including edge cases and error conditions. Ensure tests are independent.
+-   **Dependencies:** Minimize external dependencies. Place any required third-party code in `lib/tools/vendor/` and document its source and license.
+-   **Logging:** Use the `lib/tools/logging` module for structured logging, especially for debug information.
+-   **Filesystem:** Use the `lib/tools/filesystem` module for all file I/O to ensure cross-platform compatibility and proper error handling.
 
+## Related Components / Modules
 
-- NEVER import coverage module in test files
-- ALWAYS use central_config for settings
-- NEVER create custom configuration systems
-- NEVER add special case code
-- ALWAYS handle errors properly
-
-
-## Error Handling Pattern
-
-
-
-- Return nil, error_object for failures
-- Use error_handler.try for risky operations
-- Validate all input parameters
-- Include context in error objects
-- Clean up resources in error cases
-
-
-## Module Guidelines
-
-
-
-- Keep modules focused and single-purpose
-- Use consistent error handling patterns
-- Document public APIs with type annotations
-- Add debug logging for complex operations
-- Test all public functionality
-
-
-## Dependencies
-
-
-
-- Minimal external dependencies
-- Vendor dependencies in tools/vendor/
-- Document all third-party code
-- Version lock dependencies when possible
+-   **Architecture Overview:** [`docs/firmo/architecture.md`](../docs/firmo/architecture.md)
+-   **Developer Knowledge Base:** [`docs/knowledge.md`](../docs/knowledge.md)
+-   **Contributing Guide:** [`CONTRIBUTING.md`](../CONTRIBUTING.md)

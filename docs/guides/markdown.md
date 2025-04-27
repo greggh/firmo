@@ -12,7 +12,6 @@ The Markdown module provides tools for fixing and improving Markdown formatting 
 - [Fixing Specific Issues](#fixing-specific-issues)
 - [Working with Multiple Files](#working-with-multiple-files)
 - [Integration with Codefix](#integration-with-codefix)
-- [Common Formatting Scenarios](#common-formatting-scenarios)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
 
@@ -23,16 +22,14 @@ The Markdown module provides tools for fixing and improving Markdown formatting 
 ### Installation
 
 
-The Markdown module is included as part of the Firmo framework. To use it, simply require the module:
+The Markdown module provides the following capabilities:
 
-
-```lua
-local markdown = require("lib.tools.markdown")
-```
-
-
-
-### Prerequisites
+- Finding Markdown files within a directory (`find_markdown_files`).
+- Fixing heading level hierarchies (`fix_heading_levels`).
+- Correcting ordered list numbering (`fix_list_numbering`).
+- Applying multiple fixes comprehensively (`fix_comprehensive`).
+- Fixing all Markdown files in a directory (`fix_all_in_directory`).
+- Integrating with the codefix module (`register_with_codefix`).
 
 
 The module requires:
@@ -47,28 +44,9 @@ These dependencies are automatically loaded when you require the markdown module
 ## Basic Usage
 
 
-### Fixing a Single File
-
-
-To fix formatting issues in a single Markdown file:
-
-
-```lua
-local markdown = require("lib.tools.markdown")
-local success, err = markdown.fix_file("docs/README.md")
-if success then
-  print("README.md fixed successfully")
-else
-  print("Error fixing README.md: " .. (err and err.message or "unknown error"))
-end
-```
-
-
-
 ### Reading and Fixing Content
 
-
-To fix Markdown content directly:
+To read Markdown content, apply fixes, and write it back:
 
 
 ```lua
@@ -214,134 +192,6 @@ Another list:
 
 ```
 
-
-
-### Fixing Spacing
-
-
-Ensures proper spacing around Markdown elements:
-
-
-```lua
-local fixed_content = markdown.fix_spacing(content)
-```
-
-
-
-#### Before:
-
-
-
-```markdown
-
-# Heading
-
-
-Paragraph right after heading without space
-
-## Another heading
-
-
-
-* List item 1
-* List item 2
-
-Paragraph right after list without space
-```
-
-
-
-#### After:
-
-
-
-```markdown
-
-# Heading
-
-
-Paragraph right after heading without space
-
-## Another heading
-
-
-
-* List item 1
-* List item 2
-
-Paragraph right after list without space
-```
-
-
-
-### Fixing Code Blocks
-
-
-Ensures code blocks use proper formatting:
-
-
-```lua
-local fixed_content = markdown.fix_code_blocks(content)
-```
-
-
-
-#### Before:
-
-
-
-```markdown
-Some code:
-```text
-
-
-function example()
-  return true
-end
-
-
-```text
-With improper spacing:
-```
-
-
-Another function()
-
-
-```text
-
-```
-
-
-
-#### After:
-
-
-
-```markdown
-Some code:
-```lua
-
-
-function example()
-  return true
-end
-
-
-```text
-With improper spacing:
-```
-
-
-Another function()
-
-
-```text
-
-```
-
-
-
 ## Working with Multiple Files
 
 
@@ -430,70 +280,6 @@ Once registered with codefix, you can use codefix CLI commands to fix Markdown f
 
 
 This integrates Markdown fixing into your code quality workflow.
-
-## Common Formatting Scenarios
-
-
-### Creating a Table of Contents
-
-
-Generate a table of contents from document headings:
-
-
-```lua
-local toc, err = markdown.generate_table_of_contents(content)
-if toc then
-  -- Insert TOC at the beginning of the document
-  local content_with_toc = "# Table of Contents\n\n" .. toc .. "\n\n" .. content
-  fs.write_file("docs/guide.md", content_with_toc)
-end
-```
-
-
-
-### Extracting and Analyzing Headings
-
-
-Extract and analyze heading structure:
-
-
-```lua
-local headings = markdown.extract_headings(content)
--- Print heading hierarchy
-for i, heading in ipairs(headings) do
-  print(string.rep("  ", heading.level - 1) .. 
-        "- " .. heading.text .. " (Level " .. heading.level .. ")")
-end
--- Check for heading level jumps
-local prev_level = 0
-for i, heading in ipairs(headings) do
-  if heading.level > prev_level + 1 then
-    print("Warning: Heading level jump at line " .. heading.line)
-  end
-  prev_level = heading.level
-end
-```
-
-
-
-### Validating Markdown
-
-
-Check for common Markdown issues:
-
-
-```lua
-local is_valid, issues = markdown.validate_markdown(content)
-if not is_valid then
-  print("Markdown validation failed:")
-  for _, issue in ipairs(issues) do
-    print("Line " .. issue.line .. ": " .. issue.message)
-  end
-end
-```
-
-
-
 ## Best Practices
 
 
@@ -521,20 +307,14 @@ fi
 
 
 
-1. **CI/CD pipeline**: Validate Markdown formatting as part of continuous integration:
-
+1. **CI/CD pipeline**: Run Markdown fixes as part of continuous integration:
 
 ```yaml
-
-
-- name: Check Markdown formatting
-
-  run: lua -e 'require("lib.tools.markdown").validate_all("docs")'
+- name: Fix Markdown formatting
+  run: lua -e 'require("lib.tools.markdown").fix_all_in_directory("docs")'
 ```
 
-
-
-1. **Build process**: Run Markdown fixes before generating documentation:
+2. **Build process**: Run Markdown fixes before generating documentation:
 
 
 ```lua
@@ -543,34 +323,6 @@ local markdown = require("lib.tools.markdown")
 markdown.fix_all_in_directory("docs")
 -- Continue with documentation generation
 ```
-
-
-
-### Project-Wide Configuration
-
-
-Configure the module for project-wide use:
-
-
-```lua
--- In your project setup script
-local central_config = require("lib.core.central_config")
-local markdown = require("lib.tools.markdown")
--- Configure markdown module via central_config
-central_config.set("markdown", {
-  -- Custom configuration options
-  spacing_style = "loose",     -- Controls spacing between elements
-  code_block_style = "fenced", -- Use ``` for code blocks
-  heading_style = "atx",       -- Use # style headings (not === style)
-  fix_on_save = true           -- Fix markdown files on save
-})
--- Register with codefix if available
-local codefix_success, codefix = pcall(require, "lib.tools.codefix")
-if codefix_success then
-  markdown.register_with_codefix(codefix)
-end
-```
-
 
 
 ## Troubleshooting
@@ -617,9 +369,7 @@ markdown.fix_file("docs/README.md")
 
 #### Formatting Errors
 
-
 If you encounter errors during formatting:
-
 
 ```lua
 -- Enable error capture to see the specific issue
@@ -632,29 +382,7 @@ if not success then
 end
 ```
 
-
-
-#### Preserving Special Content
-
-
-If certain parts of your Markdown should be preserved exactly as-is:
-
-
-```markdown
-<!-- markdown-preserve -->
-This content will not be modified by the markdown fixer.
-
-
-1. These numbers will stay the same
-1. Even though they're not sequential
-
-<!-- end-markdown-preserve -->
-```
-
-
-
 ### Getting Help
-
 
 For more detailed information:
 
@@ -673,4 +401,7 @@ logging.configure_from_options("Markdown", {
 
 
 1. Check the full documentation in the [API Reference](../api/markdown.md).
-2. Look at the [example files](../../examples/markdown_examples.md) for guidance on specific use cases.
+2. Look at the example files (if available) for guidance on specific use cases.
+## Conclusion
+
+The Markdown module offers basic tools for maintaining consistent documentation in your Lua projects by fixing heading levels and list numbering. By integrating it into your workflow, you can automate these specific formatting tasks.

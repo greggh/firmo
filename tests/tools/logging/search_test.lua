@@ -1,19 +1,21 @@
----@class SearchTestModule
----@field search_logs function Searches logs using various filters and returns matching entries
----@field get_log_stats function Analyzes logs and returns statistics
----@field export_logs function Exports logs to different formats (CSV, JSON, etc.)
----@field get_log_processor function Creates a processor to filter and format logs
---
--- Logging Search Module Tests
--- Tests the functionality of the log search module including:
--- - Searching logs by module, level, message pattern, and other criteria
--- - Generating statistics about log files
--- - Exporting logs to different formats
--- - Creating log processors to filter and transform logs
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Logging Search Module Tests
+---
+--- Tests the functionality of the log search module (`lib.tools.logging.search`), including:
+--- - Searching logs by level, module, and message pattern (`search_logs`).
+--- - Limiting search results (`limit` option).
+--- - Generating statistics about log files (`get_log_stats`).
+--- - Exporting logs to different formats (CSV) (`export_logs`).
+--- - Creating log processors (`get_log_processor`).
+--- Uses a `before` hook to create sample text and JSON log files for testing.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
+
 local log_search = require("lib.tools.logging.search")
 local fs = require("lib.tools.filesystem")
 local test_helper = require("lib.tools.test_helper")
@@ -24,7 +26,7 @@ describe("Logging Search Module", function()
   -- Create a sample log file for testing
   before(function()
     local test_dir = test_helper.create_temp_test_directory()
-    
+
     local log_content = [[
 2025-03-26 14:32:45 | ERROR | database | Connection failed (host=db.example.com, port=5432, error=Connection refused)
 2025-03-26 14:32:50 | WARN | authentication | Failed login attempt (username=user123, ip_address=192.168.1.1, attempt=3)
@@ -56,7 +58,7 @@ describe("Logging Search Module", function()
     expect(results).to.exist()
     expect(results.entries).to.be.a("table")
     expect(#results.entries).to.equal(2) -- Two ERROR logs in the sample
-    
+
     for _, entry in ipairs(results.entries) do
       expect(entry.level).to.equal("ERROR")
     end

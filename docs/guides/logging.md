@@ -1,13 +1,10 @@
 # Logging Guide
 
-
 This guide explains how to use the firmo logging system effectively in your projects, including best practices and advanced features.
 
 ## Overview
 
-
 The firmo testing framework includes a comprehensive centralized logging system that provides:
-
 
 - Multiple log levels (FATAL, ERROR, WARN, INFO, DEBUG, TRACE)
 - Module-specific log configuration
@@ -19,33 +16,24 @@ The firmo testing framework includes a comprehensive centralized logging system 
 - Performance optimization features
 - Integration with the central configuration system
 
-
 ## Getting Started
-
 
 ### Basic Usage
 
-
 To use the logging system in your module:
-
 
 ```lua
 -- Import the logging module
 local logging = require("lib.tools.logging")
 -- Create a logger for your module
 local logger = logging.get_logger("my_module")
--- Configure logging from global config (recommended)
-logging.configure_from_config("my_module")
 -- Use the logger at different levels
 logger.info("Initializing my_module...")
 logger.debug("Configuration loaded with 5 options")
 logger.error("Failed to load file: my_file.lua")
 ```
 
-
-
 ### Log Levels
-
 
 The logging system supports six log levels, ordered by priority:
 | Level | Value | Description | Usage |
@@ -60,12 +48,9 @@ Messages are only displayed if their level is less than or equal to the configur
 
 ## Configuration Methods
 
-
 ### 1. Using Central Configuration (Recommended)
 
-
 The recommended approach is to use the central configuration system through the `.firmo-config.lua` file:
-
 
 ```lua
 -- In .firmo-config.lua
@@ -91,23 +76,16 @@ return {
 }
 ```
 
-
 Then in your module:
-
 
 ```lua
 local logging = require("lib.tools.logging")
 local logger = logging.get_logger("my_module")
-logging.configure_from_config("my_module")
 ```
-
-
 
 ### 2. Command-Line Options
 
-
 You can configure log levels based on command-line options:
-
 
 ```lua
 local logging = require("lib.tools.logging")
@@ -118,22 +96,16 @@ local options = parse_args(arg)
 logging.configure_from_options("my_module", options)
 ```
 
-
 This is useful for temporary debugging:
-
 
 ```bash
 lua my_script.lua --debug    # Sets DEBUG level
 lua my_script.lua --verbose  # Sets TRACE level
 ```
 
-
-
 ### 3. Direct Configuration
 
-
 You can also configure the logging system directly:
-
 
 ```lua
 local logging = require("lib.tools.logging")
@@ -149,16 +121,11 @@ logging.configure({
 logging.set_module_level("my_module", logging.LEVELS.TRACE)
 ```
 
-
-
 ## Structured Logging
-
 
 ### Parameter-Based Logging
 
-
 Always separate messages from contextual data using the parameters table:
-
 
 ```lua
 -- Bad: Variable data embedded in message
@@ -167,17 +134,12 @@ logger.info("Processed file " .. filename .. " with " .. count .. " lines")
 logger.info("Processed file", {filename = filename, line_count = count})
 ```
 
-
 The parameters will appear in:
-
 
 - Text logs as key-value pairs in parentheses
 - JSON logs as a nested object structure
 
-
 ### Parameter Naming Conventions
-
-
 
 - Use snake_case for parameter names
 - Be specific (use `operation_duration_ms` not just `time`)
@@ -190,12 +152,9 @@ The parameters will appear in:
   - Metrics: `duration_ms`, `size_bytes`, `memory_usage_mb`
   - Errors: `error`, `error_message`, `error_code`
 
-
 ### JSON Structured Logging
 
-
 For machine processing, the logging system can write logs in JSON format while keeping console output human-readable:
-
 
 ```lua
 logging.configure({
@@ -205,30 +164,22 @@ logging.configure({
 })
 ```
 
-
 The JSON log file format is one JSON object per line (newline-delimited JSON):
-
 
 ```text
 {"timestamp":"2025-03-26T14:32:45","level":"INFO","module":"app","message":"Application started"}
 {"timestamp":"2025-03-26T14:32:46","level":"ERROR","module":"database","message":"Connection failed","params":{"host":"db.example.com","retries":3}}
 ```
 
-
-
 ## Log File Management
 
-
 ### Log Directory
-
 
 By default, log files are stored in the `logs` directory. This directory is automatically created if it doesn't exist.
 
 ### Log Rotation
 
-
 The logging system automatically rotates log files when they reach a specified size:
-
 
 1. When `my_log.log` reaches `max_file_size`, it's renamed to `my_log.log.1`
 2. If `my_log.log.1` already exists, it's renamed to `my_log.log.2`, and so on
@@ -236,7 +187,6 @@ The logging system automatically rotates log files when they reach a specified s
 
 This prevents log files from growing too large while preserving history.
 Configuration options:
-
 
 ```lua
 logging.configure({
@@ -247,23 +197,17 @@ logging.configure({
 })
 ```
 
-
-
 ## Error Handling Integration
-
 
 ### Expected Error Suppression
 
-
 In tests that use the `{ expect_error = true }` flag, expected errors are automatically handled specially:
-
 
 1. ERROR and WARN level messages are downgraded to DEBUG level
 2. Messages are prefixed with [EXPECTED] to clearly mark them
 3. If DEBUG logging is disabled, these messages won't appear at all
 
 This provides a cleaner test output while still making the information available when needed.
-
 
 ```lua
 it("should handle division by zero", { expect_error = true }, function()
@@ -276,13 +220,9 @@ it("should handle division by zero", { expect_error = true }, function()
 })
 ```
 
-
-
 ### Error History Access
 
-
 All expected errors can be accessed programmatically:
-
 
 ```lua
 -- After running tests with expected errors
@@ -290,25 +230,20 @@ local error_handler = require("lib.tools.error_handler")
 local expected_errors = error_handler.get_expected_test_errors()
 -- Process the errors for diagnostics
 for i, err in ipairs(expected_errors) do
-  print(string.format("[%s] From module %s: %s", 
+  print(string.format("[%s] From module %s: %s",
     os.date("%H:%M:%S", err.timestamp),
-    err.module or "unknown", 
+    err.module or "unknown",
     err.message))
 end
 -- Clear expected errors when done
 error_handler.clear_expected_test_errors()
 ```
 
-
-
 ## Performance Optimization
-
 
 ### Check Level Before Expensive Operations
 
-
 To avoid performance overhead when generating complex debug messages:
-
 
 ```lua
 if logger.is_debug_enabled() then
@@ -318,11 +253,7 @@ if logger.is_debug_enabled() then
 end
 ```
 
-
-
 ### Practical Example
-
-
 
 ```lua
 function process_file(file_path)
@@ -344,13 +275,9 @@ function process_file(file_path)
 end
 ```
 
-
-
 ### Using Buffering for High-Volume Logging
 
-
 For scenarios with many log events in a short time, enable buffering:
-
 
 ```lua
 logging.configure({
@@ -361,24 +288,18 @@ logging.configure({
 })
 ```
 
-
 With buffering enabled, messages aren't written immediately but are held in memory until:
-
 
 - The buffer reaches `buffer_size` entries
 - The `buffer_flush_interval` time elapses
 - `logging.flush()` is called manually
 - The application exits (if `buffer_flush_on_exit` is true)
 
-
 ## Integration with Test System
-
 
 ### Test-Specific Loggers
 
-
 Create context-aware loggers for tests:
-
 
 ```lua
 local formatter_integration = require("lib.tools.logging.formatter_integration")
@@ -410,22 +331,16 @@ end)
 end)
 ```
 
-
 This creates logs with rich context:
-
 
 - `[INFO] [test.Calculator_Test] Initializing calculator test (component=math, type=unit)`
 - `[DEBUG] [test.Calculator_Test] Testing addition (component=math, type=unit, step=Addition Test, a=2, b=3, expected=5)`
 
-
 ### Test Error Visibility
-
 
 When writing tests that expect errors, the logging system has special behavior to help with debugging:
 
-
 1. **Debug override for expected errors**: When a test uses the `{ expect_error = true }` flag, DEBUG level messages are shown for that test even if the module's configured log level is higher (e.g., WARN).
-
 
 ```lua
 -- This test will show DEBUG messages even if the module is configured at WARN level
@@ -435,10 +350,7 @@ it("handles file operation errors", { expect_error = true }, function()
 end)
 ```
 
-
-
 1. **Selective use of expect_error**: Only use `expect_error = true` when you need visibility into debug messages during error conditions:
-
 
 ```lua
 -- Good: Use expect_error when you need DEBUG visibility into error handling
@@ -455,15 +367,12 @@ it("validates input parameters", function()
 end)
 ```
 
-
-
 1. **Log level precedence**: The precedence for determining the effective log level is:
    - Debug mode flag (`--debug` command line option)
    - Test expect_error flag (temporarily lowers threshold for specific tests)
    - Module-specific configured level
    - Global default log level
 2. **Real-world examples from the coverage module**:
-
 
 ```lua
 -- Coverage initialization errors need detailed DEBUG output
@@ -501,21 +410,17 @@ it("handles invalid include patterns", function()
 end)
 ```
 
-
 This behavior ensures that when testing error conditions, you have appropriate visibility into the system's internal state without modifying the code or changing configuration.
 
 ## Troubleshooting Logging Issues
 
-
 ### Common Problems and Solutions
-
-
 
 1. **Too many DEBUG messages in test output**
 
-   *Problem*: Tests using `{ expect_error = true }` show excessive DEBUG messages.
+   _Problem_: Tests using `{ expect_error = true }` show excessive DEBUG messages.
 
-   *Solution*: Only use `expect_error = true` for tests that need detailed error diagnostics. For simple error checks, use the helper instead:
+   _Solution_: Only use `expect_error = true` for tests that need detailed error diagnostics. For simple error checks, use the helper instead:
 
    ```lua
    -- BEFORE: Shows all DEBUG messages
@@ -532,12 +437,11 @@ This behavior ensures that when testing error conditions, you have appropriate v
    end)
    ```
 
-
 2. **Coverage module generating unexpected debug output**
 
-   *Problem*: Even with `coverage = 2` in config, some tests still show DEBUG (level 4) messages.
+   _Problem_: Even with `coverage = 2` in config, some tests still show DEBUG (level 4) messages.
 
-   *Solution*: Check for `expect_error = true` in test definitions:
+   _Solution_: Check for `expect_error = true` in test definitions:
 
    ```lua
    -- In .firmo-config.lua
@@ -555,12 +459,11 @@ This behavior ensures that when testing error conditions, you have appropriate v
    end)
    ```
 
-
 3. **Inconsistent log levels across environments**
 
-   *Problem*: Log levels change when running in different environments.
+   _Problem_: Log levels change when running in different environments.
 
-   *Solution*: Explicitly configure logging at the start of execution:
+   _Solution_: Explicitly configure logging at the start of execution:
 
    ```lua
    local central_config = require("lib.core.central_config")
@@ -571,12 +474,11 @@ This behavior ensures that when testing error conditions, you have appropriate v
    logging.configure_from_config()
    ```
 
-
 4. **Log messages missing during error conditions**
 
-   *Problem*: Important diagnostic messages aren't visible during failures.
+   _Problem_: Important diagnostic messages aren't visible during failures.
 
-   *Solution*: Use the `debug_temporary` helper for specific code sections:
+   _Solution_: Use the `debug_temporary` helper for specific code sections:
 
    ```lua
    local logging = require("lib.tools.logging")
@@ -590,20 +492,15 @@ This behavior ensures that when testing error conditions, you have appropriate v
 
 ### Debug Mode Override
 
-
 The `--debug` command-line flag will force all logs to be visible, regardless of configuration:
-
 
 ```bash
 lua test.lua --debug tests/coverage/
 ```
 
-
 This is useful for troubleshooting but can generate a large volume of output.
 
 ## Best Practices
-
-
 
 1. **Use module-specific loggers**: Create a separate logger for each module
 
@@ -611,13 +508,11 @@ This is useful for troubleshooting but can generate a large volume of output.
    local logger = logging.get_logger("module_name")
    ```
 
-
 2. **Use configure_from_config**: Let global config control log levels
 
    ```lua
    logging.configure_from_config("module_name")
    ```
-
 
 3. **Separate message from parameters**: Keep messages simple and put variable data in parameters
 
@@ -628,7 +523,6 @@ This is useful for troubleshooting but can generate a large volume of output.
    -- Good: Separated data
    logger.info("Found items", {count = count, category = category})
    ```
-
 
 4. **Include context in parameters**: Provide enough information for troubleshooting
 
@@ -641,7 +535,6 @@ This is useful for troubleshooting but can generate a large volume of output.
    })
    ```
 
-
 5. **Check level before expensive operations**:
 
    ```lua
@@ -650,10 +543,9 @@ This is useful for troubleshooting but can generate a large volume of output.
    end
    ```
 
-
 6. **Choose appropriate log levels**:
    - FATAL: System cannot continue, requires immediate action
-   - ERROR: Operation failed completely 
+   - ERROR: Operation failed completely
    - WARN: Concerning situation, but operation continued
    - INFO: Normal operational events users should know about
    - DEBUG: Information useful to developers during debugging
@@ -664,10 +556,9 @@ This is useful for troubleshooting but can generate a large volume of output.
    -- Good message verbs
    logger.info("Starting data import")
    logger.info("Completed data import")
-   logger.error("Failed to connect to database") 
+   logger.error("Failed to connect to database")
    logger.warn("Retrying failed operation")
    ```
-
 
 8. **Include operation names and IDs for correlation**:
 
@@ -679,7 +570,6 @@ This is useful for troubleshooting but can generate a large volume of output.
    })
    ```
 
-
 9. **Log state transitions**:
 
    ```lua
@@ -689,7 +579,6 @@ This is useful for troubleshooting but can generate a large volume of output.
      item_id = item.id
    })
    ```
-
 
 10. **Use consistent parameter naming across modules**:
 
@@ -701,20 +590,14 @@ This is useful for troubleshooting but can generate a large volume of output.
 
 ## See Also
 
-
-
 - [Coverage System Guide](./coverage.md) - Explains how coverage interacts with logging
 - [Central Configuration](./central_config.md) - Configuration system used for logging
 - [Error Handling](./error_handling.md) - Error integration with logging system
 - [Test Helper](./test_helper.md) - Utilities for test error handling
 
-
 ## Message Style Guide
 
-
 ### Do
-
-
 
 - Write concise, clear messages explaining what happened
 - Use active voice: "Found 5 files" (not "5 files were found")
@@ -722,10 +605,7 @@ This is useful for troubleshooting but can generate a large volume of output.
 - Write full sentences with proper capitalization
 - Include the operation being performed
 
-
 ### Don't
-
-
 
 - Include formatting characters (dashes, indentation, asterisks)
 - Include variable data in the message text
@@ -733,32 +613,22 @@ This is useful for troubleshooting but can generate a large volume of output.
 - Include timestamps or module names (the logger adds these)
 - Include line breaks or multi-line messages
 
-
 ### Common Message Templates
 
-
 #### Operations
-
-
 
 - Starting: "Starting [operation]"
 - Completion: "Completed [operation]"
 - Failure: "Failed to [operation]"
 
-
 #### Resources
-
-
 
 - Creation: "Created [resource]"
 - Update: "Updated [resource]"
 - Deletion: "Deleted [resource]"
 - Not Found: "Could not find [resource]"
 
-
 ### Examples
-
-
 
 ```lua
 -- Operation start/end

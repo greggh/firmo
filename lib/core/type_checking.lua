@@ -1,25 +1,27 @@
---- Enhanced type checking for firmo
---- Implements advanced type and class validation features
+--- Enhanced Type Checking Utilities for Firmo
 ---
---- This module provides sophisticated type checking capabilities beyond Lua's basic type() function:
---- - Strict type validation with custom error messages
---- - Object-oriented class/instance relationship validation
---- - Interface implementation verification 
---- - Container membership checking (for both tables and strings)
---- - Error generation validation
+--- This module provides sophisticated type checking capabilities beyond Lua's basic `type()` function:
+--- - Strict type validation with custom error messages (`is_exact_type`).
+--- - Object-oriented class/instance relationship validation (`is_instance_of`).
+--- - Interface implementation verification (`implements`).
+--- - Container membership checking for tables and strings (`contains`).
+--- - Error generation validation (`has_error`).
 ---
---- All functions throw descriptive errors on validation failure, making them suitable
---- for both debugging and runtime assertion checking.
+--- Functions in this module generally throw errors upon validation failure, making them suitable
+--- for runtime assertions and validation within function guards.
 ---
---- @version 0.2.3
+--- @module lib.core.type_checking
 --- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 0.2.3
 
 ---@class type_checking
----@field is_exact_type fun(value: any, expected_type: string, message?: string): boolean Checks if a value is exactly of the specified primitive type, throws error if not
----@field is_instance_of fun(object: table, class: table, message?: string): boolean Checks if an object is an instance of a class (with metatable inheritance support), throws error if not
----@field implements fun(object: table, interface: table, message?: string): boolean Checks if an object implements all required interface methods and properties, throws error if not
----@field contains fun(container: table|string, item: any, message?: string): boolean Checks if a container (table or string) contains the specified item, throws error if not
----@field has_error fun(fn: function, message?: string): string|table Tests if a function throws an error when called, throws error if function doesn't throw
+---@field is_exact_type fun(value: any, expected_type: string, message?: string): boolean|nil Checks if a value is exactly of the specified primitive type. Returns `true` on success, throws error and potentially returns `nil, error_object` on failure.
+---@field is_instance_of fun(object: table, class: table, message?: string): boolean|nil Checks if an object is an instance of a class (supports metatable inheritance). Returns `true` on success, throws error and potentially returns `nil, error_object` on failure.
+---@field implements fun(object: table, interface: table, message?: string): boolean|nil Checks if an object implements all required interface methods/properties. Returns `true` on success, throws error and potentially returns `nil, error_object` on failure.
+---@field contains fun(container: table|string, item: any, message?: string): boolean|nil Checks if a container (table or string) contains the specified item. Returns `true` on success, throws error and potentially returns `nil, error_object` on failure.
+---@field has_error fun(fn: function, message?: string): any|nil Checks if a function throws an error. Returns the captured error on success, throws error and potentially returns `nil, error_object` if the function doesn't throw or validation fails.
 ---@field _VERSION string Module version identifier
 local type_checking = {}
 
@@ -27,7 +29,7 @@ local type_checking = {}
 type_checking._VERSION = "0.2.3"
 
 --- Validates that a value is exactly of the specified Lua primitive type
---- This function checks if a value's type (as returned by Lua's type() function) is 
+--- This function checks if a value's type (as returned by Lua's type() function) is
 --- exactly the same as the expected_type. If they don't match, the function throws
 --- an error with a descriptive message. This is useful for runtime type validation
 --- and for asserting function parameter types.
@@ -35,14 +37,15 @@ type_checking._VERSION = "0.2.3"
 --- @param value any The value to check the type of
 --- @param expected_type string The expected type name (e.g., 'string', 'number', 'table')
 --- @param message? string Optional custom error message to use if validation fails
---- @return boolean true If the type matches (otherwise throws an error)
---- @error if type doesn't match the expected_type
+--- @return boolean|nil true If the type matches, nil on error.
+--- @return table? error Error object if validation fails.
+--- @throws table If type doesn't match the `expected_type`.
 ---
 --- @usage
 --- -- Basic type validation
 --- local tc = require("lib.core.type_checking")
 --- tc.is_exact_type("hello", "string") -- returns true
---- 
+---
 --- -- Handling nested functions with custom error message
 --- function process_user(user_data)
 ---   tc.is_exact_type(user_data, "table", "User data must be a table")
@@ -76,23 +79,24 @@ end
 --- @param object table The object to check
 --- @param class table The class/metatable to check against
 --- @param message? string Optional custom error message to use if validation fails
---- @return boolean true If object is an instance of class (otherwise throws an error)
---- @error if object is not an instance of class
+--- @return boolean|nil true If object is instance, nil on error.
+--- @return table? error Error object if validation fails.
+--- @throws table If object is not an instance of `class`.
 ---
 --- @usage
 --- -- Basic class instance checking
 --- local tc = require("lib.core.type_checking")
 --- local Animal = {} -- Base class
 --- Animal.__index = Animal
---- 
+---
 --- local Dog = setmetatable({}, Animal) -- Inherited class
 --- Dog.__index = Dog
---- 
+---
 --- local my_dog = setmetatable({name = "Rex"}, Dog)
---- 
+---
 --- tc.is_instance_of(my_dog, Dog) -- returns true
 --- tc.is_instance_of(my_dog, Animal) -- also returns true (inheritance)
---- 
+---
 --- -- With custom error message
 --- function pet_animal(animal)
 ---   tc.is_instance_of(animal, Animal, "Expected an Animal instance")
@@ -129,10 +133,13 @@ function type_checking.is_instance_of(object, class, message)
 
   -- Handle inheritance: Check if any metatable in the hierarchy is the class
   -- Check both metatable.__index (for inheritance) and getmetatable(metatable) for inheritance
-  ---@param meta table The metatable to check
-  ---@param target_class table The target class to compare against
-  ---@param seen? table Table to track already seen metatables (prevents infinite recursion)
-  ---@return boolean true if meta is or inherits from target_class
+  --- Recursively checks if a metatable (`meta`) is or inherits from a `target_class`.
+  --- Handles `__index` inheritance and parent metatable inheritance, preventing cycles.
+  ---@param meta table The metatable to check.
+  ---@param target_class table The target class/metatable to look for in the inheritance chain.
+  ---@param seen? table Internal table to track visited metatables to prevent infinite recursion in cyclic metatable structures.
+  ---@return boolean `true` if `meta` is or inherits from `target_class`, `false` otherwise.
+  ---@private
   local function check_inheritance_chain(meta, target_class, seen)
     seen = seen or {}
     if not meta or seen[meta] then
@@ -192,8 +199,9 @@ end
 --- @param object table The object to check against the interface
 --- @param interface table Table defining the required methods and properties
 --- @param message? string Optional custom error message to use if validation fails
---- @return boolean true If object implements all interface requirements (otherwise throws an error)
---- @error if object doesn't implement interface requirements
+--- @return boolean|nil true If implements, nil on error.
+--- @return table? error Error object if validation fails.
+--- @throws table If object doesn't implement all interface requirements (missing keys or type mismatches).
 ---
 --- @usage
 --- -- Define an interface for file-like objects
@@ -204,11 +212,11 @@ end
 ---   close = function() end,
 ---   path = ""
 --- }
---- 
+---
 --- -- Validate an object against the interface
 --- function process_file(file_obj)
 ---   tc.implements(file_obj, FileInterface, "Invalid file object")
----   
+---
 ---   -- Now safe to use file methods
 ---   local content = file_obj.read()
 ---   file_obj.write("new content")
@@ -221,7 +229,7 @@ end
 ---   close = function() print("File closed") end,
 ---   path = "/path/to/file.txt"
 --- }
---- 
+---
 --- tc.implements(my_file, FileInterface) -- returns true
 function type_checking.implements(object, interface, message)
   -- Validate arguments
@@ -279,29 +287,30 @@ end
 --- @param container table|string The container to check (either a table or string)
 --- @param item any The item to look for in the container
 --- @param message? string Optional custom error message to use if validation fails
---- @return boolean true If container contains item (otherwise throws an error)
---- @error if container doesn't contain item or if container is not a table or string
+--- @return boolean|nil true If contains, nil on error.
+--- @return table? error Error object if validation fails.
+--- @throws table If `container` doesn't contain `item` or if `container` type is invalid.
 ---
 --- @usage
 --- -- Table containment checking
 --- local tc = require("lib.core.type_checking")
 --- local fruits = {"apple", "banana", "orange"}
 --- tc.contains(fruits, "banana") -- returns true
---- 
+---
 --- -- String containment checking
 --- local text = "The quick brown fox jumps over the lazy dog"
 --- tc.contains(text, "fox") -- returns true
---- 
+---
 --- -- With custom error message
 --- function process_config(config, required_setting)
----   tc.contains(config, required_setting, 
+---   tc.contains(config, required_setting,
 ---     "Configuration is missing required setting: " .. required_setting)
 ---   -- Process configuration safely...
 --- end
 ---
 --- -- Using in validations
 --- function validate_permissions(user, required_permission)
----   tc.contains(user.permissions, required_permission, 
+---   tc.contains(user.permissions, required_permission,
 ---     "User lacks required permission: " .. required_permission)
 ---   return true -- User has permission
 --- end
@@ -342,8 +351,9 @@ end
 ---
 --- @param fn function The function to test (should throw an error when called)
 --- @param message? string Optional custom error message if function doesn't throw
---- @return string|table error The error value returned by the function
---- @error if function doesn't throw an error or if fn is not a function
+--- @return any|nil captured_error The error value thrown by `fn`, or `nil` if no error was thrown or validation failed.
+--- @return table? error Error object if validation fails (e.g., `fn` not a function) or if `fn` didn't throw an error when expected.
+--- @throws table If `fn` is not a function or if `fn` doesn't throw an error when executed.
 ---
 --- @usage
 --- -- Basic error checking
@@ -352,7 +362,7 @@ end
 ---   if b == 0 then error("Division by zero") end
 ---   return a / b
 --- end
---- 
+---
 --- -- Test that divide throws on division by zero
 --- local err = tc.has_error(function() divide(10, 0) end)
 --- print("Got expected error: " .. err) -- prints "Got expected error: Division by zero"
@@ -365,14 +375,14 @@ end
 ---   )
 ---   -- Now we can make assertions about the error
 ---   assert(err:match("Invalid email format"))
---- end 
+--- end
 ---
 --- -- In combination with other type checks
 --- function test_safe_calculation()
 ---   -- Should not throw for valid input
 ---   local result = calculate_area(10, 20)
 ---   assert(result == 200)
----   
+---
 ---   -- Should throw for invalid input
 ---   tc.has_error(function() calculate_area(-5, 10) end)
 --- end

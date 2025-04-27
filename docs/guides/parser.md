@@ -53,15 +53,13 @@ end
 
 
 
-### Inspecting the AST
+### Inspecting the AST (`to_string`)
 
-
-The AST can be difficult to understand in its raw form. Use `pretty_print` to get a readable representation:
-
+The AST can be difficult to understand in its raw form. Use `to_string` to get a readable representation (via the pretty-printer):
 
 ```lua
 -- Print the AST in a human-readable format
-local ast_string = parser.pretty_print(ast)
+local ast_string = parser.to_string(ast)
 print(ast_string)
 ```
 
@@ -127,7 +125,8 @@ For comprehensive code analysis, create a code map that contains all relevant in
 ```lua
 -- Create a complete code map
 local code_map = parser.create_code_map(source, "module.lua")
-if code_map.valid then
+-- Check if code_map creation was successful (it might be an error table)
+if code_map and code_map.valid then
   print("Source analysis:")
   print("- Total lines:", code_map.source_lines)
 
@@ -201,22 +200,22 @@ local function parse_with_protection(source, filename)
   end
 
   return result
+**Returns:**
+
+- `code_map` (table|{error: string, valid: boolean}): The code map containing AST and analysis, or an error table `{error, valid=false}` if mapping failed. The code map includes:
+  - `source` (string): Original source code.
+  - `ast` (table): Parsed abstract syntax tree.
+  - `lines` (string[]): Source code split into lines.
+  - `source_lines` (number): Number of lines in the source.
+  - `executable_lines` (table<number, boolean>): Map of executable line numbers to `true`.
+  - `functions` (table[]): Array of function information tables.
+  - `valid` (boolean): `true` if parsing and analysis were successful.
+local code_map = parser.create_code_map_from_file("/path/to/module.lua")
+if code_map and code_map.valid then
+  -- Process code map
+else
+  print("Error creating code map:", code_map and code_map.error or "Unknown error")
 end
-```
-
-
-
-### Integrating with Coverage Analysis
-
-
-The parser is commonly used with the coverage module to identify code structure for coverage tracking:
-
-
-```lua
-local coverage = require("lib.coverage")
-local parser = require("lib.tools.parser")
--- Parse a file for coverage analysis
-local function prepare_file_for_coverage(file_path)
   -- Create a code map with full information
   local code_map = parser.create_code_map_from_file(file_path)
 
@@ -241,11 +240,9 @@ end
 
 
 
-### Working with AST Nodes
+**Returns:**
 
-
-If you need to work directly with the AST structure, here's a helper function to traverse nodes:
-
+- `code_map` (table|{error: string, valid: boolean}): The code map containing AST and analysis, or an error table `{error, valid=false}` if reading or mapping failed. See `create_code_map` for structure details.
 
 ```lua
 -- Traverse all nodes in an AST

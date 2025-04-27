@@ -8,99 +8,10 @@ This document provides a comprehensive reference for firmo's module reset functi
 
 Firmo provides utilities for managing Lua's module cache (`package.loaded`) to ensure test isolation. The module reset functionality is available in two forms:
 
-
-1. **Basic Module Reset Functions**: Simple functions for resetting individual modules
-2. **Enhanced Module Reset System**: Comprehensive system for advanced module management
-
-Both approaches help prevent test cross-contamination by ensuring each test has a fresh module state.
-
-## Basic Module Reset Functions
-
-
-### firmo.reset_module(module_name)
-
-
-Resets and reloads a specific module.
-**Parameters:**
-
-
-- `module_name` (string): The name of the module to reset (as it would be used in `require()`)
-
-**Returns:**
-
-
-- (table): The freshly loaded module instance
-
-**Description:**
-This function removes the specified module from Lua's `package.loaded` table and then requires it again, returning a fresh instance. This ensures the module starts with its initial state.
-**Example:**
-
-
-```lua
-describe("Counter tests", function()
-  local counter
-
-  before_each(function()
-    -- Reset the counter module before each test
-    counter = firmo.reset_module("app.counter")
-    expect(counter.value).to.equal(0)
-  end)
-
-  it("increments the counter", function()
-    counter.increment()
-    expect(counter.value).to.equal(1)
-  end)
-
-  it("also starts from zero", function()
-    -- Thanks to reset_module, we have a fresh counter instance
-    expect(counter.value).to.equal(0)
-  end)
-end)
-```
-
-
-
-### firmo.with_fresh_module(module_name, callback)
-
-
-Temporarily uses a fresh module instance within a callback function.
-**Parameters:**
-
-
-- `module_name` (string): The name of the module to reset and reload
-- `callback` (function): Function to run with the fresh module (receives module as argument)
-
-**Returns:**
-
-
-- (any): The result of the callback function
-
-**Description:**
-This function provides a fresh module instance to the callback function while preserving the original module for code outside the callback. It's useful for isolated tests that need a clean slate but don't want to affect other tests.
-**Example:**
-
-
-```lua
-it("handles configuration changes in isolation", function()
-  -- Get a reference to the normal config module
-  local config = require("app.config")
-  local original_debug = config.debug
-
-  -- Work with a fresh module that won't affect the original
-  firmo.with_fresh_module("app.config", function(fresh_config)
-    expect(fresh_config.debug).to.equal(false) -- Default value
-    fresh_config.debug = true
-    expect(fresh_config.debug).to.equal(true)
-  end)
-
-  -- Original module is unchanged
-  expect(config.debug).to.equal(original_debug)
-end)
-```
-
-
-
-## Enhanced Module Reset System
+- [Enhanced Module Reset System](#enhanced-module-reset-system)
+- [Integration with firmo Test Framework](#integration-with-firmo-test-framework)
+- [How Module Reset Works](#how-module-reset-works)
+- [Error Handling](#error-handling)
 
 
 The enhanced module reset system is available through the `lib.core.module_reset` module and provides comprehensive module management capabilities.
@@ -195,8 +106,7 @@ Resets all non-protected modules.
 
 - `options` (table, optional): Options for reset operation
   - `verbose` (boolean, optional): Whether to show detailed output (default: false)
-  - `force` (boolean, optional): Whether to force reset of all modules, including protected (default: false)
-
+  - `force` (boolean, optional): **(Not Implemented)** Whether to force reset of all modules, including protected (default: false)
 **Returns:**
 
 
@@ -415,8 +325,7 @@ Gets current memory usage information.
 
 - (table): Memory usage information
   - `current` (number): Current memory usage in kilobytes
-  - `count` (number): Count information (if available)
-
+  - `count` (number): Currently unused.
 **Description:**
 This function returns information about the current memory usage of the Lua state, useful for tracking memory during tests.
 **Example:**
@@ -437,8 +346,7 @@ Analyzes memory usage by module.
 
 
 - `options` (table, optional): Options for analysis
-  - `track_level` (string, optional): Level of detail for tracking
-
+  - `track_level` (string, optional): **(Not Implemented)** Level of detail for tracking
 **Returns:**
 
 

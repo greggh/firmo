@@ -1,64 +1,133 @@
---- Reporting module for firmo test framework
---- Centralized module for all report generation and file output
+--- Firmo Reporting Module
+---
+--- Centralized module for generating and saving reports (coverage, quality, test results)
+--- in various formats (HTML, JSON, LCOV, Cobertura, JUnit, TAP, CSV, etc.).
 ---
 --- Features:
---- - Unified interface for generating coverage, quality, and test results reports
---- - Support for multiple output formats (HTML, JSON, XML, CSV, TAP, etc.)
---- - Pluggable formatter system with customizable themes and options
---- - File saving with appropriate error handling and validation
---- - Integration with central configuration system
---- - Automatic directory creation and path management
---- - Validation of report data and formatted output
+--- - Unified interface for formatting different data types (`format_coverage`, `format_quality`, `format_results`).
+--- - Pluggable formatter system via `lib.reporting.formatters`.
+--- - Integration with central configuration for settings (`report_dir`, formatter options).
+--- - File saving with error handling (`save_*_report`, `auto_save_reports`).
+--- - Data validation hooks via `lib.reporting.validation` and `lib.reporting.schema`.
 ---
---- This module handles the entire reporting pipeline from raw data to formatted output files,
---- including validation, formatting, and file I/O operations.
----
---- @version 0.4.0
+--- @module lib.reporting
 --- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 0.5.0
 
----@class reporting
----@field configure fun(options?: table): reporting Configure the reporting module with custom options
----@field get_config fun(): table Get the current configuration
----@field register_formatter fun(format: string, formatter: table): reporting Register a custom formatter
----@field register_coverage_formatter fun(name: string, formatter_fn: function): boolean|nil, table? Register a custom coverage report formatter
----@field register_quality_formatter fun(name: string, formatter_fn: function): boolean|nil, table? Register a custom quality report formatter
----@field register_results_formatter fun(name: string, formatter_fn: function): boolean|nil, table? Register a custom test results formatter
----@field get_formatter fun(format: string, type: string): table|nil Get a formatter by name and type
----@field get_formatter_config fun(formatter_name: string): table|nil Get configuration for a specific formatter
----@field configure_formatter fun(formatter_name: string, formatter_config: table): reporting Configure a specific formatter
----@field configure_formatters fun(formatters_config: table): reporting Configure multiple formatters at once
----@field load_formatters fun(formatter_module: table): number|nil, table? Load formatters from a module
----@field get_available_formatters fun(): table Get list of available formatters for each type
----@field generate_report fun(data: table, options?: table): boolean|nil, string? Generate a report
----@field get_report_path fun(type: string, format: string, options?: table): string Get the path for a report file
----@field load_formatter fun(format: string, type: string): table|nil Load a formatter module with lazy loading
----@field run_formatter fun(formatter: table, data: table, options?: table): string|nil Generate report output with a formatter
----@field format_coverage fun(coverage_data: table, format?: string, options?: table): string|table Format coverage data into the specified format
----@field format_quality fun(quality_data: table, format?: string, options?: table): string|table Format quality data into the specified format
----@field format_results fun(results_data: table, format?: string, options?: table): string|table Format test results data into the specified format
----@field save_coverage_report fun(file_path: string, coverage_data: table, format: string, options?: table): boolean|nil, table? Save a coverage report to a file
----@field save_quality_report fun(file_path: string, quality_data: table, format: string, options?: table): boolean|nil, table? Save a quality report to a file
----@field save_results_report fun(file_path: string, results_data: table, format: string, options?: table): boolean|nil, table? Save a test results report to a file
----@field auto_save_reports fun(coverage_data: table, quality_data: table, results_data: table, options?: table|string): table Generate and save all reports to default locations
----@field validate_coverage_data fun(coverage_data: table): boolean, table? Validate coverage data structure
----@field validate_report_format fun(formatted_data: string|table, format: string): boolean, string? Validate formatted report
----@field validate_report fun(coverage_data: table, formatted_output?: string|table, format?: string): table Run comprehensive validation of report
----@field validate_formatter_config fun(formatter_name: string, config: table): boolean, table? Validate formatter configuration
----@field write_file fun(file_path: string, content: string|table): boolean|nil, table? Write content to a file
----@field reset fun(): reporting Reset the module to default configuration
----@field full_reset fun(): reporting Reset both local and central configuration
----@field debug_config fun(): table Show current configuration for debugging
----@field _VERSION string Module version identifier
+---@class reporting The public API of the reporting module.
+---@field _VERSION string Module version identifier.
+---@field configure fun(options?: {debug?: boolean, verbose?: boolean, report_dir?: string, report_suffix?: string, timestamp_format?: string, formats?: table, formatters?: table}): reporting Configures the reporting module. Returns self.
+---@field get_config fun(): table<string, any> Gets the current merged configuration (defaults + central config).
+---@field register_formatter fun(format: string, formatter: table): reporting [Deprecated] Use specific registration functions.
+---@field register_coverage_formatter fun(name: string, formatter_fn: function): boolean|nil, table? Registers a custom formatter for coverage reports. Returns `success, error?`.
+---@field register_quality_formatter fun(name: string, formatter_fn: function): boolean|nil, table? Registers a custom formatter for quality reports. Returns `success, error?`.
+---@field register_results_formatter fun(name: string, formatter_fn: function): boolean|nil, table? Registers a custom formatter for test results. Returns `success, error?`.
+---@field get_formatter fun(format: string, type: string): table|nil Gets a registered formatter function. Type is "coverage", "quality", or "results".
+---@field get_formatter_config fun(formatter_name: string): table|nil Gets configuration for a specific formatter.
+---@field configure_formatter fun(formatter_name: string, formatter_config: table): reporting Configures a specific formatter. Returns self.
+---@field configure_formatters fun(formatters_config: table): reporting Configures multiple formatters. Returns self.
+---@field load_formatters fun(formatter_module: table): number|nil, table? Loads and registers formatters from a module table. Returns `count, error?`.
+---@field get_available_formatters fun(): {coverage: string[], quality: string[], results: string[]} Gets lists of available registered formatter names.
+---@field generate_report fun(...) [Not Implemented] Generate a report.
+---@field get_report_path fun(...) [Not Implemented] Get the path for a report file.
+---@field load_formatter fun(...) [Not Implemented] Load a formatter module with lazy loading.
+---@field run_formatter fun(...) [Not Implemented] Generate report output with a formatter.
+---@field format_coverage fun(coverage_data: table, format?: string, options?: table): string|table|nil Formats coverage data. Returns formatted output or nil. @throws table If formatter fails critically.
+---@field format_quality fun(quality_data: table, format?: string, options?: table): string|table|nil Formats quality data. Returns formatted output or nil. @throws table If formatter fails critically.
+---@field format_results fun(results_data: table, format?: string, options?: table): string|table|nil Formats test results data. Returns formatted output or nil. @throws table If formatter fails critically.
+---@field save_coverage_report fun(file_path: string, coverage_data: table, format: string, options?: table): boolean|nil, table? Saves a coverage report. Returns `success, error?`. @throws table If formatting or writing fails critically.
+---@field save_quality_report fun(file_path: string, quality_data: table, format: string, options?: table): boolean|nil, table? Saves a quality report. Returns `success, error?`. @throws table If formatting or writing fails critically.
+---@field save_results_report fun(file_path: string, results_data: table, format: string, options?: table): boolean|nil, table? Saves a test results report. Returns `success, error?`. @throws table If formatting or writing fails critically.
+---@field auto_save_reports fun(coverage_data: table|nil, quality_data: table|nil, results_data: table|nil, options?: table|string): table<string, {success: boolean, error?: table, path: string}> Generates and saves multiple reports based on configuration. Returns a table summarizing results. @throws table If directory creation fails critically.
+---@field validate_coverage_data fun(coverage_data: table): boolean, table? Validates coverage data structure via `lib.reporting.validation`. Returns `valid, issues?`. @throws table If validation module fails critically.
+---@field validate_report_format fun(formatted_data: string|table, format: string): boolean, string? Validates formatted report string/table via `lib.reporting.schema`. Returns `valid, error_message?`. @throws table If schema module fails critically.
+---@field validate_report fun(coverage_data: table, formatted_output?: string|table, format?: string): table Runs comprehensive validation via `lib.reporting.validation`. Returns validation result table. @throws table If validation module fails critically.
+---@field validate_formatter_config fun(...) [Not Implemented] Validate formatter configuration.
+---@field write_file fun(file_path: string, content: string|table): boolean|nil, table? Writes content to a file (handles JSON encoding for tables). Returns `success, error?`. @throws table If encoding or writing fails critically.
+---@field reset fun(): reporting Resets local configuration to defaults. Returns self.
+---@field full_reset fun(): reporting Resets local and central configuration. Returns self.
+---@field debug_config fun(): table Gets current configuration snapshot for debugging.
 
 local M = {}
 
 -- Module version
 M._VERSION = "0.5.0"
 
--- Import modules
-local fs = require("lib.tools.filesystem")
-local logging = require("lib.tools.logging")
-local error_handler = require("lib.tools.error_handler")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("Reporting")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+-- Load mandatory dependencies using standard pattern
+local central_config = try_require("lib.core.central_config")
+local json_module = try_require("lib.tools.json")
+local formatter_registry = try_require("lib.reporting.formatters.init")
+local validation_module = try_require("lib.reporting.validation")
 
 -- Default configuration
 local DEFAULT_CONFIG = {
@@ -169,107 +238,37 @@ local config = {
   verbose = DEFAULT_CONFIG.verbose,
 }
 
--- Create a logger for this module
-local logger = logging.get_logger("Reporting")
-
--- Lazy loading of central_config to avoid circular dependencies
-local _central_config
-
----@return table|nil central_config The central config module if loaded
----@private
-local function get_central_config()
-  if not _central_config then
-    -- Use pcall to safely attempt loading central_config
-    local success, central_config = pcall(require, "lib.core.central_config")
-    if success then
-      _central_config = central_config
-
-      -- Register this module with central_config
-      _central_config.register_module("reporting", {
-        -- Schema
-        field_types = {
-          debug = "boolean",
-          verbose = "boolean",
-          report_dir = "string",
-          report_suffix = "string",
-          timestamp_format = "string",
-          formats = "table",
-          formatters = "table",
-        },
-      }, DEFAULT_CONFIG)
-
-      -- Register formatter-specific schema
-      _central_config.register_module("reporting.formatters", {
-        field_types = {
-          html = "table",
-          summary = "table",
-          json = "table",
-          lcov = "table",
-          cobertura = "table",
-          junit = "table",
-          tap = "table",
-          csv = "table",
-        },
-      }, DEFAULT_CONFIG.formatters)
-
-      logger.debug("Successfully loaded central_config", {
-        module = "reporting",
-      })
-    else
-      logger.debug("Failed to load central_config", {
-        error = tostring(central_config),
-      })
-    end
-  end
-
-  return _central_config
-end
-
--- Load the JSON module if available
-local json_module
-local ok, mod = pcall(require, "lib.reporting.json")
-if ok then
-  json_module = mod
-else
-  -- Simple fallback JSON encoder if module isn't available
-  json_module = {
-    encode = function(t)
-      if type(t) ~= "table" then
-        return tostring(t)
-      end
-      local s = "{"
-      local first = true
-      for k, v in pairs(t) do
-        if not first then
-          s = s .. ","
-        else
-          first = false
-        end
-        if type(k) == "string" then
-          s = s .. '"' .. k .. '":'
-        else
-          s = s .. "[" .. tostring(k) .. "]:"
-        end
-        if type(v) == "table" then
-          s = s .. json_module.encode(v)
-        elseif type(v) == "string" then
-          s = s .. '"' .. v .. '"'
-        elseif type(v) == "number" or type(v) == "boolean" then
-          s = s .. tostring(v)
-        else
-          s = s .. '"' .. tostring(v) .. '"'
-        end
-      end
-      return s .. "}"
-    end,
-  }
-end
+-- Register central_config immediately after loading it (now done at top level)
+central_config.register_module("reporting", {
+  -- Schema
+  field_types = {
+    debug = "boolean",
+    verbose = "boolean",
+    report_dir = "string",
+    report_suffix = "string",
+    timestamp_format = "string",
+    formats = "table",
+    formatters = "table",
+  },
+}, DEFAULT_CONFIG)
+central_config.register_module("reporting.formatters", {
+  field_types = {
+    html = "table",
+    summary = "table",
+    json = "table",
+    lcov = "table",
+    cobertura = "table",
+    junit = "table",
+    tap = "table",
+    csv = "table",
+  },
+}, DEFAULT_CONFIG.formatters)
+get_logger().debug("Successfully loaded and registered with central_config", { module = "reporting" })
 
 --- Helper function to escape XML special characters for use in XML output formats
+---@param str string|any String to escape, or any value to convert to string and then escape.
+---@return string escaped_string String with XML special characters (`&`, `<`, `>`, `"`, `'`) escaped.
 ---@private
----@param str string|any String to escape or any value to convert to string and escape
----@return string escaped_string String with XML special characters escaped (&, <, >, ", ')
----@diagnostic disable-next-line: unused-local, unused-function
 local function escape_xml(str)
   if type(str) ~= "string" then
     return tostring(str or "")
@@ -278,20 +277,21 @@ local function escape_xml(str)
   return str:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"):gsub("'", "&apos;")
 end
 
----@return boolean success Whether the listener was registered
+--- Registers a listener with central_config to update local config cache when reporting settings change.
+---@return boolean success `true` if the listener was registered, `false` otherwise.
 ---@private
--- Set up change listener for central configuration
 local function register_change_listener()
-  local central_config = get_central_config()
+  -- central_config is loaded at top level and guaranteed to exist
   if not central_config then
-    logger.debug("Cannot register change listener - central_config not available")
+    -- This block should ideally not be reached if loading is enforced
+    get_logger().error("Cannot register change listener - central_config unexpectedly nil")
     return false
   end
 
   -- Register change listener for reporting configuration
   ---@diagnostic disable-next-line: unused-local
   central_config.on_change("reporting", function(path, old_value, new_value)
-    logger.debug("Configuration change detected", {
+    get_logger().debug("Configuration change detected", {
       path = path,
       changed_by = "central_config",
     })
@@ -302,14 +302,14 @@ local function register_change_listener()
       -- Update debug and verbose settings directly
       if reporting_config.debug ~= nil and reporting_config.debug ~= config.debug then
         config.debug = reporting_config.debug
-        logger.debug("Updated debug setting from central_config", {
+        get_logger().debug("Updated debug setting from central_config", {
           debug = config.debug,
         })
       end
 
       if reporting_config.verbose ~= nil and reporting_config.verbose ~= config.verbose then
         config.verbose = reporting_config.verbose
-        logger.debug("Updated verbose setting from central_config", {
+        get_logger().debug("Updated verbose setting from central_config", {
           verbose = config.verbose,
         })
       end
@@ -320,35 +320,39 @@ local function register_change_listener()
         verbose = config.verbose,
       })
 
-      logger.debug("Applied configuration changes from central_config")
+      get_logger().debug("Applied configuration changes from central_config")
     end
   end)
 
-  logger.debug("Registered change listener for central configuration")
+  get_logger().debug("Registered change listener for central configuration")
   return true
 end
 
----@param options? table Configuration options for the reporting module
----@return reporting The reporting module for method chaining
--- Configure the module
+--- Configures the reporting module.
+--- Merges provided `options` with defaults and central configuration.
+--- Updates local config cache and potentially updates central config if options are provided.
+--- Configures the logger based on the final debug/verbose settings.
+---@param options? {debug?: boolean, verbose?: boolean, report_dir?: string, report_suffix?: string, timestamp_format?: string, formats?: table, formatters?: table} Configuration options table.
+---@return reporting The reporting module instance (`M`) for method chaining.
+---@throws table If central config interaction fails critically during loading or setting values.
 function M.configure(options)
   options = options or {}
 
-  logger.debug("Configuring reporting module", {
+  get_logger().debug("Configuring reporting module", {
     debug = options.debug,
     verbose = options.verbose,
     has_options = options ~= nil,
   })
 
   -- Check for central configuration first
-  local central_config = get_central_config()
+  -- central_config is loaded at top level and guaranteed to exist
   if central_config then
     -- Get existing central config values
     local reporting_config = central_config.get("reporting")
 
     -- Apply central configuration (with defaults as fallback)
     if reporting_config then
-      logger.debug("Using central_config values for initialization", {
+      get_logger().debug("Using central_config values for initialization", {
         debug = reporting_config.debug,
         verbose = reporting_config.verbose,
       })
@@ -365,7 +369,7 @@ function M.configure(options)
         config.verbose = DEFAULT_CONFIG.verbose
       end
     else
-      logger.debug("No central_config values found, using defaults")
+      get_logger().debug("No central_config values found, using defaults")
       config.debug = DEFAULT_CONFIG.debug
       config.verbose = DEFAULT_CONFIG.verbose
     end
@@ -373,7 +377,7 @@ function M.configure(options)
     -- Register change listener if not already done
     register_change_listener()
   else
-    logger.debug("central_config not available, using defaults")
+    get_logger().debug("central_config not available, using defaults")
     -- Apply defaults
     config.debug = DEFAULT_CONFIG.debug
     config.verbose = DEFAULT_CONFIG.verbose
@@ -416,15 +420,14 @@ function M.configure(options)
 
   -- We can use options directly for logging configuration if provided
   if options.debug ~= nil or options.verbose ~= nil then
-    logger.debug("Using provided options for logging configuration")
-    logging.configure_from_options("Reporting", options)
+    get_logger().debug("Using provided options for logging configuration")
+    get_logging().configure_from_options("Reporting", options)
   else
     -- Otherwise use global config
-    logger.debug("Using global config for logging configuration")
-    logging.configure_from_config("Reporting")
+    get_logger().debug("Using global config for logging configuration")
   end
 
-  logger.debug("Reporting module configuration complete", {
+  get_logger().debug("Reporting module configuration complete", {
     debug = config.debug,
     verbose = config.verbose,
     using_central_config = central_config ~= nil,
@@ -434,21 +437,23 @@ function M.configure(options)
   return M
 end
 
----@param formatter_name string Name of the formatter to get configuration for
----@return table|nil formatter_config Configuration for the formatter or nil if not found
--- Get configuration for a specific formatter
+--- Gets the configuration for a specific formatter by name.
+--- Looks in central configuration first, then local configuration, then defaults.
+---@param formatter_name string The name of the formatter (e.g., "html", "json").
+---@return table formatter_config A table containing the formatter's configuration options. Returns an empty table if no specific config is found.
+---@throws table If central config interaction fails critically.
 function M.get_formatter_config(formatter_name)
   if not formatter_name then
-    logger.warn("Formatter name required for get_formatter_config")
+    get_logger().warn("Formatter name required for get_formatter_config")
     return nil
   end
 
   -- Try to get from central_config
-  local central_config = get_central_config()
+  -- central_config is loaded at top level and guaranteed to exist
   if central_config then
     local formatter_config = central_config.get("reporting.formatters." .. formatter_name)
     if formatter_config then
-      logger.debug("Retrieved formatter config from central_config", {
+      get_logger().debug("Retrieved formatter config from central_config", {
         formatter = formatter_name,
       })
       return formatter_config
@@ -457,7 +462,7 @@ function M.get_formatter_config(formatter_name)
 
   -- Fall back to local config
   if config.formatters and config.formatters[formatter_name] then
-    logger.debug("Retrieved formatter config from local config", {
+    get_logger().debug("Retrieved formatter config from local config", {
       formatter = formatter_name,
     })
     return config.formatters[formatter_name]
@@ -465,30 +470,32 @@ function M.get_formatter_config(formatter_name)
 
   -- Return default config if available
   if DEFAULT_CONFIG.formatters and DEFAULT_CONFIG.formatters[formatter_name] then
-    logger.debug("Using default formatter config", {
+    get_logger().debug("Using default formatter config", {
       formatter = formatter_name,
     })
     return DEFAULT_CONFIG.formatters[formatter_name]
   end
 
-  logger.warn("No configuration found for formatter", {
+  get_logger().warn("No configuration found for formatter", {
     formatter = formatter_name,
   })
   return {}
 end
 
----@param formatter_name string Name of the formatter to configure
----@param formatter_config table Configuration options for the formatter
----@return reporting The reporting module for method chaining
--- Configure a specific formatter
+--- Configures options for a specific formatter by name.
+--- Updates both the local config cache and the central configuration (if available).
+---@param formatter_name string Name of the formatter to configure (e.g., "html").
+---@param formatter_config table Table of configuration options for the formatter.
+---@return reporting The reporting module instance (`M`) for method chaining.
+---@throws table If central config interaction fails critically during setting values.
 function M.configure_formatter(formatter_name, formatter_config)
   if not formatter_name then
-    logger.error("Formatter name required for configure_formatter")
+    get_logger().error("Formatter name required for configure_formatter")
     return M
   end
 
   if type(formatter_config) ~= "table" then
-    logger.error("Invalid formatter configuration", {
+    get_logger().error("Invalid formatter configuration", {
       formatter = formatter_name,
       config_type = type(formatter_config),
     })
@@ -496,7 +503,7 @@ function M.configure_formatter(formatter_name, formatter_config)
   end
 
   -- Update central_config if available
-  local central_config = get_central_config()
+  -- central_config is loaded at top level and guaranteed to exist
   if central_config then
     central_config.set("reporting.formatters." .. formatter_name, formatter_config)
   end
@@ -509,7 +516,7 @@ function M.configure_formatter(formatter_name, formatter_config)
     config.formatters[formatter_name][k] = v
   end
 
-  logger.debug("Updated configuration for formatter", {
+  get_logger().debug("Updated configuration for formatter", {
     formatter = formatter_name,
     config_count = #formatter_config,
   })
@@ -517,12 +524,14 @@ function M.configure_formatter(formatter_name, formatter_config)
   return M
 end
 
----@param formatters_config table Table of formatter configurations {formatter_name = config, ...}
----@return reporting The reporting module for method chaining
--- Configure multiple formatters at once
+--- Configures multiple formatters at once by iterating through a table.
+--- Calls `M.configure_formatter` for each entry.
+---@param formatters_config table A table where keys are formatter names and values are their configuration tables. Example: `{ html = { theme = "light" }, json = { pretty = true } }`.
+---@return reporting The reporting module instance (`M`) for method chaining.
+---@throws table If `formatters_config` is not a table, or if central config interaction fails critically during `configure_formatter`.
 function M.configure_formatters(formatters_config)
   if type(formatters_config) ~= "table" then
-    logger.error("Invalid formatters configuration", {
+    get_logger().error("Invalid formatters configuration", {
       config_type = type(formatters_config),
     })
     return M
@@ -541,70 +550,74 @@ end
 
 -- Standard data structures that modules should return
 
--- Coverage report data structure
--- Modules should return this structure instead of directly generating reports
-M.CoverageData = {
-  -- Example structure that modules should follow:
-  -- files = {}, -- Data per file (line execution, function calls)
-  -- summary = {  -- Overall statistics
-  --   total_files = 0,
-  --   covered_files = 0,
-  --   total_lines = 0,
-  --   covered_lines = 0,
-  --   total_functions = 0,
-  --   covered_functions = 0,
-  --   line_coverage_percent = 0,
-  --   function_coverage_percent = 0,
-  --   overall_percent = 0
-  -- }
-}
+--- Schema definition (interface) for Coverage Report Data.
+--- Modules providing coverage data (like `lib.coverage`) should return data conforming to this structure.
+--- Actual schema validation might occur in `lib.reporting.validation` or `lib.reporting.schema`.
+-- M.CoverageData = {
+-- Example structure:
+-- files = {}, -- Data per file (line execution, function calls)
+-- summary = {  -- Overall statistics
+--   total_files = 0,
+--   covered_files = 0,
+--   total_lines = 0,
+--   covered_lines = 0,
+--   total_functions = 0,
+--   covered_functions = 0,
+--   line_coverage_percent = 0,
+--   function_coverage_percent = 0,
+--   overall_percent = 0
+-- }
+-- }
 
--- Quality report data structure
--- Modules should return this structure instead of directly generating reports
-M.QualityData = {
-  -- Example structure that modules should follow:
-  -- level = 0, -- Achieved quality level (0-5)
-  -- level_name = "", -- Level name (e.g., "basic", "standard", etc.)
-  -- tests = {}, -- Test data with assertions, patterns, etc.
-  -- summary = {
-  --   tests_analyzed = 0,
-  --   tests_passing_quality = 0,
-  --   quality_percent = 0,
-  --   assertions_total = 0,
-  --   assertions_per_test_avg = 0,
-  --   issues = {}
-  -- }
-}
+--- Schema definition (interface) for Quality Report Data.
+--- Modules providing quality data (like `lib.quality`) should return data conforming to this structure.
+--- Actual schema validation might occur elsewhere.
+-- M.QualityData = {
+-- Example structure:
+-- level = 0, -- Achieved quality level (0-5)
+-- level_name = "", -- Level name (e.g., "basic", "standard", etc.)
+-- tests = {}, -- Test data with assertions, patterns, etc.
+-- summary = {
+--   tests_analyzed = 0,
+--   tests_passing_quality = 0,
+--   quality_percent = 0,
+--   assertions_total = 0,
+--   assertions_per_test_avg = 0,
+--   issues = {}
+-- }
+-- }
 
--- Test results data structure for JUnit XML and other test reporters
-M.TestResultsData = {
-  -- Example structure that modules should follow:
-  -- name = "TestSuite", -- Name of the test suite
-  -- timestamp = "2023-01-01T00:00:00", -- ISO 8601 timestamp
-  -- tests = 0, -- Total number of tests
-  -- failures = 0, -- Number of failed tests
-  -- errors = 0, -- Number of tests with errors
-  -- skipped = 0, -- Number of skipped tests
-  -- time = 0, -- Total execution time in seconds
-  -- test_cases = { -- Array of test case results
-  --   {
-  --     name = "test_name",
-  --     classname = "test_class", -- Usually module/file name
-  --     time = 0, -- Execution time in seconds
-  --     status = "pass", -- One of: pass, fail, error, skipped, pending
-  --     failure = { -- Only present if status is fail
-  --       message = "Failure message",
-  --       type = "Assertion",
-  --       details = "Detailed failure information"
-  --     },
-  --     error = { -- Only present if status is error
-  --       message = "Error message",
-  --       type = "RuntimeError",
-  --       details = "Stack trace or error details"
-  --     }
-  --   }
-  -- }
-}
+--- Schema definition (interface) for Test Results Data (often used for JUnit/TAP).
+--- Modules providing test results (like `lib.core.test_definition`) should structure their results like this.
+--- Actual schema validation might occur elsewhere.
+-- M.TestResultsData = {
+-- Example structure:
+-- name = "TestSuite", -- Name of the test suite
+-- timestamp = "2023-01-01T00:00:00", -- ISO 8601 timestamp
+-- tests = 0, -- Total number of tests
+-- failures = 0, -- Number of failed tests
+-- errors = 0, -- Number of tests with errors
+-- skipped = 0, -- Number of skipped tests
+-- time = 0, -- Total execution time in seconds
+-- test_cases = { -- Array of test case results
+--   {
+--     name = "test_name",
+--     classname = "test_class", -- Usually module/file name
+--     time = 0, -- Execution time in seconds
+--     status = "pass", -- One of: pass, fail, error, skipped, pending
+--     failure = { -- Only present if status is fail
+--       message = "Failure message",
+--       type = "Assertion",
+--       details = "Detailed failure information"
+--     },
+--     error = { -- Only present if status is error
+--       message = "Error message",
+--       type = "RuntimeError",
+--       details = "Stack trace or error details"
+--     }
+--   }
+-- }
+-- }
 
 ---------------------------
 -- REPORT FORMATTERS
@@ -617,92 +630,52 @@ local formatters = {
   results = {}, -- Test results formatters
 }
 
--- Load and register all formatter modules with improved error handling
+--- Loads the formatter registry (`lib.reporting.formatters.init`) and calls its `register_all`
+--- function to populate the internal `formatters` table. Handles errors during loading or registration.
+---@return boolean `true` if registry loaded and at least some formatters registered, `false` otherwise.
+---@private
 local function load_formatter_registry()
-  logger.debug("Loading formatter registry")
+  get_logger().debug("Loading formatter registry")
+  -- formatter_registry is loaded at top level and guaranteed to exist
 
-  -- Use error_handler.try for better error handling
-  local success, result, err = error_handler.try(function()
-    return require("lib.reporting.formatters.init")
-  end)
-
-  if success and result then
-    logger.debug("Successfully loaded formatter registry")
+  if formatter_registry then
+    get_logger().debug("Using loaded formatter registry")
 
     -- Register formatters with error handling
-    local register_success, register_result, register_err = error_handler.try(function()
-      return result.register_all(formatters)
+    local register_success, register_result, register_err = get_error_handler().try(function()
+      return formatter_registry.register_all(formatters) -- Use loaded module
     end)
 
     if register_success then
-      logger.debug("Successfully registered all formatters", {
+      get_logger().debug("Successfully registered all formatters", {
         coverage_count = formatters.coverage and #formatters.coverage or 0,
         quality_count = formatters.quality and #formatters.quality or 0,
         results_count = formatters.results and #formatters.results or 0,
       })
       return true
     else
-      logger.warn("Failed to register formatters", {
-        error = error_handler.format_error(register_result),
+      get_logger().warn("Failed to register formatters", {
+        error = get_error_handler().format_error(register_result),
         module = "reporting",
       })
-      return false
+      return false -- Registration failed
     end
-  else
-    logger.warn("Failed to load formatter registry", {
-      error = error_handler.format_error(result),
-      module = "reporting",
-    })
+
+    -- This case should not be reachable due to fatal error on load failure
+    get_logger().error("Formatter registry module was unexpectedly nil")
     return false
   end
-end
+  get_logger().warn("Failed to load formatter registry", {
+    error = get_error_handler().format_error(result),
+    module = "reporting",
+  })
+end -- <<<< This is the end of load_formatter_registry
 
 -- Attempt to load formatter registry
-if not load_formatter_registry() then
-  logger.warn("Using fallback formatters due to registry loading failure")
+load_formatter_registry() -- Call directly; fatal errors handled during require at top
 
-  -- Fallback formatters with proper error handling
-  -- Summary formatter
-  if not formatters.coverage.summary then
-    formatters.coverage.summary = function(coverage_data, options)
-      options = options or {}
-
-      -- Use error handler to safely process data
-      local success, result, err = error_handler.try(function()
-        return {
-          files = coverage_data and coverage_data.files or {},
-          total_files = coverage_data and coverage_data.summary and coverage_data.summary.total_files or 0,
-          covered_files = coverage_data and coverage_data.summary and coverage_data.summary.covered_files or 0,
-          files_pct = coverage_data and coverage_data.summary and coverage_data.summary.files_percent or 0,
-          total_lines = coverage_data and coverage_data.summary and coverage_data.summary.total_lines or 0,
-          covered_lines = coverage_data and coverage_data.summary and coverage_data.summary.covered_lines or 0,
-          lines_pct = coverage_data and coverage_data.summary and coverage_data.summary.coverage_percent or 0,
-          overall_pct = coverage_data and coverage_data.summary and coverage_data.summary.coverage_percent or 0,
-        }
-      end)
-
-      if success then
-        return result
-      else
-        logger.error("Summary formatter processing error", {
-          error = error_handler.format_error(result),
-          module = "reporting.summary",
-        })
-        return {
-          files = {},
-          total_files = 0,
-          covered_files = 0,
-          files_pct = 0,
-          total_lines = 0,
-          covered_lines = 0,
-          lines_pct = 0,
-          overall_pct = 0,
-        }
-      end
-    end
-  end
-end
-
+-- Local references to formatter registries
+---@diagnostic disable-next-line: unused-local
 -- Local references to formatter registries
 ---@diagnostic disable-next-line: unused-local
 local coverage_formatters = formatters.coverage
@@ -715,43 +688,44 @@ local results_formatters = formatters.results
 -- CUSTOM FORMATTER REGISTRATION
 ---------------------------
 
----@param name string Name of the formatter to register
----@param formatter_fn function Function to format coverage reports
----@return boolean|nil success True if formatter was registered successfully, nil if failed
----@return table|nil error Error object if registration failed
--- Register a custom coverage report formatter
+---@param name string Name of the formatter to register (e.g., "my_coverage_format").
+---@param formatter_fn function The formatter function `(coverage_data, options) -> string|table`.
+---@return boolean|nil success `true` if registered successfully, `nil` if validation or registration failed.
+---@return table|nil error Error object if registration failed.
+---@throws table If registration fails critically within `error_handler.try`.
 function M.register_coverage_formatter(name, formatter_fn)
   -- Validate name parameter
   if type(name) ~= "string" then
-    local err = error_handler.validation_error("Failed to register coverage formatter: name must be a string", {
+    local err = get_error_handler().validation_error("Failed to register coverage formatter: name must be a string", {
       name_type = type(name),
       operation = "register_coverage_formatter",
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   -- Validate formatter_fn parameter
   if type(formatter_fn) ~= "function" then
-    local err = error_handler.validation_error("Failed to register coverage formatter: formatter must be a function", {
-      formatter_name = name,
-      formatter_type = type(formatter_fn),
-      operation = "register_coverage_formatter",
-      module = "reporting",
-    })
-    logger.error(err.message, err.context)
+    local err =
+      get_error_handler().validation_error("Failed to register coverage formatter: formatter must be a function", {
+        formatter_name = name,
+        formatter_type = type(formatter_fn),
+        operation = "register_coverage_formatter",
+        module = "reporting",
+      })
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  -- Register the formatter using error_handler.try
-  local success, result = error_handler.try(function()
+  -- Register the formatter using get_error_handler()try
+  local success, result = get_error_handler().try(function()
     formatters.coverage[name] = formatter_fn
     return true
   end)
 
   if not success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Failed to register coverage formatter: registration error",
       {
         formatter_name = name,
@@ -760,54 +734,55 @@ function M.register_coverage_formatter(name, formatter_fn)
       },
       result -- result contains the error when success is false
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Registered custom coverage formatter", {
+  get_logger().debug("Registered custom coverage formatter", {
     formatter_name = name,
   })
 
   return true
 end
 
----@param name string Name of the formatter to register
----@param formatter_fn function Function to format quality reports
----@return boolean|nil success True if formatter was registered successfully, nil if failed
----@return table|nil error Error object if registration failed
--- Register a custom quality report formatter
+---@param name string Name of the formatter to register (e.g., "my_quality_format").
+---@param formatter_fn function The formatter function `(quality_data, options) -> string|table`.
+---@return boolean|nil success `true` if registered successfully, `nil` if validation or registration failed.
+---@return table|nil error Error object if registration failed.
+---@throws table If registration fails critically within `error_handler.try`.
 function M.register_quality_formatter(name, formatter_fn)
   -- Validate name parameter
   if type(name) ~= "string" then
-    local err = error_handler.validation_error("Failed to register quality formatter: name must be a string", {
+    local err = get_error_handler().validation_error("Failed to register quality formatter: name must be a string", {
       name_type = type(name),
       operation = "register_quality_formatter",
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   -- Validate formatter_fn parameter
   if type(formatter_fn) ~= "function" then
-    local err = error_handler.validation_error("Failed to register quality formatter: formatter must be a function", {
-      formatter_name = name,
-      formatter_type = type(formatter_fn),
-      operation = "register_quality_formatter",
-      module = "reporting",
-    })
-    logger.error(err.message, err.context)
+    local err =
+      get_error_handler().validation_error("Failed to register quality formatter: formatter must be a function", {
+        formatter_name = name,
+        formatter_type = type(formatter_fn),
+        operation = "register_quality_formatter",
+        module = "reporting",
+      })
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  -- Register the formatter using error_handler.try
-  local success, result = error_handler.try(function()
+  -- Register the formatter using get_error_handler().try
+  local success, result = get_error_handler().try(function()
     formatters.quality[name] = formatter_fn
     return true
   end)
 
   if not success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Failed to register quality formatter: registration error",
       {
         formatter_name = name,
@@ -816,54 +791,55 @@ function M.register_quality_formatter(name, formatter_fn)
       },
       result -- result contains the error when success is false
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Registered custom quality formatter", {
+  get_logger().debug("Registered custom quality formatter", {
     formatter_name = name,
   })
 
   return true
 end
 
----@param name string Name of the formatter to register
----@param formatter_fn function Function to format test results
----@return boolean|nil success True if formatter was registered successfully, nil if failed
----@return table|nil error Error object if registration failed
--- Register a custom test results formatter
+---@param name string Name of the formatter to register (e.g., "my_results_format").
+---@param formatter_fn function The formatter function `(results_data, options) -> string|table`.
+---@return boolean|nil success `true` if registered successfully, `nil` if validation or registration failed.
+---@return table|nil error Error object if registration failed.
+---@throws table If registration fails critically within `error_handler.try`.
 function M.register_results_formatter(name, formatter_fn)
   -- Validate name parameter
   if type(name) ~= "string" then
-    local err = error_handler.validation_error("Failed to register results formatter: name must be a string", {
+    local err = get_error_handler().validation_error("Failed to register results formatter: name must be a string", {
       name_type = type(name),
       operation = "register_results_formatter",
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   -- Validate formatter_fn parameter
   if type(formatter_fn) ~= "function" then
-    local err = error_handler.validation_error("Failed to register results formatter: formatter must be a function", {
-      formatter_name = name,
-      formatter_type = type(formatter_fn),
-      operation = "register_results_formatter",
-      module = "reporting",
-    })
-    logger.error(err.message, err.context)
+    local err =
+      get_error_handler().validation_error("Failed to register results formatter: formatter must be a function", {
+        formatter_name = name,
+        formatter_type = type(formatter_fn),
+        operation = "register_results_formatter",
+        module = "reporting",
+      })
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  -- Register the formatter using error_handler.try
-  local success, result = error_handler.try(function()
+  -- Register the formatter using get_error_handler()try
+  local success, result = get_error_handler().try(function()
     formatters.results[name] = formatter_fn
     return true
   end)
 
   if not success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Failed to register results formatter: registration error",
       {
         formatter_name = name,
@@ -872,34 +848,34 @@ function M.register_results_formatter(name, formatter_fn)
       },
       result -- result contains the error when success is false
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Registered custom results formatter", {
+  get_logger().debug("Registered custom results formatter", {
     formatter_name = name,
   })
 
   return true
 end
 
----@param formatter_module table Module containing formatters {coverage={}, quality={}, results={}}
----@return number|nil registered Number of formatters registered or nil if failed
----@return table|nil error Error object if some formatters failed to register
--- Load formatters from a module (table with format functions)
+---@param formatter_module table A module-like table containing formatter functions keyed by type (e.g., `{ coverage = { my_format = fn }, quality = { ... } }`) or a `.register(formatters)` method.
+---@return number|nil registered The number of formatters successfully registered, or `nil` if `formatter_module` validation failed.
+---@return table|nil error An error object if some formatters failed to register. Contains details in `error.context.failed_formatters`.
+---@throws table If validation or registration fails critically.
 function M.load_formatters(formatter_module)
   -- Validate formatter_module parameter
   if type(formatter_module) ~= "table" then
-    local err = error_handler.validation_error("Failed to load formatters: module must be a table", {
+    local err = get_error_handler().validation_error("Failed to load formatters: module must be a table", {
       module_type = type(formatter_module),
       operation = "load_formatters",
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Loading formatters from module", {
+  get_logger().debug("Loading formatters from module", {
     has_coverage = type(formatter_module.coverage) == "table",
     has_quality = type(formatter_module.quality) == "table",
     has_results = type(formatter_module.results) == "table",
@@ -913,7 +889,7 @@ function M.load_formatters(formatter_module)
     local coverage_formatters = {}
     for name, fn in pairs(formatter_module.coverage) do
       if type(fn) == "function" then
-        local success, err = error_handler.try(function()
+        local success, err = get_error_handler().try(function()
           return M.register_coverage_formatter(name, fn)
         end)
 
@@ -927,16 +903,16 @@ function M.load_formatters(formatter_module)
             name = name,
             error = err,
           })
-          logger.warn("Failed to register coverage formatter", {
+          get_logger().warn("Failed to register coverage formatter", {
             formatter_name = name,
-            error = error_handler.format_error(err),
+            error = get_error_handler().format_error(err),
           })
         end
       end
     end
 
     if #coverage_formatters > 0 then
-      logger.debug("Registered coverage formatters", {
+      get_logger().debug("Registered coverage formatters", {
         count = #coverage_formatters,
         formatters = coverage_formatters,
       })
@@ -948,7 +924,7 @@ function M.load_formatters(formatter_module)
     local quality_formatters = {}
     for name, fn in pairs(formatter_module.quality) do
       if type(fn) == "function" then
-        local success, err = error_handler.try(function()
+        local success, err = get_error_handler().try(function()
           return M.register_quality_formatter(name, fn)
         end)
 
@@ -962,16 +938,16 @@ function M.load_formatters(formatter_module)
             name = name,
             error = err,
           })
-          logger.warn("Failed to register quality formatter", {
+          get_logger().warn("Failed to register quality formatter", {
             formatter_name = name,
-            error = error_handler.format_error(err),
+            error = get_error_handler().format_error(err),
           })
         end
       end
     end
 
     if #quality_formatters > 0 then
-      logger.debug("Registered quality formatters", {
+      get_logger().debug("Registered quality formatters", {
         count = #quality_formatters,
         formatters = quality_formatters,
       })
@@ -983,7 +959,7 @@ function M.load_formatters(formatter_module)
     local results_formatters = {}
     for name, fn in pairs(formatter_module.results) do
       if type(fn) == "function" then
-        local success, err = error_handler.try(function()
+        local success, err = get_error_handler().try(function()
           return M.register_results_formatter(name, fn)
         end)
 
@@ -997,30 +973,30 @@ function M.load_formatters(formatter_module)
             name = name,
             error = err,
           })
-          logger.warn("Failed to register results formatter", {
+          get_logger().warn("Failed to register results formatter", {
             formatter_name = name,
-            error = error_handler.format_error(err),
+            error = get_error_handler().format_error(err),
           })
         end
       end
     end
 
     if #results_formatters > 0 then
-      logger.debug("Registered results formatters", {
+      get_logger().debug("Registered results formatters", {
         count = #results_formatters,
         formatters = results_formatters,
       })
     end
   end
 
-  logger.debug("Completed formatter registration", {
+  get_logger().debug("Completed formatter registration", {
     total_registered = registered,
     error_count = #registration_errors,
   })
 
   -- If we have errors but still registered some formatters, return partial success
   if #registration_errors > 0 then
-    local err = error_handler.runtime_error("Some formatters failed to register", {
+    local err = get_error_handler().runtime_error("Some formatters failed to register", {
       total_attempted = registered + #registration_errors,
       successful = registered,
       failed = #registration_errors,
@@ -1035,10 +1011,10 @@ function M.load_formatters(formatter_module)
   return registered
 end
 
----@return table available_formatters Table with lists of formatters by type {coverage={}, quality={}, results={}}
--- Get list of available formatters for each type
+--- Gets a table containing lists of names for all currently registered formatters, categorized by type.
+---@return {coverage: string[], quality: string[], results: string[]} available_formatters A table where keys are report types ("coverage", "quality", "results") and values are sorted arrays of registered formatter names for that type.
 function M.get_available_formatters()
-  logger.debug("Getting available formatters")
+  get_logger().debug("Getting available formatters")
 
   local available = {
     coverage = {},
@@ -1064,7 +1040,7 @@ function M.get_available_formatters()
   table.sort(available.quality)
   table.sort(available.results)
 
-  logger.debug("Available formatters", {
+  get_logger().debug("Available formatters", {
     coverage_count = #available.coverage,
     coverage = table.concat(available.coverage, ", "),
     quality_count = #available.quality,
@@ -1080,13 +1056,13 @@ end
 -- FORMAT OUTPUT FUNCTIONS
 ---------------------------
 
----@param type string Type of report ("coverage", "quality", or "results")
----@return string format Default format name for the specified report type
+--- Gets the default format string for a given report type ("coverage", "quality", "results") from configuration.
+---@param type string The report type.
+---@return string format The default format name (e.g., "html", "junit"). Falls back to hardcoded defaults if not configured.
 ---@private
--- Get default format from configuration
 local function get_default_format(type)
   -- Check central_config first
-  local central_config = get_central_config()
+  -- central_config is loaded at top level and guaranteed to exist
   if central_config then
     local format_config = central_config.get("reporting.formats." .. type .. ".default")
     if format_config then
@@ -1111,12 +1087,16 @@ local function get_default_format(type)
   end
 end
 
--- Format coverage data
+--- Formats coverage data using the specified formatter.
+---@param coverage_data table The coverage data (conforming to `M.CoverageData` structure).
+---@param format? string The name of the formatter to use (e.g., "html", "lcov"). Defaults to the configured default for "coverage".
+---@return string|table|nil formatted_output The formatted report (string or table), or `nil` if the formatter is not found or fails.
+---@throws table If the specified formatter fails critically during execution (errors wrapped by `pcall` are handled gracefully).
 function M.format_coverage(coverage_data, format)
   -- If no format specified, use default from config
   format = format or get_default_format("coverage")
 
-  logger.debug("Formatting coverage data", {
+  get_logger().debug("Formatting coverage data", {
     format = format,
     has_data = coverage_data ~= nil,
     formatter_available = formatters.coverage[format] ~= nil,
@@ -1125,7 +1105,7 @@ function M.format_coverage(coverage_data, format)
 
   -- Use the appropriate formatter
   if formatters.coverage[format] then
-    logger.trace("Using requested formatter", { format = format })
+    get_logger().trace("Using requested formatter", { format = format })
     local result = formatters.coverage[format](coverage_data)
 
     -- Handle both old-style string returns and new-style structured returns
@@ -1138,12 +1118,12 @@ function M.format_coverage(coverage_data, format)
     end
   else
     local default_format = get_default_format("coverage")
-    logger.warn("Requested formatter not available, falling back to default", {
+    get_logger().warn("Requested formatter not available, falling back to default", {
       requested_format = format,
       default_format = default_format,
     })
     -- Default to summary formatter explicitly
-    logger.debug("Using summary formatter as fallback for invalid format")
+    get_logger().debug("Using summary formatter as fallback for invalid format")
     local result = formatters.coverage.summary(coverage_data)
 
     -- Handle both old-style string returns and new-style structured returns
@@ -1155,12 +1135,16 @@ function M.format_coverage(coverage_data, format)
   end
 end
 
--- Format quality data
+--- Formats quality data using the specified formatter.
+---@param quality_data table The quality data (conforming to `M.QualityData` structure).
+---@param format? string The name of the formatter to use (e.g., "summary", "json"). Defaults to the configured default for "quality".
+---@return string|table|nil formatted_output The formatted report (string or table), or `nil` if the formatter is not found or fails.
+---@throws table If the specified formatter fails critically during execution (errors wrapped by `pcall` are handled gracefully).
 function M.format_quality(quality_data, format)
   -- If no format specified, use default from config
   format = format or get_default_format("quality")
 
-  logger.debug("Formatting quality data", {
+  get_logger().debug("Formatting quality data", {
     format = format,
     has_data = quality_data ~= nil,
     formatter_available = formatters.quality[format] ~= nil,
@@ -1169,7 +1153,7 @@ function M.format_quality(quality_data, format)
 
   -- Use the appropriate formatter
   if formatters.quality[format] then
-    logger.trace("Using requested formatter", { format = format })
+    get_logger().trace("Using requested formatter", { format = format })
     local result = formatters.quality[format](quality_data)
 
     -- Handle both old-style string returns and new-style structured returns
@@ -1182,12 +1166,12 @@ function M.format_quality(quality_data, format)
     end
   else
     local default_format = get_default_format("quality")
-    logger.warn("Requested formatter not available, falling back to default", {
+    get_logger().warn("Requested formatter not available, falling back to default", {
       requested_format = format,
       default_format = default_format,
     })
     -- Default to summary formatter explicitly
-    logger.debug("Using summary formatter as fallback for invalid format")
+    get_logger().debug("Using summary formatter as fallback for invalid format")
     local result = formatters.quality.summary(quality_data)
 
     -- Handle both old-style string returns and new-style structured returns
@@ -1199,12 +1183,16 @@ function M.format_quality(quality_data, format)
   end
 end
 
--- Format test results data
+--- Formats test results data using the specified formatter.
+---@param results_data table The test results data (conforming to `M.TestResultsData` structure).
+---@param format? string The name of the formatter to use (e.g., "junit", "tap"). Defaults to the configured default for "results".
+---@return string|table|nil formatted_output The formatted report (string or table), or `nil` if the formatter is not found or fails.
+---@throws table If the specified formatter fails critically during execution (errors wrapped by `pcall` are handled gracefully).
 function M.format_results(results_data, format)
   -- If no format specified, use default from config
   format = format or get_default_format("results")
 
-  logger.debug("Formatting test results data", {
+  get_logger().debug("Formatting test results data", {
     format = format,
     has_data = results_data ~= nil,
     formatter_available = formatters.results[format] ~= nil,
@@ -1213,7 +1201,7 @@ function M.format_results(results_data, format)
 
   -- Use the appropriate formatter
   if formatters.results[format] then
-    logger.trace("Using requested formatter", { format = format })
+    get_logger().trace("Using requested formatter", { format = format })
     local result = formatters.results[format](results_data)
 
     -- Handle both old-style string returns and new-style structured returns
@@ -1226,12 +1214,12 @@ function M.format_results(results_data, format)
     end
   else
     local default_format = get_default_format("results")
-    logger.warn("Requested formatter not available, falling back to default", {
+    get_logger().warn("Requested formatter not available, falling back to default", {
       requested_format = format,
       default_format = default_format,
     })
     -- Default to junit formatter explicitly
-    logger.debug("Using junit formatter as fallback for invalid format")
+    get_logger().debug("Using junit formatter as fallback for invalid format")
     local result = formatters.results.junit(results_data)
 
     -- Handle both old-style string returns and new-style structured returns
@@ -1247,29 +1235,35 @@ end
 -- FILE I/O FUNCTIONS
 ---------------------------
 
--- Write content to a file using the filesystem module
+--- Writes content (string or table automatically JSON encoded) to a specified file path.
+--- Ensures parent directories exist. Uses `filesystem.write_file`.
+---@param file_path string The absolute or relative path to the output file.
+---@param content string|table The content to write. If a table, it's encoded as JSON.
+---@return boolean|nil success `true` if writing succeeded, `nil` otherwise.
+---@return table|nil error Error object if validation, encoding, or writing failed.
+---@throws table If encoding or writing fails critically within `error_handler.try` or `safe_io_operation`.
 function M.write_file(file_path, content)
   -- Input validation using error_handler
   if not file_path then
-    local err = error_handler.validation_error("Missing required file_path parameter", {
+    local err = get_error_handler().validation_error("Missing required file_path parameter", {
       operation = "write_file",
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   if not content then
-    local err = error_handler.validation_error("Missing required content parameter", {
+    local err = get_error_handler().validation_error("Missing required content parameter", {
       operation = "write_file",
       file_path = file_path,
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Writing file", {
+  get_logger().debug("Writing file", {
     file_path = file_path,
     content_length = content and #content or 0,
   })
@@ -1281,12 +1275,12 @@ function M.write_file(file_path, content)
 
   if type(content) == "table" then
     ---@diagnostic disable-next-line: unused-local
-    success, result, err = error_handler.try(function()
+    success, result, err = get_error_handler().try(function()
       return json_module.encode(content)
     end)
 
     if not success then
-      local error_obj = error_handler.io_error(
+      local error_obj = get_error_handler().io_error(
         "Failed to encode table as JSON",
         {
           file_path = file_path,
@@ -1295,24 +1289,24 @@ function M.write_file(file_path, content)
         },
         result -- The error object is in result when success is false
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
     content_str = result
-    logger.trace("Converted table to JSON string", {
+    get_logger().trace("Converted table to JSON string", {
       file_path = file_path,
       content_length = content_str and #content_str or 0,
     })
   else
     -- If not a table, convert to string directly
     ---@diagnostic disable-next-line: unused-local
-    success, result, err = error_handler.try(function()
+    success, result, err = get_error_handler().try(function()
       return tostring(content)
     end)
 
     if not success then
-      local error_obj = error_handler.io_error(
+      local error_obj = get_error_handler().io_error(
         "Failed to convert content to string",
         {
           file_path = file_path,
@@ -1321,12 +1315,12 @@ function M.write_file(file_path, content)
         },
         result -- The error object is in result when success is false
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
     content_str = result
-    logger.trace("Converted content to string", {
+    get_logger().trace("Converted content to string", {
       file_path = file_path,
       content_type = type(content),
       content_length = content_str and #content_str or 0,
@@ -1334,9 +1328,9 @@ function M.write_file(file_path, content)
   end
 
   -- Use the filesystem module to write the file with proper error handling
-  local write_success, write_err = error_handler.safe_io_operation(
+  local write_success, write_err = get_error_handler().safe_io_operation(
     function()
-      return fs.write_file(file_path, content_str)
+      return get_fs().write_file(file_path, content_str)
     end,
     file_path,
     {
@@ -1347,14 +1341,14 @@ function M.write_file(file_path, content)
   )
 
   if not write_success then
-    logger.error("Error writing to file", {
+    get_logger().error("Error writing to file", {
       file_path = file_path,
-      error = error_handler.format_error(write_err),
+      error = get_error_handler().format_error(write_err),
     })
     return nil, write_err
   end
 
-  logger.debug("Successfully wrote file", {
+  get_logger().debug("Successfully wrote file", {
     file_path = file_path,
     content_length = content_str and #content_str or 0,
   })
@@ -1365,17 +1359,17 @@ end
 local _validation_module
 local function get_validation_module()
   if not _validation_module then
-    -- Use error_handler.try for better error handling and context
-    local success, validation = error_handler.try(function()
+    -- Use get_error_handler()try for better error handling and context
+    local success, validation = get_error_handler().try(function()
       return require("lib.reporting.validation")
     end)
 
     if success then
       _validation_module = validation
-      logger.debug("Successfully loaded validation module")
+      get_logger().debug("Successfully loaded validation module")
     else
-      logger.debug("Failed to load validation module", {
-        error = error_handler.format_error(validation),
+      get_logger().debug("Failed to load validation module", {
+        error = get_error_handler().format_error(validation),
         operation = "get_validation_module",
         module = "reporting",
       })
@@ -1384,7 +1378,7 @@ local function get_validation_module()
       _validation_module = {
         validate_coverage_data = function()
           -- Return dummy validation result (valid with no issues)
-          logger.warn("Using dummy validation module", {
+          get_logger().warn("Using dummy validation module", {
             operation = "validate_coverage_data",
             module = "reporting",
           })
@@ -1393,7 +1387,7 @@ local function get_validation_module()
 
         validate_report = function()
           -- Return dummy report validation (valid with no issues)
-          logger.warn("Using dummy validation module", {
+          get_logger().warn("Using dummy validation module", {
             operation = "validate_report",
             module = "reporting",
           })
@@ -1417,11 +1411,14 @@ local function get_validation_module()
   return _validation_module
 end
 
--- Validate coverage data before saving (can be called directly)
+--- Validates the structure and consistency of coverage data using `lib.reporting.validation`.
+---@param coverage_data table The coverage data (conforming to `M.CoverageData`).
+---@return boolean is_valid `true` if the data is valid according to the validation module.
+---@return table? issues A list of validation issue tables if `is_valid` is false.
+---@throws table If validation fails critically.
 function M.validate_coverage_data(coverage_data)
-  local validation = get_validation_module()
-
-  logger.debug("Validating coverage data", {
+  -- validation_module is loaded at top level and guaranteed to exist
+  get_logger().debug("Validating coverage data", {
     has_data = coverage_data ~= nil,
     has_summary = coverage_data and coverage_data.summary ~= nil,
     has_files = coverage_data and coverage_data.files ~= nil,
@@ -1429,30 +1426,34 @@ function M.validate_coverage_data(coverage_data)
 
   -- Run validation
   ---@diagnostic disable-next-line: redundant-parameter
-  local is_valid, issues = validation.validate_coverage_data(coverage_data)
+  local is_valid, issues = validation_module.validate_coverage_data(coverage_data)
 
-  logger.info("Coverage data validation results", {
-    is_valid = is_valid,
+  get_logger().info("Coverage data validation results", {
     issue_count = issues and #issues or 0,
   })
 
   return is_valid, issues
 end
 
--- Validate report format (can be called directly)
+--- Validates if the formatted report data (string or table) conforms to the expected schema/structure for the given format name.
+--- Uses `lib.reporting.schema` (or a fallback if unavailable).
+---@param formatted_data string|table The formatted report content.
+---@param format string The name of the format (e.g., "json", "lcov").
+---@return boolean success `true` if the format is valid or validation is skipped.
+---@return string? error_message An error message if validation failed.
+---@throws table If validation fails critically.
 function M.validate_report_format(formatted_data, format)
-  local validation = get_validation_module()
-
-  logger.debug("Validating report format", {
+  -- validation_module is loaded at top level and guaranteed to exist
+  get_logger().debug("Validating report format", {
     format = format,
     has_data = formatted_data ~= nil,
     data_type = type(formatted_data),
   })
 
   -- Run validation
-  local is_valid, error_message = validation.validate_report_format(formatted_data, format)
+  local is_valid, error_message = validation_module.validate_report_format(formatted_data, format)
 
-  logger.info("Format validation results", {
+  get_logger().info("Format validation results", {
     is_valid = is_valid,
     format = format,
     error = error_message or "none",
@@ -1461,11 +1462,16 @@ function M.validate_report_format(formatted_data, format)
   return is_valid, error_message
 end
 
--- Perform comprehensive validation of coverage report
+--- Performs comprehensive validation on coverage data and optionally the formatted output.
+--- Includes schema checks, statistical analysis, and cross-checking via `lib.reporting.validation`.
+---@param coverage_data table The coverage data (conforming to `M.CoverageData`).
+---@param formatted_output? string|table Optional formatted report content to validate.
+---@param format? string Optional format name corresponding to `formatted_output`.
+---@return table validation_result A table containing detailed validation results (structure defined by `lib.reporting.validation.validate_report`).
+---@throws table If validation fails critically.
 function M.validate_report(coverage_data, formatted_output, format)
-  local validation = get_validation_module()
-
-  logger.debug("Running comprehensive report validation", {
+  -- validation_module is loaded at top level and guaranteed to exist
+  get_logger().debug("Running comprehensive report validation", {
     has_data = coverage_data ~= nil,
     has_formatted_output = formatted_output ~= nil,
     format = format,
@@ -1480,9 +1486,9 @@ function M.validate_report(coverage_data, formatted_output, format)
 
   -- Run full validation
   ---@diagnostic disable-next-line: redundant-parameter
-  local result = validation.validate_report(coverage_data, options)
+  local result = validation_module.validate_report(coverage_data, options)
 
-  logger.info("Comprehensive validation results", {
+  get_logger().info("Comprehensive validation results", {
     is_valid = result.validation.is_valid,
     issues = result.validation.issues and #result.validation.issues or 0,
     format_valid = result.format_validation and result.format_validation.is_valid,
@@ -1494,25 +1500,33 @@ function M.validate_report(coverage_data, formatted_output, format)
   return result
 end
 
--- Save a coverage report to file
+--- Formats and saves a coverage report to a file.
+--- Optionally validates data and format before saving based on `options`.
+---@param file_path string Path to save the report file.
+---@param coverage_data table Raw coverage data.
+---@param format string The desired output format (e.g., "html", "lcov").
+---@param options? {validate?: boolean, strict_validation?: boolean, validate_format?: boolean} Optional saving/validation flags.
+---@return boolean|nil success `true` if formatting and saving succeeded, `nil` otherwise.
+---@return table|nil error Error object if formatting, validation, or saving failed.
+---@throws table If formatting or writing fails critically.
 function M.save_coverage_report(file_path, coverage_data, format, options)
   -- Validate required parameters
   if not file_path then
-    local err = error_handler.validation_error("Missing required file_path parameter", {
+    local err = get_error_handler().validation_error("Missing required file_path parameter", {
       operation = "save_coverage_report",
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   if not coverage_data then
-    local err = error_handler.validation_error("Missing required coverage_data parameter", {
+    local err = get_error_handler().validation_error("Missing required coverage_data parameter", {
       operation = "save_coverage_report",
       file_path = file_path,
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
@@ -1520,7 +1534,7 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
   format = format or "html"
   options = options or {}
 
-  logger.debug("Saving coverage report to file", {
+  get_logger().debug("Saving coverage report to file", {
     file_path = file_path,
     format = format,
     has_data = true,
@@ -1529,7 +1543,7 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
 
   -- CRITICAL FIX: Check for minimal valid data structure before proceeding
   if not coverage_data.files or not coverage_data.summary then
-    local err = error_handler.validation_error("Invalid coverage data structure: missing required fields", {
+    local err = get_error_handler().validation_error("Invalid coverage data structure: missing required fields", {
       file_path = file_path,
       format = format,
       operation = "save_coverage_report",
@@ -1537,7 +1551,7 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
       missing_files = coverage_data.files == nil,
       missing_summary = coverage_data.summary == nil,
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
@@ -1551,39 +1565,39 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
 
   -- CRITICAL FIX: Fail if there are no files in the coverage data
   if file_count == 0 then
-    local err = error_handler.validation_error("Invalid coverage data: no files found in coverage data", {
+    local err = get_error_handler().validation_error("Invalid coverage data: no files found in coverage data", {
       file_path = file_path,
       format = format,
       operation = "save_coverage_report",
       module = "reporting",
       file_count = file_count,
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   -- Log file count for debugging
-  logger.debug("Coverage file count validation", {
+  get_logger().debug("Coverage file count validation", {
     file_count = file_count,
     files_valid = file_count > 0,
   })
 
   -- Validate coverage data before saving if not disabled
   if options.validate ~= false then
-    -- Safely get the validation module using error_handler.try
-    local success, validation_module = error_handler.try(function()
+    -- Safely get the validation module using get_error_handler()try
+    local success, validation_module = get_error_handler().try(function()
       return get_validation_module()
     end)
 
     if success and validation_module and validation_module.validate_coverage_data then
       -- Validate the coverage data with error handling
-      local validation_success, is_valid, issues = error_handler.try(function()
+      local validation_success, is_valid, issues = get_error_handler().try(function()
         return validation_module.validate_coverage_data(coverage_data)
       end)
 
       if validation_success then
         if issues and #issues > 0 and not is_valid then
-          logger.warn("Validation issues detected in coverage data", {
+          get_logger().warn("Validation issues detected in coverage data", {
             issue_count = #issues,
             first_issue = issues[1] and issues[1].message or "Unknown issue",
           })
@@ -1591,7 +1605,7 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
           -- If validation is strict, don't save invalid data
           if options.strict_validation then
             local validation_err =
-              error_handler.validation_error("Not saving report due to validation failures (strict mode)", {
+              get_error_handler().validation_error("Not saving report due to validation failures (strict mode)", {
                 file_path = file_path,
                 format = format,
                 operation = "save_coverage_report",
@@ -1599,16 +1613,16 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
                 issue_count = #issues,
                 first_issue = issues[1] and issues[1].message or "Unknown issue",
               })
-            logger.error(validation_err.message, validation_err.context)
+            get_logger().error(validation_err.message, validation_err.context)
             return nil, validation_err
           end
 
           -- Otherwise just warn but continue
-          logger.warn("Saving report despite validation issues (non-strict mode)")
+          get_logger().warn("Saving report despite validation issues (non-strict mode)")
         end
       else
         -- Validation failed with an error
-        local validation_err = error_handler.runtime_error(
+        local validation_err = get_error_handler().runtime_error(
           "Error during coverage data validation",
           {
             file_path = file_path,
@@ -1618,7 +1632,7 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
           },
           is_valid -- is_valid contains the error when validation_success is false
         )
-        logger.warn(validation_err.message, validation_err.context)
+        get_logger().warn(validation_err.message, validation_err.context)
 
         -- If validation is strict, don't save on validation error
         if options.strict_validation then
@@ -1626,10 +1640,10 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
         end
 
         -- Otherwise, continue despite validation error
-        logger.warn("Continuing with report generation despite validation error (non-strict mode)")
+        get_logger().warn("Continuing with report generation despite validation error (non-strict mode)")
       end
     else
-      logger.warn("Validation module not fully available, skipping validation", {
+      get_logger().warn("Validation module not fully available, skipping validation", {
         file_path = file_path,
         format = format,
       })
@@ -1638,12 +1652,12 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
 
   -- Format the coverage data with error handling
   ---@diagnostic disable-next-line: unused-local
-  local format_success, formatted, format_err = error_handler.try(function()
+  local format_success, formatted, format_err = get_error_handler().try(function()
     return M.format_coverage(coverage_data, format)
   end)
 
   if not format_success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Failed to format coverage data",
       {
         file_path = file_path,
@@ -1653,7 +1667,7 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
       },
       formatted -- formatted contains the error when format_success is false
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
@@ -1669,19 +1683,19 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
 
   -- Validate the formatted output if requested
   if options.validate_format ~= false then
-    logger.debug("Validating formatted output", {
+    get_logger().debug("Validating formatted output", {
       format = format,
       content_sample = type(content) == "string" and content:sub(1, 50) .. "..." or "non-string content",
     })
 
     -- Only attempt format validation for certain types
     if (format == "json" and type(content) == "table") or type(content) == "string" then
-      local validation_success, format_valid, format_err = error_handler.try(function()
+      local validation_success, format_valid, format_err = get_error_handler().try(function()
         return M.validate_report_format(content, format)
       end)
 
       if validation_success and not format_valid then
-        logger.warn("Format validation failed", {
+        get_logger().warn("Format validation failed", {
           format = format,
           error = format_err,
         })
@@ -1689,48 +1703,48 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
         -- If strict validation enabled, don't save the file
         if options.strict_validation then
           local validation_err =
-            error_handler.validation_error("Not saving report due to format validation failure (strict mode)", {
+            get_error_handler().validation_error("Not saving report due to format validation failure (strict mode)", {
               file_path = file_path,
               format = format,
               operation = "save_coverage_report",
               module = "reporting",
               error = format_err,
             })
-          logger.error(validation_err.message, validation_err.context)
+          get_logger().error(validation_err.message, validation_err.context)
           return nil, validation_err
         end
 
         -- Otherwise just warn but continue
-        logger.warn("Saving report despite format validation issues (non-strict mode)")
+        get_logger().warn("Saving report despite format validation issues (non-strict mode)")
       end
     end
   end
 
   -- Write all formats (including HTML) directly to file
   -- Write to file with error handling
-  logger.debug("Writing coverage report file", {
+  get_logger().debug("Writing coverage report file", {
     file_path = file_path,
     format = format,
     content_length = #content,
   })
 
   ---@diagnostic disable-next-line: unused-local
-  local write_success, write_err = error_handler.try(function()
+  local write_success, write_err = get_error_handler().try(function()
     return M.write_file(file_path, content)
   end)
 
   if not write_success then
-    local err = error_handler.io_error("Failed to write coverage report to file", {
+    local err = get_error_handler().io_error("Failed to write coverage report to file", {
       file_path = file_path,
       format = format,
       operation = "save_coverage_report",
       module = "reporting",
     }, write_err)
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Successfully saved coverage report", {
+  get_logger().debug("Successfully saved coverage report", {
     file_path = file_path,
     format = format,
   })
@@ -1738,32 +1752,38 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
   return true
 end
 
--- Save a quality report to file
+--- Formats and saves a quality report to a file.
+---@param file_path string Path to save the report file.
+---@param quality_data table Raw quality data.
+---@param format string The desired output format (e.g., "summary", "json").
+---@return boolean|nil success `true` if formatting and saving succeeded, `nil` otherwise.
+---@return table|nil error Error object if formatting or saving failed.
+---@throws table If formatting or writing fails critically.
 function M.save_quality_report(file_path, quality_data, format)
   -- Validate required parameters
   if not file_path then
-    local err = error_handler.validation_error("Missing required file_path parameter", {
+    local err = get_error_handler().validation_error("Missing required file_path parameter", {
       operation = "save_quality_report",
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   if not quality_data then
-    local err = error_handler.validation_error("Missing required quality_data parameter", {
+    local err = get_error_handler().validation_error("Missing required quality_data parameter", {
       operation = "save_quality_report",
       file_path = file_path,
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   -- Set defaults
   format = format or "html"
 
-  logger.debug("Saving quality report to file", {
+  get_logger().debug("Saving quality report to file", {
     file_path = file_path,
     format = format,
     has_data = true,
@@ -1771,12 +1791,12 @@ function M.save_quality_report(file_path, quality_data, format)
 
   -- Format the quality data with error handling
   ---@diagnostic disable-next-line: unused-local
-  local format_success, formatted, format_err = error_handler.try(function()
+  local format_success, formatted, format_err = get_error_handler().try(function()
     return M.format_quality(quality_data, format)
   end)
 
   if not format_success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Failed to format quality data",
       {
         file_path = file_path,
@@ -1786,7 +1806,7 @@ function M.save_quality_report(file_path, quality_data, format)
       },
       formatted -- formatted contains the error when format_success is false
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
@@ -1802,12 +1822,12 @@ function M.save_quality_report(file_path, quality_data, format)
 
   -- Write to file with error handling
   ---@diagnostic disable-next-line: unused-local
-  local write_success, write_err = error_handler.try(function()
+  local write_success, write_err = get_error_handler().try(function()
     return M.write_file(file_path, content)
   end)
 
   if not write_success then
-    local err = error_handler.io_error(
+    local err = get_error_handler().io_error(
       "Failed to write quality report to file",
       {
         file_path = file_path,
@@ -1817,11 +1837,11 @@ function M.save_quality_report(file_path, quality_data, format)
       },
       write_success -- write_success contains the error when success is false
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Successfully saved quality report", {
+  get_logger().debug("Successfully saved quality report", {
     file_path = file_path,
     format = format,
   })
@@ -1829,32 +1849,38 @@ function M.save_quality_report(file_path, quality_data, format)
   return true
 end
 
--- Save a test results report to file
+--- Formats and saves a test results report to a file.
+---@param file_path string Path to save the report file.
+---@param results_data table Raw test results data.
+---@param format string The desired output format (e.g., "junit", "tap").
+---@return boolean|nil success `true` if formatting and saving succeeded, `nil` otherwise.
+---@return table|nil error Error object if formatting or saving failed.
+---@throws table If formatting or writing fails critically.
 function M.save_results_report(file_path, results_data, format)
   -- Validate required parameters
   if not file_path then
-    local err = error_handler.validation_error("Missing required file_path parameter", {
+    local err = get_error_handler().validation_error("Missing required file_path parameter", {
       operation = "save_results_report",
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   if not results_data then
-    local err = error_handler.validation_error("Missing required results_data parameter", {
+    local err = get_error_handler().validation_error("Missing required results_data parameter", {
       operation = "save_results_report",
       file_path = file_path,
       module = "reporting",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   -- Set defaults
   format = format or "junit"
 
-  logger.debug("Saving test results report to file", {
+  get_logger().debug("Saving test results report to file", {
     file_path = file_path,
     format = format,
     has_data = true,
@@ -1862,12 +1888,12 @@ function M.save_results_report(file_path, results_data, format)
 
   -- Format the results data with error handling
   ---@diagnostic disable-next-line: unused-local
-  local format_success, formatted, format_err = error_handler.try(function()
+  local format_success, formatted, format_err = get_error_handler().try(function()
     return M.format_results(results_data, format)
   end)
 
   if not format_success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Failed to format test results data",
       {
         file_path = file_path,
@@ -1877,7 +1903,7 @@ function M.save_results_report(file_path, results_data, format)
       },
       formatted -- formatted contains the error when format_success is false
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
@@ -1893,12 +1919,12 @@ function M.save_results_report(file_path, results_data, format)
 
   -- Write to file with error handling
   ---@diagnostic disable-next-line: unused-local
-  local write_success, write_err = error_handler.try(function()
+  local write_success, write_err = get_error_handler().try(function()
     return M.write_file(file_path, content)
   end)
 
   if not write_success then
-    local err = error_handler.io_error(
+    local err = get_error_handler().io_error(
       "Failed to write test results report to file",
       {
         file_path = file_path,
@@ -1908,11 +1934,11 @@ function M.save_results_report(file_path, results_data, format)
       },
       write_success -- write_success contains the error when success is false
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Successfully saved test results report", {
+  get_logger().debug("Successfully saved test results report", {
     file_path = file_path,
     format = format,
   })
@@ -1935,6 +1961,15 @@ end
 --   * strict_validation: if true, don't save invalid reports (default: false)
 --   * validation_report: if true, generate validation report (default: false)
 --   * validation_report_path: path for validation report (optional)
+--- Automatically generates and saves multiple report types (coverage, quality, results)
+--- based on available data and configuration (defaults, central config, and `options`).
+--- Determines output paths using templates or defaults.
+---@param coverage_data table|nil Optional coverage data to report.
+---@param quality_data table|nil Optional quality data to report.
+---@param results_data table|nil Optional test results data to report.
+---@param options? table|string Optional configuration overrides. Can be a directory path (string) or a table: `{report_dir?: string, report_suffix?: string, timestamp_format?: string, coverage_path_template?: string, quality_path_template?: string, results_path_template?: string, verbose?: boolean, validate?: boolean, strict_validation?: boolean, validation_report?: boolean, validation_report_path?: string}`.
+---@return table<string, {success: boolean, error?: table, path: string}> results A summary table mapping report format/type (e.g., "html", "lcov", "quality_json") to its save result (`{success, error?, path}`).
+---@throws table If ensuring the base report directory exists fails critically.
 function M.auto_save_reports(coverage_data, quality_data, results_data, options)
   -- Handle both string (backward compatibility) and table options
   local config = {}
@@ -1946,7 +1981,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
   end
 
   -- Check central_config for defaults
-  local central_config = get_central_config()
+  -- central_config is loaded at top level and guaranteed to exist
   if central_config then
     local reporting_config = central_config.get("reporting")
 
@@ -1991,7 +2026,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
         end
       end
 
-      logger.debug("Using centralized configuration for reports", {
+      get_logger().debug("Using centralized configuration for reports", {
         using_central_report_dir = config.report_dir == reporting_config.report_dir,
         using_central_suffix = config.report_suffix == reporting_config.report_suffix,
         using_central_timestamp = config.timestamp_format == reporting_config.timestamp_format,
@@ -2095,7 +2130,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     end
 
     -- Log the combined debug data
-    logger.debug("Auto-saving reports", {
+    get_logger().debug("Auto-saving reports", {
       base_dir = base_dir,
       timestamp_format = config.timestamp_format,
       coverage = coverage_debug,
@@ -2105,13 +2140,13 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
   end
 
   -- Use filesystem module to ensure directory exists
-  logger.debug("Ensuring report directory exists", {
+  get_logger().debug("Ensuring report directory exists", {
     directory = base_dir,
   })
 
   -- Validate directory path
   if not base_dir or base_dir == "" then
-    logger.error("Failed to create report directory", {
+    get_logger().error("Failed to create report directory", {
       directory = base_dir,
       error = "Invalid directory path: path cannot be empty",
     })
@@ -2122,7 +2157,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
 
   -- Check for invalid characters in directory path
   if base_dir:match("[*?<>|]") then
-    logger.error("Failed to create report directory", {
+    get_logger().error("Failed to create report directory", {
       directory = base_dir,
       error = "Invalid directory path: contains invalid characters",
     })
@@ -2132,10 +2167,10 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
   end
 
   -- Create the directory if it doesn't exist
-  local dir_ok, dir_err = fs.ensure_directory_exists(base_dir)
+  local dir_ok, dir_err = get_fs().ensure_directory_exists(base_dir)
 
   if not dir_ok then
-    logger.error("Failed to create report directory", {
+    get_logger().error("Failed to create report directory", {
       directory = base_dir,
       error = tostring(dir_err),
     })
@@ -2143,9 +2178,9 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     -- Return empty results table
     return {}
   else
-    logger.debug("Report directory ready", {
+    get_logger().debug("Report directory ready", {
       directory = base_dir,
-      created = not fs.directory_exists(base_dir),
+      created = not get_fs().directory_exists(base_dir),
     })
   end
 
@@ -2179,7 +2214,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
         -- Save validation report
         local ok, err = M.write_file(validation_path, validation_json)
         if ok then
-          logger.info("Saved validation report", {
+          get_logger().info("Saved validation report", {
             path = validation_path,
             is_valid = validation_result.validation and validation_result.validation.is_valid,
           })
@@ -2190,7 +2225,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
             is_valid = validation_result.validation and validation_result.validation.is_valid,
           }
         else
-          logger.error("Failed to save validation report", {
+          get_logger().error("Failed to save validation report", {
             path = validation_path,
             error = tostring(err),
           })
@@ -2207,7 +2242,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     -- Save reports in multiple formats
     local formats = { "html", "json", "lcov", "cobertura" }
 
-    logger.debug("Saving coverage reports", {
+    get_logger().debug("Saving coverage reports", {
       formats = formats,
       has_template = config.coverage_path_template ~= nil,
       validate = validation_options.validate,
@@ -2217,7 +2252,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     for _, format in ipairs(formats) do
       local path = process_template(config.coverage_path_template, format, "coverage")
 
-      logger.debug("Saving coverage report", {
+      get_logger().debug("Saving coverage report", {
         format = format,
         path = path,
       })
@@ -2230,12 +2265,12 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
       }
 
       if ok then
-        logger.debug("Successfully saved coverage report", {
+        get_logger().debug("Successfully saved coverage report", {
           format = format,
           path = path,
         })
       else
-        logger.error("Failed to save coverage report", {
+        get_logger().error("Failed to save coverage report", {
           format = format,
           path = path,
           error = tostring(err),
@@ -2249,7 +2284,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     -- Save reports in multiple formats
     local formats = { "html", "json" }
 
-    logger.debug("Saving quality reports", {
+    get_logger().debug("Saving quality reports", {
       formats = formats,
       has_template = config.quality_path_template ~= nil,
     })
@@ -2257,7 +2292,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     for _, format in ipairs(formats) do
       local path = process_template(config.quality_path_template, format, "quality")
 
-      logger.debug("Saving quality report", {
+      get_logger().debug("Saving quality report", {
         format = format,
         path = path,
       })
@@ -2270,12 +2305,12 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
       }
 
       if ok then
-        logger.debug("Successfully saved quality report", {
+        get_logger().debug("Successfully saved quality report", {
           format = format,
           path = path,
         })
       else
-        logger.error("Failed to save quality report", {
+        get_logger().error("Failed to save quality report", {
           format = format,
           path = path,
           error = tostring(err),
@@ -2293,7 +2328,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
       csv = { ext = "csv", name = "CSV" },
     }
 
-    logger.debug("Saving test results reports", {
+    get_logger().debug("Saving test results reports", {
       formats = { "junit", "tap", "csv" },
       has_template = config.results_path_template ~= nil,
     })
@@ -2301,7 +2336,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     for format, info in pairs(formats) do
       local path = process_template(config.results_path_template, info.ext, "test-results")
 
-      logger.debug("Saving test results report", {
+      get_logger().debug("Saving test results report", {
         format = format,
         name = info.name,
         extension = info.ext,
@@ -2316,13 +2351,13 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
       }
 
       if ok then
-        logger.debug("Successfully saved test results report", {
+        get_logger().debug("Successfully saved test results report", {
           format = format,
           name = info.name,
           path = path,
         })
       else
-        logger.error("Failed to save test results report", {
+        get_logger().error("Failed to save test results report", {
           format = format,
           name = info.name,
           path = path,
@@ -2335,7 +2370,9 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
   return results
 end
 
--- Reset the module to default configuration
+--- Resets the module's local configuration cache to defaults defined in `DEFAULT_CONFIG`.
+--- Does **not** reset central configuration or loaded formatters.
+---@return reporting The reporting module instance (`M`) for method chaining.
 function M.reset()
   -- Reset local configuration to defaults
   config = {
@@ -2343,28 +2380,33 @@ function M.reset()
     verbose = DEFAULT_CONFIG.verbose,
   }
 
-  logger.debug("Reset local configuration to defaults")
+  get_logger().debug("Reset local configuration to defaults")
 
   -- Return the module for chaining
   return M
 end
 
--- Fully reset both local and central configuration
+--- Performs a full reset: resets local configuration (`M.reset()`) and attempts to reset
+--- the "reporting" section in the central configuration system (if available).
+---@return reporting The reporting module instance (`M`) for method chaining.
+---@throws table If central config interaction fails critically during reset.
 function M.full_reset()
   -- Reset local configuration
   M.reset()
 
   -- Reset central configuration if available
-  local central_config = get_central_config()
+  -- central_config is loaded at top level and guaranteed to exist
   if central_config then
     central_config.reset("reporting")
-    logger.debug("Reset central configuration for reporting module")
+    get_logger().debug("Reset central configuration for reporting module")
   end
 
   return M
 end
 
--- Debug helper to show current configuration
+--- Gets a snapshot of the current configuration (local cache and central config) for debugging.
+---@return table debug_info A table containing `{ local_config, using_central_config, central_config }`.
+---@throws table If central config interaction fails critically during retrieval.
 function M.debug_config()
   local debug_info = {
     local_config = {
@@ -2376,14 +2418,14 @@ function M.debug_config()
   }
 
   -- Check for central_config
-  local central_config = get_central_config()
+  -- central_config is loaded at top level and guaranteed to exist
   if central_config then
     debug_info.using_central_config = true
     debug_info.central_config = central_config.get("reporting")
   end
 
   -- Display configuration
-  logger.info("Reporting module configuration", debug_info)
+  get_logger().info("Reporting module configuration", debug_info)
 
   return debug_info
 end

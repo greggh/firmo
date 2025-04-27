@@ -54,9 +54,8 @@ To run only tests matching a specific pattern:
 
 
 ```bash
-lua test.lua --pattern="*_unit_test.lua" tests/
+lua test.lua --pattern=*_unit_test.lua tests/
 ```
-
 
 This runs only files that match the specified pattern.
 
@@ -189,32 +188,30 @@ lua test.lua --filter="should handle invalid input" tests/
 
 
 This runs only test cases whose descriptions match the filter.
+## Using Tags (Programmatically)
 
-### Using Tags to Organize Tests
+Tags can be used to categorize tests (see [Filtering Guide](./filtering.md)), but filtering by tags is done programmatically, not via a dedicated `--tags` CLI flag.
 
-
-Tags can be used to categorize tests and run specific subsets:
-
-
-```bash
-lua test.lua --tags="unit,fast" tests/
+```lua
+-- In a setup script or custom runner:
+local firmo = require("firmo")
+firmo.only_tags("unit", "fast")
+-- Then run tests: lua test.lua tests/
 ```
-
-
+You might also achieve pseudo-tag filtering using the `--filter` flag if your tags are part of the test names.
 This runs only tests tagged with "unit" and "fast".
 
 ### Customizing Test Timeout
 
 
-Set a custom timeout for tests:
+Set a custom timeout for tests (primarily relevant for parallel execution, configured programmatically or via central config):
 
-
-```bash
-lua test.lua --timeout=10000 tests/
+```lua
+-- Programmatic configuration
+local parallel = require("lib.tools.parallel")
+parallel.configure({ timeout = 10 }) -- 10 seconds
 ```
-
-
-This sets a 10-second timeout for each test file.
+There is no direct `--timeout` flag for the main runner script (`test.lua`).
 
 ## Watch Mode in Depth
 
@@ -236,18 +233,11 @@ Watch mode is particularly useful during development as it provides immediate fe
 
 You can customize watch mode behavior:
 
-
 ```bash
-lua test.lua --watch --watch-interval=0.5 --watch-dir=src --watch-dir=lib tests/
+lua test.lua --watch tests/
 ```
 
-
-This configures watch mode to:
-
-
-- Check for changes every 0.5 seconds
-- Watch the "src" and "lib" directories for changes
-- Run tests in the "tests" directory when changes occur
+Watch mode behavior (directories, interval, exclusions) is configured programmatically or via central configuration, not directly via command-line flags like `--watch-interval`.
 
 
 ### Excluding Files from Watch
@@ -288,17 +278,15 @@ You can customize coverage tracking behavior:
 
 
 ```bash
-lua test.lua --coverage --coverage-debug --discover-uncovered tests/
+lua test.lua --coverage --coverage-debug tests/
 ```
-
 
 This enables:
 
-
 - Coverage tracking
 - Detailed debug output about coverage
-- Discovery of files that aren't executed during tests
 
+(Note: `--discover-uncovered` is not an implemented flag).
 
 ### Understanding Coverage Reports
 
@@ -401,22 +389,24 @@ lua test.lua --timeout=30000 tests/performance/
 ### Pattern: Test Setup and Teardown
 
 
-Use the test runner with beforeEach/afterEach hooks to ensure proper test isolation:
+Use the test runner with `before`/`after` hooks to ensure proper test isolation:
 
 
 ```lua
 describe("Database tests", function()
   local db
 
-  before_each(function()
+  before(function()
     -- Create a fresh database connection for each test
-    db = firmo.reset_module("app.database")
+    -- NOTE: Module reset uses require("lib.core.module_reset") system,
+    -- often configured globally. This example focuses on setup/teardown.
+    db = require("app.database") -- Placeholder
     db.connect({in_memory = true})
   end)
 
-  after_each(function()
+  after(function()
     -- Clean up after each test
-    db.disconnect()
+    if db then db.disconnect() end
   end)
 
   it("creates a record", function()
@@ -438,25 +428,18 @@ end)
 ### Pattern: Environment-specific Testing
 
 
-Create environment-specific test configurations:
-
+Create environment-specific test configurations, potentially using `--filter` or separate test directories/scripts:
 
 ```bash
+# Development environment tests (filter by name)
+lua test.lua --filter dev tests/
 
-# Development environment tests
+# Production environment tests (filter by name)
+lua test.lua --filter prod tests/
 
-
-lua test.lua --tags="dev" tests/
-
-# Production environment tests
-
-
-lua test.lua --tags="prod" tests/
-
-# CI environment tests
-
-
-lua test.lua --tags="ci" --coverage --report-dir=reports tests/
+# CI environment tests (using a different directory or config)
+# Assumes unit tests are separated or tagged programmatically
+lua test.lua tests/unit --coverage --report-dir=reports
 ```
 
 

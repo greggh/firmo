@@ -1,12 +1,52 @@
 --- CSV Formatter for Coverage Reports
--- Generates CSV format coverage reports with configurable columns
--- @module reporting.formatters.csv
--- @author Firmo Team
+---
+--- Generates CSV format coverage reports with configurable columns, supporting
+--- both file-level summaries and detailed line-level output. Inherits from the base Formatter.
+---
+--- @module lib.reporting.formatters.csv
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
-local Formatter = require("lib.reporting.formatters.base")
-local error_handler = require("lib.tools.error_handler")
-local central_config = require("lib.core.central_config")
-local filesystem = require("lib.tools.filesystem")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+local Formatter = try_require("lib.reporting.formatters.base")
+
+---@class CSVFormatter : Formatter CSV Formatter for coverage reports.
+--- Generates CSV reports at either file or line level, with configurable columns.
+---@field _VERSION string Module version.
+---@field DEFAULT_FILE_COLUMNS table Default column configuration for file-level reports. Structure: `{ {name = string, field = string, format? = string}, ... }`.
+---@field DEFAULT_LINE_COLUMNS table Default column configuration for line-level reports. Structure: `{ {name = string, field = string, format? = string}, ... }`.
+---@field validate fun(self: CSVFormatter, coverage_data: table): boolean, table? Validates coverage data. Returns `true` or `false, error`.
+---@field format fun(self: CSVFormatter, coverage_data: table, options?: { include_header?: boolean, separator?: string, level?: "file"|"line", columns?: table[], include_summary?: boolean }): string|nil, table? Formats coverage data as a CSV string. Returns `csv_string, nil` or `nil, error`. @throws table If validation fails.
+---@field build_file_level_csv fun(self: CSVFormatter, data: table, options: table): string Builds the CSV content for file-level report. Returns CSV string.
+---@field build_line_level_csv fun(self: CSVFormatter, data: table, options: table): string Builds the CSV content for line-level report. Returns CSV string.
+---@field escape_csv_field fun(self: CSVFormatter, value: any): string Escapes a value for safe inclusion in a CSV field. Returns escaped string.
+---@field get_nested_field fun(self: CSVFormatter, data: table, field_path: string): any Retrieves a value from a nested table using a dot-separated path. Returns value or nil.
+---@field write fun(self: CSVFormatter, csv_content: string, output_path: string, options?: table): boolean, table? Writes the CSV content to a file. Returns `true, nil` or `false, error`. @throws table If writing fails critically.
+---@field register fun(formatters: table): boolean, table? Registers the CSV formatter with the main registry. Returns `true, nil` or `false, error`. @throws table If validation fails.
 
 -- Create CSV formatter class
 local CSVFormatter = Formatter.extend("csv", "csv")
@@ -14,7 +54,8 @@ local CSVFormatter = Formatter.extend("csv", "csv")
 --- CSV Formatter version
 CSVFormatter._VERSION = "1.0.0"
 
--- Default column configurations
+--- Default column configuration for file-level reports.
+--- `name` is the header, `field` is the dot-path to the value in the file data, `format` is an optional sprintf pattern.
 CSVFormatter.DEFAULT_FILE_COLUMNS = {
   { name = "File", field = "path" },
   { name = "Lines", field = "summary.total_lines" },
@@ -25,6 +66,8 @@ CSVFormatter.DEFAULT_FILE_COLUMNS = {
   { name = "Execution %", field = "summary.execution_percent", format = "%.2f" },
 }
 
+--- Default column configuration for line-level reports.
+--- `name` is the header, `field` is the key in the line record, `format` is optional sprintf pattern.
 CSVFormatter.DEFAULT_LINE_COLUMNS = {
   { name = "File", field = "file" },
   { name = "Line", field = "line" },
@@ -34,7 +77,11 @@ CSVFormatter.DEFAULT_LINE_COLUMNS = {
   { name = "Content", field = "content" },
 }
 
--- Validate coverage data structure for CSV formatter
+--- Validates the coverage data structure. Inherits base validation.
+---@param self CSVFormatter The formatter instance.
+---@param coverage_data table The coverage data to validate.
+---@return boolean success `true` if validation passes.
+---@return table? error Error object if validation fails.
 function CSVFormatter:validate(coverage_data)
   -- Call base class validation first
   local valid, err = Formatter.validate(self, coverage_data)
@@ -47,11 +94,23 @@ function CSVFormatter:validate(coverage_data)
   return true
 end
 
--- Format coverage data as CSV
+--- Formats coverage data into a CSV string based on the specified options.
+--- Can generate file-level or line-level reports.
+---@param self CSVFormatter The formatter instance.
+---@param coverage_data table The coverage data (expected structure depends on level, uses normalized data).
+---@param options? { include_header?: boolean, separator?: string, level?: "file"|"line", columns?: table[], include_summary?: boolean } Formatting options:
+---  - `include_header` (boolean, default true): Include header row.
+---  - `separator` (string, default ","): Field separator.
+---  - `level` ("file"|"line", default "file"): Level of detail.
+---  - `columns` (table[]): Array of column definitions (see `DEFAULT_*_COLUMNS`). Defaults based on `level`.
+---  - `include_summary` (boolean, file level only): Add a summary row at the end.
+---@return string|nil csv_content The generated CSV content as a single string, or `nil` on validation error.
+---@return table? error Error object if validation failed.
+---@throws table If `coverage_data` validation fails critically.
 function CSVFormatter:format(coverage_data, options)
   -- Parameter validation
   if not coverage_data then
-    return nil, error_handler.validation_error("Coverage data is required", { formatter = self.name })
+    return nil, get_error_handler().validation_error("Coverage data is required", { formatter = self.name })
   end
 
   -- Apply options with defaults
@@ -77,7 +136,11 @@ function CSVFormatter:format(coverage_data, options)
   return csv_content
 end
 
--- Build file-level CSV content
+--- Builds the CSV content string for a file-level report.
+---@param self CSVFormatter The formatter instance.
+---@param data table The normalized coverage data (requires `files` table, optionally `summary`).
+---@param options table Formatting options including `include_header`, `separator`, `columns`, `include_summary`.
+---@return string csv_content The generated CSV content.
 function CSVFormatter:build_file_level_csv(data, options)
   local lines = {}
   local separator = options.separator or ","
@@ -157,7 +220,11 @@ function CSVFormatter:build_file_level_csv(data, options)
   return table.concat(lines, "\n")
 end
 
--- Build line-level CSV content
+--- Builds the CSV content string for a line-level report.
+---@param self CSVFormatter The formatter instance.
+---@param data table The normalized coverage data (requires `files` table with `lines` and optionally `source`).
+---@param options table Formatting options including `include_header`, `separator`, `columns`.
+---@return string csv_content The generated CSV content.
 function CSVFormatter:build_line_level_csv(data, options)
   local lines = {}
   local separator = options.separator or ","
@@ -251,7 +318,11 @@ function CSVFormatter:build_line_level_csv(data, options)
   return table.concat(lines, "\n")
 end
 
--- Escape a value for CSV output
+--- Escapes a value to be safely included as a field in a CSV row.
+--- Converts non-strings to strings. Wraps fields containing commas, quotes, or newlines in double quotes, and doubles any internal double quotes.
+---@param self CSVFormatter The formatter instance.
+---@param value any The value to escape.
+---@return string escaped_value The escaped CSV field string.
 function CSVFormatter:escape_csv_field(value)
   if value == nil then
     return ""
@@ -275,7 +346,11 @@ function CSVFormatter:escape_csv_field(value)
   end
 end
 
--- Get a field value from a nested table structure
+--- Safely retrieves a potentially nested value from a table using a dot-separated path string.
+---@param self CSVFormatter The formatter instance.
+---@param data table The table to retrieve the value from.
+---@param field_path string The dot-separated path (e.g., "summary.total_lines").
+---@return any value The value found at the path, or `nil` if the path is invalid or the value doesn't exist.
 function CSVFormatter:get_nested_field(data, field_path)
   if not data or not field_path then
     return nil
@@ -302,17 +377,27 @@ function CSVFormatter:get_nested_field(data, field_path)
   return current
 end
 
--- Write the report to the filesystem
+--- Writes the generated CSV content to a file.
+--- Inherits the write logic (including directory creation) from the base `Formatter`.
+---@param self CSVFormatter The formatter instance.
+---@param csv_content string The CSV content to write.
+---@param output_path string The path to the output file.
+---@param options? table Optional options passed to the base `write` method (currently unused by base).
+---@return boolean success `true` if writing succeeded.
+---@return table? error Error object if writing failed.
+---@throws table If writing fails critically.
 function CSVFormatter:write(csv_content, output_path, options)
   return Formatter.write(self, csv_content, output_path, options)
 end
 
 --- Register the CSV formatter with the formatters registry
--- @param formatters table The formatters registry
--- @return boolean success Whether registration was successful
+---@param formatters table The main formatters registry table (typically from `lib.reporting.formatters.init`).
+---@return boolean success `true` if registration succeeded.
+---@return table? error Error object if validation failed.
+---@throws table If validation fails critically.
 function CSVFormatter.register(formatters)
   if not formatters or type(formatters) ~= "table" then
-    local err = error_handler.validation_error("Invalid formatters registry", {
+    local err = get_error_handler().validation_error("Invalid formatters registry", {
       operation = "register",
       formatter = "csv",
       provided_type = type(formatters),

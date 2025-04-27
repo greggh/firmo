@@ -1,7 +1,19 @@
--- Test for processing large files with the debug hook-based coverage system
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Coverage Performance Tests for Large Files
+---
+--- This file tests the performance and memory efficiency of the debug hook-based
+--- coverage system (`lib.coverage`) when processing a large Lua file (`firmo.lua`).
+--- It measures initialization time, file loading/execution time, stats saving time,
+--- stats loading time, and memory usage throughout the process.
+--- Also includes a test for performance over multiple executions of a smaller function.
+--- Uses `before`/`after` hooks for setup, teardown, configuration, and cleanup.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
+local logging = require("lib.tools.logging")
 
 -- Import modules for testing
 local coverage = require("lib.coverage") -- Use explicit path to coverage module
@@ -9,11 +21,11 @@ local filesystem = require("lib.tools.filesystem")
 local central_config = require("lib.core.central_config")
 local temp_file = require("lib.tools.filesystem.temp_file")
 local test_helper = require("lib.tools.test_helper")
-local logging = require("lib.tools.logging")
 local logger = logging.get_logger("performance_test")
 
----@return number Memory usage in kilobytes
--- Get the current Lua memory usage in KB
+--- Gets the current Lua memory usage in KB.
+---@return number Memory usage in kilobytes.
+---@private
 local function get_memory_usage()
   return collectgarbage("count")
 end

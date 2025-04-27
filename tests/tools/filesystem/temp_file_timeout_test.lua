@@ -1,6 +1,12 @@
--- Timeout investigation tests for temp_file module
--- This file focuses on testing with larger file counts and complex structures
--- to identify potential timeout issues
+--- Temporary File Module Timeout Investigation Tests
+---
+--- This file focuses on testing the `temp_file` module with larger file counts,
+--- deep nesting, and large file sizes to identify potential timeout issues or
+--- significant performance bottlenecks during creation and cleanup.
+--- Sets a high timeout value for tests. Measures and reports execution times.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
@@ -10,7 +16,6 @@ local temp_file = require("lib.tools.filesystem.temp_file")
 local temp_file_integration = require("lib.tools.filesystem.temp_file_integration")
 local fs = require("lib.tools.filesystem")
 local test_helper = require("lib.tools.test_helper")
-local logger = require("lib.tools.logging")
 
 -- Set high timeout for these tests
 local HIGH_TIMEOUT = 30 -- seconds
@@ -18,7 +23,14 @@ local HIGH_TIMEOUT = 30 -- seconds
 -- Compatibility function for table unpacking (works with both Lua 5.1 and 5.2+)
 local unpack_table = table.unpack or unpack
 
--- Helper function for measuring execution time
+--- Measures the execution time of a given function and prints the result.
+--- Uses `os.clock()` for timing.
+---@param operation_name string A descriptive name for the operation being measured.
+---@param func function The function to execute and time.
+---@param ... any Arguments to pass to the `func`.
+---@return number elapsed The elapsed time in seconds.
+---@return ... any The return values from the executed `func`.
+---@private
 local function measure_time(operation_name, func, ...)
   local start_time = os.clock()
   local results = { func(...) }
@@ -28,11 +40,15 @@ local function measure_time(operation_name, func, ...)
   -- Write to console immediately for visibility
   io.write(string.format("\n=== PERFORMANCE: %s took %.6f seconds ===\n", operation_name, elapsed))
   io.flush()
-
+  -- Use compatibility unpack
+  local unpack_table = table.unpack or unpack
   return elapsed, unpack_table(results)
 end
 
--- Helper to generate random content of specified size (in KB)
+--- Generates pseudo-random text content of a specified size.
+---@param size_kb number The approximate target size in kilobytes.
+---@return string content The generated content string.
+---@private
 local function generate_content(size_kb)
   local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
   local content = ""
@@ -119,26 +135,29 @@ describe("temp_file_timeout_investigation", function()
       expect(err).to_not.exist()
 
       -- Create deeply nested structure
-      local elapsed_time, deepest_path = measure_time("Creating deeply nested structure with depth " .. nesting_depth, function()
-        local current_path = base_dir
+      local elapsed_time, deepest_path = measure_time(
+        "Creating deeply nested structure with depth " .. nesting_depth,
+        function()
+          local current_path = base_dir
 
-        for i = 1, nesting_depth do
-          current_path = current_path .. "/level" .. i
-          local success, err = fs.create_directory(current_path)
-          expect(success).to.be_truthy("Failed to create directory: " .. tostring(err))
+          for i = 1, nesting_depth do
+            current_path = current_path .. "/level" .. i
+            local success, err = fs.create_directory(current_path)
+            expect(success).to.be_truthy("Failed to create directory: " .. tostring(err))
 
-          -- Add a file at each level
-          local file_path = current_path .. "/file.txt"
-          local success, err = fs.write_file(file_path, "Content at level " .. i)
-          expect(success).to.be_truthy("Failed to write file: " .. tostring(err))
-          temp_file.register_file(file_path)
+            -- Add a file at each level
+            local file_path = current_path .. "/file.txt"
+            local success, err = fs.write_file(file_path, "Content at level " .. i)
+            expect(success).to.be_truthy("Failed to write file: " .. tostring(err))
+            temp_file.register_file(file_path)
 
-          io.write("Created level " .. i .. " of " .. nesting_depth .. "\n")
-          io.flush()
+            io.write("Created level " .. i .. " of " .. nesting_depth .. "\n")
+            io.flush()
+          end
+
+          return current_path
         end
-
-        return current_path
-      end)
+      )
 
       -- Verify deepest directory exists
       expect(fs.directory_exists(deepest_path)).to.be_truthy()

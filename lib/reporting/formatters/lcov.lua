@@ -1,11 +1,67 @@
 --- LCOV Formatter for Coverage Reports
--- Generates LCOV format coverage reports for code coverage tools
--- @module reporting.formatters.lcov
--- @author Firmo Team
+---
+--- Generates coverage reports in the LCOV tracefile format, commonly used by
+--- tools like GenHTML. Inherits from the base Formatter.
+---
+--- @module lib.reporting.formatters.lcov
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
-local Formatter = require("lib.reporting.formatters.base")
-local error_handler = require("lib.tools.error_handler")
-local filesystem = require("lib.tools.filesystem")
+--- @class CoverageReportFileStats Simplified structure expected by this formatter.
+--- @field lines table<number|string, CoverageLineEntry> Map of line number to line data.
+--- @field functions? table<string, CoverageFunctionEntry> Optional map of function IDs to function data.
+--- @field executable_lines? number Total executable lines in the file.
+--- @field covered_lines? number Total covered lines in the file.
+--- @field total_functions? number Total functions in the file.
+--- @field covered_functions? number Total covered functions in the file.
+
+--- @class CoverageLineEntry Simplified structure expected by this formatter.
+--- @field execution_count? number Number of times the line was hit.
+--- @field executable? boolean Whether the line is executable.
+
+--- @class CoverageFunctionEntry Simplified structure expected by this formatter.
+--- @field name string Function name.
+--- @field start_line number Start line of the function.
+--- @field execution_count? number Number of times the function was called.
+
+--- @class CoverageReportData Expected structure for coverage data input (simplified).
+--- @field files table<string, CoverageReportFileStats> Map of file paths to file statistics.
+
+---@class LCOVFormatter : Formatter LCOV Formatter for coverage reports.
+--- Generates coverage reports in the LCOV tracefile format, commonly used by
+--- tools like GenHTML.
+---@field _VERSION string Module version.
+---@field validate fun(self: LCOVFormatter, coverage_data: CoverageReportData): boolean, string? Validates coverage data, ensuring the 'files' section exists. Returns `true` or `false, error_message`.
+---@field format fun(self: LCOVFormatter, coverage_data: CoverageReportData, options?: { include_functions?: boolean }): string|nil, table? Formats coverage data as an LCOV string. Returns `lcov_string, nil` or `nil, error`.
+---@field write fun(self: LCOVFormatter, lcov_content: string, output_path: string, options?: table): boolean, table? Writes the LCOV content to a file. Returns `true, nil` or `false, error`. @throws table If writing fails critically.
+---@field register fun(formatters: table): boolean, table? Registers the LCOV formatter with the main registry. Returns `true, nil` or `false, error`. @throws table If validation fails.
+
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+local Formatter = try_require("lib.reporting.formatters.base")
 
 -- Create LCOV formatter class
 local LCOVFormatter = Formatter.extend("lcov", "lcov")
@@ -13,7 +69,12 @@ local LCOVFormatter = Formatter.extend("lcov", "lcov")
 --- LCOV Formatter version
 LCOVFormatter._VERSION = "1.0.0"
 
--- Validate coverage data structure for LCOV formatter
+--- Validates the coverage data structure for LCOV format.
+--- Ensures the base validation passes and the `files` section exists.
+---@param self LCOVFormatter The formatter instance.
+---@param coverage_data CoverageReportData The coverage data to validate.
+---@return boolean success `true` if validation passes.
+---@return string? error_message Error message string if validation failed.
 function LCOVFormatter:validate(coverage_data)
   -- Call base class validation first
   local valid, err = Formatter.validate(self, coverage_data)
@@ -29,11 +90,17 @@ function LCOVFormatter:validate(coverage_data)
   return true
 end
 
--- Format coverage data as LCOV
+--- Formats coverage data into an LCOV tracefile string.
+---@param self LCOVFormatter The formatter instance.
+---@param coverage_data CoverageReportData The coverage data structure (expects `files`, `files[].functions`, `files[].lines`, etc.).
+---@param options? { include_functions?: boolean } Formatting options:
+---  - `include_functions` (boolean, default true): Include function coverage sections (FN, FNDA, FNF, FNH).
+---@return string|nil lcov_content The generated LCOV content as a single string, or `nil` on validation error.
+---@return table? error Error object if validation failed.
 function LCOVFormatter:format(coverage_data, options)
   -- Parameter validation
   if not coverage_data then
-    return nil, error_handler.validation_error("Coverage data is required", { formatter = self.name })
+    return nil, get_error_handler().validation_error("Coverage data is required", { formatter = self.name })
   end
 
   -- Apply options with defaults
@@ -133,17 +200,27 @@ function LCOVFormatter:format(coverage_data, options)
   return table.concat(lines, "\n") .. "\n"
 end
 
--- Write LCOV output to file
+--- Writes the generated LCOV content to a file.
+--- Inherits the write logic (including directory creation) from the base `Formatter`.
+---@param self LCOVFormatter The formatter instance.
+---@param lcov_content string The LCOV content string to write.
+---@param output_path string The path to the output file.
+---@param options? table Optional options passed to the base `write` method (currently unused by base).
+---@return boolean success `true` if writing succeeded.
+---@return table? error Error object if writing failed.
+---@throws table If writing fails critically.
 function LCOVFormatter:write(lcov_content, output_path, options)
   return Formatter.write(self, lcov_content, output_path, options)
 end
 
---- Register the LCOV formatter with the formatters registry
--- @param formatters table The formatters registry
--- @return boolean success Whether registration was successful
+--- Registers the LCOV formatter with the main formatters registry.
+---@param formatters table The main formatters registry object (must contain `coverage` table).
+---@return boolean success `true` if registration succeeded.
+---@return table? error Error object if validation failed.
+---@throws table If validation fails critically.
 function LCOVFormatter.register(formatters)
   if not formatters or type(formatters) ~= "table" then
-    local err = error_handler.validation_error("Invalid formatters registry", {
+    local err = get_error_handler().validation_error("Invalid formatters registry", {
       operation = "register",
       formatter = "lcov",
       provided_type = type(formatters),

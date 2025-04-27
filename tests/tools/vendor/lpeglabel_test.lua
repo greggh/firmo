@@ -1,24 +1,23 @@
---[[
-LPegLabel Module Tests
-
-This test suite verifies the functionality of the LPegLabel module,
-a labeled variant of LPeg (Lua Parsing Expression Grammar) that provides:
-
-- Pattern matching with labeled failure points for better error reporting
-- Core PEG operators and combinators for grammar construction
-- Captures for structured parsing results
-- Grammar rules and recursive pattern definitions
-- Error recovery mechanisms with labeled failures
-
-The tests ensure proper:
-- Module loading and initialization
-- Pattern creation and matching
-- Grammar definition and parsing
-- Error handling with labeled failures
-- Integration with the parser system
-]]
+--- LPegLabel Module Tests
+---
+--- This test suite verifies the basic functionality of the loaded LPegLabel module
+--- (`lib.tools.vendor.lpeglabel`), a labeled variant of LPeg used by the Firmo parser.
+---
+--- The tests ensure:
+--- - Successful module loading and initialization.
+--- - Availability of core LPeg functions (`P`, `V`, `C`, `Ct`).
+--- - Presence of a version identifier (`version`).
+--- - Basic pattern matching (`P`, `^`).
+--- - Basic captures (`C`, `Ct`).
+--- - Basic grammar definition and usage (`P({...})`).
+--- - Support for labeled failures (`T`).
+--- Uses a `before` hook to load the module safely via `pcall`.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
+
 local test_helper = require("lib.tools.test_helper")
 
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
@@ -111,7 +110,7 @@ describe("LPegLabel Module", function()
         "S",
         S = V("A") * V("B"),
         A = P("a") + T("ErrA"),
-        B = P("b") + T("ErrB")
+        B = P("b") + T("ErrB"),
       })
 
       -- Successful match
@@ -126,4 +125,3 @@ describe("LPegLabel Module", function()
     end)
   end)
 end)
-

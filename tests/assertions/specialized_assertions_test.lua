@@ -1,4 +1,13 @@
--- Tests for the specialized assertions in firmo
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Specialized Assertion Tests
+---
+--- Tests for specialized Firmo `expect` assertions, including:
+--- - Date assertions: `be_date`, `be_iso_date`, `be_before`, `be_after`, `be_same_day_as`
+--- - Advanced Regex: `match_regex` with options
+--- - Asynchronous assertions: `complete`, `complete_within`, `resolve_with`, `reject`
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local test_helper = require("lib.tools.test_helper")
@@ -143,9 +152,14 @@ describe("Specialized Assertions", function()
 
   describe("Async Assertions", function()
     -- Helper function to get access to the async module
-    local async = require("lib.async")
+    local async = error_handler.try_require("lib.async")
 
     -- Create test async functions
+    --- Helper function to create a promise that resolves after a delay.
+    ---@param delay? number Delay in milliseconds (default 10).
+    ---@param value? any Value to resolve with (default "success").
+    ---@return table promise A promise object that resolves with `value`.
+    ---@private
     local function async_success(delay, value)
       return async.create_promise(function(resolve)
         async.set_timeout(function()
@@ -154,6 +168,11 @@ describe("Specialized Assertions", function()
       end)
     end
 
+    --- Helper function to create a promise that rejects after a delay.
+    ---@param delay? number Delay in milliseconds (default 10).
+    ---@param message? any Error message to reject with (default "error occurred").
+    ---@return table promise A promise object that rejects with `message`.
+    ---@private
     local function async_failure(delay, message)
       return async.create_promise(function(_, reject)
         async.set_timeout(function()
@@ -162,6 +181,9 @@ describe("Specialized Assertions", function()
       end)
     end
 
+    --- Simple synchronous function for testing non-promise cases.
+    ---@return string The string "sync result".
+    ---@private
     local function sync_function()
       return "sync result"
     end

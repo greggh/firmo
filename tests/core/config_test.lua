@@ -1,4 +1,18 @@
--- Configuration Module Tests
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Central Configuration Module Tests
+---
+--- Verifies the functionality of the `lib.core.central_config` module, including:
+--- - Default configuration values (e.g., coverage threshold).
+--- - Loading configuration from files (`load_from_file`).
+--- - Setting and getting configuration values (`set`, `get`).
+--- - Handling of non-existent and invalid configuration files.
+--- - Schema validation during module registration (`register_module`).
+--- - Change listeners (`on_change`).
+--- - Test setup and teardown using `before` and `after` hooks for config reset and file cleanup.
+--- - Uses `test_helper.with_error_capture` for safe testing of error conditions.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
@@ -8,31 +22,8 @@ local before, after = firmo.before, firmo.after
 local test_helper = require("lib.tools.test_helper")
 
 -- Try to load the logging module
-local logging, logger
-local function try_load_logger()
-  if not logger then
-    local log_module, err = test_helper.with_error_capture(function()
-      return require("lib.tools.logging")
-    end)()
-
-    if log_module then
-      logging = log_module
-      logger = logging.get_logger("test.config")
-
-      if logger and logger.debug then
-        logger.debug("Config test initialized", {
-          module = "test.config",
-          test_type = "unit",
-          test_focus = "configuration system",
-        })
-      end
-    end
-  end
-  return logger
-end
-
--- Initialize logger
-local log = try_load_logger()
+local logging = require("lib.tools.logging")
+local logger = logging.get_logger("test.config")
 
 describe("Configuration Module", function()
   local fs = require("lib.tools.filesystem")
@@ -44,11 +35,9 @@ describe("Configuration Module", function()
 
   -- Clean up any test files before and after tests
   before(function()
-    if log then
-      log.debug("Setting up config test", {
-        temp_config_path = temp_config_path,
-      })
-    end
+    logger.debug("Setting up config test", {
+      temp_config_path = temp_config_path,
+    })
 
     -- Backup original coverage configuration
     original_coverage_config = central_config.get("coverage")
@@ -59,11 +48,9 @@ describe("Configuration Module", function()
     if fs.file_exists(temp_config_path) then
       fs.delete_file(temp_config_path)
 
-      if log then
-        log.debug("Deleted existing test config file", {
-          path = temp_config_path,
-        })
-      end
+      logger.debug("Deleted existing test config file", {
+        path = temp_config_path,
+      })
     end
   end)
 
@@ -71,11 +58,9 @@ describe("Configuration Module", function()
     if fs.file_exists(temp_config_path) then
       fs.delete_file(temp_config_path)
 
-      if log then
-        log.debug("Cleaned up test config file", {
-          path = temp_config_path,
-        })
-      end
+      logger.debug("Cleaned up test config file", {
+        path = temp_config_path,
+      })
     end
 
     -- Restore original coverage configuration
@@ -87,12 +72,9 @@ describe("Configuration Module", function()
   end)
 
   it("should have a default coverage threshold of 90%", function()
-    if log then
-      log.debug("Checking default coverage threshold", {
-        test = "default_threshold",
-      })
-    end
-
+    logger.debug("Checking default coverage threshold", {
+      test = "default_threshold",
+    })
 
     -- Reset module cache (config reset already done in hooks)
     package.loaded["lib.coverage"] = nil
@@ -100,7 +82,7 @@ describe("Configuration Module", function()
     -- Re-require and initialize coverage module
     local coverage_module = require("lib.coverage")
     expect(coverage_module.init()).to.be_truthy()
-    
+
     -- Check the default configuration
     local threshold = central_config.get("coverage.threshold")
     expect(threshold).to.equal(90)
@@ -108,17 +90,14 @@ describe("Configuration Module", function()
     -- Cleanup
     coverage_module.shutdown()
 
-    if log then
-      log.debug("Default threshold verification complete", {
-        expected_threshold = 90,
-        actual_threshold = threshold,
-      })
-    end
+    logger.debug("Default threshold verification complete", {
+      expected_threshold = 90,
+      actual_threshold = threshold,
+    })
   end)
 
   it("should apply configurations from a config file", { expect_error = true }, function()
     local test_helper = require("lib.tools.test_helper")
-
 
     -- Create a temporary config file
     local config_content = [[
@@ -313,8 +292,8 @@ describe("Configuration Module", function()
     expect(new_value).to.equal(200)
   end)
 
-  if log then
-    log.info("Configuration module tests completed", {
+  if logger then
+    logger.info("Configuration module tests completed", {
       status = "success",
       test_group = "config",
     })

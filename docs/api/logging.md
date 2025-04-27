@@ -1,11 +1,8 @@
 # Logging API
 
-
 The firmo logging system provides a comprehensive structured logging framework with support for multiple severity levels, module-specific configuration, various output formats, search capabilities, external tool integration, and test reporting integration.
 
 ## Basic Usage
-
-
 
 ```lua
 -- Import the logging module
@@ -27,42 +24,55 @@ logger.info("User logged in", {
 })
 ```
 
-
-
 ## Log Levels
 
-
 The logging system supports 6 severity levels:
-| Level   | Constant              | Description                                       |
+| Level | Constant | Description |
 |---------|------------------------|--------------------------------------------------|
-| FATAL   | logging.LEVELS.FATAL   | Severe errors that prevent application operation  |
-| ERROR   | logging.LEVELS.ERROR   | Critical errors that prevent normal operation     |
-| WARN    | logging.LEVELS.WARN    | Unexpected conditions that don't stop execution   |
-| INFO    | logging.LEVELS.INFO    | Normal operational messages                       |
-| DEBUG   | logging.LEVELS.DEBUG   | Detailed information useful for debugging         |
-| TRACE   | logging.LEVELS.TRACE   | Extremely detailed diagnostic information         |
+| FATAL | logging.LEVELS.FATAL | Severe errors that prevent application operation |
+| ERROR | logging.LEVELS.ERROR | Critical errors that prevent normal operation |
+| WARN | logging.LEVELS.WARN | Unexpected conditions that don't stop execution |
+| INFO | logging.LEVELS.INFO | Normal operational messages |
+| DEBUG | logging.LEVELS.DEBUG | Detailed information useful for debugging |
+| TRACE | logging.LEVELS.TRACE | Extremely detailed diagnostic information |
 
 ## Logging Module API
 
-
 ### Core Functions
 
-
-
-- **get_logger(module_name)**: Creates/retrieves a logger for the specified module
-- **configure(options)**: Sets up global logging configuration
-- **configure_from_config(module_name)**: Configures logging based on global configuration
-- **configure_from_options(module_name, options)**: Configures logging from command-line options
-- **set_module_level(module_name, level)**: Sets the log level for a specific module
-- **flush()**: Flushes any buffered log messages
-- **silent_mode(enabled)**: Enables/disables silent mode for testing
-
+- **get_logger(module_name)**: Creates/retrieves a logger instance for a specific module name. Applies configuration automatically.
+- **get_configured_logger(module_name)**: Alias for `get_logger`.
+- **configure(options)**: Sets up global logging configuration (levels, file output, format, buffering, etc.).
+- **configure_from_config(module_name)**: Configures logging based on central configuration system.
+- **configure_from_options(module_name, options)**: Configures logging based on debug/verbose flags in an options table.
+- **set_level(level)**: Sets the global default log level.
+- **set_module_level(module_name, level)**: Sets the log level specifically for one module.
+- **would_log(level, module_name?)**: Checks if a log at the specified level would be output.
+- **with_level(module_name, level, func)**: Temporarily changes a module's log level while running a function.
+- **filter_module(module_pattern)**: Adds a pattern to the module whitelist filter (shows only matching modules).
+- **clear_module_filters()**: Clears the module whitelist filter.
+- **blacklist_module(module_pattern)**: Adds a pattern to the module blacklist filter (hides matching modules).
+- **remove_from_blacklist(module_pattern)**: Removes a pattern from the module blacklist.
+- **clear_blacklist()**: Clears the module blacklist.
+- **flush()**: Flushes any buffered log messages to their destination(s).
+- **get_config()**: Returns a copy of the current logging configuration.
+- **search()**: Returns the log search module interface.
+- **export()**: Returns the log export module interface.
+- **formatter_integration()**: Returns the formatter integration module interface.
+- **create_buffered_logger(module_name, options?)**: Creates a logger instance specifically configured for buffering.
+- **fatal(message, params?)**: Logs a message globally at FATAL level.
+- **error(message, params?)**: Logs a message globally at ERROR level.
+- **warn(message, params?)**: Logs a message globally at WARN level.
+- **info(message, params?)**: Logs a message globally at INFO level.
+- **debug(message, params?)**: Logs a message globally at DEBUG level.
+- **trace(message, params?)**: Logs a message globally at TRACE level.
+- **verbose(message, params?)**: Logs a message globally at TRACE level (alias).
+- **log_debug(message, module_name?)**: Legacy function to log at DEBUG level.
+- **log_verbose(message, module_name?)**: Legacy function to log at TRACE level.
 
 ### Logger Objects
 
-
 Each logger created with `get_logger()` provides these methods:
-
 
 - **fatal(message, params)**: Logs a fatal error message
 - **error(message, params)**: Logs an error message
@@ -70,21 +80,24 @@ Each logger created with `get_logger()` provides these methods:
 - **info(message, params)**: Logs an information message
 - **debug(message, params)**: Logs a debug message
 - **trace(message, params)**: Logs a trace message
-- **would_log(level)**: Checks if a message at the specified level would be logged
-- **is_fatal_enabled()**: Checks if FATAL level is enabled
-- **is_error_enabled()**: Checks if ERROR level is enabled
-- **is_warn_enabled()**: Checks if WARN level is enabled
-- **is_info_enabled()**: Checks if INFO level is enabled
-- **is_debug_enabled()**: Checks if DEBUG level is enabled
-- **is_trace_enabled()**: Checks if TRACE level is enabled
-
+- **verbose(message, params)**: Logs a trace message (alias for `trace`).
+- **log(level, message, params)**: Logs a message at a specific numeric level.
+- **would_log(level)**: Checks if a message at the specified level would be logged.
+- **is_fatal_enabled()**: Checks if FATAL level is enabled.
+- **is_error_enabled()**: Checks if ERROR level is enabled.
+- **is_warn_enabled()**: Checks if WARN level is enabled.
+- **is_info_enabled()**: Checks if INFO level is enabled.
+- **is_debug_enabled()**: Checks if DEBUG level is enabled.
+- **is_trace_enabled()**: Checks if TRACE level is enabled.
+- **is_verbose_enabled()**: Checks if TRACE level is enabled (alias for `is_trace_enabled`).
+- **get_level()**: Gets the effective numeric log level for this logger instance.
+- **get_name()**: Gets the name (module name) of this logger instance.
+- **set_level(level)**: Sets the log level specifically for this logger instance.
+- **with_context(context)**: Creates a new logger instance derived from this one, adding context to all its logs.
 
 ## Configuration Options
 
-
 ### Basic Configuration
-
-
 
 ```lua
 logging.configure({
@@ -96,10 +109,9 @@ logging.configure({
   max_file_size = 1024 * 1024,     -- 1MB max file size before rotation
   max_log_files = 5,               -- Keep 5 rotated log files
   format = "text",                 -- Log format: "text" or "json"
-  json_file = "firmo.json",        -- Separate JSON structured log file
-  buffering = false,               -- Buffer logs for higher performance
-  buffer_size = 100,               -- Buffer size when buffering is enabled
-  buffer_flush_interval = 5000,    -- Auto-flush buffer every 5 seconds
+  json_file = nil,                 -- Separate JSON structured log file (nil = disabled)
+  buffer_size = 0,                 -- Buffer size (0 = no buffering)
+  buffer_flush_interval = 5,       -- Auto-flush buffer every 5 seconds (if buffering enabled)
   silent_mode = false,             -- Disable all output (for testing)
   standard_metadata = {            -- Metadata added to all logs
     version = "1.0.0",
@@ -108,11 +120,7 @@ logging.configure({
 })
 ```
 
-
-
 ### Module-Specific Levels
-
-
 
 ```lua
 -- Set levels for specific modules
@@ -128,11 +136,7 @@ logging.configure({
 })
 ```
 
-
-
 ### Module Filtering
-
-
 
 ```lua
 -- Only show logs from specific modules
@@ -144,11 +148,7 @@ logging.filter_module("test*")  -- Any module starting with "test"
 logging.clear_module_filters()
 ```
 
-
-
 ### Module Blacklisting
-
-
 
 ```lua
 -- Hide logs from specific modules
@@ -159,13 +159,9 @@ logging.blacklist_module("debug*")  -- Hide any module starting with "debug"
 logging.clear_blacklist()
 ```
 
-
-
 ## Structured Logging
 
-
 For machine processing and log analysis tools, the logging system supports JSON structured output:
-
 
 ```lua
 logging.configure({
@@ -175,13 +171,9 @@ logging.configure({
 })
 ```
 
-
-
 ### Parameter Logging
 
-
 You can attach structured parameters to any log message:
-
 
 ```lua
 logger.info("Processing completed", {
@@ -192,37 +184,28 @@ logger.info("Processing completed", {
 })
 ```
 
-
-
 ## Log Rotation
 
-
 The logging system automatically rotates log files when they reach the configured size:
-
 
 ```lua
 logging.configure({
   output_file = "app.log",       -- Log file name
   log_dir = "logs",              -- Log directory
-  max_file_size = 10 * 1024,     -- 10KB max file size
-  max_log_files = 3              -- Keep 3 rotated log files
+  max_file_size = 50 * 1024,     -- 50KB max file size (default)
+  max_log_files = 5              -- Keep 5 rotated log files (default)
 })
 ```
 
-
 When rotation occurs:
-
 
 - The current log file (app.log) is moved to app.log.1
 - Previous rotated files move up: app.log.1 → app.log.2, etc.
 - The oldest rotated file is deleted if max_log_files is exceeded
 
-
 ## Integration with Central Configuration
 
-
 The logging system integrates with firmo's central configuration system:
-
 
 ```lua
 -- In your .firmo-config.lua file:
@@ -247,26 +230,18 @@ return {
 }
 ```
 
-
 To configure a module using the central config:
-
 
 ```lua
 local logging = require("lib.tools.logging")
 local logger = logging.get_logger("my_module")
-logging.configure_from_config("my_module")
 ```
-
-
 
 ## Error Handling Integration
 
-
 ### Expected Error Suppression
 
-
 In tests that use the `{ expect_error = true }` flag, expected errors are automatically downgraded to DEBUG level with an [EXPECTED] prefix:
-
 
 ```lua
 it("should throw an error for invalid input", { expect_error = true }, function()
@@ -279,13 +254,9 @@ it("should throw an error for invalid input", { expect_error = true }, function(
 })
 ```
 
-
-
 ### Error History Access
 
-
 All expected errors can be accessed programmatically:
-
 
 ```lua
 -- After running tests with expected errors
@@ -293,23 +264,18 @@ local error_handler = require("lib.tools.error_handler")
 local expected_errors = error_handler.get_expected_test_errors()
 -- Print all expected errors
 for i, err in ipairs(expected_errors) do
-  print(string.format("[%s] From module %s: %s", 
+  print(string.format("[%s] From module %s: %s",
     os.date("%H:%M:%S", err.timestamp),
-    err.module or "unknown", 
+    err.module or "unknown",
     err.message))
 end
 -- Clear expected errors when done
 error_handler.clear_expected_test_errors()
 ```
 
-
-
 ## Performance Considerations
 
-
 ### Check Level Before Expensive Operations
-
-
 
 ```lua
 local logger = logging.get_logger("database")
@@ -320,11 +286,7 @@ if logger.is_debug_enabled() then
 end
 ```
 
-
-
 ### Using Buffering for High-Volume Logging
-
-
 
 ```lua
 -- Enable buffering globally
@@ -339,15 +301,12 @@ local logger = logging.get_logger("high_volume")
 for i = 1, 1000 do
   logger.debug("Processing item " .. i)  -- Not written immediately
 end
+end
 -- Manually flush all buffers
-logging.flush_buffers()
+logging.flush()
 ```
 
-
-
 ## Silent Mode for Testing
-
-
 
 ```lua
 -- Enable silent mode (no output)
@@ -359,13 +318,9 @@ logger.info("This won't be output anywhere")
 logging.configure({ silent_mode = false })
 ```
 
-
-
 ## Test Formatter Integration
 
-
 The logging system integrates with the test reporting system:
-
 
 ```lua
 local formatter_integration = require("lib.tools.logging.formatter_integration")
@@ -385,13 +340,9 @@ step_logger.info("Connecting to database")
 -- Result: "[INFO] [test.Database_Connection_Test] Connecting to database (test_name=Database Connection Test, component=database, step=Connection establishment)"
 ```
 
-
-
 ## External Tool Integration
 
-
 The logging system can export logs to popular log analysis platforms:
-
 
 ```lua
 local log_export = require("lib.tools.logging.export")

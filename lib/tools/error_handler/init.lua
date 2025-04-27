@@ -1,49 +1,48 @@
----@class ErrorHandler
----@field CATEGORY table Error categories
----@field LOG_LEVEL table Log levels for errors
----@field create fun(message: string, category: string, severity?: string, context?: table, cause?: any): table Create a standardized error object
----@field validation_error fun(message: string, context?: table): table Create a validation error
----@field io_error fun(message: string, context?: table): table Create an I/O error
----@field runtime_error fun(message: string, context?: table, original_error?: any): table Create a runtime error
----@field parser_error fun(message: string, context?: table): table Create a parser error
----@field test_expected_error fun(message: string, context?: table): table Create a test expected error
----@field format_error fun(err: any, include_traceback?: boolean): string Format an error object for display
----@field set_current_test_metadata fun(metadata: table|nil): table|nil Set metadata for the current test
----@field get_current_test_metadata fun(): table|nil Get metadata for the current test
----@field try fun(func: function, ...): boolean, any, any? Execute a function in protected mode
----@field log_error fun(err: any) Log an error using the logging system
----@field assert fun(condition: any, message: string, category?: string, context?: table): boolean Assert a condition
----@field safe_io_operation fun(func: function, file_path: string, context?: table, transform_result?: function): any, any? Safely execute an I/O operation
----@field rethrow fun(err: table|string, context?: table): nil Rethrow an error with proper error level
---[[
-    Structured Error Handling Module for the Firmo Framework
+--- Structured Error Handling Module for the Firmo Framework
+---
+--- Provides a comprehensive error handling system with standardized error objects,
+--- contextual information, integrated logging, and test-aware behavior.
+---
+--- Features:
+--- - Standardized error objects (`{ message, category, severity, timestamp, traceback?, context?, cause? }`).
+--- - Error categories (`M.CATEGORY`) and severities (`M.SEVERITY`).
+--- - Specialized error constructors (`validation_error`, `io_error`, etc.).
+--- - Protected function execution (`M.try`).
+--- - Safe I/O operation wrapper (`M.safe_io_operation`).
+--- - Integrated logging (`M.log_error`) with configurable suppression in test environments.
+--- - Stack trace capture and formatting (`M.format_error`).
+--- - Assertion helper (`M.assert`).
+--- - Error rethrowing (`M.rethrow`).
+--- - Test context integration (`set/get_current_test_metadata`, `is_expected_test_error`, etc.).
+---
+--- @module lib.tools.error_handler
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
-    This module provides a comprehensive error handling system with standardized
-    error objects, contextual information, and integrated logging. It's designed
-    to create consistent, informative error handling throughout the codebase.
+---@class ErrorHandler The public API of the error handler module.
+---@field CATEGORY table<string, string> Enum of error category constants (e.g., `VALIDATION`, `IO`).
+---@field SEVERITY table<string, string> Enum of error severity constants (e.g., `FATAL`, `ERROR`, `WARNING`).
+---@field _VERSION string Module version string.
+---@field try_require fun(module_name: string): table Safely requires a Lua module.
+---@field configure fun(options?: table): ErrorHandler Configures the error handler.
+---@field configure_from_config fun(): ErrorHandler Configures from central config.
+---@field create fun(message: string, category?: string, severity?: string, context?: table, cause?: any): table Creates a standardized error object.
+---@field throw fun(message: string, category?: string, severity?: string, context?: table, cause?: any): nil Creates, logs, and throws an error. @throws table Always throws an error.
+---@field validation_error fun(message: string, context?: table): table Creates a validation error object.
+---@field io_error fun(message: string, context?: table, cause?: any): table Creates an I/O error object.
+---@field runtime_error fun(message: string, context?: table, cause?: any): table Creates a runtime error object.
+---@field parser_error fun(message: string, context?: table, cause?: any): table Creates a parser error object.
+---@field test_expected_error fun(message: string, context?: table, cause?: any): table Creates an error object specifically for expected test failures.
+---@field not_found_error fun(message: string, context?: table, cause?: any): table Creates a validation/not found error object.
+---@field timeout_error fun(message: string, context?: table): table Creates a timeout error object.
+---@field config_error fun(message: string, context?: table): table local M = {}
 
-    Features:
-    - Structured error objects with categories, severity, and context
-    - Specialized error creators for common error types (validation, IO, runtime)
-    - Protected function execution with try/catch pattern
-    - Safe IO operation wrappers with detailed error reporting
-    - Error logging integration with configurable verbosity
-    - Test-aware error handling with suppression capabilities
-    - Stack trace capture and formatting
-    - Error assertion mechanism with clean syntax
-    - Error rethrowing with context preservation
-
-    The module serves as the foundation for error handling across the Firmo
-    framework, ensuring that errors are consistently created, propagated,
-    and reported with appropriate context information.
-
-    @module error_handler
-    @author Firmo Team
-    @license MIT
-    @copyright 2023-2025
-    @version 1.0.0
-]]
 local M = {}
+
+--- Module version
+M._VERSION = "1.0.0"
 
 -- Simple forward declarations for functions used before they're defined
 local create_error -- Forward declaration for create_error function
@@ -52,11 +51,10 @@ local create_error -- Forward declaration for create_error function
 local unpack_table = table.unpack or unpack
 
 -- Lazy-load dependencies to avoid circular dependencies
-local _logging, _fs
+local _logging, fs, logger
 local function get_logging()
   if not _logging then
-    local success, logging = pcall(require, "lib.tools.logging")
-    _logging = success and logging or nil
+    _logging = M.try_require("lib.tools.logging")
   end
   return _logging
 end
@@ -64,11 +62,10 @@ end
 --- Get the filesystem module lazily to avoid circular dependencies
 ---@return table|nil The filesystem module if available
 local function get_fs()
-  if not _fs then
-    local success, fs = pcall(require, "lib.tools.filesystem")
-    _fs = success and fs or nil
+  if not fs then
+    fs = M.try_require("lib.tools.filesystem")
   end
-  return _fs
+  return fs
 end
 
 -- Get a logger instance for this module
@@ -96,8 +93,6 @@ local function get_logger()
     end,
   }
 end
-
-local logger = get_logger()
 
 -- Module configuration
 local config = {
@@ -141,7 +136,10 @@ M.CATEGORY = {
   TEST_EXPECTED = "TEST_EXPECTED", -- Errors that are expected during tests
 }
 
--- Internal helper to get a traceback
+--- Internal helper to get a traceback string.
+---@param level? number Stack level offset (default 3).
+---@return string|nil Traceback string or nil if disabled.
+---@private
 local function get_traceback(level)
   if not config.capture_backtraces then
     return nil
@@ -172,7 +170,10 @@ create_error = function(message, category, severity, context, cause)
   return err
 end
 
--- Format an error object as a string
+--- Internal helper to format error object for logging/display (before export).
+---@param err any Error object or value.
+---@return string Formatted string.
+---@private
 local function format_error(err)
   if type(err) == "string" then
     return err
@@ -214,9 +215,10 @@ end
 M.format_error = format_error
 
 --- Rethrow an error with proper error level
----@param err table|string The error object or string to rethrow
----@param context? table Additional context to add to the error
----@return nil Never returns, always throws an error
+---@param err table|string The error object or string to rethrow.
+---@param context? table Additional context to merge into the error object.
+---@return nil Never returns.
+---@throws table Always throws an error based on `err`, potentially adding context and logging it.
 function M.rethrow(err, context)
   -- Create a copy of the error to avoid modifying the original
   local error_to_throw
@@ -278,7 +280,13 @@ end
 --- Internal helper to log an error
 ---@param err table Error object to log
 ---@return nil
+---@private
 local function log_error(err)
+  -- Lazy initialize logger if needed
+  if not logger and config.log_all_errors ~= false then
+    logger = get_logger()
+  end
+
   -- Skip all error logging if config says not to log errors
   if not config.log_all_errors then
     return
@@ -289,13 +297,6 @@ local function log_error(err)
     -- Store the error in a global table for potential debugging if needed
     _G._firmo_test_errors = _G._firmo_test_errors or {}
     table.insert(_G._firmo_test_errors, err)
-    return
-  end
-
-  local logging = get_logging()
-  if not logging then
-    -- Fallback to print if logging isn't available
-    print(string.format("[%s] %s: %s", err.severity, err.category, err.message))
     return
   end
 
@@ -397,9 +398,10 @@ local function log_error(err)
 end
 
 --- Internal helper to handle an error
----@param err table Error object to handle
+---@param err table Error object.
 ---@return nil
----@return table err The error object
+---@return table err The error object passed in.
+---@private
 local function handle_error(err)
   -- Log the error
   log_error(err)
@@ -408,9 +410,9 @@ local function handle_error(err)
   return nil, err
 end
 
---- Initialize the error handler with configuration
----@param options? table Options to configure the error handler
----@return table The error handler module (for chaining)
+--- Configures the error handler settings.
+---@param options? table Options table matching the structure of the internal `config` table.
+---@return ErrorHandler self The module instance (`M`) for chaining.
 function M.configure(options)
   if options then
     for k, v in pairs(options) do
@@ -467,24 +469,26 @@ function M.configure(options)
   return M
 end
 
---- Create an error object
----@param message string The error message
----@param category? string The error category (defaults to UNKNOWN)
----@param severity? string The error severity (defaults to ERROR)
----@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return table The error object
+--- Creates a standardized error object.
+---@param message string The error message.
+---@param category? string The error category (defaults to `M.CATEGORY.UNKNOWN`).
+---@param severity? string The error severity (defaults to `M.SEVERITY.ERROR`).
+---@param context? table Additional context for the error.
+---@param cause? any The original cause of the error (another error object or value).
+---@return table The structured error object.
 function M.create(message, category, severity, context, cause)
   return create_error(message, category, severity, context, cause)
 end
 
---- Throw an error with proper logging
----@param message string The error message
----@param category? string The error category (defaults to UNKNOWN)
----@param severity? string The error severity (defaults to ERROR)
----@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return nil Never returns, always throws an error
+--- Creates, logs, and then throws a standardized error.
+--- Adjusts category/severity based on context (e.g., `TEST_EXPECTED` in relevant test modes).
+---@param message string The error message.
+---@param category? string The error category (defaults to `M.CATEGORY.UNKNOWN`).
+---@param severity? string The error severity (defaults to `M.SEVERITY.ERROR`).
+---@param context? table Additional context for the error.
+---@param cause? any The original cause of the error.
+---@return nil Never returns.
+---@throws table Always throws the created error object (or its message).
 function M.throw(message, category, severity, context, cause)
   -- Determine the appropriate error category based on context
   local error_category = category
@@ -537,13 +541,14 @@ function M.throw(message, category, severity, context, cause)
   error(err.message, 2) -- Level 2 to point to the caller
 end
 
---- Assert a condition or throw an error
----@param condition boolean The condition to check
----@param message string The error message if condition is false
----@param category? string The error category (defaults to UNKNOWN)
----@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return boolean The condition value (always true if no error)
+--- Checks a condition and throws a standardized error if the condition is falsey.
+---@param condition any The condition to check.
+---@param message string The error message if the condition fails.
+---@param category? string The error category (defaults to `M.CATEGORY.VALIDATION`).
+---@param context? table Additional context for the error.
+---@param cause? any The cause of the error.
+---@return boolean `true` if the condition is truthy (the function does not throw).
+---@throws table Throws a standardized error if the condition is falsey.
 function M.assert(condition, message, category, context, cause)
   if not condition then
     local severity = M.SEVERITY.ERROR
@@ -556,7 +561,7 @@ function M.assert(condition, message, category, context, cause)
       error(err.message, 2) -- Level 2 to point to the caller
     end
   end
-  return condition
+  return condition -- Will only return true if no error was thrown
 end
 
 --- Safely call a function and catch any errors (try/catch pattern)
@@ -567,8 +572,8 @@ end
 --- @param func function The function to execute safely
 --- @param ... any Arguments to pass to the function
 --- @return boolean success Whether the function execution succeeded
---- @return any result The function's return value(s) if successful, or an error object if failed
---- @return any additional_results Additional return values from the function (if successful)
+--- @return any result The function's first return value if successful, or the error object if failed.
+--- @return ... any? Additional return values from the function if successful.
 ---
 --- @usage
 --- -- Basic usage:
@@ -660,8 +665,8 @@ end
 --- can be suppressed in test environments that expect them.
 ---
 --- @param message string The human-readable error message
---- @param context? table Additional context information (key-value pairs)
---- @return table The structured validation error object
+--- @param context? table Additional context information (key-value pairs).
+--- @return table The structured validation error object.
 ---
 --- @usage
 --- -- Basic validation error
@@ -678,8 +683,8 @@ end
 --- Create an I/O error object
 ---@param message string The error message
 ---@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return table The I/O error object
+---@param cause? any The underlying error (e.g., from `io.open`).
+---@return table The I/O error object.
 function M.io_error(message, context, cause)
   return create_error(message, M.CATEGORY.IO, M.SEVERITY.ERROR, context, cause)
 end
@@ -687,8 +692,8 @@ end
 --- Create a parse error object
 ---@param message string The error message
 ---@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return table The parse error object
+---@param cause? any The underlying error (e.g., from a parser).
+---@return table The parse error object.
 function M.parse_error(message, context, cause)
   return create_error(message, M.CATEGORY.PARSE, M.SEVERITY.ERROR, context, cause)
 end
@@ -712,8 +717,8 @@ end
 --- Create a runtime error object
 ---@param message string The error message
 ---@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return table The runtime error object
+---@param cause? any The underlying error.
+---@return table The runtime error object.
 function M.runtime_error(message, context, cause)
   return create_error(message, M.CATEGORY.RUNTIME, M.SEVERITY.ERROR, context, cause)
 end
@@ -722,8 +727,8 @@ end
 ---@param message string The error message
 ---@param category? string The error category (defaults to UNKNOWN)
 ---@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return table The fatal error object
+---@param cause? any The underlying error.
+---@return table The fatal error object.
 function M.fatal_error(message, category, context, cause)
   return create_error(message, category or M.CATEGORY.UNKNOWN, M.SEVERITY.FATAL, context, cause)
 end
@@ -731,10 +736,35 @@ end
 --- Create a test expected error object (for use in test stubs, mocks, etc.)
 ---@param message string The error message
 ---@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return table The test expected error object
+---@param cause? any The underlying expected error.
+---@return table The test expected error object.
 function M.test_expected_error(message, context, cause)
   return create_error(message, M.CATEGORY.TEST_EXPECTED, M.SEVERITY.ERROR, context, cause)
+end
+
+--- Safely attempts to require a Lua module using `try`.
+--- This function wraps the standard `require` function in a protected call,
+--- capturing any errors that occur during module loading.
+---
+--- @param module_name string The name of the module to require (e.g., "lib.tools.filesystem").
+--- @return table module The loaded module table if successful.
+function M.try_require(module_name)
+  local success, result = M.try(require, module_name)
+
+  if success then
+    -- Return module on success
+    return result
+  else
+    M.throw(
+      "Failed to load essential dependency: " .. module_name,
+      M.CATEGORY.RUNTIME,
+      M.SEVERITY.FATAL,
+      { module_name = module_name },
+      result
+    )
+    print("FATAL: Exiting due to essential dependency load failure: " .. module_name)
+    os.exit(1)
+  end
 end
 
 --- Safely execute an I/O operation with proper error handling
@@ -747,12 +777,13 @@ end
 --- @param context? table Additional context information for error reporting
 --- @param transform_result? fun(result:any):any Optional function to transform the success result
 --- @return any|nil result The result of the operation or nil on error
---- @return table|nil error_obj The structured error object on failure
+--- @return any|nil result The result of the operation (potentially transformed), or `nil` on error.
+--- @return table|nil error_obj The structured error object on failure, `nil` on success.
 ---
 --- @usage
 --- -- Read a file safely
 --- local content, err = error_handler.safe_io_operation(
----   function() return fs.read_file("config.json") end,
+---   function() return get_fs().read_file("config.json") end,
 ---   "config.json",
 ---   {operation = "read_config"}
 --- )
@@ -765,7 +796,7 @@ end
 ---
 --- -- With result transformation
 --- local data, err = error_handler.safe_io_operation(
----   function() return fs.read_file("config.json") end,
+---   function() return get_fs().read_file("config.json") end,
 ---   "config.json",
 ---   {operation = "parse_config"},
 ---   function(content) return json.decode(content) end
@@ -795,9 +826,10 @@ function M.safe_io_operation(operation, file_path, context, transform_result)
   return nil, error_obj
 end
 
---- Check if a value is an error object
----@param value any The value to check
----@return boolean Whether the value is an error object
+--- Checks if a value appears to be a structured error object created by this module
+--- by checking for the presence of key fields (`message`, `category`, `severity`).
+---@param value any The value to check.
+---@return boolean `true` if the value looks like a structured error object, `false` otherwise.
 function M.is_error(value)
   return type(value) == "table" and value.message ~= nil and value.category ~= nil and value.severity ~= nil
 end
@@ -813,17 +845,25 @@ local mt = {
   end,
 }
 
--- Update the create_error function to set metatable
 local original_create_error = create_error
+--- Internal helper to create a standardized error object with metatable.
+---@param message string Error message.
+---@param category? string Error category.
+---@param severity? string Error severity.
+---@param context? table Error context.
+---@param cause? any Original cause.
+---@return table The error object.
+---@private
 create_error = function(message, category, severity, context, cause)
   local err = original_create_error(message, category, severity, context, cause)
   return setmetatable(err, mt)
 end
 
---- Format an error object for display
----@param err table|string The error object or string to format
----@param include_traceback? boolean Whether to include the traceback in the output
----@return string The formatted error string
+--- Formats an error object or any value into a human-readable string.
+--- Includes severity, category, message, source location, context, cause, and optional traceback.
+---@param err any The error object or value to format.
+---@param include_traceback? boolean If `true`, include the stack traceback in the output (if available).
+---@return string The formatted error string.
 function M.format_error(err, include_traceback)
   if not M.is_error(err) then
     if type(err) == "string" then
@@ -870,8 +910,9 @@ end
 -- Export log_error function for internal use by other module functions
 M.log_error = log_error
 
---- Configure the error handler from global configuration
----@return table The error handler module (for chaining)
+--- Configures the error handler using settings from the central configuration system.
+--- Loads central config, registers schema/defaults if needed, and applies the configuration.
+---@return ErrorHandler self The module instance (`M`) for chaining.
 function M.configure_from_config()
   -- Try to load central_config directly
   local ok, central_config = pcall(require, "lib.core.central_config")
@@ -919,9 +960,11 @@ function M.configure_from_config()
   return M
 end
 
---- Set whether the error handler is in test mode
----@param enabled boolean Whether test mode is enabled
----@return boolean The current test mode state
+--- Sets the internal flag indicating whether Firmo is running in a test environment.
+--- This affects error logging and potentially assertion behavior.
+--- Should be called by the test runner.
+---@param enabled boolean `true` to enable test mode, `false` to disable.
+---@return boolean enabled The new state of the test mode flag.
 function M.set_test_mode(enabled)
   config.in_test_run = enabled and true or false
 
@@ -939,21 +982,23 @@ function M.set_test_mode(enabled)
   return config.in_test_run
 end
 
---- Check if the error handler is in test mode
----@return boolean Whether test mode is enabled
+--- Checks if the internal test mode flag is currently enabled.
+---@return boolean is_test_mode `true` if test mode is active, `false` otherwise.
 function M.is_test_mode()
   return config.in_test_run
 end
 
---- Check if we're suppressing all logging in tests
----@return boolean Whether test logs are being suppressed
+--- Checks if logging is currently being suppressed due to test mode configuration
+--- (`config.in_test_run` and `config.suppress_all_logging_in_tests` are both true).
+---@return boolean is_suppressed `true` if logging is suppressed, `false` otherwise.
 function M.is_suppressing_test_logs()
   return config.in_test_run and config.suppress_all_logging_in_tests
 end
 
---- Helper function to check if an error is an expected test error
----@param err table The error object to check
----@return boolean Whether the error is an expected test error
+--- Determines if a given error object should be considered an "expected" error within the current test context.
+--- Checks the error's category (`VALIDATION` or `TEST_EXPECTED`) and if the current test metadata includes `expect_error = true`.
+---@param err table The structured error object to check.
+---@return boolean is_expected `true` if the error is considered expected, `false` otherwise.
 function M.is_expected_test_error(err)
   if not M.is_error(err) then
     return false
@@ -966,7 +1011,7 @@ function M.is_expected_test_error(err)
   -- Tests with { expect_error = true } flag have ALL error logging completely suppressed
   -- This is different from tests that lack the flag, where only validation/test_expected errors are suppressed
   if config.current_test_metadata and config.current_test_metadata.expect_error then
-    logger.debug("Expected test error detected via test metadata", {
+    get_logger().debug("Expected test error detected via test metadata", {
       error_category = err.category,
       metadata_name = config.current_test_metadata.name,
       expect_error = true,
@@ -977,18 +1022,20 @@ function M.is_expected_test_error(err)
   return is_expected_category
 end
 
---- Set metadata for the current test
----@param metadata table|nil The test metadata or nil to clear
----@return table|nil The current test metadata
+--- Sets metadata associated with the currently executing test.
+--- Used by `log_error` and `is_expected_test_error` to adjust behavior based on test context (e.g., `expect_error` flag).
+--- Should be called by the test runner before and after each test execution.
+---@param metadata table|nil The test metadata table (e.g., `{ name = "...", expect_error = true }`) or `nil` to clear.
+---@return table|nil metadata The metadata that was just set, or `nil` if cleared.
 function M.set_current_test_metadata(metadata)
   -- Log the metadata change
   if metadata then
-    logger.debug("Setting test metadata", {
+    get_logger().debug("Setting test metadata", {
       metadata_name = metadata.name,
       expect_error = metadata.expect_error or false,
     })
   else
-    logger.debug("Clearing test metadata")
+    get_logger().debug("Clearing test metadata")
   end
 
   config.current_test_metadata = metadata
@@ -1002,8 +1049,9 @@ function M.set_current_test_metadata(metadata)
   return config.current_test_metadata
 end
 
---- Get the current test metadata
----@return table The current test metadata (with defaults if none is set)
+--- Gets the metadata associated with the currently executing test.
+--- Returns a default table `{ expect_error = false, name = "(no active test)" }` if no metadata is currently set.
+---@return table metadata The current test metadata table.
 function M.get_current_test_metadata()
   -- Return the current metadata or default with expect_error=false
   return config.current_test_metadata or {
@@ -1012,20 +1060,22 @@ function M.get_current_test_metadata()
   }
 end
 
---- Check if current test expects errors
----@return boolean Whether the current test expects errors
+--- Checks if the currently set test metadata indicates that the test expects an error (`expect_error == true`).
+---@return boolean expects_errors `true` if the current test expects an error, `false` otherwise.
 function M.current_test_expects_errors()
   return config.current_test_metadata ~= nil and config.current_test_metadata.expect_error == true or false
 end
 
---- Retrieve expected errors captured during tests
----@return table Array of expected test errors
+--- Retrieves the list of errors that were logged while `expect_error` was active for the current test context.
+--- These are errors logged via `log_error` but potentially suppressed from console output.
+---@return table[] errors An array containing the captured error objects. Returns empty table if none captured.
 function M.get_expected_test_errors()
   return _G._firmo_test_expected_errors or {}
 end
 
---- Clear the collection of expected errors
----@return boolean Always returns true
+--- Clears the internal list of captured expected errors (`_G._firmo_test_expected_errors`).
+--- Should be called by the test runner, typically after a test finishes.
+---@return boolean success Always returns `true`.
 function M.clear_expected_test_errors()
   _G._firmo_test_expected_errors = {}
   return true
@@ -1034,11 +1084,11 @@ end
 -- Automatically configure from global config if available
 M.configure_from_config()
 
---- Create a not found error object
----@param message string The error message
----@param context? table Additional context for the error
----@param cause? table|string The cause of the error
----@return table The not found error object
+--- Creates a validation error object, often used specifically for "not found" scenarios.
+---@param message string The error message (e.g., "File not found").
+---@param context? table Additional context (e.g., `{ path = "..." }`).
+---@param cause? any Optional underlying cause.
+---@return table The validation error object.
 function M.not_found_error(message, context, cause)
   return create_error(message, M.CATEGORY.VALIDATION, M.SEVERITY.ERROR, context, cause)
 end

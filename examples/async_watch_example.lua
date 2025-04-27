@@ -1,16 +1,14 @@
--- Example of using async testing with watch mode in firmo
+--- async_watch_example.lua
+--
+-- This example demonstrates running Firmo's asynchronous tests (`it_async`, `await`,
+-- `wait_until`) within the test runner's `--watch` mode. It shows that watch
+-- mode correctly handles and re-runs asynchronous tests when file changes
+-- are detected.
+--
 -- Run with: lua test.lua --watch examples/async_watch_example.lua
+--
 
--- Add paths for proper module loading
----@type string script_path Path to the directory containing this script
-local script_path = debug.getinfo(1, "S").source:sub(2):match("(.*/)")
-package.path = script_path
-  .. "../?.lua;"
-  .. script_path
-  .. "../scripts/?.lua;"
-  .. script_path
-  .. "../src/?.lua;"
-  .. package.path
+---@diagnostic disable: undefined-global
 
 -- Load firmo with async support
 ---@type Firmo
@@ -22,13 +20,11 @@ local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 ---@type fun(description: string, timeout: number?, callback: function) it_async Asynchronous test case function
 local it_async = firmo.it_async
 ---@diagnostic disable-next-line: unused-local
----@type fun(callback: function): function async Function to wrap a function for asynchronous execution
-local async = firmo.async
 ---@type fun(ms: number): nil await Function to pause execution for a specified number of milliseconds
 local await = firmo.await
 local wait_until = firmo.wait_until
 
--- Create a test suite with async tests
+--- Main test suite demonstrating async tests running in watch mode.
 describe("Async Watch Mode Example", function()
   -- Simple passing test
   it("runs standard synchronous tests", function()
@@ -40,7 +36,6 @@ describe("Async Watch Mode Example", function()
     local start_time = os.clock()
 
     -- Wait for 100ms
-    ---@diagnostic disable-next-line: redundant-parameter
     await(100)
 
     -- Calculate elapsed time
@@ -67,7 +62,6 @@ describe("Async Watch Mode Example", function()
     end
 
     -- Wait for the condition to become true (with timeout)
-    ---@diagnostic disable-next-line: redundant-parameter
     wait_until(condition, 200, 10)
 
     -- Now make assertions
@@ -77,10 +71,8 @@ describe("Async Watch Mode Example", function()
   -- Test error handling
   it_async("handles errors in async tests", function()
     -- Wait a bit before checking an assertion that will pass
-    ---@diagnostic disable-next-line: redundant-parameter
     await(50)
     expect(true).to.be.truthy()
-
     -- This test would fail if uncommented:
     -- error("Test failure")
   end)

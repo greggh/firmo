@@ -1,4 +1,15 @@
--- Special fixed test file just for testing timeouts
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Asynchronous Timeout Tests
+---
+--- This file specifically tests timeout scenarios within Firmo's asynchronous
+--- testing features. It includes:
+--- - A test simulating timeout detection and error message parsing for `parallel_async`.
+--- - An `it_async` test verifying behavior when an operation exceeds the expected timeout
+---   using `set_timeout` and `wait_until`, employing `test_helper.with_error_capture`
+---   to manage assertions within async callbacks.
+---
+--- @author Firmo Team
+--- @test
 package.path = "../?.lua;" .. package.path
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect

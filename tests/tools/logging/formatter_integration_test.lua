@@ -1,10 +1,22 @@
--- Logging Formatter Integration Module Tests
--- Tests for the logging formatter integration functionality
+--- Logging Formatter Integration Module Tests
+---
+--- Verifies the functionality of the `lib.tools.logging.formatter_integration` module, including:
+--- - Enhancing formatter objects with logging methods (`enhance_formatters`).
+--- - Creating test-specific loggers with context (`create_test_logger`).
+--- - Creating step-specific loggers (`logger.step`).
+--- - Creating a standalone log formatter (`create_log_formatter`).
+--- - Integrating logging with the reporting module (`integrate_with_reporting`).
+--- Uses mock objects and `test_helper` for setup and verification.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+
 local formatter_integration = require("lib.tools.logging.formatter_integration")
 local logging = require("lib.tools.logging")
+local test_helper = require("lib.tools.test_helper")
 
 describe("Logging Formatter Integration Module", function()
   it("enhances formatters with logging capabilities", function()
@@ -138,23 +150,19 @@ describe("Logging Formatter Integration Module", function()
   end)
 
   it("integrates with the reporting system", function()
-    -- Skip test if reporting module is not available
-    if not pcall(require, "lib.reporting") then
-      return
-    end
+    local reporting = require("lib.reporting")
 
     local result = formatter_integration.integrate_with_reporting()
     expect(result).to.exist()
 
     -- Verify enhanced reporting functions
-    local reporting = require("lib.reporting")
     expect(reporting.test_start).to.be.a("function")
     expect(reporting.test_end).to.be.a("function")
     expect(reporting.generate).to.be.a("function")
   end)
 
   it("creates JSON formatted output", function()
-    local temp_dir = require("lib.tools.test_helper").create_temp_test_directory()
+    local temp_dir = test_helper.create_temp_test_directory()
     local output_file = temp_dir.create_file("test_results.json", "")
 
     local formatter = formatter_integration.create_log_formatter()

@@ -102,7 +102,6 @@ Current settings:
   Test directory:     ./tests
   Test pattern:       *_test.lua
   Focus filter:       none
-  Tag filter:         none
   Watch mode:         disabled
   Codefix:            disabled
   Available tests:    24
@@ -188,13 +187,13 @@ Run all discovered test files:
 
 ### Run Specific Test File
 
-
-Run a single test file by name or path:
-
-
-```text
-> run tests/core/config_test.lua
-```
+|| `filter <pattern>` | Filter tests by name pattern |
+|| `focus <pattern>` | Focus on tests matching pattern |
+|| `pattern <pattern>` | Set the test file discovery pattern |
+|| `watch <on|off>` | Toggle watch mode |
+|| `watch-dir <dir>` | Add directory to watch |
+|| `watch-exclude <pattern>` | Add pattern to exclude from watching |
+|| `codefix <cmd> [path]` | Run codefix operations (e.g., `check`, `fix`) |
 
 
 You can also run a file by its number from the list:
@@ -277,28 +276,19 @@ To clear the focus:
 > focus
 ```
 
+### Setting Test File Pattern
 
-
-### Filter by Tags
-
-
-Filter tests by tag:
-
+Change the pattern used to find test files:
 
 ```text
-> tags unit,fast
+> pattern *_spec.lua
 ```
 
-
-This will only run tests that have both "unit" and "fast" tags.
-To clear tag filters:
-
+This will update the test file pattern and rediscover test files. To clear and use the default (`*_test.lua`):
 
 ```text
-> tags
+> pattern
 ```
-
-
 
 ## Watch Mode
 
@@ -421,7 +411,7 @@ Fix code quality issues:
 ```
 
 
-The codefix command supports all the capabilities of the codefix module, including StyLua formatting and Luacheck linting.
+The codefix command supports subcommands like `check` and `fix` along with a path, allowing you to run code quality checks directly (e.g., `codefix check src`, `codefix fix src/my_module.lua`).
 
 ## Command History
 
@@ -516,20 +506,15 @@ The interactive CLI will automatically use these settings.
 
 
 For continuous integration pipelines, you can use the interactive CLI in non-interactive mode:
-
-
 ```lua
--- Run all tests programmatically
-local firmo = require("firmo")
-local interactive = require("lib.tools.interactive")
-interactive.configure({
-  test_dir = "tests",
-  test_pattern = "*_test.lua"
-})
-local test_files = firmo.discover_tests("tests", "*_test.lua")
-local success = firmo.run_all(test_files)
+-- Example for running tests programmatically (suitable for CI)
+-- This typically involves using the main runner script directly
+local runner = require("scripts.runner")
+
+-- Run all tests found in 'tests/' directory
+local success = runner.main({"tests/"})
 if not success then
-  os.exit(1)
+  os.exit(1) -- Exit with error code if tests failed
 end
 ```
 
@@ -543,38 +528,34 @@ You can use the interactive CLI in pre-commit hooks to ensure tests pass before 
 
 ```bash
 #!/bin/sh
+# .git/hooks/pre-commit
 
-# pre-commit hook
+echo "Running codefix check..."
+# Use lua -e to invoke the CLI check command on staged files or the whole project
+# Using '.' checks the whole project here for simplicity
+lua -e 'require("lib.tools.codefix").run_cli({"check", "."})'
+check_exit_code=$?
 
+if [ $check_exit_code -ne 0 ]; then
+  echo "Codefix check failed. Please fix issues before committing."
+  exit 1
+fi
 
-lua -e 'require("lib.tools.interactive").run_pre_commit()'
+echo "Codefix check passed."
+
+# Optionally, run quick unit tests
+# echo "Running unit tests..."
+# lua test.lua tests/ --filter unit
+# test_exit_code=$?
+# if [ $test_exit_code -ne 0 ]; then
+#   echo "Unit tests failed. Please fix tests before committing."
+#   exit 1
+# fi
+# echo "Unit tests passed."
+
+exit 0
 ```
-
-
-With a corresponding Lua function:
-
-
-```lua
-function interactive.run_pre_commit()
-  local firmo = require("firmo")
-
-  interactive.configure({
-    test_dir = "tests",
-    test_pattern = "*_test.lua",
-    colorized_output = true
-  })
-
-  local test_files = firmo.discover_tests("tests", "*_test.lua")
-  local success = firmo.run_all(test_files)
-
-  if not success then
-    print("Tests failed, commit aborted")
-    os.exit(1)
-  end
-
-  print("All tests passed")
-end
-```
+*(Note: The Lua `run_cli` function might need adjustment to return a non-zero exit code on failure for the hook to work correctly).*
 
 
 
@@ -638,10 +619,11 @@ You can adjust these settings:
 
 If colorized output looks strange in your terminal:
 
-
-```text
-> configure colorized_output false
+This is usually configured programmatically before starting the interactive session:
+```lua
+interactive.configure({ colorized_output = false })
 ```
+There is no direct interactive command to toggle colors during a session.
 
 
 

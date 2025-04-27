@@ -1,40 +1,102 @@
---- Centralized configuration module for firmo
---- Provides a global configuration store with standardized access patterns
+--- Firmo Central Configuration Module
 ---
---- Features:
---- - Hierarchical configuration with dot-notation paths (module.setting.subsetting)
---- - Schema validation for type safety and consistency
---- - Change listeners with hierarchical notification
---- - Default values with automatic application
---- - File-based persistence with load/save capabilities
---- - Clean serialization of Lua tables for readable config files
---- - Comprehensive error handling with detailed context
---- - Lazy loading of dependencies to avoid circular references
+--- Provides a centralized system for managing configuration settings across the Firmo framework.
+--- It supports hierarchical configurations, schema validation, default values, change listeners,
+--- and loading/saving configuration from Lua files.
 ---
---- @version 0.3.0
+--- @module lib.core.central_config
 --- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 0.3.0
 
--- Directly require error_handler to ensure it's always available
-local error_handler = require("lib.tools.error_handler")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
 
----@class central_config
----@field get fun(path?: string, default?: any): any, table|nil Returns the value at the specified path or the default if not found
----@field set fun(path: string, value: any): central_config Sets a value at the specified path
----@field delete fun(path: string): boolean, table|nil Deletes a value at the specified path
----@field on_change fun(path: string, callback: fun(path: string, old_value: any, new_value: any)): central_config Registers a callback for when a value changes
----@field notify_change fun(path: string, old_value: any, new_value: any) Notifies listeners of a value change
----@field register_module fun(module_name: string, schema?: table, defaults?: table): central_config Registers a module's schema and defaults
----@field validate fun(module_name?: string): boolean, table|nil Validates configuration against registered schemas
----@field load_from_file fun(path?: string): table|nil, table|nil Loads configuration from a file
----@field save_to_file fun(path?: string): boolean, table|nil Saves configuration to a file
----@field reset fun(module_name?: string): central_config Resets configuration to defaults
----@field configure_from_options fun(options: table): central_config Configures from options table (typically from CLI)
----@field configure_from_config fun(global_config: table): central_config Configures from global config
----@field serialize fun(obj: any): any Serializes an object for storage
----@field merge fun(target: table, source: table): table Merges two tables
----@field DEFAULT_CONFIG_PATH string The default configuration file path
----@field ERROR_TYPES table Error type constants mapping to error_handler categories
----@field _VERSION string Module version identifier
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    local logger = logging.get_logger("central_config")
+    return logger
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+---@class central_config The public API of the central configuration module.
+---@field get fun(path?: string, default?: any): any, table|nil Gets a configuration value, returning a deep copy. Returns `value, nil` on success, or `default, error_object` on failure/not found.
+---@field set fun(path: string, value: any): central_config Sets a configuration value, making a deep copy of tables.
+---@field delete fun(path: string): boolean, table|nil Deletes a configuration value. Returns `true, nil` on success, or `false, error_object` on failure.
+---@field on_change fun(path?: string, callback: fun(path: string, old_value: any, new_value: any)): central_config Registers a callback for changes at or below the specified path.
+---@field notify_change fun(path: string, old_value: any, new_value: any): nil Manually notifies listeners of a change (used internally by `set`/`delete`).
+---@field register_module fun(module_name: string, schema?: table, defaults?: table): central_config Registers a module's schema and default values.
+---@field validate fun(module_name?: string): boolean, table|nil Validates configuration against schemas. Returns `true, nil` on success, or `false, error_object` on failure. The error object context contains detailed error information per module/field.
+---@field load_from_file fun(path?: string): table|nil, table|nil Loads configuration from a Lua file (must return a table). Returns `loaded_config, nil` on success, or `nil, error_object` on failure (including file not found).
+---@field save_to_file fun(path?: string): boolean, table|nil Saves the current configuration to a Lua file. Returns `true, nil` on success, or `false, error_object` on failure.
+---@field reset fun(module_name?: string): central_config Resets configuration to defaults (or clears if no defaults). If `module_name` is nil, resets the entire system (config, schemas, defaults, listeners).
+---@field configure_from_options fun(options: table): central_config Applies configuration from a flat key-value table (e.g., from CLI args like `{"logging.level": "debug"}`).
+---@field configure_from_config fun(global_config: table): central_config Deeply merges a full configuration table into the current configuration.
+---@field serialize fun(obj: any): any Creates a deep copy of a Lua value, safely handling cycles. Useful for getting copies of config sections.
+---@field merge fun(target: table, source: table): table Deeply merges the `source` table into the `target` table and returns the modified `target`. Use `serialize` first if you need to avoid modifying the original target.
+---@field DEFAULT_CONFIG_PATH string The default filename used for loading/saving (`.firmo-config.lua`).
+---@field ERROR_TYPES table Mapping of internal error type constants to `error_handler.CATEGORY` constants (e.g., `VALIDATION`, `IO`, `PARSE`).
+---@field _VERSION string The semantic version string of the module.
 -- Module table
 local M = {}
 
@@ -50,8 +112,8 @@ local config = {
   resetting = false, -- Flag to prevent recursive resets
 }
 
+--- Initializes or clears the internal configuration data structures.
 ---@private
--- Initialize empty config storage
 local function init_config()
   config.values = {}
   config.schemas = {}
@@ -64,16 +126,17 @@ M.DEFAULT_CONFIG_PATH = ".firmo-config.lua"
 
 -- Error categories mapping to error_handler categories
 M.ERROR_TYPES = {
-  VALIDATION = error_handler.CATEGORY.VALIDATION, -- Schema validation errors
-  ACCESS = error_handler.CATEGORY.VALIDATION, -- Path access errors
-  IO = error_handler.CATEGORY.IO, -- File I/O errors
-  PARSE = error_handler.CATEGORY.PARSE, -- Config file parsing errors
+  VALIDATION = get_error_handler().CATEGORY.VALIDATION, -- Schema validation errors
+  ACCESS = get_error_handler().CATEGORY.VALIDATION, -- Path access errors
+  IO = get_error_handler().CATEGORY.IO, -- File I/O errors
+  PARSE = get_error_handler().CATEGORY.PARSE, -- Config file parsing errors
 }
 
+--- Splits a dot-separated path string into an array of segments.
+--- Returns an empty table if the path is nil or empty.
+---@param path string|nil The path string (e.g., "module.setting.key").
+---@return string[] parts An array of path segments (e.g., `{"module", "setting", "key"}`).
 ---@private
----@param path string|nil The dot-separated path to convert to parts
----@return string[] Array of path segments
--- Helper for generating pathed keys (a.b.c -> ["a"]["b"]["c"])
 local function path_to_parts(path)
   if not path or path == "" then
     return {}
@@ -87,17 +150,17 @@ local function path_to_parts(path)
   return parts
 end
 
+--- Ensures that the nested table structure for a given path exists within a table.
+--- Creates intermediate tables if they don't exist.
+---@param t table The root table where the path should exist.
+---@param parts string[] The path segments (from `path_to_parts`).
+---@return table|nil parent The immediate parent table where the final segment of the path should reside.
+---@return table|nil error An error object if traversal fails because a segment is not a table.
 ---@private
----@param t table The table to ensure path in
----@param parts string[] The path parts to ensure exist
----@return table|nil parent The parent table where the last part would be set
----@return table|nil error The error if any occurred
--- Create value at path
----@diagnostic disable-next-line: unused-local
 local function ensure_path(t, parts)
   if not t or type(t) ~= "table" then
     return nil,
-      error_handler.validation_error("Target must be a table for ensure_path", {
+      get_error_handler().validation_error("Target must be a table for ensure_path", {
         target_type = type(t),
         parts = parts,
       })
@@ -116,55 +179,30 @@ local function ensure_path(t, parts)
   return current
 end
 
--- Lazy loading of dependencies to avoid circular references
-local _logging, _fs
-
+--- Logs a message using the loaded logging module.
+---@param level string The log level ('debug', 'info', 'warn', 'error').
+---@param message string The primary log message.
+---@param params? table Optional structured data to include in the log entry.
+---@return nil
 ---@private
----@return table|nil The logging module if available, nil otherwise
--- Get the logging module, loading it if necessary
-local function get_logging()
-  if not _logging then
-    local success, logging = pcall(require, "lib.tools.logging")
-    _logging = success and logging or nil
-  end
-  return _logging
-end
-
----@private
----@return table|nil The filesystem module if available, nil otherwise
--- Get the filesystem module, loading it if necessary
-local function get_fs()
-  if not _fs then
-    local success, fs = pcall(require, "lib.tools.filesystem")
-    _fs = success and fs or nil
-  end
-  return _fs
-end
-
----@private
----@param level string The log level ('debug', 'info', 'warn', 'error')
----@param message string The log message
----@param params? table Additional parameters for structured logging
--- Log helper with structured logging
 local function log(level, message, params)
-  local logging = get_logging()
-  if logging then
-    local logger = logging.get_logger("central_config")
-    logger[level](message, params or {})
-  end
+  get_logger()[level](message, params or {})
 end
 
+--- Recursively merges key-value pairs from `source` table into `target` table.
+--- If a key exists in both and both values are tables, it merges recursively.
+--- Otherwise, the value from `source` overwrites the value in `target`.
+--- **Note:** Modifies the `target` table in place. Use `M.serialize` first if you need a copy.
+---@param target table|nil The table to merge into (modified in place). Created if nil.
+---@param source table|nil The table to merge from. If nil, target is returned unchanged.
+---@return table|nil merged The modified `target` table.
+---@return table|nil error An error object if `source` or `target` are invalid types or if recursion fails.
 ---@private
----@param target table|nil The target table to merge into
----@param source table|nil The source table to merge from
----@return table|nil merged The merged table
----@return table|nil error Any error that occurred during merging
--- Deep merge helper (for merging configs)
 local function deep_merge(target, source)
   -- Input validation
   if source ~= nil and type(source) ~= "table" then
     return nil,
-      error_handler.validation_error("Source must be a table or nil for deep_merge", {
+      get_error_handler().validation_error("Source must be a table or nil for deep_merge", {
         source_type = type(source),
         operation = "deep_merge",
       })
@@ -176,7 +214,7 @@ local function deep_merge(target, source)
 
   if target ~= nil and type(target) ~= "table" then
     return nil,
-      error_handler.validation_error("Target must be a table or nil for deep_merge", {
+      get_error_handler().validation_error("Target must be a table or nil for deep_merge", {
         target_type = type(target),
         operation = "deep_merge",
       })
@@ -191,7 +229,7 @@ local function deep_merge(target, source)
       local merged_value, err = deep_merge(target[k], v)
       if err then
         return nil,
-          error_handler.validation_error("Failed to merge nested table", {
+          get_error_handler().validation_error("Failed to merge nested table", {
             key = k,
             operation = "deep_merge",
             error = err.message,
@@ -206,31 +244,32 @@ local function deep_merge(target, source)
   return target
 end
 
+--- Creates a deep copy of a Lua value, handling cycles using a cache table.
+--- Recursively copies nested tables. Copies metatables. Non-table values are returned directly.
+---@param obj any The value to copy.
+---@param cache table A table used to track already visited tables during recursion to detect cycles. Must be provided by the caller (typically initialized as `{}`).
+---@return any copy A deep copy of `obj`.
 ---@private
----@param obj any The object to copy
----@param cache table Cache table for cycle detection
----@return any A deep copy of the input object
--- Deep copy helper with cycle detection to prevent infinite recursion
 local function deep_copy(obj, cache)
   -- Input validation
   if obj == nil then
     return nil
   end
-  
+
   if type(obj) ~= "table" then
     -- For non-tables, just return the value
     return obj
   end
-  
+
   -- Check if we've already copied this table (cycle detection)
   if cache[obj] then
     return cache[obj]
   end
-  
+
   -- Create new table and register it in cache immediately to handle cycles
   local result = {}
   cache[obj] = result
-  
+
   -- Copy all key/value pairs
   for k, v in pairs(obj) do
     -- Handle table keys - check cache first to prevent recursion
@@ -245,25 +284,26 @@ local function deep_copy(obj, cache)
     else
       key_copy = k
     end
-    
+
     -- Handle values (already checks cache in deep_copy)
     result[key_copy] = deep_copy(v, cache)
   end
-  
+
   -- Copy metatable if exists
   local mt = getmetatable(obj)
   if mt then
     setmetatable(result, deep_copy(mt, cache))
   end
-  
+
   return result
 end
 
+--- Recursively compares two Lua values for deep equality.
+--- Handles basic types, tables (checks keys and recursively compares values), but does **not** currently handle cycles.
+---@param a any The first value.
+---@param b any The second value.
+---@return boolean `true` if `a` and `b` are deeply equal, `false` otherwise.
 ---@private
----@param a any First value to compare
----@param b any Second value to compare
----@return boolean Whether the values are deeply equal
--- Deep compare helper
 local function deep_equals(a, b)
   -- Direct comparison for identical references or non-table values
   if a == b then
@@ -298,10 +338,10 @@ end
 --- modification of configuration data. If the path doesn't exist, it returns either
 --- the provided default value or an error object.
 ---
---- @param path? string The path to get the value at (dot-separated, e.g. 'module.setting')
---- @param default? any Value to return if path doesn't exist
---- @return any value The value at the path or the default
---- @return table|nil error Error if any occurred
+--- @param path? string The dot-separated path to the desired configuration value (e.g., `"logging.level"`). If `nil` or `""`, returns the entire configuration object.
+--- @param default? any An optional value to return if the `path` is not found.
+--- @return any value A deep copy of the configuration value found at `path`, or the `default` value if not found. Returns `nil` if not found and no default is provided (error will also be returned).
+--- @return table|nil error An error object if the path is invalid or not found (and no default was provided), otherwise `nil`. The error object conforms to the `error_handler` structure.
 ---
 --- @usage
 --- -- Get a simple setting with default value
@@ -326,7 +366,7 @@ end
 function M.get(path, default)
   -- Parameter validation
   if path ~= nil and type(path) ~= "string" then
-    local err = error_handler.validation_error("Path must be a string or nil", {
+    local err = get_error_handler().validation_error("Path must be a string or nil", {
       parameter_name = "path",
       provided_type = type(path),
       operation = "get",
@@ -361,8 +401,10 @@ function M.get(path, default)
       if default ~= nil then
         return default
       else
-        local err =
-          error_handler.validation_error("Path traversal failed: expected table but got " .. type(current), context)
+        local err = get_error_handler().validation_error(
+          "Path traversal failed: expected table but got " .. type(current),
+          context
+        )
         return nil, err
       end
     end
@@ -379,7 +421,7 @@ function M.get(path, default)
       if default ~= nil then
         return default
       else
-        local err = error_handler.validation_error("Path not found: " .. path, context)
+        local err = get_error_handler().validation_error("Path not found: " .. path, context)
         return nil, err
       end
     end
@@ -400,9 +442,10 @@ end
 --- also notifies any change listeners if the value changes. The function supports
 --- method chaining by returning the module instance.
 ---
---- @param path? string The path to set the value at (dot-separated, e.g. 'module.setting')
---- @param value any The value to store at the specified path
---- @return central_config The module instance for chaining
+--- @param path string The dot-separated path where the value should be set (e.g., `"database.pool.size"`). Cannot be nil or empty.
+--- @param value any The value to store. If it's a table, a deep copy is made before storing.
+--- @return central_config The module instance (`M`) for method chaining.
+--- @throws string If path is invalid or setting the value fails (e.g., trying to set a key within a non-table). Handled internally, logs warning.
 ---
 --- @usage
 --- -- Set a simple value
@@ -431,7 +474,7 @@ end
 function M.set(path, value)
   -- Parameter validation
   if path ~= nil and type(path) ~= "string" then
-    local err = error_handler.validation_error("Path must be a string or nil", {
+    local err = get_error_handler().validation_error("Path must be a string or nil", {
       parameter_name = "path",
       provided_type = type(path),
       operation = "set",
@@ -444,7 +487,7 @@ function M.set(path, value)
   if not path or path == "" then
     -- Root config must be a table
     if type(value) ~= "table" then
-      local err = error_handler.validation_error("Cannot set root config to non-table value", {
+      local err = get_error_handler().validation_error("Cannot set root config to non-table value", {
         type = type(value),
         operation = "set",
       })
@@ -465,7 +508,7 @@ function M.set(path, value)
       config.values = M.serialize(value)
       log("debug", "Set complete configuration (empty parts)", { path = path })
     else
-      local err = error_handler.validation_error("Cannot set root config to non-table value", {
+      local err = get_error_handler().validation_error("Cannot set root config to non-table value", {
         type = type(value),
         operation = "set",
       })
@@ -530,9 +573,9 @@ end
 --- existence, and properly notifies listeners of the change. The function returns
 --- a boolean indicating success or failure and an optional error object with details.
 ---
---- @param path string The path to delete the value at (dot-separated, e.g. 'module.setting')
---- @return boolean success Whether the delete was successful
---- @return table|nil error Error if any occurred
+--- @param path string The dot-separated path of the value to delete (e.g., `"cache.ttl"`). Cannot be nil or empty, or the root path.
+--- @return boolean success `true` if the value was successfully deleted, `false` otherwise.
+--- @return table|nil error An error object if the path is invalid, not found, or cannot be deleted, otherwise `nil`.
 ---
 --- @usage
 --- -- Delete a configuration value
@@ -562,7 +605,7 @@ end
 function M.delete(path)
   -- Parameter validation
   if path == nil or type(path) ~= "string" then
-    local err = error_handler.validation_error("Path must be a non-empty string", {
+    local err = get_error_handler().validation_error("Path must be a non-empty string", {
       parameter_name = "path",
       provided_type = type(path),
       operation = "delete",
@@ -572,7 +615,7 @@ function M.delete(path)
   end
 
   if path == "" then
-    local err = error_handler.validation_error("Cannot delete root configuration", {
+    local err = get_error_handler().validation_error("Cannot delete root configuration", {
       operation = "delete",
     })
     log("warn", err.message, err.context)
@@ -581,7 +624,7 @@ function M.delete(path)
 
   local parts = path_to_parts(path)
   if #parts == 0 then
-    local err = error_handler.validation_error("Cannot delete root configuration", {
+    local err = get_error_handler().validation_error("Cannot delete root configuration", {
       operation = "delete",
       path = path,
     })
@@ -603,7 +646,7 @@ function M.delete(path)
         operation = "delete",
       }
 
-      local err = error_handler.validation_error("Delete failed: path not found", context)
+      local err = get_error_handler().validation_error("Delete failed: path not found", context)
       log("debug", err.message, context)
       return false, err
     end
@@ -616,7 +659,7 @@ function M.delete(path)
         operation = "delete",
       }
 
-      local err = error_handler.validation_error("Delete failed: path not found", context)
+      local err = get_error_handler().validation_error("Delete failed: path not found", context)
       log("debug", err.message, context)
       return false, err
     end
@@ -635,7 +678,7 @@ function M.delete(path)
         operation = "delete",
       }
 
-      local err = error_handler.validation_error("Delete failed: key does not exist", context)
+      local err = get_error_handler().validation_error("Delete failed: key does not exist", context)
       log("debug", err.message, context)
       return false, err
     end
@@ -657,7 +700,7 @@ function M.delete(path)
     operation = "delete",
   }
 
-  local err = error_handler.validation_error("Delete failed: parent is not a table", context)
+  local err = get_error_handler().validation_error("Delete failed: parent is not a table", context)
   log("debug", err.message, context)
   return false, err
 end
@@ -668,9 +711,10 @@ end
 --- or for the entire configuration tree (by using nil or "" as the path). Callbacks
 --- receive the changed path, the old value, and the new value as parameters.
 ---
---- @param path? string The path to listen for changes on (nil for all changes)
---- @param callback fun(path: string, old_value: any, new_value: any) Function to call when value changes
---- @return central_config The module instance for chaining
+--- @param path? string The dot-separated path to listen on (e.g., `"logging"`). If `nil` or `""`, the callback listens for *all* changes.
+--- @param callback fun(path: string, old_value: any, new_value: any) The function to execute when a change occurs at or below the specified `path`. It receives the full path of the changed value, the old value, and the new value.
+--- @return central_config The module instance (`M`) for method chaining.
+--- @throws string If arguments are invalid. Handled internally, logs warning.
 ---
 --- @usage
 --- -- Listen for changes to a specific setting
@@ -699,7 +743,7 @@ end
 function M.on_change(path, callback)
   -- Parameter validation
   if path ~= nil and type(path) ~= "string" then
-    local err = error_handler.validation_error("Path must be a string or nil", {
+    local err = get_error_handler().validation_error("Path must be a string or nil", {
       parameter_name = "path",
       provided_type = type(path),
       operation = "on_change",
@@ -709,7 +753,7 @@ function M.on_change(path, callback)
   end
 
   if type(callback) ~= "function" then
-    local err = error_handler.validation_error("Callback must be a function", {
+    local err = get_error_handler().validation_error("Callback must be a function", {
       parameter_name = "callback",
       provided_type = type(callback),
       operation = "on_change",
@@ -735,12 +779,11 @@ end
 --- and root path. The function handles errors in listeners safely, ensuring configuration
 --- system stability even if callbacks throw errors.
 ---
---- @param path string The path that changed
---- @param old_value any The previous value
---- @param new_value any The new value
----
---- @usage
---- -- Typically called internally by set() and delete()
+--- @param path string The full dot-separated path of the configuration value that change--- @param module_name string The unique name for the module (e.g., `"coverage"`).
+--- @param schema? table An optional schema definition table used for validation (see `M.validate` docs and examples for structure). Keys might include `required_fields` (array), `field_types` (table `{[field]=type_string}`), `field_ranges`, `field_patterns`, `field_values`, `validators`.
+--- @param defaults? table An optional table containing default configuration values for this module.
+--- @return central_config The module instance (`M`) for method chaining.
+--- @throws string If `module_name` is invalid or `schema`/`defaults` are not tables (if provided). Handled internally, logs error/warning.
 --- -- Example of manual notification:
 --- local old_value = central_config.get("app.version")
 --- -- External process changed version file
@@ -752,7 +795,7 @@ end
 function M.notify_change(path, old_value, new_value)
   -- Parameter validation
   if path == nil or type(path) ~= "string" then
-    local err = error_handler.validation_error("Path must be a string", {
+    local err = get_error_handler().validation_error("Path must be a string", {
       parameter_name = "path",
       provided_type = type(path),
       operation = "notify_change",
@@ -769,11 +812,11 @@ function M.notify_change(path, old_value, new_value)
     has_exact_listeners = config.listeners[path] ~= nil and #(config.listeners[path] or {}) > 0,
   })
 
-  -- Notify exact path listeners using error_handler.try for safety
+  -- Notify exact path listeners using get_error_handler().try for safety
   if config.listeners[path] and #config.listeners[path] > 0 then
     for i, callback in ipairs(config.listeners[path]) do
       if type(callback) == "function" then
-        local success, err = error_handler.try(function()
+        local success, err = get_error_handler().try(function()
           return callback(path, old_value, new_value)
         end)
 
@@ -809,7 +852,7 @@ function M.notify_change(path, old_value, new_value)
     if config.listeners[parent_path] and #config.listeners[parent_path] > 0 then
       for i, callback in ipairs(config.listeners[parent_path]) do
         if type(callback) == "function" then
-          local success, err = error_handler.try(function()
+          local success, err = get_error_handler().try(function()
             return callback(path, old_value, new_value)
           end)
 
@@ -843,7 +886,7 @@ function M.notify_change(path, old_value, new_value)
   if config.listeners[""] and #config.listeners[""] > 0 then
     for i, callback in ipairs(config.listeners[""]) do
       if type(callback) == "function" then
-        local success, err = error_handler.try(function()
+        local success, err = get_error_handler().try(function()
           return callback(path, old_value, new_value)
         end)
 
@@ -926,7 +969,7 @@ end
 function M.register_module(module_name, schema, defaults)
   -- Parameter validation
   if type(module_name) ~= "string" then
-    local err = error_handler.validation_error("Module name must be a string", {
+    local err = get_error_handler().validation_error("Module name must be a string", {
       parameter_name = "module_name",
       provided_type = type(module_name),
       operation = "register_module",
@@ -936,7 +979,7 @@ function M.register_module(module_name, schema, defaults)
   end
 
   if module_name == "" then
-    local err = error_handler.validation_error("Module name cannot be empty", {
+    local err = get_error_handler().validation_error("Module name cannot be empty", {
       parameter_name = "module_name",
       operation = "register_module",
     })
@@ -954,7 +997,7 @@ function M.register_module(module_name, schema, defaults)
   -- Store schema if provided
   if schema ~= nil then
     if type(schema) ~= "table" then
-      local err = error_handler.validation_error("Schema must be a table or nil", {
+      local err = get_error_handler().validation_error("Schema must be a table or nil", {
         parameter_name = "schema",
         provided_type = type(schema),
         module = module_name,
@@ -982,7 +1025,7 @@ function M.register_module(module_name, schema, defaults)
   -- Apply defaults if provided
   if defaults ~= nil then
     if type(defaults) ~= "table" then
-      local err = error_handler.validation_error("Defaults must be a table or nil", {
+      local err = get_error_handler().validation_error("Defaults must be a table or nil", {
         parameter_name = "defaults",
         provided_type = type(defaults),
         module = module_name,
@@ -1001,28 +1044,28 @@ function M.register_module(module_name, schema, defaults)
       local function apply_defaults(target, source, seen)
         -- Initialize tracking table on first call
         seen = seen or {}
-        
+
         -- Validate input types
         if type(target) ~= "table" or type(source) ~= "table" then
           log("warn", "Invalid types in apply_defaults", {
             module = module_name,
             target_type = type(target),
-            source_type = type(source)
+            source_type = type(source),
           })
           return
         end
-        
+
         -- Direct table reference check for cycle detection
         if seen[source] then
           log("warn", "Circular reference detected in apply_defaults", {
-            module = module_name
+            module = module_name,
           })
           return
         end
-        
+
         -- Mark this source table as seen using direct reference
         seen[source] = true
-        
+
         for k, v in pairs(source) do
           -- Check if key exists in target
           if target[k] == nil then
@@ -1032,7 +1075,7 @@ function M.register_module(module_name, schema, defaults)
             else
               target[k] = v -- Direct assignment for simple values
             end
-            
+
             log("debug", "Applied default value for key", {
               module = module_name,
               key = k,
@@ -1072,9 +1115,9 @@ end
 --- registered schemas. The validation includes type checking, required fields verification,
 --- range validation, pattern matching, enum value validation, and custom validator functions.
 ---
---- @param module_name? string The name of the module to validate (nil for all)
---- @return boolean valid Whether the configuration is valid
---- @return table|nil error Error if validation failed, with details on validation errors
+--- @param module_name? string Optional. The name of a specific module to validate. If `nil`, validates all modules with registered schemas.
+--- @return boolean valid `true` if the specified configuration is valid according to the registered schema(s), `false` otherwise.
+--- @return table|nil error An error object if validation fails, otherwise `nil`. The `error.context` field contains detailed information: `context.errors` (for single module validation) or `context.modules` (for all modules validation), listing specific fields and failure messages.
 ---
 --- @usage
 --- -- Validate a specific module's configuration
@@ -1110,7 +1153,7 @@ end
 function M.validate(module_name)
   -- Parameter validation
   if module_name ~= nil and type(module_name) ~= "string" then
-    local err = error_handler.validation_error("Module name must be a string or nil", {
+    local err = get_error_handler().validation_error("Module name must be a string or nil", {
       parameter_name = "module_name",
       provided_type = type(module_name),
       operation = "validate",
@@ -1229,7 +1272,7 @@ function M.validate(module_name)
           else
             local value = module_config[field]
             if value ~= nil and type(value) == "string" then
-              local success, result = error_handler.try(function()
+              local success, result = get_error_handler().try(function()
                 return string.match(value, pattern) ~= nil
               end)
 
@@ -1311,7 +1354,7 @@ function M.validate(module_name)
           else
             local value = module_config[field]
             if value ~= nil then
-              local success, result, message = error_handler.try(function()
+              local success, result, message = get_error_handler().try(function()
                 return validator(value, module_config)
               end)
 
@@ -1350,7 +1393,7 @@ function M.validate(module_name)
       return true
     else
       local validation_error =
-        error_handler.validation_error("Configuration validation failed for module: " .. module_name, {
+        get_error_handler().validation_error("Configuration validation failed for module: " .. module_name, {
           module = module_name,
           errors = errors[module_name],
         })
@@ -1371,9 +1414,10 @@ function M.validate(module_name)
     return true
   else
     -- Create error object
-    local validation_error = error_handler.validation_error("Configuration validation failed for multiple modules", {
-      modules = errors,
-    })
+    local validation_error =
+      get_error_handler().validation_error("Configuration validation failed for multiple modules", {
+        modules = errors,
+      })
     return false, validation_error
   end
 end
@@ -1384,9 +1428,9 @@ end
 --- configuration data. If the file doesn't exist, it's not considered an error
 --- (the function simply logs the case and continues with existing configuration).
 ---
---- @param path? string The path to the configuration file (defaults to DEFAULT_CONFIG_PATH)
---- @return table|nil config The loaded configuration or nil if failed
---- @return table|nil error Error if any occurred
+--- @param path? string The path to the Lua configuration file. Defaults to `M.DEFAULT_CONFIG_PATH` (`.firmo-config.lua`).
+--- @return table|nil config The configuration table returned by the loaded Lua file, or `nil` if loading failed or the file was not found.
+--- @return table|nil error An error object if loading or parsing failed, or if the file was not found, otherwise `nil`.
 ---
 --- @usage
 --- -- Load from default configuration path
@@ -1416,7 +1460,7 @@ end
 function M.load_from_file(path)
   -- Parameter validation
   if path ~= nil and type(path) ~= "string" then
-    local err = error_handler.validation_error("Path must be a string or nil", {
+    local err = get_error_handler().validation_error("Path must be a string or nil", {
       parameter_name = "path",
       provided_type = type(path),
       operation = "load_from_file",
@@ -1426,23 +1470,12 @@ function M.load_from_file(path)
   end
 
   path = path or M.DEFAULT_CONFIG_PATH
-  local fs = get_fs()
-
-  -- Check if filesystem module is available
-  if not fs then
-    local err = error_handler.io_error("Filesystem module not available for loading config", {
-      path = path,
-      operation = "load_from_file",
-    })
-    log("error", err.message, err.context)
-    return nil, err
-  end
+  -- _fs is guaranteed to be loaded due to check at top
 
   -- Use safe_io_operation for checking if file exists
-  local exists, err = error_handler.safe_io_operation(function()
-    return fs.file_exists(path)
+  local exists, err = get_error_handler().safe_io_operation(function()
+    return get_fs().file_exists(path) -- Use _fs
   end, path, { operation = "check_file_exists" })
-
   if err then
     log("error", "Error checking if config file exists", {
       path = path,
@@ -1458,7 +1491,7 @@ function M.load_from_file(path)
       operation = "load_from_file",
     })
     -- Create a proper error object for tests
-    local err = error_handler.io_error("Config file not found", {
+    local err = get_error_handler().io_error("Config file not found", {
       path = path,
       operation = "load_from_file",
     })
@@ -1466,25 +1499,25 @@ function M.load_from_file(path)
   end
 
   -- Try to load the configuration file
-  local success, user_config, err = error_handler.try(function()
+  local success, user_config, err = get_error_handler().try(function()
     return dofile(path)
   end)
 
   if not success then
     -- Handle the case where err might not be a structured error
     ---@diagnostic disable-next-line: need-check-nil, undefined-field
-    local error_message = error_handler.is_error(err) and err.message or tostring(err)
-    local parse_err = error_handler.parse_error("Error loading config file: " .. error_message, {
+    local error_message = get_error_handler().is_error(err) and err.message or tostring(err)
+    local parse_err = get_error_handler().parse_error("Error loading config file: " .. error_message, {
       path = path,
       operation = "load_from_file",
-    }, error_handler.is_error(err) and err or nil)
+    }, get_error_handler().is_error(err) and err or nil)
     log("warn", parse_err.message, parse_err.context)
     return nil, parse_err
   end
 
   if type(user_config) ~= "table" then
     local format_err =
-      error_handler.validation_error("Invalid config format: expected a table, got " .. type(user_config), {
+      get_error_handler().validation_error("Invalid config format: expected a table, got " .. type(user_config), {
         path = path,
         expected = "table",
         got = type(user_config),
@@ -1544,9 +1577,9 @@ end
 --- with sorted keys for readability and consistency. The function creates any parent
 --- directories needed and handles filesystem errors properly.
 ---
---- @param path? string The path to save the configuration to (defaults to DEFAULT_CONFIG_PATH)
---- @return boolean success Whether the save was successful
---- @return table|nil error Error if any occurred
+--- @param path? string The path to the file where the configuration should be saved. Defaults to `M.DEFAULT_CONFIG_PATH` (`.firmo-config.lua`). Parent directories will be created if they don't exist.
+--- @return boolean success `true` if the configuration was successfully serialized and written to the file, `false` otherwise.
+--- @return table|nil error An error object if serialization or file writing failed, otherwise `nil`.
 ---
 --- @usage
 --- -- Save to default configuration file
@@ -1576,7 +1609,7 @@ end
 function M.save_to_file(path)
   -- Parameter validation
   if path ~= nil and type(path) ~= "string" then
-    local err = error_handler.validation_error("Path must be a string or nil", {
+    local err = get_error_handler().validation_error("Path must be a string or nil", {
       parameter_name = "path",
       provided_type = type(path),
       operation = "save_to_file",
@@ -1586,24 +1619,14 @@ function M.save_to_file(path)
   end
 
   path = path or M.DEFAULT_CONFIG_PATH
-  local fs = get_fs()
-
-  -- Check if filesystem module is available
-  if not fs then
-    local err = error_handler.io_error("Filesystem module not available for saving config", {
-      path = path,
-      operation = "save_to_file",
-    })
-    log("error", err.message, err.context)
-    return false, err
-  end
+  -- _fs is guaranteed to be loaded due to check at top
 
   -- Generate Lua code for the configuration
   local function serialize(tbl, indent)
     -- Validate input
     if type(tbl) ~= "table" then
       return nil,
-        error_handler.validation_error("Cannot serialize non-table value", {
+        get_error_handler().validation_error("Cannot serialize non-table value", {
           provided_type = type(tbl),
           operation = "serialize",
         })
@@ -1687,8 +1710,8 @@ function M.save_to_file(path)
   content = content .. "return " .. serialized_config .. "\n"
 
   -- Write to file using safe_io_operation
-  local success, err = error_handler.safe_io_operation(function()
-    return fs.write_file(path, content)
+  local success, err = get_error_handler().safe_io_operation(function()
+    return get_fs().write_file(path, content) -- Use _fs
   end, path, { operation = "write_config_file" })
 
   if not success then
@@ -1709,8 +1732,9 @@ end
 --- entire configuration system. If no defaults are available for a module, its
 --- configuration will be cleared. The function notifies any listeners of the changes.
 ---
---- @param module_name? string The name of the module to reset (nil for all)
---- @return central_config The module instance for chaining
+--- @param module_name? string Optional. The name of the specific module whose configuration should be reset to its defaults. If `nil`, resets the **entire** configuration system (values, schemas, defaults, listeners).
+--- @return central_config The module instance (`M`) for method chaining.
+--- @throws string If `module_name` is provided but not a string. Handled internally, logs warning.
 ---
 --- @usage
 --- -- Reset a specific module's configuration
@@ -1734,13 +1758,13 @@ function M.reset(module_name)
   if config.resetting then
     return M
   end
-  
+
   -- Set resetting flag
   config.resetting = true
 
   -- Parameter validation
   if module_name ~= nil and type(module_name) ~= "string" then
-    local err = error_handler.validation_error("Module name must be a string or nil", {
+    local err = get_error_handler().validation_error("Module name must be a string or nil", {
       parameter_name = "module_name",
       provided_type = type(module_name),
       operation = "reset",
@@ -1818,8 +1842,9 @@ end
 --- that follow the "module.setting" dot notation format, ignoring other entries. The function
 --- safely applies each valid option, logging warnings for any options that fail to apply.
 ---
---- @param options table Table of options from CLI or other source
---- @return central_config The module instance for chaining
+--- @param options table A flat table where keys are dot-separated configuration paths (e.g., `"logging.level"`) and values are the corresponding settings. Keys without dots are ignored.
+--- @return central_config The module instance (`M`) for method chaining.
+--- @throws string If `options` is not a table. Handled internally, logs warning. Errors during individual `set` calls are logged as warnings.
 ---
 --- @usage
 --- -- Configure from command-line arguments
@@ -1857,7 +1882,7 @@ function M.configure_from_options(options)
   end
 
   if type(options) ~= "table" then
-    local err = error_handler.validation_error("Options must be a table", {
+    local err = get_error_handler().validation_error("Options must be a table", {
       parameter_name = "options",
       provided_type = type(options),
       operation = "configure_from_options",
@@ -1866,11 +1891,11 @@ function M.configure_from_options(options)
     return M
   end
 
-  -- Process options using error_handler.try to catch any errors
+  -- Process options using get_error_handler().try to catch any errors
   for k, v in pairs(options) do
     -- Only handle options with module.option format
     if type(k) == "string" and string.find(k, "%.") then
-      local success, err = error_handler.try(function()
+      local success, err = get_error_handler().try(function()
         M.set(k, v)
       end)
 
@@ -1895,8 +1920,9 @@ end
 --- existing configuration. This is useful for initializing configuration from a predefined
 --- state or applying configuration presets.
 ---
---- @param global_config table Global configuration table to apply
---- @return central_config The module instance for chaining
+--- @param global_config table A potentially nested table representing a full configuration structure to be merged into the current configuration.
+--- @return central_config The module instance (`M`) for method chaining.
+--- @throws string If `global_config` is not a table or if merging fails. Handled internally, logs error/warning.
 ---
 --- @usage
 --- -- Configure from a predefined configuration structure
@@ -1937,7 +1963,7 @@ function M.configure_from_config(global_config)
   end
 
   if type(global_config) ~= "table" then
-    local err = error_handler.validation_error("Global config must be a table", {
+    local err = get_error_handler().validation_error("Global config must be a table", {
       parameter_name = "global_config",
       provided_type = type(global_config),
       operation = "configure_from_config",
@@ -1970,8 +1996,8 @@ end
 --- values, it simply returns the value itself. This function is safe to use with any
 --- value type and handles nil values appropriately.
 ---
---- @param obj any Object to serialize (deep copy)
---- @return any Serialized (deep-copied) object
+--- @param obj any The Lua value to deep copy.
+--- @return any copy A deep copy of `obj`.
 ---
 --- @usage
 --- -- Deep copy a configuration table
@@ -2006,10 +2032,10 @@ M.serialize = function(obj)
   if type(obj) ~= "table" then
     return obj
   end
-  
+
   -- Create a new cache for this copy operation to prevent memory leaks
   local cache = {}
-  
+
   local result = deep_copy(obj, cache)
   if type(result) ~= "table" and obj ~= nil then
     log("warn", "serialize was called on a non-table value", {
@@ -2026,9 +2052,9 @@ end
 --- If an error occurs during merging, the function logs the error and returns the original
 --- target table unmodified.
 ---
---- @param target table Target table to merge into
---- @param source table Source table to merge from
---- @return table Merged result
+--- @param target table The table to merge values into (modified in place).
+--- @param source table The table providing the values to merge.
+--- @return table merged_target The modified `target` table. Returns original `target` if merge fails (error logged).
 ---
 --- @usage
 --- -- Merge configuration tables
@@ -2076,11 +2102,13 @@ end
 --- to ensure the module is always returned, even if initialization fails, preventing
 --- application crashes. This function is called automatically when the module is required.
 ---
---- @private
---- @return central_config Initialized module
+--- Initializes the central_config module by registering its own schema and defaults.
+--- Called automatically when the module is first required.
+---@return central_config The initialized module table (`M`). Returns `M` even if initialization fails (logs error).
+---@private
 local function init()
   -- Initialize with proper error handling
-  local success, err = error_handler.try(function()
+  local success, err = get_error_handler().try(function()
     -- Register this module's defaults
     M.register_module("central_config", {
       -- Schema

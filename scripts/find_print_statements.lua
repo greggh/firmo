@@ -1,39 +1,77 @@
 #!/usr/bin/env lua
--- Script to find print statements that need to be converted to the logging system
+--- Find Print Statements Script
+---
+--- Scans Lua files in the project (excluding configured directories and files)
+--- to find `print` function calls that should ideally be replaced with the
+--- Firmo logging system (`logger.info`, `logger.debug`, etc.).
+--- Reports the count and location of found `print` statements, grouped by directory.
+---
+--- Usage: lua scripts/find_print_statements.lua
+---
+--- @author Firmo Team
+--- @version 1.0.0
+--- @script
 
--- Initialize logging system
-local logging
+-- Lazy-load dependencies to avoid circular dependencies
 ---@diagnostic disable-next-line: unused-local
-local ok, err = pcall(function()
-  logging = require("lib.tools.logging")
-end)
-if not ok or not logging then
-  -- Fall back to standard print if logging module isn't available
-  logging = {
-    configure = function() end,
-    get_logger = function()
-      return {
-        info = print,
-        error = print,
-        warn = print,
-        debug = print,
-        verbose = print,
-      }
+local _logging, _fs
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("find_print_statements")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
     end,
   }
 end
 
--- Get logger for find_print_statements module
----@diagnostic disable-next-line: redundant-parameter
-local logger = logging.get_logger("find_print_statements")
--- Configure from config if possible
-logging.configure_from_config("find_print_statements")
-
--- Load the filesystem module
-local fs = require("lib.tools.filesystem")
-logger.debug("Loaded filesystem module", { version = fs._VERSION })
-
--- Configuration
+--- Script configuration.
 local config = {
   root_dir = ".",
   excluded_dirs = {
@@ -64,7 +102,10 @@ local config = {
   },
 }
 
--- Function to check if a file should be ignored
+--- Checks if a file path matches any of the patterns in `config.ignore_files`.
+---@param file_path string The file path to check.
+---@return boolean True if the file should be ignored, false otherwise.
+---@private
 local function should_ignore_file(file_path)
   for _, pattern in ipairs(config.ignore_files) do
     if file_path:match(pattern) then
@@ -74,11 +115,15 @@ local function should_ignore_file(file_path)
   return false
 end
 
--- Function to find Lua files
+--- Finds all relevant Lua files in a directory using the filesystem module.
+--- Respects `config.included_extensions`, `config.excluded_dirs`, and `config.ignore_files`.
+---@param dir string The starting directory path.
+---@param files? string[] Optional table to accumulate results (for recursion, not used currently).
+---@return string[] files An array of relevant Lua file paths found. Returns empty table on filesystem error.
+---@private
 local function find_lua_files(dir, files)
   files = files or {}
-
-  logger.debug("Finding Lua files using filesystem module", {
+  get_logger().debug("Finding Lua files using filesystem module", {
     directory = dir,
   })
 
@@ -86,7 +131,7 @@ local function find_lua_files(dir, files)
   local include_patterns = config.included_extensions
   local exclude_patterns = config.excluded_dirs
 
-  local all_files = fs.discover_files({ dir }, include_patterns, exclude_patterns)
+  local all_files = get_fs().discover_files({ dir }, include_patterns, exclude_patterns)
 
   -- Apply additional filters
   for _, file_path in ipairs(all_files) do
@@ -96,18 +141,22 @@ local function find_lua_files(dir, files)
     end
   end
 
-  logger.debug("Found Lua files", {
+  get_logger().debug("Found Lua files", {
     count = #files,
   })
 
   return files
 end
 
--- Function to count print statements in a file
+--- Counts potential print statements in a file's content.
+--- Matches configured patterns and attempts to exclude `logger.*` calls that contain "print".
+---@param file_path string The path to the file to analyze.
+---@return number count The number of potential print statements found. Returns 0 if file cannot be read.
+---@private
 local function count_print_statements(file_path)
-  local content, err = fs.read_file(file_path)
+  local content, err = get_fs().read_file(file_path)
   if not content then
-    logger.error("Could not read file: " .. file_path .. " - " .. (err or "unknown error"))
+    get_logger().error("Could not read file: " .. file_path .. " - " .. (err or "unknown error"))
     return 0
   end
 
@@ -119,7 +168,7 @@ local function count_print_statements(file_path)
     end
   end
 
-  -- Avoid false positives by checking for logger.xxx calls that contain "print"
+  -- Avoid false positives by checking for get_logger().xxx calls that contain "print"
   local logger_count = 0
   for _ in content:gmatch("logger%.[^(]*%(.-print") do
     logger_count = logger_count + 1
@@ -129,13 +178,15 @@ local function count_print_statements(file_path)
   return count - logger_count
 end
 
--- Main function
+--- Main function for the script. Finds Lua files, counts print statements in each,
+--- and reports the results grouped by directory.
+---@return nil
+---@private
 local function find_print_statements()
-  logger.info("Finding Lua files with print statements...")
-
+  get_logger().info("Finding Lua files with print statements...")
   -- Find all Lua files
   local files = find_lua_files(config.root_dir)
-  logger.info("Found " .. #files .. " Lua files to check")
+  get_logger().info("Found " .. #files .. " Lua files to check")
 
   -- Check each file for print statements
   local files_with_print = {}
@@ -158,10 +209,10 @@ local function find_print_statements()
   end)
 
   -- Report results
-  logger.info("----------------------------------------------------")
-  logger.info("Found " .. #files_with_print .. " files with print statements")
-  logger.info("Total print statements: " .. total_prints)
-  logger.info("----------------------------------------------------")
+  get_logger().info("----------------------------------------------------")
+  get_logger().info("Found " .. #files_with_print .. " files with print statements")
+  get_logger().info("Total print statements: " .. total_prints)
+  get_logger().info("----------------------------------------------------")
 
   -- Group by directory for better organization
   local by_directory = {}
@@ -200,7 +251,7 @@ local function find_print_statements()
 
   -- Print results by directory
   for _, dir in ipairs(dirs) do
-    logger.info("\nDirectory: " .. dir.path .. " (" .. dir.total .. " prints)")
+    get_logger().info("\nDirectory: " .. dir.path .. " (" .. dir.total .. " prints)")
 
     -- Sort files in directory by count
     table.sort(dir.files, function(a, b)
@@ -209,11 +260,11 @@ local function find_print_statements()
 
     -- Print file details
     for _, file in ipairs(dir.files) do
-      logger.info(string.format("  %-40s %3d prints", file.name, file.count))
+      get_logger().info(string.format("  %-40s %3d prints", file.name, file.count))
     end
   end
 
-  logger.info("\nRun this tool periodically to track progress in converting print statements to logging.")
+  get_logger().info("\nRun this tool periodically to track progress in converting print statements to logging.")
 end
 
 -- Run the main function

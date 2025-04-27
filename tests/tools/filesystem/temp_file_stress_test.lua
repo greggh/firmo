@@ -1,5 +1,13 @@
--- Stress test for temp_file module with much larger file counts
--- This file focuses on pushing the limits of the system with extremely large file counts
+--- Temporary File Module Stress Tests
+---
+--- Pushes the limits of the `lib.tools.filesystem.temp_file` module with extremely
+--- large file counts (5000+) and deeply nested directory structures (5 levels).
+--- Focuses on ensuring the module remains stable and performs reasonably under heavy load,
+--- including creation and cleanup operations. Measures and reports execution times.
+--- Includes a high timeout value to accommodate potentially long-running operations.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
@@ -9,7 +17,6 @@ local temp_file = require("lib.tools.filesystem.temp_file")
 local temp_file_integration = require("lib.tools.filesystem.temp_file_integration")
 local fs = require("lib.tools.filesystem")
 local test_helper = require("lib.tools.test_helper")
-local logger = require("lib.tools.logging")
 
 -- Set very high timeout for these tests
 local VERY_HIGH_TIMEOUT = 120 -- seconds
@@ -17,7 +24,14 @@ local VERY_HIGH_TIMEOUT = 120 -- seconds
 -- Compatibility function for table unpacking (works with both Lua 5.1 and 5.2+)
 local unpack_table = table.unpack or unpack
 
--- Helper function for measuring execution time
+--- Measures the execution time of a given function and prints the result.
+--- Uses `os.clock()` for timing.
+---@param operation_name string A descriptive name for the operation being measured.
+---@param func function The function to execute and time.
+---@param ... any Arguments to pass to the `func`.
+---@return number elapsed The elapsed time in seconds.
+---@return ... any The return values from the executed `func`.
+---@private
 local function measure_time(operation_name, func, ...)
   io.write(string.format("\n=== Starting: %s ===\n", operation_name))
   io.flush()
@@ -31,6 +45,8 @@ local function measure_time(operation_name, func, ...)
   io.write(string.format("\n=== PERFORMANCE: %s took %.6f seconds ===\n", operation_name, elapsed))
   io.flush()
 
+  -- Use compatibility unpack
+  local unpack_table = table.unpack or unpack
   return elapsed, unpack_table(results)
 end
 
@@ -137,8 +153,13 @@ describe("temp_file_stress_test", function()
         )
       )
       io.flush()
-
-      -- Function to create directory structure recursively
+      --- Recursively creates a nested directory structure with files in each directory.
+      --- Registers created files and directories with the `temp_file` module.
+      ---@param path string The current directory path to build within.
+      ---@param current_depth number The current nesting depth.
+      ---@return nil
+      ---@private
+      ---@throws table If file or directory creation fails critically (via `expect`).
       local function create_dirs(path, current_depth)
         if current_depth > depth then
           return

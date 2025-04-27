@@ -1,19 +1,37 @@
-# Examples Knowledge
-
+# Firmo Examples Knowledge Snippets
 
 ## Purpose
 
+This document serves as a quick reference or cheat sheet, providing concise code snippets demonstrating common patterns found in the Firmo example files located in the `examples/` directory.
 
-Demonstrate Firmo testing framework usage and best practices through practical examples.
+## Key Concepts (Example Areas)
 
-## Basic Test Example
+The `examples/` directory contains practical demonstrations of various Firmo features:
 
+1.  **Basic Tests:** `basic_example.lua` - Shows fundamental `describe`, `it`, `expect`.
+2.  **Assertions:** `assertions_example.lua` - Demonstrates various assertion types.
+3.  **Async Tests:** `async_example.lua` - Shows testing of asynchronous code.
+4.  **Mocking:** `mocking_example.lua` - Illustrates spies, stubs, and mocks.
+5.  **Coverage:** `coverage_example.lua` - Example of running tests with coverage.
+6.  **Error Handling:** `error_handling_example.lua` - Shows patterns for testing errors.
+7.  **Performance:** `performance_example.lua` - Demonstrates benchmarking (if applicable).
+8.  **Integration:** `integration_example.lua` - Example of integrating multiple components.
 
+## Usage Examples / Patterns
+
+*(Note: These snippets assume necessary modules like `firmo`, `test_helper`, `mocking` are required and functions like `expect`, `describe`, `it`, `before`, `after`, `it_async` are available in the scope, typically via `local firmo = require("firmo")` etc.)*
+
+### Basic Test Example
 
 ```lua
--- Basic test structure
+--[[
+  Basic test structure with setup, teardown, and assertions.
+  See: examples/basic_example.lua
+]]
 local firmo = require('firmo')
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+local describe, it, expect, before, after = firmo.describe, firmo.it, firmo.expect, firmo.before, firmo.after
+local test_helper = require("lib.tools.test_helper") -- For error capture
+
 describe('Calculator', function()
   local calculator
 
@@ -29,9 +47,11 @@ describe('Calculator', function()
       end
     }
   end)
+
   it('adds numbers correctly', function()
     expect(calculator.add(2, 2)).to.equal(4)
   end)
+
   it('handles errors properly', { expect_error = true }, function()
     local result, err = test_helper.with_error_capture(function()
       return calculator.divide(1, 0)
@@ -42,13 +62,13 @@ describe('Calculator', function()
 end)
 ```
 
-
-
-## Assertion Examples
-
-
+### Assertion Examples
 
 ```lua
+--[[
+  Demonstrates various assertion types.
+  See: examples/assertions_example.lua
+]]
 -- Basic assertions
 expect(value).to.exist()
 expect(actual).to.equal(expected)
@@ -70,151 +90,128 @@ expect({name = "John"}).to.have_property("name")
 expect({1, 2, 3}).to.contain(2)
 ```
 
-
-
-## Async Testing
-
-
+### Async Testing
 
 ```lua
--- Basic async test
-it.async("completes async operation", function(done)
-  start_async_operation(function(result)
-    expect(result).to.exist()
-    done()
+--[[
+  Shows basic async testing with it_async and wait_until.
+  See: examples/async_example.lua
+]]
+local firmo = require("firmo")
+local describe, it_async, expect = firmo.describe, firmo.it_async, firmo.expect
+local start_async_operation -- Placeholder
+
+describe("Async Examples", function()
+  -- Basic async test using done callback
+  it_async("completes async operation", function(done)
+    start_async_operation(function(result)
+      expect(result).to.exist()
+      done()
+    end)
+  end)
+
+  -- Using wait_until
+  it_async("waits for condition", function()
+    local value = false
+    firmo.await(50) -- Simulate async delay
+    value = true
+
+    firmo.wait_until(function()
+      return value
+    end, 200) -- Wait up to 200ms
+
+    expect(value).to.be_truthy()
   end)
 end)
--- Using wait_until
-it.async("waits for condition", function()
-  local value = false
-  setTimeout(function() value = true end, 50)
-
-  firmo.wait_until(function() 
-    return value 
-  end, 200)
-
-  expect(value).to.be_truthy()
-end)
 ```
 
-
-
-## Mocking Examples
-
-
+### Mocking Examples
 
 ```lua
+--[[
+  Demonstrates spies, stubs, and mocks.
+  See: examples/mocking_example.lua
+]]
+local mocking = require("lib.mocking")
+local firmo = require("firmo") -- For expect
+local expect = firmo.expect
+local table = {} -- Define table for stub example
+
 -- Function spy
-local spy = firmo.spy(function(x) return x * 2 end)
+local spy = mocking.spy(function(x) return x * 2 end)
 spy(5)
 expect(spy).to.be.called()
-expect(spy[1][1]).to.equal(5)
+expect(spy.calls[1].args[1]).to.equal(5) -- Access args correctly
+
 -- Method stub
-local stub = firmo.stub.on(table, "method")
-  .returns("stubbed value")
+local stub = mocking.stub.on(table, "method")
+stub:returns("stubbed value") -- Chain returns correctly
 expect(table.method()).to.equal("stubbed value")
+stub:restore() -- Remember to restore
+
 -- Full mock
-local mock = firmo.mock.new()
-mock.method.returns("mocked")
+local mock = mocking.mock({}) -- Create mock from empty table
+mock:stub("method"):returns("mocked") -- Use :stub():returns()
 expect(mock.method()).to.equal("mocked")
+mock:verify() -- Verify calls if needed
 ```
 
-
-
-## Error Handling
-
-
+### Error Handling
 
 ```lua
--- Basic error testing
+--[[
+  Shows patterns for testing code that should produce errors.
+  See: examples/error_handling_example.lua
+]]
+local firmo = require("firmo")
+local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+local test_helper = require("lib.tools.test_helper")
+local error_handler = require("lib.core.error_handler")
+
+-- Basic error testing using expect_error flag
 it("handles errors", { expect_error = true }, function()
   local result, err = test_helper.with_error_capture(function()
-    return function_that_throws()
+    return function_that_throws() -- Placeholder
   end)()
   expect(err).to.exist()
   expect(err.message).to.match("pattern")
 end)
--- Complex error scenario
+
+-- Complex error scenario using try/catch from error_handler
 describe("Error handling", function()
   it("handles nested errors", function()
     local function deep_error()
-      error_handler.try(function()
+      local success, result = error_handler.try(function()
         error("inner error")
       end)
+      if not success then error(result) end -- Re-throw if needed
     end
 
-    local _, err = test_helper.with_error_capture(function()
-      return deep_error()
-    end)()
+    local _, err = test_helper.with_error_capture(deep_error) -- Call wrapped function
 
     expect(err).to.exist()
-    expect(err.stack).to.exist()
+    -- expect(err.stack).to.exist() -- Stack might not be standard field
   end)
 end)
 ```
 
-
-
-## Critical Rules
-
-
-
-- Use expect-style assertions
-- Always test error cases
-- Clean up resources
-- Document examples
-- Keep focused
-- Handle errors properly
-
-
-## Best Practices
-
-
-
-- Start with basic examples
-- Use assertions correctly
-- Handle errors properly
-- Clean up resources
-- Document behavior
-- Test edge cases
-- Keep focused
-- Follow patterns
-- Use helpers
-- Monitor performance
-
-
-## Example Categories
-
-
-
-1. Basic Tests: basic_example.lua
-2. Assertions: assertions_example.lua
-3. Async Tests: async_example.lua
-4. Mocking: mocking_example.lua
-5. Coverage: coverage_example.lua
-6. Error Handling: error_handling_example.lua
-7. Performance: performance_example.lua
-8. Integration: integration_example.lua
-
-
 ## Running Examples
 
-
+You can run the example files directly using the Firmo test runner:
 
 ```bash
-
 # Run single example
-
-
 lua test.lua examples/basic_example.lua
 
 # Run with coverage
-
-
 lua test.lua --coverage examples/coverage_example.lua
 
-# Run all examples
-
-
+# Run all examples in the directory
 lua test.lua examples/
 ```
+
+## Related Components / Modules
+
+-   **Examples Directory:** [`examples/`](./) - Contains the full source code for these patterns.
+-   **Getting Started Guide:** [`docs/guides/getting-started.md`](../guides/getting-started.md) - Introduces basic Firmo usage.
+-   **API Reference & Guides:** Refer to the specific API/Guide documents for detailed information on functions used in the examples (e.g., Assertions, Mocking, Async). See [`docs/firmo/knowledge.md`](../firmo/knowledge.md) for an index.

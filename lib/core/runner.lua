@@ -1,94 +1,141 @@
----@class TestRunner
----@field run_file fun(file: string): table, table|nil Run a single test file and return test results and any error information
----@field run_discovered fun(dir?: string, pattern?: string): boolean, table|nil Run all discovered test files in a directory matching a pattern
----@field run_tests fun(files: table, options?: {coverage?: boolean, watch?: boolean, quality?: boolean, quality_level?: number, clean?: boolean, format?: string, report_dir?: string, dry_run?: boolean, fail_fast?: boolean, parallel?: boolean}): boolean, table Run a list of test files with various execution options
----@field execute_test fun(test: table): boolean, table|nil Execute a single test case and return success status and results
----@field run_all_tests fun(files: table, options?: table): boolean, table Run all tests in multiple files and aggregate results
----@field configure fun(options: {coverage?: boolean, watch?: boolean, quality?: boolean, quality_level?: number, clean?: boolean, format?: string, report_dir?: string, dry_run?: boolean, fail_fast?: boolean, parallel?: boolean}): TestRunner Configure the test runner with various options
----@field format fun(options: {use_color?: boolean, indent_char?: string, indent_size?: number, show_trace?: boolean, show_success_detail?: boolean, compact?: boolean, dot_mode?: boolean, summary_only?: boolean}): TestRunner Configure output formatting options
----@field format_options FormatOptions Current output formatting options 
----@field nocolor fun(): TestRunner Disable colors in the output (for terminals that don't support ANSI color codes)
----@field before_file_run fun(callback: fun(file_path: string)): TestRunner Register a callback to run before executing each test file
----@field after_file_run fun(callback: fun(file_path: string, results: table)): TestRunner Register a callback to run after executing each test file
----@field on_test_error fun(callback: fun(test: table, error: table)): TestRunner Register a callback for test execution errors
----@field get_stats fun(): {files: number, tests: number, executed: number, passed: number, failed: number, skipped: number, time: number} Get test execution statistics
----@field set_environment fun(env_variables: table<string, string>): TestRunner Set environment variables for test execution
+---@class TestRunner The public API of the test runner module.
+---@field run_file fun(file: string): {success: boolean, passes: number, errors: number, skipped: number, file: string}, table|nil Runs a single test file. Returns results table and optional error object.
+---@field run_discovered fun(dir?: string, pattern?: string): boolean, table|nil Discovers and runs test files. Returns overall success flag and optional error object.
+---@field run_tests fun(files: string[], options?: {parallel?: boolean, coverage?: boolean, verbose?: boolean, timeout?: number}): boolean Runs a list of test files. Returns overall success flag.
+---@field execute_test fun(...) [Not Implemented] Execute a single test case and return success status and results.
+---@field run_all_tests fun(...) [Not Implemented] Run all tests in multiple files and aggregate results.
+---@field configure fun(options: {format?: FormatOptions, parallel?: boolean, coverage?: boolean, verbose?: boolean, timeout?: number, cleanup_temp_files?: boolean}): TestRunner Configures the test runner.
+---@field format fun(options: FormatOptions): TestRunner Configures output formatting options.
+---@field format_options FormatOptions Current output formatting options.
+---@field nocolor fun(): TestRunner Disables colored output.
+---@field before_file_run fun(...) [Not Implemented] Register a callback to run before executing each test file.
+---@field after_file_run fun(...) [Not Implemented] Register a callback to run after executing each test file.
+---@field on_test_error fun(...) [Not Implemented] Register a callback for test execution errors.
+---@field get_stats fun(...) [Not Implemented] Get test execution statistics.
+---@field set_environment fun(...) [Not Implemented] Set environment variables for test execution.
 
---- Test runner module for Firmo
+--- Test Runner Module for Firmo
+---
 --- This module manages the execution of test files, provides output formatting,
 --- and coordinates test lifecycle operations. It serves as the central coordinator
 --- for the testing framework, handling test discovery, execution, result collection,
---- and reporting. The runner can execute tests in parallel or sequentially,
---- with various configuration options for output formatting and test execution.
+--- and potentially interacting with reporting, coverage, and parallel execution modules.
 ---
 --- Features:
---- - Test file discovery and execution
---- - Test environment preparation and cleanup
---- - Output formatting with color, indentation, and verbosity options
---- - Test result collection and reporting
---- - Integration with coverage, quality, and reporting modules
---- - Support for parallel test execution
---- - Temporary file cleanup and tracking
---- - Extensibility via callbacks for test lifecycle events
+--- - Test file discovery (via `lib.tools.discover` or `lib.tools.filesystem`) and execution.
+--- - Basic sequential execution of test files.
+--- - Optional parallel execution via `lib.tools.parallel` (if available and configured).
+--- - Test state management via `lib.core.test_definition`.
+--- - Configurable output formatting (`use_color`, `indent`, `dot_mode`, `summary_only`).
+--- - Integration with `lib.tools.error_handler` for structured errors.
+--- - Integration with `lib.tools.filesystem.temp_file` for context setting.
+--- - Basic summary reporting to the console.
 ---
---- @version 0.4.0
+--- @module lib.core.runner
 --- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 0.4.0
 
 local M = {}
 
 -- Load required modules
-local error_handler = require("lib.tools.error_handler")
-local logging = require("lib.tools.logging")
-local logger = logging.get_logger("TestRunner")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
 
---- Safely require a module without raising an error if it doesn't exist
----@param name string The name of the module to require
----@return table|nil The loaded module or nil if it couldn't be loaded
-local function try_require(name)
-  local success, mod = pcall(require, name)
-  if success then return mod end
-  return nil
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
 end
 
--- Load filesystem module
-local fs = try_require("lib.tools.filesystem")
-if not fs then
-  error_handler.throw(
-    "Required module 'lib.tools.filesystem' could not be loaded",
-    error_handler.CATEGORY.CONFIGURATION,
-    error_handler.SEVERITY.FATAL,
-    { module = "test_runner" }
-  )
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
 end
 
--- Try to load optional modules
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("runner")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+
+-- Load mandatory modules with fatal error handling
 local discover_module = try_require("lib.tools.discover")
 local test_definition = try_require("lib.core.test_definition")
 local central_config = try_require("lib.core.central_config")
 local parallel_module = try_require("lib.tools.parallel")
 local temp_file = try_require("lib.tools.filesystem.temp_file")
 
---- Output formatting options for the test runner
----@class FormatOptions
----@field use_color boolean Whether to use color codes in output
----@field indent_char string Character to use for indentation (tab or spaces)
----@field indent_size number How many indent_chars to use per level
----@field show_trace boolean Show stack traces for errors
----@field show_success_detail boolean Show details for successful tests
----@field compact boolean Use compact output format (less verbose)
----@field dot_mode boolean Use dot mode (. for pass, F for fail)
----@field summary_only boolean Show only summary, not individual tests
+--- Output formatting options used by the test runner.
+---@field use_color boolean Whether to use ANSI color codes in console output.
+---@field indent_char string Character(s) used for one level of indentation (e.g., `"\t"` or `"  "`).
+---@field indent_size number Number of `indent_char` repetitions per indentation level.
+---@field show_trace boolean If `true`, show stack traces for test failures.
+---@field show_success_detail boolean If `true`, show details even for successful tests (usually just the name). If `false`, successful tests might be hidden depending on other options.
+---@field compact boolean If `true`, use a more compact output format (implementation specific, may interact with `dot_mode`).
+---@field dot_mode boolean If `true`, display `.` for passed tests, `F` for failed, `S` for skipped, reducing output verbosity significantly.
+---@field summary_only boolean If `true`, suppress individual test results and only display the final summary counts.
 
 -- Set up default formatter options
 M.format_options = {
-  use_color = true,       -- Whether to use color codes in output
-  indent_char = "\t",     -- Character to use for indentation (tab or spaces)
-  indent_size = 1,        -- How many indent_chars to use per level
-  show_trace = false,     -- Show stack traces for errors
+  use_color = true, -- Whether to use color codes in output
+  indent_char = "\t", -- Character to use for indentation (tab or spaces)
+  indent_size = 1, -- How many indent_chars to use per level
+  show_trace = false, -- Show stack traces for errors
   show_success_detail = true, -- Show details for successful tests
-  compact = false,        -- Use compact output format (less verbose)
-  dot_mode = false,       -- Use dot mode (. for pass, F for fail)
-  summary_only = false,   -- Show only summary, not individual tests
+  compact = false, -- Use compact output format (less verbose)
+  dot_mode = false, -- Use dot mode (. for pass, F for fail)
+  summary_only = false, -- Show only summary, not individual tests
 }
 
 -- Set up colors based on format options
@@ -122,10 +169,12 @@ local cyan = string.char(27) .. "[36m"
 ---@type string
 local normal = string.char(27) .. "[0m"
 
--- Helper function for indentation with configurable char and size
---- Generate indentation string based on the current level
----@param level? number The indentation level (defaults to current test level)
----@return string The indentation string
+--- Generates an indentation string based on the current test nesting level.
+--- Uses the `indent_char` and `indent_size` from `M.format_options`.
+--- Retrieves the current level from `test_definition` if available.
+---@param level? number Optional indentation level override. Defaults to the current level from `test_definition` or 0.
+---@return string The generated indentation string.
+---@private
 local function indent(level)
   level = level or (test_definition and test_definition.get_state().level or 0)
   local indent_char = M.format_options.indent_char
@@ -133,17 +182,18 @@ local function indent(level)
   return string.rep(indent_char, level * indent_size)
 end
 
---- Disable colors in output for non-terminal output or color-blind users
----@return nil
+--- Disables ANSI color codes in the output by setting `M.format_options.use_color` to false
+--- and clearing the internal color variables.
+---@return TestRunner The module instance (`M`) for method chaining.
+---@throws table If an error occurs while applying the setting (unlikely but possible).
 function M.nocolor()
   -- No need for parameter validation as this function takes no parameters
-
-  logger.debug("Disabling colors in output", {
+  get_logger().debug("Disabling colors in output", {
     function_name = "nocolor",
   })
 
   -- Apply change with error handling in case of any terminal-related issues
-  local success, err = error_handler.try(function()
+  local success, err = get_error_handler().try(function()
     M.format_options.use_color = false
     ---@diagnostic disable-next-line: unused-local
     red, green, yellow, blue, magenta, cyan, normal = "", "", "", "", "", "", ""
@@ -151,14 +201,14 @@ function M.nocolor()
   end)
 
   if not success then
-    logger.error("Failed to disable colors", {
-      error = error_handler.format_error(err),
+    get_logger().error("Failed to disable colors", {
+      error = get_error_handler().format_error(err),
       function_name = "nocolor",
     })
-    error_handler.throw(
-      "Failed to disable colors: " .. error_handler.format_error(err),
-      error_handler.CATEGORY.RUNTIME,
-      error_handler.SEVERITY.ERROR,
+    get_error_handler().throw(
+      "Failed to disable colors: " .. get_error_handler().format_error(err),
+      get_error_handler().CATEGORY.RUNTIME,
+      get_error_handler().SEVERITY.ERROR,
       { function_name = "nocolor" }
     )
   end
@@ -181,7 +231,8 @@ end
 ---@field options.compact boolean? Use compact output format (less verbose)
 ---@field options.dot_mode boolean? Use dot mode (. for pass, F for fail)
 ---@field options.summary_only boolean? Show only summary, not individual tests
----@return TestRunner The module instance for method chaining
+---@return TestRunner The module instance (`M`) for method chaining.
+---@throws table If `options` validation fails or applying options fails.
 ---
 ---@usage
 --- -- Configure runner with colored output
@@ -209,45 +260,46 @@ end
 ---   .format({ use_color = true, show_trace = true })
 ---   .configure({ coverage = true })
 ---   .run_discovered("tests")
+---@param options FormatOptions A table containing formatting options to apply. See `FormatOptions` class definition.
 function M.format(options)
   -- Parameter validation
   if options == nil then
-    local err = error_handler.validation_error("Options cannot be nil", {
+    local err = get_error_handler().validation_error("Options cannot be nil", {
       parameter = "options",
       function_name = "format",
     })
 
-    logger.error("Parameter validation failed", {
-      error = error_handler.format_error(err),
+    get_logger().error("Parameter validation failed", {
+      error = get_error_handler().format_error(err),
       operation = "format",
     })
 
-    error_handler.throw(err.message, err.category, err.severity, err.context)
+    get_error_handler().throw(err.message, err.category, err.severity, err.context)
   end
 
   if type(options) ~= "table" then
-    local err = error_handler.validation_error("Options must be a table", {
+    local err = get_error_handler().validation_error("Options must be a table", {
       parameter = "options",
       provided_type = type(options),
       function_name = "format",
     })
 
-    logger.error("Parameter validation failed", {
-      error = error_handler.format_error(err),
+    get_logger().error("Parameter validation failed", {
+      error = get_error_handler().format_error(err),
       operation = "format",
     })
 
-    error_handler.throw(err.message, err.category, err.severity, err.context)
+    get_error_handler().throw(err.message, err.category, err.severity, err.context)
   end
 
-  logger.debug("Configuring format options", {
+  get_logger().debug("Configuring format options", {
     function_name = "format",
     option_count = (options and type(options) == "table") and #options or 0,
   })
 
   -- Apply format options with error handling
   local unknown_options = {}
-  local success, apply_err = error_handler.try(function()
+  local success, apply_err = get_error_handler().try(function()
     for k, v in pairs(options) do
       if M.format_options[k] ~= nil then
         M.format_options[k] = v
@@ -260,7 +312,7 @@ function M.format(options)
 
   -- Handle unknown options
   if #unknown_options > 0 then
-    local err = error_handler.validation_error("Unknown format option(s): " .. table.concat(unknown_options, ", "), {
+    local err = get_error_handler().validation_error("Unknown format option(s): " .. table.concat(unknown_options, ", "), {
       function_name = "format",
       unknown_options = unknown_options,
       valid_options = (function()
@@ -272,32 +324,32 @@ function M.format(options)
       end)(),
     })
 
-    logger.error("Unknown format options provided", {
-      error = error_handler.format_error(err),
+    get_logger().error("Unknown format options provided", {
+      error = get_error_handler().format_error(err),
       operation = "format",
       unknown_options = unknown_options,
     })
 
-    error_handler.throw(err.message, err.category, err.severity, err.context)
+    get_error_handler().throw(err.message, err.category, err.severity, err.context)
   end
 
   -- Handle general application errors
   if not success then
-    logger.error("Failed to apply format options", {
-      error = error_handler.format_error(apply_err),
+    get_logger().error("Failed to apply format options", {
+      error = get_error_handler().format_error(apply_err),
       operation = "format",
     })
 
-    error_handler.throw(
-      "Failed to apply format options: " .. error_handler.format_error(apply_err),
-      error_handler.CATEGORY.RUNTIME,
-      error_handler.SEVERITY.ERROR,
+    get_error_handler().throw(
+      "Failed to apply format options: " .. get_error_handler().format_error(apply_err),
+      get_error_handler().CATEGORY.RUNTIME,
+      get_error_handler().SEVERITY.ERROR,
       { function_name = "format" }
     )
   end
 
   -- Update colors if needed
-  local color_success, color_err = error_handler.try(function()
+  local color_success, color_err = get_error_handler().try(function()
     if not M.format_options.use_color then
       -- Call nocolor but catch errors explicitly here
       M.format_options.use_color = false
@@ -315,21 +367,21 @@ function M.format(options)
   end)
 
   if not color_success then
-    logger.error("Failed to update color settings", {
-      error = error_handler.format_error(color_err),
+    get_logger().error("Failed to update color settings", {
+      error = get_error_handler().format_error(color_err),
       operation = "format",
       use_color = M.format_options.use_color,
     })
 
-    error_handler.throw(
-      "Failed to update color settings: " .. error_handler.format_error(color_err),
-      error_handler.CATEGORY.RUNTIME,
-      error_handler.SEVERITY.ERROR,
+    get_error_handler().throw(
+      "Failed to update color settings: " .. get_error_handler().format_error(color_err),
+      get_error_handler().CATEGORY.RUNTIME,
+      get_error_handler().SEVERITY.ERROR,
       { function_name = "format", use_color = M.format_options.use_color }
     )
   end
 
-  logger.debug("Format options configured successfully", {
+  get_logger().debug("Format options configured successfully", {
     function_name = "format",
     use_color = M.format_options.use_color,
     show_trace = M.format_options.show_trace,
@@ -351,8 +403,9 @@ end
 ---@field options.coverage boolean? Whether to track code coverage during test execution
 ---@field options.verbose boolean? Whether to show verbose output including test details
 ---@field options.timeout number? Timeout in milliseconds for test execution (default: 30000)
----@field options.cleanup_temp_files boolean? Whether to clean up temporary files (defaults to true)
----@return TestRunner The module instance for method chaining
+---@field options.cleanup_temp_files boolean? Whether to automatically clean up temporary files created via `lib.tools.filesystem.temp_file` (defaults to `true`).
+---@return TestRunner The module instance (`M`) for method chaining.
+---@throws table If configuration fails (e.g., applying format options, configuring parallel module, configuring temp file system).
 ---
 ---@usage
 --- -- Basic configuration with coverage
@@ -384,16 +437,16 @@ end
 --- runner
 ---   .configure({ coverage = true, parallel = true })
 ---   .run_discovered("tests", "*_test.lua")
+---@param options {format?: FormatOptions, parallel?: boolean, coverage?: boolean, verbose?: boolean, timeout?: number, cleanup_temp_files?: boolean} Configuration options.
 function M.configure(options)
   options = options or {}
-  
   -- Apply configuration options with error handling
-  local success, err = error_handler.try(function()
+  local success, err = get_error_handler().try(function()
     -- Configure formatting options
     if options.format then
       M.format(options.format)
     end
-    
+
     -- Configure parallel execution if available
     if parallel_module and options.parallel then
       parallel_module.configure({
@@ -401,35 +454,35 @@ function M.configure(options)
         print_output = options.verbose,
         timeout = options.timeout or 30000,
         show_progress = true,
-        isolate_state = true
+        isolate_state = true,
       })
     end
-    
+
     -- Configure temp file system if available
     if temp_file and options.cleanup_temp_files ~= false then
       temp_file.configure({
         auto_cleanup = true,
-        track_files = true
+        track_files = true,
       })
     end
-    
+
     return true
   end)
-  
+
   if not success then
-    logger.error("Failed to configure test runner", {
-      error = error_handler.format_error(err),
+    get_logger().error("Failed to configure test runner", {
+      error = get_error_handler().format_error(err),
       operation = "configure",
     })
-    
-    error_handler.throw(
-      "Failed to configure test runner: " .. error_handler.format_error(err),
-      error_handler.CATEGORY.CONFIGURATION,
-      error_handler.SEVERITY.ERROR,
+
+    get_error_handler().throw(
+      "Failed to configure test runner: " .. get_error_handler().format_error(err),
+      get_error_handler().CATEGORY.CONFIGURATION,
+      get_error_handler().SEVERITY.ERROR,
       { function_name = "configure" }
     )
   end
-  
+
   return M
 end
 
@@ -439,9 +492,9 @@ end
 --- file management, and error handling. It provides detailed results about the
 --- executed tests, including counts of passed, failed, and skipped tests.
 ---
----@param file string The absolute path to the test file to run
----@return {success: boolean, passes: number, errors: number, skipped: number, file: string} results Test execution results with counts
----@return table|nil error Error information if execution failed
+---@param file string The path to the test file to execute. Should preferably be an absolute path.
+---@return {success: boolean, passes: number, errors: number, skipped: number, file: string}, table|nil results Test execution results (counts and file path), and an optional error object if execution failed catastrophically (e.g., file not found, syntax error).
+---@throws table If the `file` parameter validation fails (nil or not a string).
 ---
 ---@usage
 --- -- Run a single test file and handle results
@@ -469,27 +522,27 @@ end
 function M.run_file(file)
   -- Parameter validation
   if not file then
-    local err = error_handler.validation_error("File path cannot be nil", {
+    local err = get_error_handler().validation_error("File path cannot be nil", {
       parameter = "file",
       function_name = "run_file",
     })
 
-    logger.error("Parameter validation failed", {
-      error = error_handler.format_error(err),
+    get_logger().error("Parameter validation failed", {
+      error = get_error_handler().format_error(err),
       operation = "run_file",
     })
     return { success = false, errors = 1 }, err
   end
 
   if type(file) ~= "string" then
-    local err = error_handler.validation_error("File path must be a string", {
+    local err = get_error_handler().validation_error("File path must be a string", {
       parameter = "file",
       provided_type = type(file),
       function_name = "run_file",
     })
 
-    logger.error("Parameter validation failed", {
-      error = error_handler.format_error(err),
+    get_logger().error("Parameter validation failed", {
+      error = get_error_handler().format_error(err),
       operation = "run_file",
     })
     return { success = false, errors = 1 }, err
@@ -500,17 +553,17 @@ function M.run_file(file)
     test_definition.reset()
   end
 
-  logger.debug("Running test file", {
+  get_logger().debug("Running test file", {
     file = file,
   })
 
-  -- Load the test file using error_handler.try
-  local success, result = error_handler.try(function()
+  -- Load the test file using get_error_handler().try
+  local success, result = get_error_handler().try(function()
     -- First check if the file exists
     ---@diagnostic disable-next-line: need-check-nil
-    local exists, exists_err = fs.file_exists(file)
+    local exists, exists_err = get_fs().file_exists(file)
     if not exists then
-      return nil, error_handler.io_error("Test file does not exist", {
+      return nil, get_error_handler().io_error("Test file does not exist", {
         file = file,
       }, exists_err)
     end
@@ -519,36 +572,34 @@ function M.run_file(file)
       print("Running test file: " .. file)
     end
 
-    -- Set context for temp file tracking if available
-    if temp_file and temp_file.set_current_test_context then
-      temp_file.set_current_test_context({
-        type = "file",
-        path = file,
-      })
-    end
+    -- Set context for temp file tracking
+    temp_file.set_current_test_context({
+      type = "file",
+      path = file,
+    })
 
     -- Load and execute the test file
     local chunk, chunk_err = loadfile(file)
     if not chunk then
-      return nil, error_handler.runtime_error("Failed to load test file", {
-        file = file,
-        error = tostring(chunk_err),
-      })
+      return nil,
+        get_error_handler().runtime_error("Failed to load test file", {
+          file = file,
+          error = tostring(chunk_err),
+        })
     end
 
     -- Execute the chunk
     local exec_success, exec_result = pcall(chunk)
     if not exec_success then
-      return nil, error_handler.runtime_error("Error executing test file", {
-        file = file,
-        error = tostring(exec_result),
-      })
+      return nil,
+        get_error_handler().runtime_error("Error executing test file", {
+          file = file,
+          error = tostring(exec_result),
+        })
     end
 
     -- Clear temp file context
-    if temp_file and temp_file.set_current_test_context then
-      temp_file.set_current_test_context(nil)
-    end
+    temp_file.set_current_test_context(nil)
 
     -- Get test results
     local test_state = {
@@ -572,14 +623,14 @@ function M.run_file(file)
 
   if not success then
     -- Handle errors during file execution
-    logger.error("Failed to run test file", {
+    get_logger().error("Failed to run test file", {
       file = file,
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
 
     if not M.format_options.summary_only then
       print(red .. "ERROR" .. normal .. " Failed to run test file: " .. file)
-      print(red .. error_handler.format_error(result) .. normal)
+      print(red .. get_error_handler().format_error(result) .. normal)
     end
 
     return {
@@ -588,7 +639,8 @@ function M.run_file(file)
       passes = 0,
       skipped = 0,
       file = file,
-    }, result
+    },
+      result
   end
 
   -- Return the test results
@@ -603,8 +655,9 @@ end
 ---
 ---@param dir? string Directory to search for test files (default: "tests")
 ---@param pattern? string Pattern to filter test files (default: "*_test.lua")
----@return boolean success Whether all discovered tests passed successfully
----@return table|nil error Error information if discovery or execution failed
+---@return boolean success Overall success status (`true` if all tests in all discovered files passed, `false` otherwise).
+---@return table|nil error An error object if discovery or parameter validation failed, otherwise `nil`. Note: Individual test failures do not populate this error return; check the boolean `success` flag for test failures.
+---@throws table If parameter validation fails.
 ---
 ---@usage
 --- -- Run all tests in the default directory
@@ -633,28 +686,28 @@ end
 function M.run_discovered(dir, pattern)
   -- Parameter validation
   if dir ~= nil and type(dir) ~= "string" then
-    local err = error_handler.validation_error("Directory must be a string", {
+    local err = get_error_handler().validation_error("Directory must be a string", {
       parameter = "dir",
       provided_type = type(dir),
       function_name = "run_discovered",
     })
 
-    logger.error("Parameter validation failed", {
-      error = error_handler.format_error(err),
+    get_logger().error("Parameter validation failed", {
+      error = get_error_handler().format_error(err),
       operation = "run_discovered",
     })
     return false, err
   end
 
   if pattern ~= nil and type(pattern) ~= "string" then
-    local err = error_handler.validation_error("Pattern must be a string", {
+    local err = get_error_handler().validation_error("Pattern must be a string", {
       parameter = "pattern",
       provided_type = type(pattern),
       function_name = "run_discovered",
     })
 
-    logger.error("Parameter validation failed", {
-      error = error_handler.format_error(err),
+    get_logger().error("Parameter validation failed", {
+      error = get_error_handler().format_error(err),
       operation = "run_discovered",
     })
     return false, err
@@ -664,7 +717,7 @@ function M.run_discovered(dir, pattern)
   dir = dir or "tests"
   pattern = pattern or "*_test.lua"
 
-  logger.info("Running discovered tests", {
+  get_logger().info("Running discovered tests", {
     directory = dir,
     pattern = pattern,
   })
@@ -672,31 +725,31 @@ function M.run_discovered(dir, pattern)
   local files
   local discover_err
 
-  -- Use discover_module if available, otherwise fallback to fs.discover_files
+  -- Use discover_module if available, otherwise fallback to get_fs().discover_files
   if discover_module and discover_module.discover then
     local result = discover_module.discover(dir, pattern)
     if result then
       files = result.files
     else
-      discover_err = error_handler.io_error("Failed to discover test files", {
+      discover_err = get_error_handler().io_error("Failed to discover test files", {
         directory = dir,
         pattern = pattern,
       })
     end
-  elseif fs and fs.discover_files then
-    files, discover_err = fs.discover_files(dir, pattern)
+  elseif fs and get_fs().discover_files then
+    files, discover_err = get_fs().discover_files(dir, pattern)
   else
-    discover_err = error_handler.configuration_error("No test discovery mechanism available", {
+    discover_err = get_error_handler().configuration_error("No test discovery mechanism available", {
       directory = dir,
       pattern = pattern,
     })
   end
 
   if not files or #files == 0 then
-    logger.error("No test files found", {
+    get_logger().error("No test files found", {
       directory = dir,
       pattern = pattern,
-      error = discover_err and error_handler.format_error(discover_err) or nil,
+      error = discover_err and get_error_handler().format_error(discover_err) or nil,
     })
 
     if not M.format_options.summary_only then
@@ -706,7 +759,7 @@ function M.run_discovered(dir, pattern)
     return false, discover_err
   end
 
-  logger.info("Found test files", {
+  get_logger().info("Found test files", {
     directory = dir,
     pattern = pattern,
     count = #files,
@@ -730,9 +783,10 @@ end
 ---@param options? {parallel?: boolean, coverage?: boolean, verbose?: boolean, timeout?: number} Additional options for test execution
 ---@field options.parallel boolean Whether to run tests in parallel using parallel_module
 ---@field options.coverage boolean Whether to track code coverage
----@field options.verbose boolean Whether to show verbose output
----@field options.timeout number Timeout in milliseconds for test execution (default: 30000)
----@return boolean success Whether all tests passed successfully
+---@field options.verbose boolean If `true`, enable more detailed output during execution (may depend on parallel execution settings).
+---@field options.timeout number Timeout in milliseconds for parallel test execution (default: 30000).
+---@return boolean success `true` if all tests in all executed files passed, `false` otherwise.
+---@throws table If the `files` parameter validation fails.
 ---
 ---@usage
 --- -- Run a list of test files sequentially
@@ -756,30 +810,32 @@ end
 ---   verbose = false,                       -- Minimal output
 ---   timeout = 10000                        -- 10 second timeout
 --- })
+---@param files string[] An array of test file paths to execute.
+---@param options? {parallel?: boolean, coverage?: boolean, verbose?: boolean, timeout?: number} Optional configuration for this run.
 function M.run_tests(files, options)
   -- Parameter validation
   if not files then
-    local err = error_handler.validation_error("Files cannot be nil", {
+    local err = get_error_handler().validation_error("Files cannot be nil", {
       parameter = "files",
       function_name = "run_tests",
     })
 
-    logger.error("Parameter validation failed", {
-      error = error_handler.format_error(err),
+    get_logger().error("Parameter validation failed", {
+      error = get_error_handler().format_error(err),
       operation = "run_tests",
     })
     return false
   end
 
   if type(files) ~= "table" then
-    local err = error_handler.validation_error("Files must be a table", {
+    local err = get_error_handler().validation_error("Files must be a table", {
       parameter = "files",
       provided_type = type(files),
       function_name = "run_tests",
     })
 
-    logger.error("Parameter validation failed", {
-      error = error_handler.format_error(err),
+    get_logger().error("Parameter validation failed", {
+      error = get_error_handler().format_error(err),
       operation = "run_tests",
     })
     return false
@@ -799,16 +855,16 @@ function M.run_tests(files, options)
       print_output = options.verbose or false,
       timeout = options.timeout or 30000,
       show_progress = true,
-      isolate_state = true
+      isolate_state = true,
     })
 
     -- Run files in parallel
-    logger.info("Running tests in parallel", {
+    get_logger().info("Running tests in parallel", {
       file_count = #files,
     })
 
     local results = parallel_module.run_files(files)
-    
+
     -- Process results
     for _, result in ipairs(results) do
       if result.success then
@@ -821,17 +877,17 @@ function M.run_tests(files, options)
     end
   else
     -- Run files sequentially
-    logger.info("Running tests sequentially", {
+    get_logger().info("Running tests sequentially", {
       file_count = #files,
     })
 
     for _, file in ipairs(files) do
       local result, _ = M.run_file(file)
-      
+
       total_passes = total_passes + (result.passes or 0)
       total_errors = total_errors + (result.errors or 0)
       total_skipped = total_skipped + (result.skipped or 0)
-      
+
       if not result.success or result.errors > 0 then
         all_success = false
       end
@@ -847,16 +903,18 @@ function M.run_tests(files, options)
     print("- Total:    " .. (total_passes + total_errors + total_skipped))
     print(all_success and green .. "All tests passed!" .. normal or red .. "There were test failures!" .. normal)
   else
-    print("\n" .. (all_success and green .. "All tests passed!" .. normal or red .. "There were test failures!" .. normal))
+    print(
+      "\n" .. (all_success and green .. "All tests passed!" .. normal or red .. "There were test failures!" .. normal)
+    )
     print("Passes: " .. total_passes .. ", Failures: " .. total_errors .. ", Skipped: " .. total_skipped)
   end
 
   if total_errors > 0 then
-    logger.error("Test failures detected in file", {
+    get_logger().error("Test failures detected in file", {
       success = false,
       errors = total_errors,
       path = file,
-      test_errors = total_errors
+      test_errors = total_errors,
     })
   end
 

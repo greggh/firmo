@@ -1,7 +1,19 @@
--- Test for the error_handler.rethrow function
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Error Handler `rethrow` Function Tests
+---
+--- Verifies the functionality of `error_handler.rethrow`, ensuring that it:
+--- - Correctly rethrows simple string errors.
+--- - Correctly rethrows structured error objects created by the error handler.
+--- - Merges additional context provided during the `rethrow` call into the logged error object.
+--- Uses `test_helper.with_error_capture` to capture rethrown errors and temporarily
+--- replaces `error_handler.log_error` to inspect the object passed to the logger.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local error_handler = require("lib.tools.error_handler")
+
 local test_helper = require("lib.tools.test_helper")
 
 describe("Error Handler Rethrow", function()
@@ -78,4 +90,3 @@ describe("Error Handler Rethrow", function()
     end)
   end)
 end)
-

@@ -1,124 +1,117 @@
---[[
-    Filesystem - Platform-independent file and directory operations module
-
-    A comprehensive, standalone filesystem module for Lua with minimal dependencies.
-    This module provides a consistent, cross-platform interface for file and directory
-    operations with robust error handling, path manipulation capabilities, and discovery
-    functions.
-
-    Features:
-    - File operations: read, write, append, copy, move, delete
-    - Directory operations: create, delete, list, scan recursively
-    - Path manipulation: join, normalize, get components
-    - File discovery: pattern matching, glob support, recursive search
-    - File metadata: size, timestamps, existence checks
-    - Error handling: consistent nil/error return pattern
-    - Platform independence: works on Windows, macOS, Linux
-
-    Design principles:
-    - Complete independence: Minimal imports from other modules
-    - Generic interface: All functions usable in any Lua project
-    - Minimal dependencies: Only relies on Lua standard library
-    - Platform neutral: Works identically on all platforms
-    - Comprehensive error handling: All functions return nil/error pairs on failure
-    - Cross-version compatibility: Works with Lua 5.1+ and LuaJIT
-
-    @module filesystem
-    @author Firmo Team
-    @license MIT
-    @copyright 2023-2025
-    @version 0.2.5
-]]
-
---- Filesystem module for cross-platform file and directory operations
+--- Filesystem - Platform-independent file and directory operations module
 ---
---- Provides a comprehensive set of file operations with proper error handling:
---- - File operations: reading, writing, appending, copying, moving, and deleting files
---- - Directory operations: creating, listing, scanning, and recursive removal
---- - Path manipulation: joining, normalizing, extracting components
---- - File discovery: pattern matching, glob support, recursive search
---- - File metadata: size, timestamps, existence checks
---- - Platform independence: consistent behavior across Windows, macOS, and Linux
+--- A comprehensive, standalone filesystem module for Lua with minimal dependencies.
+--- Provides a consistent, cross-platform interface for file and directory
+--- operations with robust error handling, path manipulation, and discovery functions.
 ---
+--- Features:
+--- - File operations: read, write, append, copy, move, delete.
+--- - Directory operations: create, delete, list, scan recursively.
+--- - Path manipulation: join, normalize, get components (dir, file, ext).
+--- - File discovery: pattern matching, glob support, recursive search.
+--- - File metadata: size, timestamps, existence checks.
+--- - Error handling: consistent `result|nil, error_message?` return pattern.
+--- - Platform independence: works on Windows, macOS, Linux.
+---
+--- @module lib.tools.filesystem
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 0.2.5
+
 --- All functions follow a consistent error handling pattern:
 --- - Success case: return result
 --- - Failure case: return nil, error_message
 ---
---- @class filesystem
---- @field _VERSION string Module version
---- @field read_file fun(file_path: string): string|nil, string? Read a file's entire contents as a string
---- @field write_file fun(file_path: string, content: string): boolean|nil, string? Write a string to a file, creating parent directories if needed
---- @field append_file fun(file_path: string, content: string): boolean|nil, string? Append a string to an existing file
---- @field file_exists fun(file_path: string): boolean Check if a file exists and is readable
---- @field directory_exists fun(dir_path: string): boolean Check if a directory exists and is accessible
---- @field create_directory fun(dir_path: string): boolean|nil, string? Create a directory (and parent directories if needed)
---- @field ensure_directory_exists fun(dir_path: string): boolean|nil, string? Create a directory if it doesn't exist
---- @field remove_directory fun(dir_path: string, recursive?: boolean): boolean|nil, string? Remove a directory, with optional recursive deletion
---- @field delete_directory fun(dir_path: string, recursive?: boolean): boolean|nil, string? Alias for remove_directory
---- @field remove_file fun(file_path: string): boolean|nil, string? Remove a file
---- @field delete_file fun(file_path: string): boolean|nil, string? Alias for remove_file
---- @field get_directory_contents fun(dir_path: string, include_hidden?: boolean): table|nil, string? Get all items in a directory (optionally including hidden files)
---- @field get_directory_items fun(dir_path: string, include_hidden?: boolean): table<number, string>|nil, string? Get items in a directory
---- @field list_files fun(dir_path: string, include_hidden?: boolean): string[]|nil, string? List files in a directory (non-recursive)
---- @field list_files_recursive fun(dir_path: string, include_hidden?: boolean): string[]|nil, string? List files recursively in a directory and its subdirectories
---- @field list_directories fun(dir_path: string, include_hidden?: boolean): table<number, string>|nil, string? List directories in a directory
---- @field get_file_info fun(file_path: string): {size: number, modified: number, type: string, is_directory: boolean, is_file: boolean, is_link: boolean, permissions: string}|nil, string? Get detailed information about a file
---- @field get_file_size fun(file_path: string): number|nil, string? Get the size of a file in bytes
---- @field get_file_modified_time fun(file_path: string): number|nil, string? Get the last modified time of a file
---- @field get_modified_time fun(file_path: string): number|nil, string? Alias for get_file_modified_time
---- @field get_creation_time fun(file_path: string): number|nil, string? Get the creation time of a file (when available)
---- @field copy_file fun(source_path: string, dest_path: string, overwrite?: boolean): boolean|nil, string? Copy a file from source to destination
---- @field copy_directory fun(source_path: string, dest_path: string, overwrite?: boolean): boolean|nil, string? Recursively copy a directory and its contents
---- @field create_symlink fun(target_path: string, link_path: string): boolean|nil, string? Create a symbolic link pointing to a target
---- @field is_symlink fun(path: string): boolean Check if a path is a symbolic link
---- @field supports_symlinks boolean Flag indicating whether the current platform supports symbolic links
---- @field rename fun(old_path: string, new_path: string): boolean|nil, string? Rename a file or directory
---- @field move_file fun(source_path: string, dest_path: string): boolean|nil, string? Move or rename a file from source to destination
---- @field normalize_path fun(path: string): string|nil Normalize a path (remove .., ., duplicate separators)
---- @field join_paths fun(...: string): string|nil, string? Join multiple path components
---- @field get_directory_name fun(file_path: string): string|nil Get the directory part of a path
---- @field dirname fun(file_path: string): string|nil Get the directory part of a path
---- @field get_directory fun(file_path: string): string|nil Alias for get_directory_name
---- @field get_file_name fun(file_path: string): string|nil, string? Get the filename part of a path
---- @field basename fun(file_path: string): string|nil, string? Get the filename part of a path
---- @field get_filename fun(file_path: string): string|nil, string? Alias for get_file_name
---- @field get_extension fun(file_path: string): string|nil, string? Get the extension of a file without the dot
---- @field get_absolute_path fun(path: string): string|nil, string? Convert relative path to absolute path
---- @field get_relative_path fun(path: string, base: string): string|nil Convert absolute path to relative path from base
---- @field get_current_directory fun(): string|nil, string? Get the current working directory
---- @field set_current_directory fun(dir_path: string): boolean|nil, string? Set the current working directory
---- @field glob fun(pattern: string, base_dir?: string): table<number, string>|nil, string? Find files matching a glob pattern
---- @field glob_to_pattern fun(glob: string): string|nil Convert a glob pattern to a Lua pattern
---- @field matches_pattern fun(path: string, pattern: string): boolean|nil, string? Check if a path matches a pattern
---- @field find_files fun(dir_path: string, pattern: string, recursive?: boolean): table<number, string>|nil, string? Find files matching a pattern
---- @field find_directories fun(dir_path: string, pattern: string, recursive?: boolean): table<number, string>|nil, string? Find directories matching a pattern
---- @field discover_files fun(directories: table, patterns: table, exclude_patterns: table): table|nil, string? Advanced file discovery with include/exclude patterns
---- @field scan_directory fun(path: string, recursive: boolean): table Scan a directory for files
---- @field find_matches fun(files: table, pattern: string): table Filter a list of files by pattern
---- @field is_file fun(path: string): boolean Check if a path is a file
---- @field is_directory fun(path: string): boolean Check if a path is a directory
---- @field is_absolute_path fun(path: string): boolean Check if a path is absolute
-
--- Import error_handler for proper error handling
-local error_handler = require("lib.tools.error_handler")
+---@class filesystem The public API of the filesystem module.
+---@field _VERSION string Module version.
+---@field read_file fun(file_path: string): string|nil, string? Reads a file's content. Returns `content, nil` or `nil, error_message`.
+---@field write_file fun(file_path: string, content: string): boolean|nil, string? Writes content to a file. Returns `true, nil` or `nil, error_message`.
+---@field append_file fun(file_path: string, content: string): boolean|nil, string? Appends content to a file. Returns `true, nil` or `nil, error_message`.
+---@field file_exists fun(file_path: string): boolean Checks if a file exists.
+---@field directory_exists fun(dir_path: string): boolean Checks if a directory exists.
+---@field create_directory fun(dir_path: string): boolean|nil, string? Creates a directory (recursively). Returns `true, nil` or `nil, error_message`.
+---@field ensure_directory_exists fun(dir_path: string): boolean|nil, string? Creates directory if it doesn't exist. Returns `true, nil` or `nil, error_message`.
+---@field remove_directory fun(dir_path: string, recursive?: boolean): boolean|nil, string? Removes a directory. Returns `true, nil` or `nil, error_message`.
+---@field delete_directory fun(dir_path: string, recursive?: boolean): boolean|nil, string? Alias for `remove_directory`.
+---@field remove_file fun(file_path: string): boolean|nil, string? Removes a file. Returns `true, nil` or `nil, error_message`.
+---@field delete_file fun(file_path: string): boolean|nil, string? Alias for `remove_file`.
+---@field get_directory_contents fun(dir_path: string, include_hidden?: boolean): string[]|nil, string? Lists files and directories. Returns `list, nil` or `nil, error_message`.
+---@field get_directory_items fun(dir_path: string, include_hidden?: boolean): string[]|nil, string? Alias for `get_directory_contents`.
+---@field list_files fun(dir_path: string, include_hidden?: boolean): string[]|nil, string? Lists files only (non-recursive). Returns `list, nil` or `nil, error_message`.
+---@field list_files_recursive fun(dir_path: string, include_hidden?: boolean): string[]|nil, string? Lists files recursively. Returns `list, nil` or `nil, error_message`.
+---@field list_directories fun(dir_path: string, include_hidden?: boolean): string[]|nil, string? Lists directories only (non-recursive). Returns `list, nil` or `nil, error_message`.
+---@field get_file_info fun(file_path: string): table|nil, string? Gets file attributes (type, size, modified). Returns `info_table, nil` or `nil, error_message`. (Note: Specific attributes depend on platform and `lfs` availability).
+---@field get_file_size fun(file_path: string): number|nil, string? Gets file size in bytes. Returns `size, nil` or `nil, error_message`.
+---@field get_file_modified_time fun(file_path: string): number|nil, string? Gets last modified time (Unix timestamp). Returns `timestamp, nil` or `nil, error_message`.
+---@field get_modified_time fun(file_path: string): number|nil, string? Alias for `get_file_modified_time`.
+---@field get_creation_time fun(file_path: string): number|nil, string? Gets creation time (Unix timestamp). Returns `timestamp, nil` or `nil, error_message`.
+---@field copy_file fun(source_path: string, dest_path: string): boolean|nil, string? Copies a file. Returns `true, nil` or `nil, error_message`.
+---@field copy_directory fun(source_path: string, dest_path: string, overwrite?: boolean): boolean|nil, string? Recursively copies a directory. Returns `true, nil` or `nil, error_message`.
+---@field create_symlink fun(target_path: string, link_path: string): boolean|nil, string? Creates a symbolic link. Returns `true, nil` or `nil, error_message`.
+---@field is_symlink fun(path: string): boolean Checks if a path is a symbolic link.
+---@field supports_symlinks boolean Flag indicating platform support for symbolic links.
+---@field rename fun(old_path: string, new_path: string): boolean|nil, string? Renames/moves a file or directory. Uses `os.rename`. Returns `true, nil` or `nil, error_message`.
+---@field move_file fun(source_path: string, dest_path: string): boolean|nil, string? Moves a file (uses rename, falls back to copy+delete). Returns `true, nil` or `nil, error_message`.
+---@field normalize_path fun(path: string): string|nil Normalizes a path string. Returns `normalized_path` or `nil`.
+---@field join_paths fun(...: string): string|nil, table? Joins path components. Returns `joined_path, nil` or `nil, error_object`.
+---@field get_directory_name fun(file_path: string): string|nil Gets the directory part of a path.
+---@field dirname fun(file_path: string): string|nil Alias for `get_directory_name`.
+---@field get_directory fun(file_path: string): string|nil Alias for `get_directory_name`.
+---@field get_file_name fun(file_path: string): string|nil, table? Gets the filename part of a path. Returns `filename, nil` or `nil, error_object`.
+---@field basename fun(file_path: string, suffix?: string): string|nil, table? Gets the filename part, optionally removing suffix. Returns `basename, nil` or `nil, error_object`.
+---@field get_filename fun(file_path: string): string|nil, table? Alias for `get_file_name`.
+---@field get_extension fun(file_path: string): string|nil, table? Gets the file extension (without dot). Returns `extension, nil` or `nil, error_object`.
+---@field get_absolute_path fun(path: string): string|nil, table? Converts path to absolute. Returns `absolute_path, nil` or `nil, error_object`.
+---@field get_relative_path fun(path: string, base: string): string|nil Converts path to relative based on `base`. Returns `relative_path` or `nil`.
+---@field get_current_directory fun(): string|nil, string|table? Gets the current working directory. Returns `cwd, nil` or `nil, error`.
+---@field set_current_directory fun(dir_path: string): boolean|nil, string? Sets the current working directory. Returns `true, nil` or `nil, error_message`.
+---@field glob fun(pattern: string, base_dir?: string): string[]|nil, string? Finds files matching a glob pattern. Returns `file_list, nil` or `nil, error_message`.
+---@field glob_to_pattern fun(glob: string): string|nil Converts a glob pattern to a Lua pattern. Returns `lua_pattern` or `nil`.
+---@field matches_pattern fun(path: string, pattern: string): boolean|nil, table? Checks if a path matches a pattern. Returns `matches, nil` or `nil, error_object`.
+---@field find_files fun(dir_path: string, pattern?: string, recursive?: boolean): string[]|nil, string? Finds files matching a pattern. Returns `file_list, nil` or `nil, error_message`.
+---@field find_directories fun(dir_path: string, pattern?: string, recursive?: boolean): string[]|nil, string? Finds directories matching a pattern. Returns `dir_list, nil` or `nil, error_message`.
+---@field discover_files fun(directories: table, patterns?: table, exclude_patterns?: table): string[]|nil, table? Advanced file discovery. Returns `file_list, nil` or `nil, error_object`.
+---@field scan_directory fun(path: string, recursive: boolean): string[] Scans directory recursively or not. Returns `file_list`.
+---@field find_matches fun(files: table, pattern: string): string[] Filters a list of files by pattern. Returns `matching_files`.
+---@field is_file fun(path: string): boolean Checks if a path is a file.
+---@field is_directory fun(path: string): boolean Checks if a path is a directory.
+---@field is_absolute_path fun(path: string): boolean Checks if a path is absolute.
+---@field list_directory fun(dir_path: string, include_hidden?: boolean): string[]|nil, string? Lists all files and directories in a directory. Alias for `get_directory_contents`.
+---@field resolve_symlink fun(path: string): string|nil, string? Resolves a symbolic link to its target path.
+---@field get_symlink_target fun(link_path: string): string|nil, string? Alias for `resolve_symlink`.
+---@class filesystem The public API of the filesystem module.
 
 -- Implementation of the filesystem module
--- This local table will hold all the filesystem functions and be returned at the end of the file
 -- All JSDoc annotations are provided in the class definition at the top of the file
 local fs = {}
+local error_handler_module = nil
 
 -- Module version
 fs._VERSION = "0.2.5"
 
 -- Internal utility functions
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
 
---- Detect if running on Windows operating system
---- This function checks the Lua environment to determine if the code
---- is running on Windows by examining the path separator character
---- in package.config, which is OS-specific.
----
---- @private
---- @return boolean True if running on Windows, false otherwise
+--- gets the error handler for the filesystem module
+local function get_error_handler()
+  if not error_handler_module then
+    error_handler_module = try_require("lib.tools.error_handler")
+  end
+  return error_handler_module
+end
+
+--- Checks if the current operating system is Windows based on the path separator.
+---@return boolean True if running on Windows, false otherwise.
+---@private
 local function is_windows()
   return package.config:sub(1, 1) == "\\"
 end
@@ -134,12 +127,11 @@ local path_separator = is_windows() and "\\" or "/"
 --- denied errors to avoid flooding logs. All filesystem module functions
 --- should use this wrapper for consistent error handling.
 ---
---- @private
---- @generic T
---- @param action fun(...): T The I/O operation function to execute safely
---- @param ... any Additional arguments to pass to the action function
---- @return T|nil result The result of the action function or nil on error
---- @return string|nil error An error message if the action failed
+---@param action function The I/O function to execute. It should return results or `nil, error_message` on failure.
+---@param ... any Arguments to pass to the `action` function.
+---@return any|nil result The first result from `action` if successful, `nil` otherwise.
+---@return string? error An error message string if the action failed, `nil` otherwise. Ignores "Permission denied" errors silently.
+---@private
 local function safe_io_action(action, ...)
   local status, result, err = pcall(action, ...)
   if not status then
@@ -168,10 +160,9 @@ end
 --- It handles error checking and proper file closing even in error cases.
 ---
 --- @param path string Path to the file to read
---- @return string|nil content File contents or nil if an error occurred
---- @return string|nil error Error message if reading failed
+--- @return string|nil content File contents as a string, or `nil` if an error occurred.
+--- @return string? error Error message string if reading failed, `nil` otherwise.
 ---
---- @usage
 --- -- Read a configuration file
 --- local content, err = fs.read_file("/path/to/config.json")
 --- if not content then
@@ -200,10 +191,9 @@ end
 ---
 --- @param path string Path to the file to write
 --- @param content string Content to write to the file
---- @return boolean|nil success True if write was successful, nil on error
---- @return string|nil error Error message if writing failed
+--- @return boolean|nil success `true` if write was successful, `nil` otherwise.
+--- @return string? error Error message string if writing failed, `nil` otherwise.
 ---
---- @usage
 --- -- Write a configuration file
 --- local success, err = fs.write_file("/path/to/config.json", json.encode(config_data))
 --- if not success then
@@ -251,8 +241,8 @@ end
 ---
 --- @param path string Path to the file to append to
 --- @param content string Content to append to the file
---- @return boolean|nil success True if append was successful, nil on error
---- @return string|nil error Error message if appending failed
+--- @return boolean|nil success `true` if append was successful, `nil` otherwise.
+--- @return string? error Error message string if appending failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Append a line to a log file
@@ -294,8 +284,8 @@ end
 ---
 --- @param source string Path to the source file
 --- @param destination string Path to the destination file
---- @return boolean|nil success True if copy was successful, nil on error
---- @return string|nil error Error message if copying failed
+--- @return boolean|nil success `true` if copy was successful, `nil` otherwise.
+--- @return string? error Error message string if copying failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Copy a configuration file to a backup location
@@ -337,8 +327,8 @@ end
 ---
 --- @param source string Path to the source file
 --- @param destination string Path to the destination file
---- @return boolean|nil success True if move was successful, nil on error
---- @return string|nil error Error message if moving failed
+--- @return boolean|nil success `true` if move was successful, `nil` otherwise.
+--- @return string? error Error message string if moving failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Move a temporary file to its final location
@@ -393,8 +383,8 @@ end
 --- proper error handling for permissions and other common deletion issues.
 ---
 --- @param path string Path to the file to delete
---- @return boolean|nil success True if deletion was successful, nil on error
---- @return string|nil error Error message if deletion failed
+--- @return boolean|nil success `true` if deletion was successful (or file didn't exist), `nil` otherwise.
+--- @return string? error Error message string if deletion failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Delete a temporary file
@@ -430,8 +420,8 @@ end
 --- handles validation, normalization, and platform-specific directory creation.
 ---
 --- @param path string Path to the directory to create
---- @return boolean|nil success True if creation was successful, nil on error
---- @return string|nil error Error message if creation failed
+--- @return boolean|nil success `true` if creation was successful or directory already existed, `nil` otherwise.
+--- @return string? error Error message string if creation failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Create a nested directory structure
@@ -501,8 +491,8 @@ end
 --- performing operations that require it.
 ---
 --- @param path string Path to ensure exists
---- @return boolean|nil success True if directory exists or was created, nil on error
---- @return string|nil error Error message if creation failed
+--- @return boolean|nil success `true` if directory exists or was created successfully, `nil` otherwise.
+--- @return string? error Error message string if creation failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Make sure a data directory exists before writing files
@@ -535,8 +525,8 @@ end
 ---
 --- @param path string Path to the directory to delete
 --- @param recursive boolean If true, recursively delete contents
---- @return boolean|nil success True if deletion was successful, nil on error
---- @return string|nil error Error message if deletion failed
+--- @return boolean|nil success `true` if deletion was successful (or directory didn't exist), `nil` otherwise.
+--- @return string? error Error message string if deletion failed (e.g., directory not empty and `recursive` is false), `nil` otherwise.
 ---
 --- @usage
 --- -- Safely remove an empty directory
@@ -598,8 +588,8 @@ end
 ---
 --- @param path string Path to the directory to list
 --- @param include_hidden boolean Whether to include hidden files (default: false)
---- @return table|nil files List of file and directory names or nil on error
---- @return string|nil error Error message if listing failed
+--- @return string[]|nil files An array of file and directory names, or `nil` if an error occurred.
+--- @return string? error Error message string if listing failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Get all items in a directory
@@ -667,13 +657,11 @@ end
 
 -- Path Manipulation
 
---- Normalize a path for cross-platform consistency
---- This function standardizes path separators, removes duplicates, handles
---- trailing slashes, and makes paths consistent across different operating systems.
---- It converts Windows backslashes to forward slashes for consistent handling.
----
---- @param path string Path to normalize
---- @return string|nil normalized Path with standardized separators or nil if path is nil
+--- Normalizes a path string for cross-platform consistency.
+--- Converts `\` to `/`, removes duplicate separators, resolves `.` and `..`,
+--- and handles trailing slashes appropriately.
+---@param path string|nil Path to normalize.
+---@return string|nil normalized_path Normalized path string, "." if input resolves to empty, "/" if input resolves to root, or nil if input is nil.
 ---
 --- @usage
 --- -- Normalize a Windows path
@@ -767,8 +755,8 @@ end
 --- correctly managing absolute and relative path components.
 ---
 --- @vararg string Path components to join
---- @return string|nil joined_path Joined path or nil on error
---- @return string|nil error Error message if joining failed
+--- @return string|nil joined_path Joined and normalized path string, or `nil` if an error occurs during processing.
+--- @return table? error Error object from `error_handler.try` if processing fails critically.
 ---
 --- @usage
 --- -- Join directory and filename
@@ -788,8 +776,7 @@ function fs.join_paths(...)
     return ""
   end
 
-  -- Use proper pattern for handling error_handler.try results
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     local result = fs.normalize_path(args[1] or "")
     for i = 2, #args do
       local component = fs.normalize_path(args[i] or "")
@@ -810,7 +797,7 @@ function fs.join_paths(...)
     return result
   end)
 
-  -- Properly handle the result of error_handler.try
+  -- Properly handle the result of get_error_handler().try
   if success then
     return result
   else
@@ -824,7 +811,7 @@ end
 --- without directory components.
 ---
 --- @param path string Path to process
---- @return string|nil directory_name Directory component of path or nil if path is nil
+--- @return string|nil directory_name Directory part of the path (e.g., "/home/user" from "/home/user/file.txt"), "." for filename only, "/" for root, or nil if input path is nil.
 ---
 --- @usage
 --- -- Get directory from a file path
@@ -883,7 +870,8 @@ end
 --- Alternative name for get_directory_name
 --- This is an alias for `fs.get_directory_name` to provide a more intuitive
 --- name for users who might be familiar with other programming languages
---- @return string|nil directory_name Directory component of path or nil if path is nil
+--- @param path string Path to process.
+--- @return string|nil directory_name Directory part of the path, "." for filename only, "/" for root, or nil if input path is nil.
 function fs.dirname(path)
   -- Call the existing get_directory_name function for consistency
   return fs.get_directory_name(path)
@@ -896,7 +884,8 @@ end
 ---
 --- @param path string Path to process
 --- @return string|nil filename File name component of path or nil on error
---- @return string|nil error Error message if extraction failed
+--- @return string|nil filename Filename part of the path (e.g., "file.txt" from "/dir/file.txt"), or `nil` if an error occurs.
+--- @return table? error Error object from `error_handler.try` if processing fails critically.
 ---
 --- @usage
 --- -- Get filename from a path
@@ -915,8 +904,7 @@ function fs.get_file_name(path)
     return nil
   end
 
-  -- Use proper pattern for handling error_handler.try results
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     -- Check for a trailing slash in the original path
     if path:match("/$") then
       return ""
@@ -941,7 +929,7 @@ function fs.get_file_name(path)
     return filename
   end)
 
-  -- Properly handle the result of error_handler.try
+  -- Properly handle the result of get_error_handler().try
   if success then
     return result
   else
@@ -955,8 +943,8 @@ end
 --- extension, an empty string is returned.
 ---
 --- @param path string Path to process
---- @return string|nil extension Extension of the file (without the dot), or empty string if none, nil on error
---- @return string|nil error Error message if extraction failed
+--- @return string|nil extension File extension without the leading dot (e.g., "txt"), "" if no extension, or `nil` if an error occurs.
+--- @return table? error Error object from `error_handler.try` if processing fails critically.
 ---
 --- @usage
 --- -- Get the extension from a file path
@@ -975,8 +963,7 @@ function fs.get_extension(path)
     return nil
   end
 
-  -- Use proper pattern for handling error_handler.try results
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     local filename = fs.get_file_name(path)
     if not filename or filename == "" then
       return ""
@@ -993,7 +980,7 @@ function fs.get_extension(path)
     return extension
   end)
 
-  -- Properly handle the result of error_handler.try
+  -- Properly handle the result of get_error_handler().try
   if success then
     return result
   else
@@ -1007,8 +994,8 @@ end
 --- normalized and returned.
 ---
 --- @param path string Path to convert
---- @return string|nil absolute_path Absolute path or nil on error
---- @return string|nil error Error message if conversion failed
+--- @return string|nil absolute_path The absolute path string, or `nil` if an error occurs.
+--- @return table? error Error object from `error_handler.try` if processing fails critically.
 ---
 --- @usage
 --- -- Convert a relative path to absolute
@@ -1027,8 +1014,7 @@ function fs.get_absolute_path(path)
     return nil
   end
 
-  -- Use proper pattern for handling error_handler.try results
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     -- If already absolute, return normalized path
     if path:sub(1, 1) == "/" or (is_windows() and path:match("^%a:")) then
       return fs.normalize_path(path)
@@ -1041,7 +1027,7 @@ function fs.get_absolute_path(path)
     return fs.join_paths(current_dir, path)
   end)
 
-  -- Properly handle the result of error_handler.try
+  -- Properly handle the result of get_error_handler().try
   if success then
     return result
   else
@@ -1056,7 +1042,7 @@ end
 ---
 --- @param path string Path to convert
 --- @param base string Base path to make relative to
---- @return string|nil relative_path Path relative to base or nil if path or base is nil
+--- @return string|nil relative_path The computed relative path string (e.g., "../other/file"), "." if paths are the same, or `nil` if input is invalid.
 ---
 --- @usage
 --- -- Get a path relative to a base directory
@@ -1137,7 +1123,7 @@ end
 --- and ** (recursive directory matching).
 ---
 --- @param glob string Glob pattern to convert
---- @return string|nil pattern Lua pattern equivalent or nil if glob is nil
+--- @return string|nil pattern Lua pattern string equivalent to the glob, or `nil` if `glob` is nil.
 ---
 --- @usage
 --- -- Convert simple file extension glob
@@ -1219,8 +1205,8 @@ end
 ---
 --- @param path string Path to test
 --- @param pattern string Glob pattern to match against
---- @return boolean|nil matches True if path matches pattern, nil on error
---- @return string|nil error Error message if matching failed
+--- @return boolean|nil matches `true` if path matches pattern, `false` otherwise, or `nil` if an error occurs during matching.
+--- @return table? error Error object from `error_handler.try` if pattern conversion or matching fails critically.
 ---
 --- @usage
 --- -- Check if a file matches an extension pattern
@@ -1240,8 +1226,7 @@ function fs.matches_pattern(path, pattern)
     return false
   end
 
-  -- Use proper pattern for handling error_handler.try results
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     -- For debugging pattern matching issues
     local debug_mode = os.getenv("FIRMO_DEBUG_PATTERNS")
     if debug_mode then
@@ -1312,7 +1297,7 @@ function fs.matches_pattern(path, pattern)
     end
   end)
 
-  -- Properly handle the result of error_handler.try
+  -- Properly handle the result of get_error_handler().try
   if success then
     return result
   else
@@ -1328,8 +1313,8 @@ end
 --- @param directories table List of root directories to search in
 --- @param patterns? table List of glob patterns to include (default: {"*"})
 --- @param exclude_patterns? table List of glob patterns to exclude
---- @return table|nil matches List of matching file paths or nil on error
---- @return string|nil error Error message if discovery failed
+--- @return string[]|nil matches An array of absolute paths for files matching the criteria, or `nil` if an error occurs.
+--- @return table? error Error object from `error_handler.try` if processing fails critically.
 ---
 --- @usage
 --- -- Find all Lua files in the current project
@@ -1353,8 +1338,7 @@ function fs.discover_files(directories, patterns, exclude_patterns)
     return {}
   end
 
-  -- Use proper pattern for handling error_handler.try results
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     -- Default patterns if none provided
     patterns = patterns or { "*" }
     exclude_patterns = exclude_patterns or {}
@@ -1437,7 +1421,7 @@ function fs.discover_files(directories, patterns, exclude_patterns)
     return matches
   end)
 
-  -- Properly handle the result of error_handler.try
+  -- Properly handle the result of get_error_handler().try
   if success then
     return result
   else
@@ -1451,8 +1435,8 @@ end
 --- This function safely handles circular symlinks and permission issues.
 ---
 --- @param path string Directory path to scan
---- @param recursive boolean Whether to scan recursively into subdirectories
---- @return table files List of absolute file paths found in the directory
+--- @param recursive boolean If `true`, scan subdirectories recursively.
+--- @return string[] files An array containing absolute paths of all found files. Returns empty table if directory doesn't exist or is empty.
 ---
 --- @usage
 --- -- Get all files in the current directory (non-recursive)
@@ -1557,8 +1541,8 @@ end
 --- not the full path, making it easy to filter by file types or naming conventions.
 ---
 --- @param files table List of file paths to filter
---- @param pattern string Pattern to match against (glob pattern or Lua pattern)
---- @return table matches List of matching file paths
+--- @param pattern string Pattern (glob or Lua) to match against filenames.
+--- @return string[] matches An array containing paths from the input `files` list whose filenames match the `pattern`. Returns empty table if no matches or input invalid.
 ---
 --- @usage
 --- -- Find all Lua files from a directory scan
@@ -1605,9 +1589,9 @@ end
 --- @param dir_path string Directory to search for files
 --- @param pattern? string Optional file matching pattern (e.g., "*.lua")
 --- @return string[]|nil files Array of matching file paths or nil on error
---- @return string|nil error Error message if the operation failed
+--- @return string[]|nil files An array of absolute paths for matching files, or `nil` if an error occurs.
+--- @return string? error Error message string if the operation failed, `nil` otherwise.
 ---
---- @usage
 --- -- Get all Lua files in a directory
 --- local files, err = fs.get_files("/path/to/dir", "*.lua")
 --- if not files then
@@ -1623,8 +1607,10 @@ end
 --- It does not distinguish between files and directories in the returned list.
 ---
 --- @param dir_path string Directory to list
---- @return table|nil entries Array of file/directory names or nil on error
---- @return string|nil error Error message if the operation failed
+---@param dir_path string Directory to list.
+---@param include_hidden? boolean Whether to include hidden files (default false).
+---@return string[]|nil entries An array of file/directory names, or `nil` on error.
+---@return string? error Error message string if the operation failed, `nil` otherwise.
 function fs.list_directory(dir_path, include_hidden)
   if not dir_path then
     return nil, "No directory path provided"
@@ -1811,8 +1797,8 @@ end
 --- includes proper error checking and validation to handle various edge cases.
 ---
 --- @param path string Path to the file to check
---- @return number|nil size File size in bytes or nil on error
---- @return string|nil error Error message if getting the size failed
+--- @return number|nil size File size in bytes, or `nil` if an error occurs.
+--- @return string? error Error message string if getting the size failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Check file size before processing
@@ -1851,8 +1837,8 @@ end
 --- properly validates that the path exists before attempting to get its timestamp.
 ---
 --- @param path string Path to the file or directory
---- @return number|nil timestamp Modification time as Unix timestamp or nil on error
---- @return string|nil error Error message if getting the time failed
+--- @return number|nil timestamp Modification time as a Unix timestamp, or `nil` if an error occurs.
+--- @return string? error Error message string if getting the time failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Check when a file was last modified
@@ -1912,8 +1898,8 @@ end
 --- might not be available (falls back to modification time in that case).
 ---
 --- @param path string Path to the file or directory
---- @return number|nil timestamp Creation time as Unix timestamp or nil on error
---- @return string|nil error Error message if getting the time failed
+--- @return number|nil timestamp Creation time as a Unix timestamp, or `nil` if an error occurs or creation time is unavailable.
+--- @return string? error Error message string if getting the time failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Get and display a file's creation date
@@ -2221,8 +2207,8 @@ end
 ---
 --- @param start_dir? string The directory to start searching from (defaults to current directory)
 --- @param markers? table List of marker files/directories to look for (defaults to common ones)
---- @return string|nil root_dir The detected project root directory or nil if not found
---- @return string|nil error Error message if an error occurred
+--- @return string|nil root_dir The absolute path to the detected project root directory, or the `start_dir` if no markers found, or `nil` if an error occurs.
+--- @return string? error Error message string if getting the current directory fails.
 ---
 --- @usage
 --- -- Detect project root from current directory
@@ -2290,34 +2276,30 @@ function fs.detect_project_root(start_dir, markers)
 end
 
 --- Get the current working directory
----@return string|nil current_dir The current working directory or nil on error
----@return string|nil error Error message if operation failed
+---@return string|nil current_dir The current working directory path string, or `nil` on error.
+---@return string|table? error Error message string or error object if the operation failed.
 function fs.get_current_directory()
-  local success, result, err = error_handler.try(function()
-    if lfs then
-      return lfs.currentdir()
+  local success, result, err = get_error_handler().try(function()
+    -- Fallback method if lfs is not available
+    local handle, err
+    if is_windows() then
+      handle, err = io.popen("cd")
     else
-      -- Fallback method if lfs is not available
-      local handle, err
-      if is_windows() then
-        handle, err = io.popen("cd")
-      else
-        handle, err = io.popen("pwd")
-      end
-
-      if not handle then
-        return nil, "Failed to execute current directory command: " .. (err or "unknown error")
-      end
-
-      local current_dir = handle:read("*l")
-      handle:close()
-
-      if not current_dir or current_dir == "" then
-        return nil, "Failed to get current directory output"
-      end
-
-      return current_dir
+      handle, err = io.popen("pwd")
     end
+
+    if not handle then
+      return nil, "Failed to execute current directory command: " .. (err or "unknown error")
+    end
+
+    local current_dir = handle:read("*l")
+    handle:close()
+
+    if not current_dir or current_dir == "" then
+      return nil, "Failed to get current directory output"
+    end
+
+    return current_dir
   end)
 
   if not success then
@@ -2335,14 +2317,14 @@ end
 --- This function searches for files in the specified directory that match
 --- the given Lua pattern. It can optionally search recursively into subdirectories.
 ---
---- @param dir_path string The directory to search in
---- @param pattern string The Lua pattern to match against file names
---- @param recursive boolean Whether to search recursively in subdirectories (default: false)
---- @return table<number, string>|nil files List of matching file paths or nil on error
---- @return string|nil error Error message if the search failed
+---@param dir_path string The directory to search in.
+---@param pattern string The Lua pattern to match against file names.
+---@param recursive? boolean Whether to search recursively (default false).
+---@return string[]|nil files An array of absolute paths for matching files, or `nil` on error.
+---@return string? error Error message string if the search failed.
 function fs.find_files(dir_path, pattern, recursive)
   if not dir_path then
-    return nil, "Directory path is required"
+    return nil, "No directory path provided"
   end
 
   if not pattern then
@@ -2389,9 +2371,9 @@ end
 ---
 --- @param path string Path that might be a symlink
 --- @return string|nil resolved_path The resolved path or nil on error
---- @return string|nil error Error message if resolution failed
+--- @return string resolved_path The resolved absolute path (returns original path if not a symlink or on error).
+--- @return string? error Error message string if the resolution command failed (unlikely due to fallback).
 ---
---- @usage
 --- -- Resolve a symlink to its target path
 --- local real_path, err = fs.resolve_symlink("/path/to/symlink")
 --- if not real_path then
@@ -2455,7 +2437,8 @@ end
 --- @param path string Path to the directory to delete
 --- @param recursive boolean If true, recursively delete contents
 --- @return boolean|nil success True if deletion was successful, nil on error
---- @return string|nil error Error message if deletion failed
+--- @return boolean|nil success `true` if deletion was successful (or directory didn't exist), `nil` otherwise.
+--- @return string? error Error message string if deletion failed, `nil` otherwise.
 function fs.remove_directory(path, recursive)
   return fs.delete_directory(path, recursive)
 end
@@ -2465,15 +2448,17 @@ end
 ---
 --- @param path string Path to the file to delete
 --- @return boolean|nil success True if deletion was successful, nil on error
---- @return string|nil error Error message if deletion failed
+--- @return boolean|nil success `true` if deletion was successful (or file didn't exist), `nil` otherwise.
+--- @return string? error Error message string if deletion failed, `nil` otherwise.
 function fs.remove_file(path)
   return fs.delete_file(path)
 end
+
 --- Alias for get_directory_name
 --- This is an alias for fs.get_directory_name for compatibility and alternative naming.
 ---
---- @param path string Path to process
---- @return string|nil directory_name Directory component of path or nil if path is nil
+--- @param path string Path to process.
+--- @return string|nil directory_name Directory part of the path, "." for filename only, "/" for root, or nil if input path is nil.
 function fs.get_directory(path)
   return fs.get_directory_name(path)
 end
@@ -2518,9 +2503,9 @@ end
 --- Alias for get_file_name
 --- This is an alias for fs.get_file_name for compatibility and alternative naming.
 ---
---- @param path string Path to process
---- @return string|nil filename File name component of path or nil on error
---- @return string|nil error Error message if extraction failed
+--- @param path string Path to process.
+--- @return string|nil filename Filename part of the path, or `nil` if an error occurs.
+--- @return table? error Error object from `error_handler.try` if processing fails critically.
 function fs.get_filename(path)
   return fs.get_file_name(path)
 end
@@ -2528,9 +2513,9 @@ end
 --- Alias for get_modified_time
 --- This is an alias for fs.get_modified_time for compatibility and alternative naming.
 ---
---- @param path string Path to the file or directory
---- @return number|nil timestamp Modification time as Unix timestamp or nil on error
---- @return string|nil error Error message if getting the time failed
+--- @param path string Path to the file or directory.
+--- @return number|nil timestamp Modification time as a Unix timestamp, or `nil` if an error occurs.
+--- @return string? error Error message string if getting the time failed, `nil` otherwise.
 function fs.get_file_modified_time(path)
   return fs.get_modified_time(path)
 end
@@ -2538,10 +2523,10 @@ end
 --- Alias for get_directory_contents
 --- This is an alias for fs.get_directory_contents for compatibility and alternative naming.
 ---
---- @param dir_path string Directory to list
---- @param include_hidden boolean Whether to include hidden files (default: false)
---- @return table|nil entries Array of file/directory names or nil on error
---- @return string|nil error Error message if the operation failed
+---@param dir_path string Directory to list.
+---@param include_hidden? boolean Whether to include hidden files (default false).
+---@return string[]|nil entries An array of file/directory names, or `nil` on error.
+---@return string? error Error message string if the operation failed, `nil` otherwise.
 function fs.get_directory_items(dir_path, include_hidden)
   return fs.get_directory_contents(dir_path, include_hidden)
 end
@@ -2589,8 +2574,8 @@ fs.supports_symlinks = has_symlink_support()
 --- @param source_dir string Path to the source directory to copy
 --- @param target_dir string Path to the destination directory
 --- @param overwrite? boolean If true, overwrite existing files (default: false)
---- @return boolean|nil success True if the copy was successful, nil on error
---- @return string|nil error Error message if copying failed
+--- @return boolean|nil success `true` if the copy was successful, `nil` otherwise.
+--- @return string? error Error message string if copying failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Copy a directory with all its contents
@@ -2670,8 +2655,8 @@ end
 ---
 --- @param target_path string Path to the target file or directory
 --- @param link_path string Path where the symbolic link will be created
---- @return boolean|nil success True if the symlink was created successfully, nil on error
---- @return string|nil error Error message if creating the symlink failed
+--- @return boolean|nil success `true` if the symlink was created successfully, `nil` otherwise.
+--- @return string? error Error message string if creating the symlink failed, `nil` otherwise.
 ---
 --- @usage
 --- -- Create a symlink to a file

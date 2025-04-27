@@ -1,191 +1,80 @@
-# Core Functions
+# Core Aggregator Module (`lib.core`)
 
+This module acts as a central point for accessing several core utility submodules within Firmo. It attempts to safely load these submodules and re-exports them, along with some convenience functions.
 
-This document describes the core functions provided by Firmo for defining and organizing tests.
+## Overview
 
-## Test Structure Functions
+The `lib.core` module aggregates functionality from:
 
+- `lib.core.type_checking`: Utilities for advanced type validation.
+- `lib.core.fix_expect`: Utility to repair the `expect` assertion system (used internally).
+- `lib.core.version`: Version information for the Firmo framework.
 
-### describe(name, fn)
+If a submodule fails to load (e.g., due to missing dependencies or errors during loading), its corresponding fields in the returned `core` table will be `nil`.
 
-
-Creates a group of tests with a descriptive name.
-**Parameters:**
-
-
-- `name` (string): Name of the test group
-- `fn` (function): Function containing the test definitions
-
-**Returns:** None
-**Example:**
-
+## Usage
 
 ```lua
-describe("Math operations", function()
-  -- Tests go here
-end)
+---@type core
+local core = require("lib.core")
+
+if core.version then
+  print("Firmo Version (from core):", core.version._VERSION)
+end
+
+if core.type_checking then
+  local is_str = core.is_exact_type("hello", "string") -- true
+  print("Is 'hello' a string?", is_str)
+end
+
+-- Direct convenience access (if type_checking loaded)
+if core.is_instance_of then
+  -- Assume MyClass and instance exist
+  local is_inst = core.is_instance_of(instance, MyClass)
+  print("Is instance of MyClass?", is_inst)
+end
 ```
 
+## API Reference
 
-**Notes:**
+The `core` table returned by `require("lib.core")` contains the following fields:
 
+### `core.type_checking`
 
-- `describe` blocks can be nested to create a hierarchical structure
-- Before/after hooks are scoped to their respective `describe` block
-- Test names should be descriptive of the functionality being tested
+- **Type:** `table` | `nil`
+- **Description:** The loaded `lib.core.type_checking` module, providing functions like `is_exact_type`, `is_instance_of`, `implements`, etc. Will be `nil` if the submodule failed to load.
+- **See:** `docs/api/type_checking.md` (Note: This file might not exist yet or might need creation/update)
 
+### `core.fix_expect`
 
-### it(name, fn)
+- **Type:** `boolean` | `nil`
+- **Description:** The result (success status) returned when the `lib.core.fix_expect` module was loaded and executed during the `lib.core` initialization. Will be `nil` if the submodule failed to load. Primarily used internally.
 
+### `core.version`
 
-Defines an individual test case.
-**Parameters:**
+- **Type:** `table` | `nil`
+- **Description:** The loaded `lib.core.version` module, containing version information like `_VERSION`, `major`, `minor`, `patch`, and comparison functions. Will be `nil` if the submodule failed to load.
+- **See:** `docs/api/version.md` (Note: This file might not exist yet or might need creation/update)
 
+### `core.is_exact_type(value, expected_type)`
 
-- `name` (string): Name of the test
-- `fn` (function): Function containing the test code
+- **Type:** `function` | `nil`
+- **Description:** Convenience alias for `core.type_checking.is_exact_type`. Checks if `value` has the exact primitive type specified by `expected_type` (string). Available only if `lib.core.type_checking` loaded successfully.
+- **Returns:** `boolean`
 
-**Returns:** None
-**Example:**
+### `core.is_instance_of(object, class)`
 
+- **Type:** `function` | `nil`
+- **Description:** Convenience alias for `core.type_checking.is_instance_of`. Checks if `object`'s metatable indicates it's an instance of `class`. Available only if `lib.core.type_checking` loaded successfully.
+- **Returns:** `boolean`
 
-```lua
-it("adds two numbers correctly", function()
-  expect(1 + 1).to.equal(2)
-end)
-```
+### `core.implements(object, interface)`
 
+- **Type:** `function` | `nil`
+- **Description:** Convenience alias for `core.type_checking.implements`. Checks if `object` has all the methods defined in the `interface` table. Available only if `lib.core.type_checking` loaded successfully.
+- **Returns:** `boolean`
 
-**Notes:**
+### `core._VERSION`
 
-
-- Test names should describe the expected behavior, not the implementation
-- Each test should focus on a single aspect of behavior
-- Use `expect` within tests to make assertions
-
-
-## Setup and Teardown
-
-
-### before(fn)
-
-
-Registers a function to run before each test in the current describe block.
-**Parameters:**
-
-
-- `fn` (function): Function to run before each test
-
-**Returns:** None
-**Example:**
-
-
-```lua
-describe("Database tests", function()
-  before(function()
-    -- Set up database connection
-    db = Database.connect()
-  end)
-  it("queries records", function()
-    -- Test using the db connection
-  end)
-end)
-```
-
-
-**Notes:**
-
-
-- `before` hooks run in the order they are defined
-- Each `before` hook has access to the test's name via its parameter
-- `before` hooks are scoped to their describe block and nested describe blocks
-
-
-### after(fn)
-
-
-Registers a function to run after each test in the current describe block.
-**Parameters:**
-
-
-- `fn` (function): Function to run after each test
-
-**Returns:** None
-**Example:**
-
-
-```lua
-describe("File operations", function()
-  after(function()
-    -- Clean up temporary files
-    os.remove("temp.txt")
-  end)
-  it("writes to a file", function()
-    -- Test that creates temp.txt
-  end)
-end)
-```
-
-
-**Notes:**
-
-
-- `after` hooks run in the order they are defined
-- Each `after` hook has access to the test's name via its parameter
-- `after` hooks are useful for cleanup operations
-- `after` hooks run even if the test fails
-
-
-## Aliases
-
-
-The following aliases are provided for convenience:
-
-
-- `firmo.test` - Alias for `firmo.it`
-
-
-## Examples
-
-
-### Basic Test Structure
-
-
-
-```lua
-describe("Calculator", function()
-  local calc
-  before(function()
-    calc = Calculator.new()
-  end)
-  describe("Addition", function()
-    it("adds positive numbers", function()
-      expect(calc:add(2, 3)).to.equal(5)
-    end)
-    it("adds negative numbers", function()
-      expect(calc:add(-2, -3)).to.equal(-5)
-    end)
-  end)
-  describe("Subtraction", function()
-    it("subtracts numbers", function()
-      expect(calc:subtract(5, 2)).to.equal(3)
-    end)
-  end)
-  after(function()
-    calc:shutdown()
-  end)
-end)
-```
-
-
-
-### Test Organization Best Practices
-
-
-
-1. Group related tests with `describe`
-2. Use nested `describe` blocks for sub-features
-3. Keep test functions small and focused
-4. Use `before` for common setup
-5. Use `after` for cleanup
-6. Give tests descriptive names that explain the expected behavior
+- **Type:** `string`
+- **Description:** The version identifier for the `lib.core` aggregator module itself (e.g., `"0.3.0"`).

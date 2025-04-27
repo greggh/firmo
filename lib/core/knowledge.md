@@ -1,214 +1,139 @@
-# Core Knowledge
-
+# Core Modules Knowledge
 
 ## Purpose
 
+This document provides internal knowledge, patterns, and guidelines for developers working with Firmo's core modules located in `lib/core/`. These modules provide the foundational functionality for the entire framework.
 
-Core utilities and foundational functionality for the framework.
+## Key Concepts
 
-## Configuration System
+-   **`central_config`:** The single source of truth for all framework configuration. Handles loading, saving, validation, defaults, and change notifications. All modules MUST use this.
+-   **`module_reset`:** Manages Lua's `package.loaded` cache to provide test isolation by resetting module state between tests or on demand. Allows protection of core modules.
+-   **`type_checking`:** Provides advanced type validation utilities beyond Lua's basic `type()`, including schema validation and custom type checks. Used internally by other modules like `central_config`.
+-   **`error_handler`:** Defines the standardized structure for error objects and provides utilities like `try` and `safe_io_operation` for consistent error handling across the framework.
+-   **`test_definition`:** Implements the core BDD functions (`describe`, `it`, `before`, `after`, `tags`, `fdescribe`, `fit`, etc.) and manages the test execution state (hooks, results, focus mode, filters).
+-   **`runner`:** Core logic for executing test files, integrating with other modules like `test_definition`, `module_reset`, `coverage`, and `reporting`.
+-   **`version`:** Contains framework version information.
+-   **`fix_expect`:** Utility related to the assertion system.
+-   **`init.lua`:** Aggregates and exports parts of the other core modules.
 
+## Usage Examples / Patterns
 
+### Configuration System (`central_config`)
 
 ```lua
--- Load config from file
+--[[
+  Demonstrates getting/setting config, registering a module schema/defaults,
+  and watching for changes using central_config.
+]]
 local config = require("lib.core.central_config")
-config.load_from_file(".firmo-config.lua")
+local logger = require("lib.tools.logging").get_logger("core-example") -- Example logger
+
+-- Load config from file (optional, often handled by runner)
+-- config.load_from_file(".firmo-config.lua")
+
 -- Get and set values
-local value = config.get("coverage.threshold")
+local threshold = config.get("coverage.threshold", 80) -- Get with default
 config.set("coverage.threshold", 90)
--- Register module config
-config.register_module("my_module", {
-  field_types = {
-    timeout = "number",
-    debug = "boolean"
-  }
+
+-- Register module config (schema and defaults)
+config.register_module("my_db_module", {
+  -- Schema
+  field_types = { host = "string", port = "number", timeout = "number" },
+  required_fields = {"host", "port"}
 }, {
-  timeout = 5000,
-  debug = false
+  -- Defaults
+  host = "localhost", port = 5432, timeout = 5000
 })
--- Complex configuration example
-local function setup_module_config()
-  -- Define schema
-  local schema = {
-    field_types = {
-      database = {
-        host = "string",
-        port = "number",
-        timeout = "number",
-        max_connections = "number"
-      },
-      logging = {
-        level = "string",
-        file = "string",
-        format = "string"
-      }
-    }
-  }
 
-  -- Define defaults
-  local defaults = {
-    database = {
-      host = "localhost",
-      port = 5432,
-      timeout = 5000,
-      max_connections = 10
-    },
-    logging = {
-      level = "INFO",
-      file = "app.log",
-      format = "json"
-    }
-  }
-
-  -- Register with validation
-  config.register_module("my_module", schema, defaults)
-
-  -- Watch for changes
-  config.on_change("my_module.database.timeout", function(path, old, new)
-    logger.info("Timeout changed", {
-      old = old,
-      new = new
-    })
-  end)
-end
+-- Watch for changes
+config.on_change("my_db_module.timeout", function(path, old, new_val)
+  logger.info("DB Timeout changed", { old = old, new = new_val })
+end)
 ```
 
-
-
-## Module Reset System
-
-
+### Module Reset System (`module_reset`)
 
 ```lua
--- Reset single module
-local fresh_module = firmo.reset_module("path.to.module")
--- Reset with dependencies
-firmo.reset_module("my_module", {
-  recursive = true,
-  clear_cache = true
-})
--- Complex module reset
-local function reset_module_group()
-  -- Define module dependencies
-  local modules = {
-    "module_a",
-    "module_b",
-    "module_c"
-  }
+--[[
+  Demonstrates using the enhanced module reset system.
+  Note: Resetting is often handled automatically by the test runner if configured.
+]]
+local module_reset = require("lib.core.module_reset")
+local logger = require("lib.tools.logging").get_logger("core-example")
+local error_handler = require("lib.core.error_handler")
 
-  -- Define reset order
-  local order = {
-    "c", -- Must be reset first
-    "b",
-    "a"  -- Must be reset last
-  }
+-- Typically called once at startup by the runner
+module_reset.init()
+module_reset.configure({ reset_modules = true }) -- Enable auto-reset
 
-  -- Reset modules in order
-  for _, name in ipairs(order) do
-    local success, err = error_handler.try(function()
-      return firmo.reset_module(name, {
-        recursive = false,  -- Already handling order
-        clear_cache = true
-      })
-    end)
+-- Manually reset all non-protected modules (e.g., in a custom setup)
+local reset_count = module_reset.reset_all({ verbose = true })
+print("Reset " .. reset_count .. " modules")
 
-    if not success then
-      logger.error("Module reset failed", {
-        module = name,
-        error = err
-      })
-      return nil, err
-    end
-  end
+-- Manually reset modules matching a pattern
+local service_count = module_reset.reset_pattern("app%.services%.")
+print("Reset " .. service_count .. " service modules")
 
-  return true
-end
+-- Protect essential modules from being reset
+module_reset.protect({"app.config", "app.logger"})
 ```
 
-
-
-## Type Validation
-
-
+### Type Validation (`type_checking`)
 
 ```lua
--- Basic type checks
-expect(value).to.be.a("string")
-expect(value).to.be.a("number")
-expect(value).to.be.a("table")
-expect(value).to.be.a("function")
--- Complex type validation
-expect(fn).to.be_type("callable")  -- Function or callable table
-expect(num).to.be_type("comparable")  -- Can use < operator
-expect(table).to.be_type("iterable")  -- Can iterate with pairs()
--- Custom type validation
+--[[
+  Shows basic and schema-based type validation.
+  Note: expect().to.be.a() uses M.isa which wraps type_checking logic.
+]]
+local type_checker = require("lib.core.type_checking")
+local error_handler = require("lib.core.error_handler")
+local expect = require("firmo").expect -- Assuming expect is available
+
+-- Basic type checks (often done via assertions)
+expect("hello").to.be.a("string")
+expect(123).to.be.a("number")
+
+-- Custom type registration (e.g., for specific validation rules)
 type_checker.register_type("positive_number", function(value)
   return type(value) == "number" and value > 0
 end)
--- Type validation with schema
+-- expect(5).to.be.a("positive_number") -- If assertion paths were extended
+
+-- Schema validation
 local schema = {
   name = "string",
   age = "number",
-  email = "string?",  -- Optional
-  settings = {
-    theme = "string",
-    notifications = "boolean"
-  }
+  email = "string?",  -- Optional field
+  settings = { theme = "string", notifications = "boolean" }
 }
 local function validate_user(user)
   local valid, errors = type_checker.validate(user, schema)
   if not valid then
     return nil, error_handler.validation_error(
-      "Invalid user data",
-      { errors = errors }
+      "Invalid user data", { errors = errors }
     )
   end
   return true
 end
+
+local user_data = { name = "Test", age = 30, settings = { theme = "dark", notifications = true } }
+local is_valid, err = validate_user(user_data)
+expect(is_valid).to.be_truthy()
 ```
 
+## Related Components / Modules
 
-
-## Critical Rules
-
-
-
-- ALWAYS use central_config
-- NEVER bypass type checks
-- ALWAYS handle module reset
-- NEVER modify core modules
-- ALWAYS validate input
-- NEVER add special cases
-- ALWAYS clean up state
-- DOCUMENT public APIs
-
-
-## Best Practices
-
-
-
-- Use type annotations
-- Document public APIs
-- Handle edge cases
-- Clean up resources
-- Log state changes
-- Monitor performance
-- Test thoroughly
-- Handle errors
-- Follow patterns
-- Keep focused
-
-
-## Performance Tips
-
-
-
-- Cache config values
-- Minimize resets
-- Clean up promptly
-- Monitor memory
-- Handle timeouts
-- Batch operations
-- Use efficient checks
-- Profile regularly
+-   **Source Files:** [`lib/core/`](.)
+-   **Guides:**
+    -   [`docs/guides/central_config.md`](../../docs/guides/central_config.md)
+    -   [`docs/guides/module_reset.md`](../../docs/guides/module_reset.md)
+    -   [`docs/guides/core.md`](../../docs/guides/core.md)
+    -   [`docs/guides/error_handling.md`](../../docs/guides/error_handling.md)
+-   **API Reference:**
+    -   [`docs/api/central_config.md`](../../docs/api/central_config.md)
+    -   [`docs/api/module_reset.md`](../../docs/api/module_reset.md)
+    -   [`docs/api/type_checking.md`](../../docs/api/type_checking.md)
+    -   [`docs/api/error_handling.md`](../../docs/api/error_handling.md)
+    -   [`docs/api/test_definition.md`](../../docs/api/test_definition.md)
+    -   [`docs/api/runner.md`](../../docs/api/runner.md)
+    -   [`docs/api/core.md`](../../docs/api/core.md)

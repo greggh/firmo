@@ -1,13 +1,29 @@
--- Hash module example
+--- hash_example.lua
+--
+-- This example demonstrates the `lib.tools.hash` module, which provides
+-- utilities for generating hash digests for strings and files. It showcases:
+-- - Hashing strings using `hash.hash_string()`.
+-- - Hashing file contents using `hash.hash_file()`.
+-- - Using hashes for simple change detection.
+-- - Using hashes as keys in a basic caching system simulation.
+--
+-- Run this example directly: lua examples/hash_example.lua
+--
+
+local error_handler = require("lib.tools.error_handler")
 local hash = require("lib.tools.hash")
 local test_helper = require("lib.tools.test_helper")
+local logging = require("lib.tools.logging")
+
+-- Setup logger
+local logger = logging.get_logger("HashExample")
 
 -- Create a test directory
 local test_dir = test_helper.create_temp_test_directory()
 
 -- Example 1: Basic string hashing
-print("\nExample 1: Basic String Hashing")
-print("-------------------------------")
+logger.info("\nExample 1: Basic String Hashing")
+logger.info("-------------------------------")
 
 local str = "Hello, world!"
 local str_hash = hash.hash_string(str)
@@ -15,8 +31,8 @@ print("String:", str)
 print("Hash:", str_hash)
 
 -- Example 2: File hashing
-print("\nExample 2: File Hashing")
-print("----------------------")
+logger.info("\nExample 2: File Hashing")
+logger.info("----------------------")
 
 -- Create a test file
 local file_content = [[
@@ -32,8 +48,8 @@ print("File content:", file_content:gsub("\n", "\\n"))
 print("File hash:", file_hash)
 
 -- Example 3: Change detection
-print("\nExample 3: Change Detection")
-print("-------------------------")
+logger.info("\nExample 3: Change Detection")
+logger.info("-------------------------")
 
 -- Create a file
 local original_content = "Original content"
@@ -56,12 +72,16 @@ print("Modified hash:", new_hash)
 print("File changed:", original_hash ~= new_hash)
 
 -- Example 4: Simple caching system
-print("\nExample 4: Simple Caching System")
-print("------------------------------")
+logger.info("\nExample 4: Simple Caching System")
+logger.info("------------------------------")
 
 -- Create a simple cache
 local cache = {}
 
+--- Simulates an expensive computation based on input string length.
+-- This function's results will be cached in the example.
+-- @param input string The input string.
+-- @return number The computed result.
 local function compute_expensive_result(input)
   -- Simulate expensive computation
   local result = 0
@@ -71,6 +91,11 @@ local function compute_expensive_result(input)
   return result + #input
 end
 
+--- Retrieves a result for the given input, using a simple hash-based cache.
+-- If the result for the input's hash is not in the cache, it computes it
+-- using `compute_expensive_result` and stores it.
+-- @param input string The input string.
+-- @return number The cached or newly computed result.
 local function get_cached_result(input)
   local input_hash = hash.hash_string(input)
   if not cache[input_hash] then
@@ -94,4 +119,4 @@ print("Result:", result2)
 local result3 = get_cached_result("different input")
 print("Result:", result3)
 
-print("\nHash module example completed successfully.")
+logger.info("\nHash module example completed successfully.")

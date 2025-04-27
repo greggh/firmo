@@ -1,148 +1,51 @@
-# Integration Knowledge
-
+# tests/integration Knowledge
 
 ## Purpose
 
+The `tests/integration/` directory is designated within the Firmo project structure to hold **integration tests**. Integration tests differ from unit tests in that they verify the interaction and data flow between multiple distinct modules or components of the framework, ensuring these parts work together correctly as a cohesive system.
 
-Test cross-component interactions and system integration.
+Examples of interactions suitable for integration tests include:
+- The full workflow from command-line interface (`lib/tools/cli`) parsing, through test discovery (`lib/tools/discover`), execution by the runner (`lib/core/runner`), and final reporting (`lib/reporting`).
+- The interaction between the test runner, the coverage module (`lib/coverage`) enabling hooks and collecting data, and the reporting module generating a coverage report.
+- The interplay between configuration loading (`lib/core/central_config`) and multiple modules that consume that configuration.
 
-## Integration Test Patterns
+## Key Concepts
 
+- **Scope:** Integration tests focus on the interfaces, contracts, and communication paths between different modules. They aim to catch issues that might arise from incorrect assumptions about how modules interact, data format mismatches, or unexpected side effects when components are used together. This contrasts with unit tests (found in other `tests/*` subdirectories), which typically test a single module in isolation, often using mocks or stubs for dependencies.
+- **Current Status:** This directory **currently contains no implemented integration test files**. It serves as a designated placeholder for such tests as they are developed for the Firmo framework.
+- **Future Use:** When added, tests in this directory will validate key end-to-end workflows and complex interactions between multiple Firmo subsystems, providing a higher level of confidence in the framework's overall stability.
 
+## Usage Examples / Patterns
 
-```lua
-describe("Coverage and Reporting Integration", function()
-  local test_dir = test_helper.create_temp_test_directory()
+**Not Applicable.**
 
-  -- Create test files
-  before(function()
-    test_dir.create_file("test.lua", [[
-      it("test", function()
-        expect(true).to.be_truthy()
-      end)
-    ]])
-  end)
+There are currently no integration test scripts within this directory to run or demonstrate. Hypothetical examples showing cross-component testing (like CLI -> Runner -> Reporter) would belong here once implemented.
 
-  it("generates coverage report", function()
-    local runner = require("lib.core.runner")
-    local result = runner.run_tests({
-      path = test_dir.path,
-      coverage = {
-        enabled = true,
-        format = "html"
-      }
-    })
+## Related Components / Modules
 
-    expect(result.success).to.be_truthy()
-    expect(fs.file_exists(test_dir.path .. "/coverage.html"))
-      .to.be_truthy()
-  end)
-end)
--- Database integration
-describe("Database Integration", function()
-  local db = require("database")
+Integration tests placed here would typically involve interactions between several key Firmo modules, including but not limited to:
 
-  before_each(function()
-    db.connect()
-    db.begin_transaction()
-  end)
+- `lib/core/runner/knowledge.md`: The test execution engine.
+- `lib/coverage/knowledge.md`: The code coverage system.
+- `lib/reporting/knowledge.md`: The report generation system.
+- `lib/tools/cli/knowledge.md`: The command-line interface handler.
+- `lib/tools/discover/knowledge.md`: The test file discovery mechanism.
+- `lib/assertion/knowledge.md`: Used for making assertions within the tests.
+- `lib/core/central_config/knowledge.md`: Configuration management.
+- `lib/tools/test_helper/knowledge.md`: Would likely be used for test setup, assertions, and managing temporary resources needed for integration scenarios.
+- `tests/knowledge.md`: Overview of the parent test directory.
 
-  after_each(function()
-    db.rollback_transaction()
-    db.disconnect()
-  end)
+## Best Practices / Critical Rules (Optional)
 
-  it("persists data", function()
-    local id = db.insert({ data = "test" })
-    local result = db.find(id)
-    expect(result.data).to.equal("test")
-  end)
-end)
--- File system integration
-describe("File System Integration", function()
-  local fs = require("lib.tools.filesystem")
-  local test_dir
+*(These apply if/when integration tests are added)*
+- **Focus on Interactions:** Design tests to specifically target the communication points and data handoffs between modules.
+- **Minimize Mocking:** While some mocking might be unavoidable (e.g., for truly external services), integration tests provide the most value when they use the *real* implementations of the interacting Firmo modules.
+- **Robust Setup/Teardown:** Integration tests often require more complex setup (e.g., creating configuration files, setting up directory structures) and careful teardown (e.g., cleaning up temporary files) to ensure isolation. Use `lib/tools/test_helper` extensively.
+- **Keep Focused:** Integration tests can become slow and complex. Focus on testing the most critical cross-component workflows rather than trying to achieve exhaustive coverage of all possible interactions.
 
-  before_each(function()
-    test_dir = test_helper.create_temp_test_directory()
-  end)
+## Troubleshooting / Common Pitfalls (Optional)
 
-  it("handles file operations", function()
-    local path = test_dir.path .. "/test.txt"
-    fs.write_file(path, "content")
-    local content = fs.read_file(path)
-    expect(content).to.equal("content")
-  end)
-end)
-```
+**Not Applicable** due to the current lack of tests in this directory.
 
-
-
-## Error Handling
-
-
-
-```lua
--- Cross-component error handling
-it("handles cross-component errors", { expect_error = true }, function()
-  local result, err = test_helper.with_error_capture(function()
-    return coverage.track_file("nonexistent.lua")
-  end)()
-
-  expect(err).to.exist()
-  expect(err.category).to.equal("IO")
-  expect(logger.last_error()).to.match("file not found")
-end)
--- Transaction rollback
-it("rolls back on error", { expect_error = true }, function()
-  local db = require("database")
-  db.begin_transaction()
-
-  local err = test_helper.with_error_capture(function()
-    db.insert({ invalid = true })
-  end)()
-
-  expect(err).to.exist()
-  db.rollback_transaction()
-end)
-```
-
-
-
-## Critical Rules
-
-
-
-- Clean up resources
-- Handle transactions
-- Verify integrations
-- Document dependencies
-- Test error paths
-
-
-## Best Practices
-
-
-
-- Test real scenarios
-- Verify data flow
-- Check boundaries
-- Handle errors
-- Clean up resources
-- Use transactions
-- Mock external services
-- Document setup
-- Test thoroughly
-- Monitor performance
-
-
-## Performance Tips
-
-
-
-- Use transactions
-- Clean up data
-- Handle timeouts
-- Monitor resources
-- Batch operations
-- Cache results
+*(If/when integration tests are added)*
+- Debugging failures would typically involve tracing the execution flow and data transformations across the boundaries of the interacting modules to identify where the communication breaks down or produces incorrect results. This might require more extensive logging or step-through debugging compared to unit tests.

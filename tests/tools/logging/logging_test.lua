@@ -1,6 +1,22 @@
--- Tests for the logging system
+--- Logging System Tests
+---
+--- Verifies the core functionality of the `lib.tools.logging` module, including:
+--- - Log level constants and usage (`LEVELS`, `set_level`, `would_log`).
+--- - Module logger creation and usage (`get_logger`, `set_module_level`).
+--- - Configuration (`configure`, `get_config`).
+--- - File logging (text and JSON formats).
+--- - Silent mode (`configure({ silent = true })`).
+--- - Module filtering (`filter_module`, `clear_module_filters`, `blacklist_module`, `clear_blacklist`).
+--- - Buffered logging (`configure({ buffer_size = ... })`, `flush`, `create_buffered_logger`).
+--- - Integration with sub-modules (`search`, `export`, `formatter_integration`).
+--- Uses `filesystem` for log file verification and `test_helper` for error assertions.
+--- Configures logging to use a test-specific directory and resets at the end.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+
 local fs = require("lib.tools.filesystem")
 local test_helper = require("lib.tools.test_helper")
 

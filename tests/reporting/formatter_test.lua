@@ -1,5 +1,13 @@
--- Tests for reporting module formatters
+--- Reporting Formatter Tests
+---
 ---@diagnostic disable: unused-local
+---
+--- Tests the functionality of various reporting formatters within the `lib.reporting`
+--- module, including registration, configuration, formatting data (coverage, quality,
+--- results), and file writing. Covers HTML, JSON, TAP, CSV, and Summary formatters.
+---
+--- @author Firmo Team
+--- @test
 
 -- Import firmo test framework
 local firmo = require("firmo")
@@ -8,41 +16,19 @@ local before, after = firmo.before, firmo.after
 
 -- Import modules needed for testing
 local test_helper = require("lib.tools.test_helper")
-local error_handler = require("lib.tools.error_handler")
 local fs = require("lib.tools.filesystem")
 local temp_file = require("lib.tools.filesystem.temp_file")
 
 -- Initialize logging if available
-local logging, logger
-local function initialize_logger()
-  if not logger then
-    local success, log_module = pcall(require, "lib.tools.logging")
-    if success then
-      logging = log_module
-      logger = logging.get_logger("test.reporting.formatters")
-      if logger and logger.debug then
-        logger.debug("Reporting formatter test initialized", {
-          module = "test.reporting.formatters",
-          test_type = "unit",
-          test_focus = "formatter interface",
-        })
-      end
-    end
-  end
-  return logger
-end
+local logging = require("lib.tools.logging")
+local logger = logging.get_logger("test.reporting.formatters")
 
--- Initialize logger
-local log = initialize_logger()
-
--- Try to load the reporting module safely
-local function load_reporting_module()
-  return test_helper.with_error_capture(function()
-    return require("lib.reporting")
-  end)()
-end
+local reporting = require("lib.reporting")
 
 -- Sample data for testing formatters
+--- Creates a sample coverage data table for testing formatters.
+---@return CoverageReportData sample_data Sample coverage report data.
+---@private
 local function create_sample_coverage_data()
   return {
     files = {
@@ -93,6 +79,9 @@ local function create_sample_coverage_data()
   }
 end
 
+--- Creates a sample quality data table for testing formatters.
+---@return QualityReportData sample_data Sample quality report data.
+---@private
 local function create_sample_quality_data()
   return {
     level = 3,
@@ -124,6 +113,9 @@ local function create_sample_quality_data()
   }
 end
 
+--- Creates a sample test results data table for testing formatters.
+---@return TestResultsData sample_data Sample test results data.
+---@private
 local function create_sample_results_data()
   return {
     name = "TestSuite",
@@ -173,7 +165,6 @@ describe("reporting formatter interface", function()
 
   before(function()
     -- Load the reporting module before each test
-    reporting = load_reporting_module()
     expect(reporting).to.exist()
 
     -- Create a temporary directory for test output

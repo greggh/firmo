@@ -89,19 +89,17 @@ local results = parallel.run_tests({
 
 **Returns:**
 
-
-- `results` (table): Combined results from all test runs with the following structure:
-  - `passed` (number): Count of passed tests
-  - `failed` (number): Count of failed tests
-  - `skipped` (number): Count of skipped tests
-  - `pending` (number): Count of pending tests
-  - `total` (number): Total number of tests
-  - `errors` (table): Array of error objects with file, message, and traceback
-  - `elapsed` (number): Total execution time in seconds
-  - `coverage` (table): Combined coverage data (if enabled)
-  - `files_run` (table): Array of executed file paths
-  - `worker_outputs` (table): Raw output from worker processes
-
+- `results` (table): An aggregated results object (instance of `Results` class) containing:
+  - `passed` (number): Total count of passed tests across all files.
+  - `failed` (number): Total count of failed tests across all files.
+  - `skipped` (number): Total count of skipped tests across all files.
+  - `pending` (number): Total count of pending tests across all files.
+  - `total` (number): Total count of tests executed/counted across all files.
+  - `errors` (table): Array of error detail tables, each containing `{file, message, traceback}` for failures.
+  - `elapsed` (number): Total wall-clock time for the entire parallel execution in seconds.
+  - `coverage` (table): Aggregated coverage data table (if coverage and aggregation are enabled). Structure depends on coverage module.
+  - `files_run` (string[]): Array of file paths that were executed by workers.
+  - `worker_outputs` (string[]): Array containing the raw stdout/stderr captured from each worker process.
 
 ### `parallel.register_with_firmo(firmo)`
 

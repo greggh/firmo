@@ -25,7 +25,7 @@ local hash_str = hash.hash_string(str)
 ```
 
 
-Generate a hash for a string.
+Generate a hash for a string. Throws a validation error (via `error_handler`) if the input is not a string.
 **Parameters:**
 
 
@@ -34,7 +34,7 @@ Generate a hash for a string.
 **Returns:**
 
 
-- `hash_str` (string): The hash string in hexadecimal format
+- `hash_str` (string): The 32-bit FNV-1a hash as an 8-character hexadecimal string.
 
 **Example:**
 
@@ -64,8 +64,8 @@ Generate a hash for a file's contents.
 **Returns:**
 
 
-- `hash_str` (string|nil): The hash string in hexadecimal format, or nil if file couldn't be read
-- `error` (table|nil): Error information if reading failed
+- `hash_str` (string|nil): The 32-bit FNV-1a hash as an 8-character hexadecimal string, or `nil` if the file couldn't be read or the path was invalid.
+- `error` (table|nil): An error handler object (`operation_error` or `validation_error`) if reading or input validation failed.
 
 **Example:**
 
@@ -82,7 +82,7 @@ end
 ## Error Handling
 
 
-The module uses the standard error_handler system:
+The module uses the standard `error_handler` system. `hash_string` throws an error for invalid input (typically caught using `pcall`), while `hash_file` returns `nil, error_object` for file read issues or invalid input path:
 
 
 ```lua

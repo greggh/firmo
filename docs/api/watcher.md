@@ -32,7 +32,7 @@ local watcher = require("lib.tools.watcher")
 ### `watcher.configure(options)`
 
 
-Configure the watcher module with various options.
+Configure the watcher module settings. Merges provided options with defaults and central configuration.
 
 
 ```lua
@@ -53,12 +53,12 @@ watcher.configure({
 
 
 - `options` (table, optional): Configuration options
-  - `check_interval` (number): Time in seconds between file checks
-  - `watch_patterns` (string[]): Array of Lua patterns to match files to watch
-  - `default_directory` (string): Default directory to watch if none specified
-  - `debug` (boolean): Enable debug logging
-  - `verbose` (boolean): Enable verbose logging
-
+- `options` (table, optional): Configuration options:
+  - `check_interval` (number, optional): Time in seconds between file checks (e.g., `1.0`).
+  - `watch_patterns` (string[], optional): Array of Lua patterns to match files to watch (replaces existing patterns).
+  - `default_directory` (string, optional): Default directory to watch if none specified during `init`.
+  - `debug` (boolean, optional): Enable debug logging for the watcher module.
+  - `verbose` (boolean, optional): Enable verbose logging for the watcher module.
 **Returns:**
 
 
@@ -164,6 +164,7 @@ local config_info = watcher.debug_config()
   - `file_count` (number): Number of files being watched
   - `last_check_time` (number): Timestamp of last file check
   - `status` (string): Status of the watcher ("initialized", "uninitialized", or "error")
+  - `status` (string): Status of the watcher ("initialized", "uninitialized", or "error")
 
 
 ## Watcher Operation Functions
@@ -215,91 +216,6 @@ end
 
 - `changed_files` (string[]|nil): Array of changed file paths, or nil if no changes detected
 - `error` (table|nil): Error object if operation failed
-
-
-### `watcher.get_watched_files()`
-
-
-Get information about currently watched files.
-
-
-```lua
-local watched_files = watcher.get_watched_files()
-```
-
-
-**Returns:**
-
-
-- `watched_files` (table<string, {mtime: number, size: number}>): Table mapping file paths to metadata
-
-
-### `watcher.add_directory(dir_path, recursive)`
-
-
-Add a directory to watch.
-
-
-```lua
-local file_count = watcher.add_directory("./src", true)
-```
-
-
-**Parameters:**
-
-
-- `dir_path` (string): Path to the directory to watch
-- `recursive` (boolean, optional): Whether to watch subdirectories recursively
-
-**Returns:**
-
-
-- `file_count` (number|nil): Number of files added for watching, or nil on failure
-- `error` (table|nil): Error object if operation failed
-
-
-### `watcher.add_file(file_path)`
-
-
-Add a specific file to watch.
-
-
-```lua
-local success, err = watcher.add_file("./config.json")
-```
-
-
-**Parameters:**
-
-
-- `file_path` (string): Path to the file to watch
-
-**Returns:**
-
-
-- `success` (boolean|nil): True if the file was added successfully, nil on failure
-- `error` (table|nil): Error object if operation failed
-
-
-### `watcher.is_watching()`
-
-
-Check if the watcher is currently active.
-
-
-```lua
-if watcher.is_watching() then
-  print("Watcher is active")
-end
-```
-
-
-**Returns:**
-
-
-- `is_active` (boolean): Whether the watcher is currently active
-
-
 ## Example Usage
 
 

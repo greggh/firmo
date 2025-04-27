@@ -1,63 +1,33 @@
--- Basic test for firmo
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Firmo Core API Tests
+---
+--- Verifies the presence and basic functionality of core Firmo API functions
+--- (`describe`, `it`, `expect`, `spy`). Includes tests for graceful handling
+--- of non-existent functions and simple assertion passes. Also includes tests
+--- for basic spy creation, usage, and error handling.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 ---@diagnostic disable-next-line: unused-local
 local before, after = firmo.before, firmo.after
 
+
+
 -- Import test_helper for improved error handling
 local test_helper = require("lib.tools.test_helper")
-local error_handler = require("lib.tools.error_handler")
 
 -- Try to load the logging module
-local logging, logger
-local function try_load_logger()
-  if not logger then
-    local log_module, err = test_helper.with_error_capture(function()
-      return require("lib.tools.logging")
-    end)()
-
-    if err then
-      return nil
-    end
-
-    if log_module then
-      logging = log_module
-
-      local get_logger_result, get_logger_err = test_helper.with_error_capture(function()
-        return logging.get_logger("test.firmo")
-      end)()
-
-      if get_logger_err then
-        return nil
-      end
-
-      logger = get_logger_result
-
-      if logger and logger.debug then
-        local debug_result = test_helper.with_error_capture(function()
-          logger.debug("Firmo core test initialized", {
-            module = "test.firmo",
-            test_type = "unit",
-            test_focus = "core API",
-          })
-          return true
-        end)()
-      end
-    end
-  end
-  return logger
-end
-
+local logging = require("lib.tools.logging")
 -- Initialize logger
-local log = try_load_logger()
+local logger = logging.get_logger("firmo_test")
 
 describe("firmo", function()
-  if log then
-    log.info("Beginning firmo core tests", {
-      test_group = "firmo_core",
-      test_focus = "API functions",
-    })
-  end
+  logger.info("Beginning firmo core tests", {
+    test_group = "firmo_core",
+    test_focus = "API functions",
+  })
 
   it("has required functions", function()
     expect(firmo.describe).to.be.a("function")
@@ -67,9 +37,7 @@ describe("firmo", function()
   end)
 
   it("gracefully handles access to non-existent functions", { expect_error = true }, function()
-    if log then
-      log.debug("Testing access to non-existent functions")
-    end
+    logger.debug("Testing access to non-existent functions")
 
     local err = test_helper.expect_error(function()
       -- This should fail gracefully and not cause a hard crash
@@ -81,18 +49,14 @@ describe("firmo", function()
   end)
 
   it("passes simple tests", function()
-    if log then
-      log.debug("Testing basic assertions")
-    end
+    logger.debug("Testing basic assertions")
     expect(1).to.equal(1)
     expect("hello").to.equal("hello")
     expect({ 1, 2 }).to.equal({ 1, 2 })
   end)
 
   it("has spy functionality", function()
-    if log then
-      log.debug("Testing spy functionality")
-    end
+    logger.debug("Testing spy functionality")
     -- Test the spy functionality which is now implemented
     expect(firmo.spy).to.exist()
     -- The spy is a module with new and on functions
@@ -129,9 +93,7 @@ describe("firmo", function()
   end)
 
   it("handles spy errors gracefully", { expect_error = true }, function()
-    if log then
-      log.debug("Testing spy error handling")
-    end
+    logger.debug("Testing spy error handling")
 
     -- Test spying on nil
     local err1 = test_helper.expect_error(function()
@@ -184,13 +146,8 @@ describe("firmo", function()
     expect(obj.method.call_count).to.equal(1)
   end)
 
-  if log then
-    log.info("Firmo core tests completed", {
-      status = "success",
-      test_group = "firmo_core",
-    })
-  end
+  logger.info("Firmo core tests completed", {
+    status = "success",
+    test_group = "firmo_core",
+  })
 end)
-
--- Tests are run by run_all_tests.lua or scripts/runner.lua
--- No need to call firmo() explicitly here

@@ -1,5 +1,15 @@
--- Basic usage example for firmo
--- This example demonstrates the correct usage patterns for firmo tests
+--- basic_example.lua
+--
+-- This file demonstrates the fundamental structure and usage patterns of the
+-- Firmo testing framework. It covers:
+-- - Basic BDD syntax (`describe`, `it`).
+-- - Setup and teardown hooks (`before`, `after`).
+-- - Making assertions using `expect`.
+-- - Nested test suites.
+-- - Basic error testing patterns using `test_helper` and `error_handler`.
+--
+-- Run with: lua test.lua examples/basic_example.lua
+--
 
 -- Import the firmo framework
 local firmo = require("firmo")
@@ -11,6 +21,9 @@ local before, after = firmo.before, firmo.after
 -- Optional: Import error handling utilities for testing errors
 local test_helper = require("lib.tools.test_helper")
 local error_handler = require("lib.tools.error_handler")
+local logging = require("lib.tools.logging")
+
+local logger = logging.get_logger("BasicExample")
 
 -- A simple calculator module to test
 local calculator = {
@@ -29,25 +42,20 @@ local calculator = {
 }
 
 -- Test suite using nested describe blocks
+--- Defines the main test suite for the simple calculator module.
 describe("Calculator", function()
   -- Setup that runs before each test
   before(function()
     -- Use structured logging
-    firmo.log.info("Setting up test", {
-      module = "calculator",
-      timestamp = os.time()
-    })
+    logger.info("Setting up test for calculator", { module = "calculator" })
   end)
   
   -- Cleanup that runs after each test
   after(function()
-    firmo.log.info("Cleaning up test", {
-      module = "calculator",
-      timestamp = os.time()
-    })
+    logger.info("Cleaning up test for calculator", { module = "calculator" })
   end)
-  
   describe("Basic Operations", function()
+    --- Tests for the addition functionality.
     describe("addition", function()
       it("adds two positive numbers", function()
         expect(calculator.add(2, 3)).to.equal(5)
@@ -58,12 +66,14 @@ describe("Calculator", function()
       end)
     end)
     
+    --- Tests for the subtraction functionality.
     describe("subtraction", function()
       it("subtracts two numbers", function()
         expect(calculator.subtract(5, 3)).to.equal(2)
       end)
     end)
     
+    --- Tests for the multiplication functionality.
     describe("multiplication", function()
       it("multiplies two numbers", function()
         expect(calculator.multiply(2, 3)).to.equal(6)
@@ -71,7 +81,9 @@ describe("Calculator", function()
     end)
   end)
   
+  --- Groups tests related to more complex operations or error handling.
   describe("Advanced Operations", function()
+    --- Tests for the division functionality, including error handling.
     describe("division", function()
       it("divides two numbers", function()
         expect(calculator.divide(6, 3)).to.equal(2)

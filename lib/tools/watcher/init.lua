@@ -1,33 +1,102 @@
--- File watcher module for firmo
--- Monitors filesystem for changes and provides change notifications
+--- File Watcher Module for Firmo
+---
+--- Monitors filesystem for changes based on patterns and provides change
+--- notifications. Integrates with central configuration.
+---
+--- @module lib.tools.watcher
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
----@class watcher_module
----@field _VERSION string Module version
----@field configure fun(options?: {include_patterns?: string[], exclude_patterns?: string[], directories?: string|string[], check_interval?: number, recursive?: boolean, use_polling?: boolean, polling_interval?: number, ignore_hidden?: boolean, enable_event_dispatch?: boolean, max_files?: number, throttle_notifications?: boolean, save_state?: boolean}): watcher_module Configure the module with various options
----@field init fun(directories?: string|string[], exclude_patterns?: string[]): boolean|nil, table? Initialize the watcher by scanning all files in the given directories
----@field check_for_changes fun(): string[]|nil, table? Check for file changes since the last check
----@field add_patterns fun(patterns: string[]): watcher_module|nil, table? Add patterns to watch
----@field set_check_interval fun(interval: number): watcher_module|nil, table? Set check interval
----@field on_change fun(callback: fun(changed_files: string[])): watcher_module|nil, table? Register a callback for when files change
----@field watch fun(start?: boolean): boolean|nil, table? Start watching for changes with continuous polling
----@field stop fun(): boolean|nil, table? Stop watching for changes
----@field reset fun(): watcher_module|nil, table? Reset the module configuration to defaults
----@field full_reset fun(): watcher_module|nil, table? Fully reset both local and central configuration
----@field debug_config fun(): table Debug helper to show current configuration
----@field get_watched_files fun(): table<string, {mtime: number, size: number}> Get currently watched files with metadata
----@field add_directory fun(dir_path: string, recursive?: boolean): number|nil, table? Add a directory to watch
----@field add_file fun(file_path: string): boolean|nil, table? Add a specific file to watch
----@field is_watching fun(): boolean Check if the watcher is currently active
+---@class watcher_module The public API for the file watcher module.
+---@field _VERSION string Module version.
+---@field configure fun(options?: { check_interval?: number, watch_patterns?: string[], default_directory?: string, debug?: boolean, verbose?: boolean }): watcher_module Configures the watcher. Returns self.
+---@field init fun(directories?: string|string[], exclude_patterns?: string[]): boolean|nil, table? Initializes the watcher by scanning files. Returns `success, error?`. @throws table If validation fails.
+---@field check_for_changes fun(): string[]|nil, table? Checks for modified/new/deleted files. Returns list of changed files or `nil, error?`. @throws table If validation fails or critical error occurs.
+---@field add_patterns fun(patterns: string[]): watcher_module|nil, table? Adds patterns to the `watch_patterns` list. Returns self or `nil, error?`. @throws table If validation fails.
+---@field set_check_interval fun(interval: number): watcher_module|nil, table? Sets the file check interval. Returns self or `nil, error?`. @throws table If validation fails.
+---@field reset fun(): watcher_module|nil, table? Resets local configuration to defaults. Returns self or `nil, error?`. @throws table If runtime error occurs.
+---@field full_reset fun(): watcher_module|nil, table? Resets local and central configuration. Returns self or `nil, error?`. @throws table If runtime error occurs.
+---@field debug_config fun(): table Returns a table with current configuration and state for debugging.
+---@field on_change fun(...) [Not Implemented] Register a callback for when files change.
+---@field watch fun(...) [Not Implemented] Start watching for changes with continuous polling.
+---@field stop fun(...) [Not Implemented] Stop watching for changes.
+---@field get_watched_files fun(...) [Not Implemented] Get currently watched files with metadata.
+---@field add_directory fun(...) [Not Implemented] Add a directory to watch.
+---@field add_file fun(...) [Not Implemented] Add a specific file to watch.
+---@field is_watching fun(...) [Not Implemented] Check if the watcher is currently active.
 
 local watcher = {}
 watcher._VERSION = "1.0.0"
 
-local logging = require("lib.tools.logging")
-local fs = require("lib.tools.filesystem")
-local error_handler = require("lib.tools.error_handler")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
 
--- Initialize module logger
-local logger = logging.get_logger("watcher")
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("watcher")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
 
 -- Default configuration
 local DEFAULT_CONFIG = {
@@ -60,59 +129,30 @@ end
 local file_timestamps = {}
 local last_check_time = 0
 
--- Lazy loading of central_config to avoid circular dependencies
-local _central_config
+local central_config = try_require("lib.core.central_config")
 
+-- Register this module with central_config
+central_config.register_module("watcher", {
+  -- Schema
+  field_types = {
+    check_interval = "number",
+    watch_patterns = "table",
+    default_directory = "string",
+    debug = "boolean",
+    verbose = "boolean",
+  },
+  field_ranges = {
+    check_interval = { min = 0.1, max = 60 },
+  },
+}, DEFAULT_CONFIG)
+
+--- Registers a listener with central_config to update local config cache when watcher settings change.
+---@return boolean success `true` if the listener was registered, `false` otherwise.
 ---@private
----@return table|nil central_config The central_config module if available, nil otherwise
-local function get_central_config()
-  if not _central_config then
-    -- Use pcall to safely attempt loading central_config
-    local success, central_config = pcall(require, "lib.core.central_config")
-    if success then
-      _central_config = central_config
-
-      -- Register this module with central_config
-      _central_config.register_module("watcher", {
-        -- Schema
-        field_types = {
-          check_interval = "number",
-          watch_patterns = "table",
-          default_directory = "string",
-          debug = "boolean",
-          verbose = "boolean",
-        },
-        field_ranges = {
-          check_interval = { min = 0.1, max = 60 },
-        },
-      }, DEFAULT_CONFIG)
-
-      logger.debug("Successfully loaded central_config", {
-        module = "watcher",
-      })
-    else
-      logger.debug("Failed to load central_config", {
-        error = tostring(central_config),
-      })
-    end
-  end
-
-  return _central_config
-end
-
----@private
----@return boolean success Whether the change listener was registered successfully
--- Set up change listener for central configuration
 local function register_change_listener()
-  local central_config = get_central_config()
-  if not central_config then
-    logger.debug("Cannot register change listener - central_config not available")
-    return false
-  end
-
   -- Register change listener for watcher configuration
   central_config.on_change("watcher", function(path, old_value, new_value)
-    logger.debug("Configuration change detected", {
+    get_logger().debug("Configuration change detected", {
       path = path,
       changed_by = "central_config",
     })
@@ -123,7 +163,7 @@ local function register_change_listener()
       -- Update check_interval
       if watcher_config.check_interval ~= nil and watcher_config.check_interval ~= config.check_interval then
         config.check_interval = watcher_config.check_interval
-        logger.debug("Updated check_interval from central_config", {
+        get_logger().debug("Updated check_interval from central_config", {
           check_interval = config.check_interval,
         })
       end
@@ -135,7 +175,7 @@ local function register_change_listener()
         for _, pattern in ipairs(watcher_config.watch_patterns) do
           table.insert(config.watch_patterns, pattern)
         end
-        logger.debug("Updated watch_patterns from central_config", {
+        get_logger().debug("Updated watch_patterns from central_config", {
           pattern_count = #config.watch_patterns,
         })
       end
@@ -143,7 +183,7 @@ local function register_change_listener()
       -- Update default_directory
       if watcher_config.default_directory ~= nil and watcher_config.default_directory ~= config.default_directory then
         config.default_directory = watcher_config.default_directory
-        logger.debug("Updated default_directory from central_config", {
+        get_logger().debug("Updated default_directory from central_config", {
           default_directory = config.default_directory,
         })
       end
@@ -151,7 +191,7 @@ local function register_change_listener()
       -- Update debug setting
       if watcher_config.debug ~= nil and watcher_config.debug ~= config.debug then
         config.debug = watcher_config.debug
-        logger.debug("Updated debug setting from central_config", {
+        get_logger().debug("Updated debug setting from central_config", {
           debug = config.debug,
         })
       end
@@ -159,92 +199,74 @@ local function register_change_listener()
       -- Update verbose setting
       if watcher_config.verbose ~= nil and watcher_config.verbose ~= config.verbose then
         config.verbose = watcher_config.verbose
-        logger.debug("Updated verbose setting from central_config", {
+        get_logger().debug("Updated verbose setting from central_config", {
           verbose = config.verbose,
         })
       end
 
       -- Update logging configuration
       -- Update logging configuration
-      local log_level = config.debug and logging.LEVELS.DEBUG
-        or (config.verbose and logging.LEVELS.VERBOSE or logging.LEVELS.INFO)
-      logging.set_module_level("watcher", log_level)
-      logger.debug("Applied configuration changes from central_config")
+      local log_level = config.debug and get_logging().LEVELS.DEBUG
+        or (config.verbose and get_logging().LEVELS.VERBOSE or get_logging().LEVELS.INFO)
+      get_logging().set_module_level("watcher", log_level)
+      get_logger().debug("Applied configuration changes from central_config")
     end
   end)
 
-  logger.debug("Registered change listener for central configuration")
+  get_logger().debug("Registered change listener for central configuration")
   return true
 end
 
---- Configure the watcher module with various options
----@param options? table Configuration options { check_interval?: number, default_directory?: string, debug?: boolean, verbose?: boolean, watch_patterns?: string[] }
----@return watcher_module The module instance for method chaining
+--- Configures the watcher module settings.
+--- Merges provided `options` with defaults, potentially loading from or saving to central config.
+---@param options? { check_interval?: number, default_directory?: string, debug?: boolean, verbose?: boolean, watch_patterns?: string[] } Configuration options table.
+---@return watcher_module self The module instance (`watcher`) for chaining.
 function watcher.configure(options)
   options = options or {}
 
-  logger.debug("Configuring watcher module", {
+  get_logger().debug("Configuring watcher module", {
     options = options,
   })
 
-  -- Check for central configuration first
-  local central_config = get_central_config()
-  if central_config then
-    -- Get existing central config values
-    local watcher_config = central_config.get("watcher")
+  -- Get existing central config values
+  local watcher_config = central_config.get("watcher")
 
-    -- Apply central configuration (with defaults as fallback)
-    if watcher_config then
-      logger.debug("Using central_config values for initialization", {
-        check_interval = watcher_config.check_interval,
-        has_watch_patterns = watcher_config.watch_patterns ~= nil,
-      })
+  -- Apply central configuration (with defaults as fallback)
+  if watcher_config then
+    get_logger().debug("Using central_config values for initialization", {
+      check_interval = watcher_config.check_interval,
+      has_watch_patterns = watcher_config.watch_patterns ~= nil,
+    })
 
-      -- Apply check_interval
-      config.check_interval = watcher_config.check_interval ~= nil and watcher_config.check_interval
-        or DEFAULT_CONFIG.check_interval
+    -- Apply check_interval
+    config.check_interval = watcher_config.check_interval ~= nil and watcher_config.check_interval
+      or DEFAULT_CONFIG.check_interval
 
-      -- Apply default_directory
-      config.default_directory = watcher_config.default_directory ~= nil and watcher_config.default_directory
-        or DEFAULT_CONFIG.default_directory
+    -- Apply default_directory
+    config.default_directory = watcher_config.default_directory ~= nil and watcher_config.default_directory
+      or DEFAULT_CONFIG.default_directory
 
-      -- Apply debug and verbose settings
-      config.debug = watcher_config.debug ~= nil and watcher_config.debug or DEFAULT_CONFIG.debug
+    -- Apply debug and verbose settings
+    config.debug = watcher_config.debug ~= nil and watcher_config.debug or DEFAULT_CONFIG.debug
 
-      config.verbose = watcher_config.verbose ~= nil and watcher_config.verbose or DEFAULT_CONFIG.verbose
+    config.verbose = watcher_config.verbose ~= nil and watcher_config.verbose or DEFAULT_CONFIG.verbose
 
-      -- Apply watch_patterns if available
-      if watcher_config.watch_patterns then
-        config.watch_patterns = {}
-        for _, pattern in ipairs(watcher_config.watch_patterns) do
-          table.insert(config.watch_patterns, pattern)
-        end
-      else
-        -- Reset to defaults
-        config.watch_patterns = {}
-        for _, pattern in ipairs(DEFAULT_CONFIG.watch_patterns) do
-          table.insert(config.watch_patterns, pattern)
-        end
+    -- Apply watch_patterns if available
+    if watcher_config.watch_patterns then
+      config.watch_patterns = {}
+      for _, pattern in ipairs(watcher_config.watch_patterns) do
+        table.insert(config.watch_patterns, pattern)
       end
     else
-      logger.debug("No central_config values found, using defaults")
       -- Reset to defaults
-      config.check_interval = DEFAULT_CONFIG.check_interval
-      config.default_directory = DEFAULT_CONFIG.default_directory
-      config.debug = DEFAULT_CONFIG.debug
-      config.verbose = DEFAULT_CONFIG.verbose
-
       config.watch_patterns = {}
       for _, pattern in ipairs(DEFAULT_CONFIG.watch_patterns) do
         table.insert(config.watch_patterns, pattern)
       end
     end
-
-    -- Register change listener if not already done
-    register_change_listener()
   else
-    logger.debug("central_config not available, using defaults")
-    -- Apply defaults
+    get_logger().debug("No central_config values found, using defaults")
+    -- Reset to defaults
     config.check_interval = DEFAULT_CONFIG.check_interval
     config.default_directory = DEFAULT_CONFIG.default_directory
     config.debug = DEFAULT_CONFIG.debug
@@ -256,41 +278,36 @@ function watcher.configure(options)
     end
   end
 
+  -- Register change listener if not already done
+  register_change_listener()
+
   -- Apply user options (highest priority) and update central config
   if options.check_interval ~= nil then
     config.check_interval = options.check_interval
 
     -- Update central_config if available
-    if central_config then
-      central_config.set("watcher.check_interval", options.check_interval)
-    end
+    central_config.set("watcher.check_interval", options.check_interval)
   end
 
   if options.default_directory ~= nil then
     config.default_directory = options.default_directory
 
     -- Update central_config if available
-    if central_config then
-      central_config.set("watcher.default_directory", options.default_directory)
-    end
+    central_config.set("watcher.default_directory", options.default_directory)
   end
 
   if options.debug ~= nil then
     config.debug = options.debug
 
     -- Update central_config if available
-    if central_config then
-      central_config.set("watcher.debug", options.debug)
-    end
+    central_config.set("watcher.debug", options.debug)
   end
 
   if options.verbose ~= nil then
     config.verbose = options.verbose
 
     -- Update central_config if available
-    if central_config then
-      central_config.set("watcher.verbose", options.verbose)
-    end
+    central_config.set("watcher.verbose", options.verbose)
   end
 
   if options.watch_patterns ~= nil then
@@ -301,16 +318,14 @@ function watcher.configure(options)
     end
 
     -- Update central_config if available
-    if central_config then
-      central_config.set("watcher.watch_patterns", options.watch_patterns)
-    end
+    central_config.set("watcher.watch_patterns", options.watch_patterns)
   end
 
   -- Configure logging based on debug/verbose settings
   local log_level = config.debug and "DEBUG" or (config.verbose and "VERBOSE" or "INFO")
-  logging.set_module_level("watcher", log_level)
+  get_logging().set_module_level("watcher", log_level)
 
-  logger.debug("Watcher module configuration complete", {
+  get_logger().debug("Watcher module configuration complete", {
     check_interval = config.check_interval,
     watch_patterns_count = #config.watch_patterns,
     default_directory = config.default_directory,
@@ -325,70 +340,71 @@ end
 -- Initialize the module
 watcher.configure()
 
+--- Checks if a filename matches any of the configured `watch_patterns`.
+---@param filename string The filename to check.
+---@return boolean should_watch `true` if the filename matches any pattern, `false` otherwise.
+---@throws table If validation fails (e.g., filename is nil) via `error_handler`.
 ---@private
----@param filename string The filename to check against watch patterns
----@return boolean should_watch Whether the file should be watched
--- Function to check if a file matches any of the watch patterns
 local function should_watch_file(filename)
   -- Validate input
   if not filename then
-    local err = error_handler.validation_error("Missing required filename parameter", {
+    local err = get_error_handler().validation_error("Missing required filename parameter", {
       operation = "should_watch_file",
       module = "watcher",
     })
-    logger.warn("Invalid parameter", {
+    get_logger().warn("Invalid parameter", {
       operation = "should_watch_file",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return false
   end
 
   -- Ensure filename is a string
   if type(filename) ~= "string" then
-    local err = error_handler.validation_error("Filename must be a string", {
+    local err = get_error_handler().validation_error("Filename must be a string", {
       operation = "should_watch_file",
       provided_type = type(filename),
       module = "watcher",
     })
-    logger.warn("Invalid parameter type", {
+    get_logger().warn("Invalid parameter type", {
       operation = "should_watch_file",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return false
   end
 
   -- Check if patterns is valid
   if not config.watch_patterns or type(config.watch_patterns) ~= "table" then
-    local err = error_handler.runtime_error("Invalid watch patterns configuration", {
+    local err = get_error_handler().runtime_error("Invalid watch patterns configuration", {
       operation = "should_watch_file",
       module = "watcher",
     })
-    logger.warn("Invalid configuration", {
+    get_logger().warn("Invalid configuration", {
       operation = "should_watch_file",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return false
   end
 
   -- Try to match each pattern
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     for _, pattern in ipairs(config.watch_patterns) do
       if type(pattern) == "string" and filename:match(pattern) then
-        logger.debug("File matches watch pattern", {
+        get_logger().debug("File matches watch pattern", {
           filename = filename,
           pattern = pattern,
         })
         return true
       end
     end
-    logger.debug("File does not match watch patterns", { filename = filename })
+    get_logger().debug("File does not match watch patterns", { filename = filename })
     return false
   end)
 
   if not success then
-    logger.warn("Pattern matching failed", {
+    get_logger().warn("Pattern matching failed", {
       filename = filename,
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
     return false
   end
@@ -396,42 +412,44 @@ local function should_watch_file(filename)
   return result
 end
 
+--- Gets the last modification time of a file using `get_fs().get_modified_time`.
+--- Handles errors gracefully.
+---@param path string The file path to check.
+---@return number|nil mtime Modification time as a Unix timestamp, or `nil` on error.
+---@throws table If `path` validation fails (e.g., nil) via `error_handler`.
 ---@private
----@param path string The file path to check for modification time
----@return number|nil mtime Modification time as a number, or nil on error
--- Get file modification time
 local function get_file_mtime(path)
   -- Validate input
   if not path then
-    local err = error_handler.validation_error("Missing required path parameter", {
+    local err = get_error_handler().validation_error("Missing required path parameter", {
       operation = "get_file_mtime",
       module = "watcher",
     })
-    logger.warn("Invalid parameter", {
+    get_logger().warn("Invalid parameter", {
       operation = "get_file_mtime",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return nil
   end
 
   -- Ensure path is a string
   if type(path) ~= "string" then
-    local err = error_handler.validation_error("Path must be a string", {
+    local err = get_error_handler().validation_error("Path must be a string", {
       operation = "get_file_mtime",
       provided_type = type(path),
       module = "watcher",
     })
-    logger.warn("Invalid parameter type", {
+    get_logger().warn("Invalid parameter type", {
       operation = "get_file_mtime",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return nil
   end
 
   -- Get modification time with error handling
-  local mtime, err = error_handler.safe_io_operation(
+  local mtime, err = get_error_handler().safe_io_operation(
     function()
-      return fs.get_modified_time(path)
+      return get_fs().get_modified_time(path)
     end,
     path,
     {
@@ -441,52 +459,53 @@ local function get_file_mtime(path)
   )
 
   if not mtime then
-    logger.warn("Failed to get modification time", {
+    get_logger().warn("Failed to get modification time", {
       path = path,
-      error = err and error_handler.format_error(err),
+      error = err and get_error_handler().format_error(err),
     })
     return nil
   end
 
-  logger.debug("File modification time", { path = path, mtime = mtime })
+  get_logger().debug("File modification time", { path = path, mtime = mtime })
   return mtime
 end
 
 --- Initialize the watcher by scanning all files in the given directories
----@param directories? string|string[] Directory or array of directories to scan (default: current directory)
----@param exclude_patterns? string[] Array of patterns to exclude from watching
----@return boolean|nil success True if initialization succeeded, nil on failure
----@return table? error Error object if operation failed
+---@param directories? string|string[] Directory path string or array of directory paths to scan initially. Defaults to `config.default_directory`.
+---@param exclude_patterns? string[] Array of Lua patterns to exclude files/directories during the initial scan.
+---@return boolean|nil success `true` if initialization succeeded (files scanned), `nil` if a critical error occurred (e.g., all directories failed).
+---@return table? error Error object from `error_handler` if operation failed critically.
+---@throws table If parameter validation fails via `error_handler`.
 function watcher.init(directories, exclude_patterns)
-  logger.info("Initializing file watcher", {
+  get_logger().info("Initializing file watcher", {
     directories = directories,
     exclude_pattern_count = exclude_patterns and #exclude_patterns or 0,
   })
 
   -- Validate directories parameter
   if directories ~= nil and type(directories) ~= "table" and type(directories) ~= "string" then
-    local err = error_handler.validation_error("Directories must be a string, table, or nil", {
+    local err = get_error_handler().validation_error("Directories must be a string, table, or nil", {
       operation = "watcher.init",
       provided_type = type(directories),
       module = "watcher",
     })
-    logger.error("Invalid parameter type", {
+    get_logger().error("Invalid parameter type", {
       operation = "watcher.init",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   -- Validate exclude_patterns parameter
   if exclude_patterns ~= nil and type(exclude_patterns) ~= "table" then
-    local err = error_handler.validation_error("Exclude patterns must be a table or nil", {
+    local err = get_error_handler().validation_error("Exclude patterns must be a table or nil", {
       operation = "watcher.init",
       provided_type = type(exclude_patterns),
       module = "watcher",
     })
-    logger.error("Invalid parameter type", {
+    get_logger().error("Invalid parameter type", {
       operation = "watcher.init",
-      error = error_handler.format_error(err),
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
@@ -502,15 +521,15 @@ function watcher.init(directories, exclude_patterns)
   -- Ensure all directory entries are strings
   for i, dir in ipairs(dirs_to_watch) do
     if type(dir) ~= "string" then
-      local err = error_handler.validation_error("Directory entry must be a string", {
+      local err = get_error_handler().validation_error("Directory entry must be a string", {
         operation = "watcher.init",
         index = i,
         provided_type = type(dir),
         module = "watcher",
       })
-      logger.error("Invalid directory entry", {
+      get_logger().error("Invalid directory entry", {
         operation = "watcher.init",
-        error = error_handler.format_error(err),
+        error = get_error_handler().format_error(err),
       })
       return nil, err
     end
@@ -523,13 +542,13 @@ function watcher.init(directories, exclude_patterns)
   file_timestamps = {}
 
   -- Record the initialization time using protected call
-  local success, current_time = error_handler.try(function()
+  local success, current_time = get_error_handler().try(function()
     return os.time()
   end)
 
   if not success then
-    logger.warn("Failed to get system time, using 0 as fallback", {
-      error = error_handler.format_error(current_time),
+    get_logger().warn("Failed to get system time, using 0 as fallback", {
+      error = get_error_handler().format_error(current_time),
     })
     last_check_time = 0
   else
@@ -538,15 +557,15 @@ function watcher.init(directories, exclude_patterns)
 
   -- Create list of exclusion patterns as functions
   local excludes = {}
-  local exclude_success, exclude_result = error_handler.try(function()
+  local exclude_success, exclude_result = get_error_handler().try(function()
     for i, pattern in ipairs(excl_patterns) do
       if type(pattern) ~= "string" then
-        logger.warn("Skipping non-string exclusion pattern", {
+        get_logger().warn("Skipping non-string exclusion pattern", {
           index = i,
           provided_type = type(pattern),
         })
       else
-        logger.info("Adding exclusion pattern", { pattern = pattern })
+        get_logger().info("Adding exclusion pattern", { pattern = pattern })
         table.insert(excludes, function(path)
           return path:match(pattern)
         end)
@@ -556,8 +575,8 @@ function watcher.init(directories, exclude_patterns)
   end)
 
   if not exclude_success then
-    logger.warn("Failed to process exclusion patterns", {
-      error = error_handler.format_error(exclude_result),
+    get_logger().warn("Failed to process exclusion patterns", {
+      error = get_error_handler().format_error(exclude_result),
     })
     -- Continue with empty excludes as a fallback
     excludes = {}
@@ -571,12 +590,12 @@ function watcher.init(directories, exclude_patterns)
 
   -- Scan all files in directories
   for _, dir in ipairs(dirs_to_watch) do
-    logger.info("Watching directory", { directory = dir })
+    get_logger().info("Watching directory", { directory = dir })
 
     -- Verify the directory exists before scanning
-    local dir_exists, dir_err = error_handler.safe_io_operation(
+    local dir_exists, dir_err = get_error_handler().safe_io_operation(
       function()
-        return fs.directory_exists(dir)
+        return get_fs().directory_exists(dir)
       end,
       dir,
       {
@@ -586,9 +605,9 @@ function watcher.init(directories, exclude_patterns)
     )
 
     if not dir_exists then
-      logger.error("Directory does not exist", {
+      get_logger().error("Directory does not exist", {
         directory = dir,
-        error = dir_err and error_handler.format_error(dir_err),
+        error = dir_err and get_error_handler().format_error(dir_err),
       })
       dir_error_count = dir_error_count + 1
       -- Continue with other directories instead of failing completely
@@ -596,10 +615,10 @@ function watcher.init(directories, exclude_patterns)
     end
 
     -- Use filesystem module to scan directory recursively with error handling
-    logger.debug("Scanning directory recursively", { directory = dir })
-    local files, scan_err = error_handler.safe_io_operation(
+    get_logger().debug("Scanning directory recursively", { directory = dir })
+    local files, scan_err = get_error_handler().safe_io_operation(
       function()
-        return fs.scan_directory(dir, true)
+        return get_fs().scan_directory(dir, true)
       end,
       dir,
       {
@@ -610,16 +629,16 @@ function watcher.init(directories, exclude_patterns)
     )
 
     if not files then
-      logger.error("Failed to scan directory", {
+      get_logger().error("Failed to scan directory", {
         directory = dir,
-        error = scan_err and error_handler.format_error(scan_err),
+        error = scan_err and get_error_handler().format_error(scan_err),
       })
       dir_error_count = dir_error_count + 1
       goto continue
     end
 
     if type(files) ~= "table" then
-      logger.error("Invalid scan results, expected table", {
+      get_logger().error("Invalid scan results, expected table", {
         directory = dir,
         result_type = type(files),
       })
@@ -628,7 +647,7 @@ function watcher.init(directories, exclude_patterns)
     end
 
     -- Process found files with error boundaries
-    local success, result = error_handler.try(function()
+    local success, result = get_error_handler().try(function()
       local file_count = #files
       local exclude_count = 0
       local watch_count = 0
@@ -636,18 +655,18 @@ function watcher.init(directories, exclude_patterns)
       for _, path in ipairs(files) do
         -- Skip invalid paths
         if type(path) ~= "string" then
-          logger.warn("Skipping invalid path", { path_type = type(path) })
+          get_logger().warn("Skipping invalid path", { path_type = type(path) })
           goto next_file
         end
 
         -- Apply exclusion patterns with protection
         local exclude = false
-        local exclude_success, exclude_result = error_handler.try(function()
+        local exclude_success, exclude_result = get_error_handler().try(function()
           for _, exclude_func in ipairs(excludes) do
             if exclude_func(path) then
               exclude = true
               exclude_count = exclude_count + 1
-              logger.debug("Excluding file", { path = path })
+              get_logger().debug("Excluding file", { path = path })
               break
             end
           end
@@ -655,9 +674,9 @@ function watcher.init(directories, exclude_patterns)
         end)
 
         if not exclude_success then
-          logger.warn("Error applying exclusion patterns", {
+          get_logger().warn("Error applying exclusion patterns", {
             path = path,
-            error = error_handler.format_error(exclude_result),
+            error = get_error_handler().format_error(exclude_result),
           })
           -- Default to not excluding on error
           exclude = false
@@ -680,7 +699,7 @@ function watcher.init(directories, exclude_patterns)
         ::next_file::
       end
 
-      logger.info("Directory scan results", {
+      get_logger().info("Directory scan results", {
         directory = dir,
         files_found = file_count,
         files_excluded = exclude_count,
@@ -696,9 +715,9 @@ function watcher.init(directories, exclude_patterns)
     end)
 
     if not success then
-      logger.error("Failed to process files in directory", {
+      get_logger().error("Failed to process files in directory", {
         directory = dir,
-        error = error_handler.format_error(result),
+        error = get_error_handler().format_error(result),
       })
       dir_error_count = dir_error_count + 1
     end
@@ -708,7 +727,7 @@ function watcher.init(directories, exclude_patterns)
 
   -- Count total watched files with error handling
   local file_count = 0
-  local count_success, count_result = error_handler.try(function()
+  local count_success, count_result = get_error_handler().try(function()
     for _ in pairs(file_timestamps) do
       file_count = file_count + 1
     end
@@ -716,15 +735,15 @@ function watcher.init(directories, exclude_patterns)
   end)
 
   if not count_success then
-    logger.warn("Failed to count monitored files", {
-      error = error_handler.format_error(count_result),
+    get_logger().warn("Failed to count monitored files", {
+      error = get_error_handler().format_error(count_result),
     })
     file_count = total_watched -- Use the accumulated count as fallback
   else
     file_count = count_result
   end
 
-  logger.info("Watch initialization complete", {
+  get_logger().info("Watch initialization complete", {
     monitored_files = file_count,
     total_found = total_found,
     total_excluded = total_excluded,
@@ -733,7 +752,7 @@ function watcher.init(directories, exclude_patterns)
   })
 
   if dir_error_count == #dirs_to_watch and #dirs_to_watch > 0 then
-    local err = error_handler.io_error("Failed to initialize watcher - all directories failed", {
+    local err = get_error_handler().io_error("Failed to initialize watcher - all directories failed", {
       operation = "watcher.init",
       module = "watcher",
       directories = dirs_to_watch,
@@ -745,41 +764,44 @@ function watcher.init(directories, exclude_patterns)
   return true
 end
 
---- Check for file changes since the last check
----@return string[]|nil changed_files Array of changed files, or nil if no changes detected
----@return table? error Error object if operation failed
+--- Checks all watched files for changes since the last call to this function or `init`.
+--- Detects modified, added, and removed files based on timestamps and presence.
+--- Updates internal state (`file_timestamps`, `last_check_time`).
+---@return string[]|nil changed_files An array of file paths that have changed (modified, added, or removed), or `nil` if no changes were detected or if a critical error occurred.
+---@return table? error Error object from `error_handler` if a critical error occurred during checks.
+---@throws table If configuration validation fails or critical errors occur during file checks via `error_handler`.
 function watcher.check_for_changes()
   -- Validate configuration before proceeding
   if not config then
-    local err = error_handler.runtime_error("Configuration not initialized", {
+    local err = get_error_handler().runtime_error("Configuration not initialized", {
       operation = "watcher.check_for_changes",
       module = "watcher",
     })
-    logger.error("Invalid configuration state", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid configuration state", {
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   if not config.check_interval or type(config.check_interval) ~= "number" then
-    local err = error_handler.validation_error("Invalid check_interval in configuration", {
+    local err = get_error_handler().validation_error("Invalid check_interval in configuration", {
       operation = "watcher.check_for_changes",
       provided_type = type(config.check_interval),
       module = "watcher",
     })
-    logger.error("Invalid configuration value", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid configuration value", {
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   -- Get current time with error handling
-  local time_success, current_time = error_handler.try(function()
+  local time_success, current_time = get_error_handler().try(function()
     return os.time()
   end)
 
   if not time_success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Failed to get system time",
       {
         operation = "watcher.check_for_changes",
@@ -787,8 +809,8 @@ function watcher.check_for_changes()
       },
       current_time -- cause
     )
-    logger.error("Time function failed", {
-      error = error_handler.format_error(err),
+    get_logger().error("Time function failed", {
+      error = get_error_handler().format_error(err),
     })
     -- Use a reasonable fallback to not disrupt operation
     current_time = (last_check_time or 0) + config.check_interval + 1
@@ -796,7 +818,7 @@ function watcher.check_for_changes()
 
   -- Check if it's time for a new check
   if current_time - last_check_time < config.check_interval then
-    logger.verbose("Skipping file check", {
+    get_logger().verbose("Skipping file check", {
       elapsed = current_time - last_check_time,
       required_interval = config.check_interval,
     })
@@ -805,31 +827,31 @@ function watcher.check_for_changes()
 
   -- Get formatted timestamp with error protection
   local timestamp
-  local timestamp_success, timestamp_result = error_handler.try(function()
+  local timestamp_success, timestamp_result = get_error_handler().try(function()
     return os.date("%Y-%m-%d %H:%M:%S")
   end)
 
   if not timestamp_success then
-    logger.warn("Failed to format timestamp", {
-      error = error_handler.format_error(timestamp_result),
+    get_logger().warn("Failed to format timestamp", {
+      error = get_error_handler().format_error(timestamp_result),
     })
     timestamp = tostring(current_time) -- Fallback to raw timestamp
   else
     timestamp = timestamp_result
   end
 
-  logger.debug("Checking for file changes", { timestamp = timestamp })
+  get_logger().debug("Checking for file changes", { timestamp = timestamp })
   last_check_time = current_time
   local changed_files = {}
 
   -- Verify file_timestamps is valid
   if type(file_timestamps) ~= "table" then
-    local err = error_handler.runtime_error("Invalid file_timestamps table", {
+    local err = get_error_handler().runtime_error("Invalid file_timestamps table", {
       operation = "watcher.check_for_changes",
       module = "watcher",
     })
-    logger.error("Invalid state", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid state", {
+      error = get_error_handler().format_error(err),
     })
     -- Initialize a new empty table as fallback
     file_timestamps = {}
@@ -843,13 +865,13 @@ function watcher.check_for_changes()
   local errors_count = 0
 
   -- Check each watched file for changes with error boundaries per file
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     for path, old_mtime in pairs(file_timestamps) do
       checked_files = checked_files + 1
 
       -- Skip invalid paths and mtimes
       if type(path) ~= "string" or type(old_mtime) ~= "number" then
-        logger.warn("Skipping invalid entry", {
+        get_logger().warn("Skipping invalid entry", {
           path_type = type(path),
           mtime_type = type(old_mtime),
         })
@@ -862,19 +884,19 @@ function watcher.check_for_changes()
 
       -- If file exists and has changed
       if new_mtime and new_mtime > old_mtime then
-        logger.info("File changed", {
+        get_logger().info("File changed", {
           path = path,
           old_mtime = old_mtime,
           new_mtime = new_mtime,
         })
         -- Protected insert operation
-        local insert_success, _ = error_handler.try(function()
+        local insert_success, _ = get_error_handler().try(function()
           table.insert(changed_files, path)
           return true
         end)
 
         if not insert_success then
-          logger.warn("Failed to add path to changed files list", { path = path })
+          get_logger().warn("Failed to add path to changed files list", { path = path })
           errors_count = errors_count + 1
         else
           changed_count = changed_count + 1
@@ -883,15 +905,15 @@ function watcher.check_for_changes()
         file_timestamps[path] = new_mtime
       -- If file no longer exists
       elseif not new_mtime then
-        logger.info("File removed", { path = path })
+        get_logger().info("File removed", { path = path })
         -- Protected insert operation
-        local insert_success, _ = error_handler.try(function()
+        local insert_success, _ = get_error_handler().try(function()
           table.insert(changed_files, path)
           return true
         end)
 
         if not insert_success then
-          logger.warn("Failed to add removed path to changed files list", { path = path })
+          get_logger().warn("Failed to add removed path to changed files list", { path = path })
           errors_count = errors_count + 1
         else
           removed_count = removed_count + 1
@@ -907,8 +929,8 @@ function watcher.check_for_changes()
   end)
 
   if not success then
-    logger.error("Failed to check existing files", {
-      error = error_handler.format_error(result),
+    get_logger().error("Failed to check existing files", {
+      error = get_error_handler().format_error(result),
     })
     -- Don't return immediately - try to check for new files too
   end
@@ -919,7 +941,7 @@ function watcher.check_for_changes()
 
   -- Validate directory configuration
   if not config.default_directory or type(config.default_directory) ~= "string" then
-    logger.warn("Invalid default_directory configuration, using current directory", {
+    get_logger().warn("Invalid default_directory configuration, using current directory", {
       provided_value = config.default_directory,
     })
     config.default_directory = "."
@@ -931,9 +953,9 @@ function watcher.check_for_changes()
   -- Process each directory for new files
   for _, dir in ipairs(dirs) do
     -- Check if directory exists before scanning
-    local dir_exists, dir_err = error_handler.safe_io_operation(
+    local dir_exists, dir_err = get_error_handler().safe_io_operation(
       function()
-        return fs.directory_exists(dir)
+        return get_fs().directory_exists(dir)
       end,
       dir,
       {
@@ -943,18 +965,18 @@ function watcher.check_for_changes()
     )
 
     if not dir_exists then
-      logger.warn("Directory does not exist", {
+      get_logger().warn("Directory does not exist", {
         directory = dir,
-        error = dir_err and error_handler.format_error(dir_err),
+        error = dir_err and get_error_handler().format_error(dir_err),
       })
       scan_errors_count = scan_errors_count + 1
       goto continue_dir
     end
 
-    logger.debug("Checking for new files", { directory = dir })
-    local files, scan_err = error_handler.safe_io_operation(
+    get_logger().debug("Checking for new files", { directory = dir })
+    local files, scan_err = get_error_handler().safe_io_operation(
       function()
-        return fs.scan_directory(dir, true)
+        return get_fs().scan_directory(dir, true)
       end,
       dir,
       {
@@ -965,9 +987,9 @@ function watcher.check_for_changes()
     )
 
     if not files then
-      logger.warn("Failed to scan directory for new files", {
+      get_logger().warn("Failed to scan directory for new files", {
         directory = dir,
-        error = scan_err and error_handler.format_error(scan_err),
+        error = scan_err and get_error_handler().format_error(scan_err),
       })
       scan_errors_count = scan_errors_count + 1
       goto continue_dir
@@ -975,7 +997,7 @@ function watcher.check_for_changes()
 
     -- Validate scan results
     if type(files) ~= "table" then
-      logger.warn("Invalid scan result type", {
+      get_logger().warn("Invalid scan result type", {
         directory = dir,
         result_type = type(files),
       })
@@ -984,11 +1006,11 @@ function watcher.check_for_changes()
     end
 
     -- Process new files with per-file error boundaries
-    local files_success, _ = error_handler.try(function()
+    local files_success, _ = get_error_handler().try(function()
       for _, path in ipairs(files) do
         -- Skip invalid paths
         if type(path) ~= "string" then
-          logger.warn("Skipping invalid path", { path_type = type(path) })
+          get_logger().warn("Skipping invalid path", { path_type = type(path) })
           goto continue_new_file
         end
 
@@ -1002,16 +1024,16 @@ function watcher.check_for_changes()
         if should_watch then
           local mtime = get_file_mtime(path)
           if mtime then
-            logger.info("New file detected", { path = path })
+            get_logger().info("New file detected", { path = path })
 
             -- Protected insert operation
-            local insert_success, _ = error_handler.try(function()
+            local insert_success, _ = get_error_handler().try(function()
               table.insert(changed_files, path)
               return true
             end)
 
             if not insert_success then
-              logger.warn("Failed to add new path to changed files list", { path = path })
+              get_logger().warn("Failed to add new path to changed files list", { path = path })
               errors_count = errors_count + 1
             else
               new_files_count = new_files_count + 1
@@ -1027,9 +1049,9 @@ function watcher.check_for_changes()
     end)
 
     if not files_success then
-      logger.warn("Error processing new files", {
+      get_logger().warn("Error processing new files", {
         directory = dir,
-        error = error_handler.format_error(files_success), -- Error is in first return value in this case
+        error = get_error_handler().format_error(files_success), -- Error is in first return value in this case
       })
       scan_errors_count = scan_errors_count + 1
     end
@@ -1039,20 +1061,20 @@ function watcher.check_for_changes()
 
   -- Get file count safely
   local file_count = 0
-  local count_success, count_result = error_handler.try(function()
+  local count_success, count_result = get_error_handler().try(function()
     return #changed_files
   end)
 
   if not count_success then
-    logger.warn("Failed to count changed files", {
-      error = error_handler.format_error(count_result),
+    get_logger().warn("Failed to count changed files", {
+      error = get_error_handler().format_error(count_result),
     })
     file_count = changed_count + removed_count + new_files_count -- Fallback to tracked counts
   else
     file_count = count_result
   end
 
-  logger.info("File check completed", {
+  get_logger().info("File check completed", {
     files_checked = checked_files,
     files_changed = changed_count,
     files_removed = removed_count,
@@ -1063,10 +1085,10 @@ function watcher.check_for_changes()
   })
 
   if file_count > 0 then
-    logger.info("Detected changed files", { count = file_count })
+    get_logger().info("Detected changed files", { count = file_count })
     return changed_files
   else
-    logger.debug("No file changes detected", {
+    get_logger().debug("No file changes detected", {
       elapsed = os.time() - last_check_time,
     })
     return nil
@@ -1074,48 +1096,49 @@ function watcher.check_for_changes()
 end
 
 --- Add patterns to watch
----@param patterns string[] Array of patterns to add to the watch list
----@return watcher_module|nil watcher The module instance for method chaining, or nil on failure
----@return table? error Error object if operation failed
+---@param patterns string[] Array of Lua patterns to add to the `config.watch_patterns` list.
+---@return watcher_module|nil self The module instance (`watcher`) for chaining, or `nil` on validation failure.
+---@return table? error Error object from `error_handler` if validation failed.
+---@throws table If parameter validation fails critically via `error_handler`.
 function watcher.add_patterns(patterns)
   -- Validate patterns parameter
   if not patterns then
-    local err = error_handler.validation_error("Missing required patterns parameter", {
+    local err = get_error_handler().validation_error("Missing required patterns parameter", {
       operation = "watcher.add_patterns",
       module = "watcher",
     })
-    logger.error("Invalid parameter", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid parameter", {
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   if type(patterns) ~= "table" then
-    local err = error_handler.validation_error("Patterns must be a table", {
+    local err = get_error_handler().validation_error("Patterns must be a table", {
       operation = "watcher.add_patterns",
       provided_type = type(patterns),
       module = "watcher",
     })
-    logger.error("Invalid parameter type", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid parameter type", {
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   -- Validate config state
   if not config or type(config) ~= "table" then
-    local err = error_handler.runtime_error("Configuration not initialized", {
+    local err = get_error_handler().runtime_error("Configuration not initialized", {
       operation = "watcher.add_patterns",
       module = "watcher",
     })
-    logger.error("Invalid state", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid state", {
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   if not config.watch_patterns or type(config.watch_patterns) ~= "table" then
-    logger.warn("Invalid watch_patterns configuration, initializing new table")
+    get_logger().warn("Invalid watch_patterns configuration, initializing new table")
     config.watch_patterns = {}
   end
 
@@ -1125,10 +1148,10 @@ function watcher.add_patterns(patterns)
 
   -- Process each pattern with error boundaries around each pattern
   for i, pattern in ipairs(patterns) do
-    local success, result = error_handler.try(function()
+    local success, result = get_error_handler().try(function()
       -- Validate pattern
       if type(pattern) ~= "string" then
-        logger.warn("Skipping non-string pattern", {
+        get_logger().warn("Skipping non-string pattern", {
           index = i,
           provided_type = type(pattern),
         })
@@ -1140,51 +1163,47 @@ function watcher.add_patterns(patterns)
         return string.match("test", pattern)
       end)
       if pattern_err then
-        logger.warn("Skipping invalid pattern", {
+        get_logger().warn("Skipping invalid pattern", {
           pattern = pattern,
           error = pattern_err,
         })
         return false
       end
 
-      logger.info("Adding watch pattern", { pattern = pattern })
+      get_logger().info("Adding watch pattern", { pattern = pattern })
       table.insert(config.watch_patterns, pattern)
 
-      -- Update central_config if available
-      local central_config = get_central_config()
-      if central_config then
-        -- Get current patterns with error handling
-        local get_success, current_patterns = error_handler.try(function()
-          return central_config.get("watcher.watch_patterns") or {}
-        end)
+      -- Get current patterns with error handling
+      local get_success, current_patterns = get_error_handler().try(function()
+        return central_config.get("watcher.watch_patterns") or {}
+      end)
 
-        if not get_success then
-          logger.warn("Failed to get current patterns from central_config", {
-            error = error_handler.format_error(current_patterns),
-          })
-          -- Continue without updating central_config
-          return true
-        end
+      if not get_success then
+        get_logger().warn("Failed to get current patterns from central_config", {
+          error = get_error_handler().format_error(current_patterns),
+        })
+        -- Continue without updating central_config
+        return true
+      end
 
-        -- Add new pattern with error handling
-        local set_success, set_result = error_handler.try(function()
-          -- Add new pattern
-          table.insert(current_patterns, pattern)
-          -- Update central config
-          central_config.set("watcher.watch_patterns", current_patterns)
-          return true
-        end)
+      -- Add new pattern with error handling
+      local set_success, set_result = get_error_handler().try(function()
+        -- Add new pattern
+        table.insert(current_patterns, pattern)
+        -- Update central config
+        central_config.set("watcher.watch_patterns", current_patterns)
+        return true
+      end)
 
-        if not set_success then
-          logger.warn("Failed to update patterns in central_config", {
-            error = error_handler.format_error(set_result),
-          })
-          -- Pattern was still added to local config, so still return success
-        else
-          logger.debug("Updated watch_patterns in central_config", {
-            pattern_count = #current_patterns,
-          })
-        end
+      if not set_success then
+        get_logger().warn("Failed to update patterns in central_config", {
+          error = get_error_handler().format_error(set_result),
+        })
+        -- Pattern was still added to local config, so still return success
+      else
+        get_logger().debug("Updated watch_patterns in central_config", {
+          pattern_count = #current_patterns,
+        })
       end
 
       return true
@@ -1197,7 +1216,7 @@ function watcher.add_patterns(patterns)
     end
   end
 
-  logger.info("Pattern addition complete", {
+  get_logger().info("Pattern addition complete", {
     patterns_added = added_count,
     errors = error_count,
   })
@@ -1206,110 +1225,109 @@ function watcher.add_patterns(patterns)
 end
 
 --- Set check interval for file change detection
----@param interval number Time in seconds between file checks (must be greater than 0)
----@return watcher_module|nil watcher The module instance for method chaining, or nil on failure
----@return table? error Error object if operation failed
+---@param interval number Time in seconds between file checks (must be > 0).
+---@return watcher_module|nil self The module instance (`watcher`) for chaining, or `nil` on validation failure.
+---@return table? error Error object from `error_handler` if validation failed.
+---@throws table If parameter validation fails critically via `error_handler`.
 function watcher.set_check_interval(interval)
   -- Validate interval parameter
   if not interval then
-    local err = error_handler.validation_error("Missing required interval parameter", {
+    local err = get_error_handler().validation_error("Missing required interval parameter", {
       operation = "watcher.set_check_interval",
       module = "watcher",
     })
-    logger.error("Invalid parameter", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid parameter", {
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   if type(interval) ~= "number" then
-    local err = error_handler.validation_error("Interval must be a number", {
+    local err = get_error_handler().validation_error("Interval must be a number", {
       operation = "watcher.set_check_interval",
       provided_type = type(interval),
       module = "watcher",
     })
-    logger.error("Invalid parameter type", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid parameter type", {
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   if interval <= 0 then
-    local err = error_handler.validation_error("Interval must be greater than zero", {
+    local err = get_error_handler().validation_error("Interval must be greater than zero", {
       operation = "watcher.set_check_interval",
       provided_value = interval,
       module = "watcher",
     })
-    logger.error("Invalid parameter value", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid parameter value", {
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   -- Validate config state
   if not config or type(config) ~= "table" then
-    local err = error_handler.runtime_error("Configuration not initialized", {
+    local err = get_error_handler().runtime_error("Configuration not initialized", {
       operation = "watcher.set_check_interval",
       module = "watcher",
     })
-    logger.error("Invalid state", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid state", {
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
-  logger.info("Setting check interval", { seconds = interval })
+  get_logger().info("Setting check interval", { seconds = interval })
   config.check_interval = interval
 
-  -- Update central_config if available
-  local central_config = get_central_config()
-  if central_config then
-    local success, result = error_handler.try(function()
-      central_config.set("watcher.check_interval", interval)
-      return true
-    end)
+  local success, result = get_error_handler().try(function()
+    central_config.set("watcher.check_interval", interval)
+    return true
+  end)
 
-    if not success then
-      logger.warn("Failed to update check_interval in central_config", {
-        error = error_handler.format_error(result),
-      })
-      -- Value was still updated locally, so don't return error
-    else
-      logger.debug("Updated check_interval in central_config", {
-        check_interval = interval,
-      })
-    end
+  if not success then
+    get_logger().warn("Failed to update check_interval in central_config", {
+      error = get_error_handler().format_error(result),
+    })
+    -- Value was still updated locally, so don't return error
+  else
+    get_logger().debug("Updated check_interval in central_config", {
+      check_interval = interval,
+    })
   end
 
   return watcher
 end
 
---- Reset the module configuration to defaults
----@return watcher_module|nil watcher The module instance for method chaining, or nil on failure
----@return table? error Error object if reset failed
+--- Resets the watcher module's local configuration to its defaults (`DEFAULT_CONFIG`).
+--- Does not reset file timestamps or central configuration.
+---@return watcher_module|nil self The module instance (`watcher`) for chaining, or `nil` on failure.
+---@return table? error Error object from `error_handler` if reset failed critically.
+---@throws table If a runtime error occurs during reset (via `get_error_handler().try`).
 function watcher.reset()
-  logger.debug("Resetting watcher module configuration to defaults")
+  get_logger().debug("Resetting watcher module configuration to defaults")
 
   -- Validate DEFAULT_CONFIG availability
   if not DEFAULT_CONFIG then
-    local err = error_handler.runtime_error("Default configuration not available", {
+    local err = get_error_handler().runtime_error("Default configuration not available", {
       operation = "watcher.reset",
       module = "watcher",
     })
-    logger.error("Missing default configuration", {
-      error = error_handler.format_error(err),
+    get_logger().error("Missing default configuration", {
+      error = get_error_handler().format_error(err),
     })
     return nil, err
   end
 
   -- Validate config state
   if not config then
-    local err = error_handler.runtime_error("Configuration table not initialized", {
+    local err = get_error_handler().runtime_error("Configuration table not initialized", {
       operation = "watcher.reset",
       module = "watcher",
     })
-    logger.error("Invalid state", {
-      error = error_handler.format_error(err),
+    get_logger().error("Invalid state", {
+      error = get_error_handler().format_error(err),
     })
 
     -- Initialize config as fallback
@@ -1317,7 +1335,7 @@ function watcher.reset()
   end
 
   -- Reset configuration with error boundaries
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     -- Reset check_interval and default_directory with proper defaults
     config.check_interval = DEFAULT_CONFIG.check_interval
     config.default_directory = DEFAULT_CONFIG.default_directory
@@ -1334,7 +1352,7 @@ function watcher.reset()
           return string.match("test", pattern)
         end)
         if pattern_err then
-          logger.warn("Skipping invalid default pattern", {
+          get_logger().warn("Skipping invalid default pattern", {
             pattern = pattern,
             error = pattern_err,
           })
@@ -1345,7 +1363,7 @@ function watcher.reset()
           table.insert(config.watch_patterns, pattern)
         end
       else
-        logger.warn("Skipping non-string default pattern", {
+        get_logger().warn("Skipping non-string default pattern", {
           pattern_type = type(pattern),
         })
       end
@@ -1355,18 +1373,18 @@ function watcher.reset()
   end)
 
   if not success then
-    logger.error("Failed to reset configuration", {
-      error = error_handler.format_error(result),
+    get_logger().error("Failed to reset configuration", {
+      error = get_error_handler().format_error(result),
     })
     return nil, result
   end
 
   -- Update logging configuration
-  local log_level = config.debug and logging.LEVELS.DEBUG
-    or (config.verbose and logging.LEVELS.VERBOSE or logging.LEVELS.INFO)
-  logging.set_level(log_level)
+  local log_level = config.debug and get_logging().LEVELS.DEBUG
+    or (config.verbose and get_logging().LEVELS.VERBOSE or get_logging().LEVELS.INFO)
+  get_logging().set_level(log_level)
 
-  logger.info("Reset complete", {
+  get_logger().info("Reset complete", {
     check_interval = config.check_interval,
     patterns_count = #config.watch_patterns,
   })
@@ -1374,51 +1392,50 @@ function watcher.reset()
   return watcher
 end
 
---- Fully reset both local and central configuration
----@return watcher_module|nil watcher The module instance for method chaining, or nil on failure
----@return table? error Error object if reset failed
+--- Performs a full reset: resets local configuration (`watcher.reset()`) and attempts to reset
+--- the "watcher" section in the central configuration system. Also clears file timestamps.
+---@return watcher_module|nil self The module instance (`watcher`) for chaining, or `nil` on failure.
+---@return table? error Error object from `error_handler` if reset failed critically.
+---@throws table If a runtime error occurs during reset (via `get_error_handler().try`).
 function watcher.full_reset()
-  logger.info("Performing full reset of watcher module")
+  get_logger().info("Performing full reset of watcher module")
 
   -- Reset local configuration first
   local success, err = watcher.reset()
   if not success then
-    logger.error("Failed to reset local configuration during full reset", {
-      error = error_handler.format_error(err),
+    get_logger().error("Failed to reset local configuration during full reset", {
+      error = get_error_handler().format_error(err),
     })
     -- Continue with central config reset despite local reset failure
   end
 
-  -- Reset central configuration if available
-  local central_config = get_central_config()
-  if central_config then
-    local success, result = error_handler.try(function()
-      central_config.reset("watcher")
-      return true
-    end)
+  local success, result = get_error_handler().try(function()
+    central_config.reset("watcher")
+    return true
+  end)
 
-    if not success then
-      logger.warn("Failed to reset central configuration", {
-        error = error_handler.format_error(result),
-      })
-      return nil, result
-    else
-      logger.debug("Reset central configuration for watcher module")
-    end
+  if not success then
+    get_logger().warn("Failed to reset central configuration", {
+      error = get_error_handler().format_error(result),
+    })
+    return nil, result
+  else
+    get_logger().debug("Reset central configuration for watcher module")
   end
 
   -- Clear the file timestamps to force re-initialization
   file_timestamps = {}
   last_check_time = 0
 
-  logger.info("Full reset complete")
+  get_logger().info("Full reset complete")
   return watcher
 end
 
---- Debug helper to show current configuration
----@return table config_info Configuration details including local and central configuration
+--- Returns a table containing the current watcher configuration and state for debugging purposes.
+--- Includes local config, central config (if available), file counts, and timestamps.
+---@return table debug_info Detailed information about configuration and state.
 function watcher.debug_config()
-  logger.debug("Generating configuration debug information")
+  get_logger().debug("Generating configuration debug information")
 
   -- Initialize with safe defaults
   local debug_info = {
@@ -1431,7 +1448,7 @@ function watcher.debug_config()
   }
 
   -- Get local config with error handling
-  local config_success, _ = error_handler.try(function()
+  local config_success, _ = get_error_handler().try(function()
     if config then
       debug_info.local_config = {
         check_interval = config.check_interval,
@@ -1458,7 +1475,7 @@ function watcher.debug_config()
   end
 
   -- Count monitored files with error handling
-  local count_success, _ = error_handler.try(function()
+  local count_success, _ = get_error_handler().try(function()
     local file_count = 0
     if type(file_timestamps) == "table" then
       for _ in pairs(file_timestamps) do
@@ -1474,13 +1491,10 @@ function watcher.debug_config()
   end
 
   -- Check for central_config with error handling
-  local central_success, _ = error_handler.try(function()
-    local central_config = get_central_config()
-    if central_config then
-      debug_info.using_central_config = true
-      local watcher_config = central_config.get("watcher")
-      debug_info.central_config = watcher_config or { status = "empty" }
-    end
+  local central_success, _ = get_error_handler().try(function()
+    debug_info.using_central_config = true
+    local watcher_config = central_config.get("watcher")
+    debug_info.central_config = watcher_config or { status = "empty" }
     return true
   end)
 
@@ -1490,7 +1504,7 @@ function watcher.debug_config()
   end
 
   -- Display configuration
-  logger.info("Watcher module configuration", debug_info)
+  get_logger().info("Watcher module configuration", debug_info)
 
   return debug_info
 end

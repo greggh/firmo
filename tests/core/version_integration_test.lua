@@ -1,3 +1,4 @@
+---@diagnostic disable: missing-parameter, param-type-mismatch
 -- tests/core/version_integration_test.lua
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect

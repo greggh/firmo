@@ -1,6 +1,19 @@
--- JSON module tests
+--- JSON Module Tests
+---
+--- Verifies the encoding and decoding functionality of the `lib.tools.json` module.
+--- Covers:
+--- - Encoding/decoding of simple values (string, number, boolean, nil).
+--- - Encoding/decoding of arrays and objects (tables).
+--- - Handling of nested structures.
+--- - Correct handling of special numbers (NaN, Infinity).
+--- - Escaping/unescaping of special characters in strings.
+--- - Graceful error handling for invalid inputs (non-string for decode, function for encode).
+--- - Round-trip consistency (encode then decode).
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
-local error_handler = require("lib.tools.error_handler")
+
 local test_helper = require("lib.tools.test_helper")
 local json = require("lib.tools.json")
 
@@ -18,23 +31,23 @@ describe("JSON Module", function()
 
     it("should encode arrays", function()
       expect(json.encode({})).to.equal("[]")
-      expect(json.encode({1, 2, 3})).to.equal("[1,2,3]")
-      expect(json.encode({"a", "b"})).to.equal('["a","b"]')
+      expect(json.encode({ 1, 2, 3 })).to.equal("[1,2,3]")
+      expect(json.encode({ "a", "b" })).to.equal('["a","b"]')
     end)
 
     it("should encode objects", function()
-      expect(json.encode({name = "test"})).to.equal('{"name":"test"}')
-      expect(json.encode({x = 1, y = 2})).to.match('"x":1')
-      expect(json.encode({x = 1, y = 2})).to.match('"y":2')
+      expect(json.encode({ name = "test" })).to.equal('{"name":"test"}')
+      expect(json.encode({ x = 1, y = 2 })).to.match('"x":1')
+      expect(json.encode({ x = 1, y = 2 })).to.match('"y":2')
     end)
 
     it("should encode nested structures", function()
       local data = {
         items = {
           { id = 1, name = "first" },
-          { id = 2, name = "second" }
+          { id = 2, name = "second" },
         },
-        count = 2
+        count = 2,
       }
       local encoded = json.encode(data)
       expect(encoded).to.match('"items":%[')
@@ -44,14 +57,14 @@ describe("JSON Module", function()
     end)
 
     it("should handle special numbers", function()
-      expect(json.encode(0/0)).to.equal("null")  -- NaN
-      expect(json.encode(math.huge)).to.equal("null")  -- Infinity
-      expect(json.encode(-math.huge)).to.equal("null")  -- -Infinity
+      expect(json.encode(0 / 0)).to.equal("null") -- NaN
+      expect(json.encode(math.huge)).to.equal("null") -- Infinity
+      expect(json.encode(-math.huge)).to.equal("null") -- -Infinity
     end)
 
     it("should handle special characters in strings", function()
       expect(json.encode("hello\nworld")).to.equal('"hello\\nworld"')
-      expect(json.encode("quote\"here")).to.equal('"quote\\"here"')
+      expect(json.encode('quote"here')).to.equal('"quote\\"here"')
       expect(json.encode("tab\there")).to.equal('"tab\\there"')
     end)
 
@@ -170,11 +183,11 @@ describe("JSON Module", function()
         string = "test",
         number = 42,
         boolean = true,
-        array = {1, 2, 3},
+        array = { 1, 2, 3 },
         object = {
           name = "nested",
-          value = 123
-        }
+          value = 123,
+        },
       }
 
       local encoded = json.encode(original)

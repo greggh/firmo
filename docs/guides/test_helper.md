@@ -11,8 +11,7 @@ The Test Helper module provides essential utilities for writing robust tests, ha
 - [Testing Error Conditions](#testing-error-conditions)
 - [Working with Temporary Files](#working-with-temporary-files)
 - [Creating Test Directories](#creating-test-directories)
-- [Test Environment Utilities](#test-environment-utilities)
-- [Mocking and Spying](#mocking-and-spying)
+- [Utility Functions](#utility-functions)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
 
@@ -34,11 +33,10 @@ local test_helper = require("lib.tools.test_helper")
 The module works seamlessly with the Firmo testing framework and provides several categories of utilities:
 
 
-1. **Error testing**: Safely capture and verify errors
-2. **Temporary file management**: Create and cleanup test files automatically
-3. **Test directory utilities**: Work with directories containing multiple test files
-4. **Environment utilities**: Modify environment variables, working directory, etc.
-5. **Mocking and spying**: Mock I/O operations and create spy functions
+1. **Error testing**: Safely capture and verify errors (`with_error_capture`, `expect_error`).
+2. **Temporary file management**: Register external temporary files/directories for automatic cleanup (`register_temp_file`, `register_temp_directory`). Note: File creation is handled by the `temp_file` module.
+3. **Test directory utilities**: Create temporary directories with helper methods for file manipulation (`create_temp_test_directory`, `with_temp_test_directory`).
+4. **Utility Functions**: Execute Lua code strings (`execute_string`).
 
 
 ## Testing Error Conditions
@@ -46,8 +44,7 @@ The module works seamlessly with the Firmo testing framework and provides severa
 
 ### Capturing Errors Safely
 
-
-Traditional Lua error handling with `pcall` can be verbose. The Test Helper provides a cleaner approach:
+- (function): A new function that wraps the original `func`. When this new function is called, it executes `func` safely. The wrapped function returns `result, nil` on success, or `nil, error_object` if `func` throws an error.
 
 
 ```lua
@@ -126,67 +123,15 @@ end)
 
 
 The `expect_error` flag indicates to the test framework that this test intentionally tests error conditions, which helps with reporting and test quality validation.
-
-### Suppressing Output
-
-
-To test functions that produce output without cluttering test results:
-
-
-```lua
-it("should print error message", function()
-  local result, stdout, stderr = test_helper.with_suppressed_output(function()
-    return print_error_and_return("Something went wrong", 1)
-  end)
-
-  expect(result).to.equal(1)
-  expect(stdout).to.match("Something went wrong")
-  expect(stderr).to.equal("")
-end)
-```
-
-
-The function captures both stdout and stderr while executing the provided function, allowing you to test the output without it appearing in test results.
-
 ## Working with Temporary Files
 
 
 ### Creating Temporary Files
 
 
-Create temporary files that are automatically cleaned up after tests:
+Register externally created temporary files that should be automatically cleaned up after tests:
 
-
-```lua
-it("should read JSON file correctly", function()
-  local content = [[
-    {
-      "name": "test",
-      "value": 42
-    }
-  ]]
-
-  local temp_file, err = test_helper.create_temp_file_with_content(content, "json")
-  expect(err).to_not.exist("Failed to create temp file")
-
-  -- Test file operations
-  local data = load_json_file(temp_file)
-  expect(data.name).to.equal("test")
-  expect(data.value).to.equal(42)
-
-  -- No need to clean up - happens automatically
-end)
-```
-
-
-Benefits of using `test_helper` for temporary files:
-
-
-1. Files are automatically cleaned up after tests
-2. File paths are tracked to ensure nothing is left behind
-3. Error handling is built in
-
-
+> Note: For creating temporary files and directories with automatic registration, use the dedicated `temp_file` module (`require("lib.tools.filesystem.temp_file")`). The `test_helper` module primarily provides functions to *register* files/directories created by other means.
 ### Registering External Files
 
 
@@ -213,33 +158,25 @@ end)
 ```
 
 
-This ensures all files are cleaned up, even those created outside the test helper system.
+This ensures all files and directories are cleaned up, even those created outside the `temp_file` module's creation functions.
 
-### Creating Temporary Directories
+### Registering Temporary Directories
 
-
-For tests that need directory operations:
-
+Similar to files, register directories created externally:
 
 ```lua
-it("should scan directory for configuration files", function()
-  local temp_dir, err = test_helper.create_temp_directory("config_test_")
-  expect(err).to_not.exist("Failed to create temp directory")
+it("should handle directories created externally", function()
+  -- Directory created by some external means
+  local dir_path = create_directory_structure() -- Your function
 
-  -- Create files in the directory
-  local fs = require("lib.tools.filesystem")
-  fs.write_file(temp_dir .. "/config.json", '{"enabled": true}')
-  fs.write_file(temp_dir .. "/settings.ini", "[Settings]\nenabled=true")
+  -- Register it for automatic cleanup
+  test_helper.register_temp_directory(dir_path)
 
-  -- Register files for cleanup
-  test_helper.register_temp_file(temp_dir .. "/config.json")
-  test_helper.register_temp_file(temp_dir .. "/settings.ini")
+  -- Test with the directory
+  local files = fs.list_files(dir_path)
+  expect(#files).to.be_greater_than(0)
 
-  -- Test directory operations
-  local configs = find_config_files(temp_dir)
-  expect(#configs).to.equal(2)
-
-  -- Directory is cleaned up automatically
+  -- No need to manually delete - happens automatically
 end)
 ```
 
@@ -247,44 +184,51 @@ end)
 
 ## Creating Test Directories
 
+### `create_temp_test_directory()`
 
-### Using Test Directory Objects
+Creates a temporary test directory with helper methods for managing files within it. The directory itself is automatically registered for cleanup.
 
+```lua
+function test_helper.create_temp_test_directory()
+```
 
-For more complex tests involving multiple files in a directory structure:
+**Returns:**
 
+- `test_directory` (TestDirectory): An object representing the temporary directory with the following properties and methods:
+  - `path` (string): The absolute path to the created temporary directory.
+  - `create_file(file_path, content)`: Creates a file within the test directory (relative `file_path`). Handles subdirectories. Returns the full path. Registers the file for cleanup.
+  - `read_file(file_path)`: Reads a file within the test directory (relative `file_path`). Returns `content|nil, error?`.
+  - `create_subdirectory(subdir_path)`: Creates a subdirectory within the test directory (relative `subdir_path`). Returns the full path. Registers the subdirectory for cleanup.
+  - `file_exists(file_name)`: Checks if a file exists within the test directory (relative `file_name`).
+  - `unique_filename(prefix?, extension?)`: Generates a unique filename (not path) suitable for use within this directory.
+  - `create_numbered_files(basename, content_pattern, count)`: Creates multiple numbered files (e.g., `base_001.txt`). Returns an array of full paths. Registers files for cleanup.
+  - `write_file(filename, content)`: Writes content to a file (relative `filename`) and registers it for cleanup. Returns `success?, error?`.
+
+**Example:**
 
 ```lua
 it("should process project structure correctly", function()
   local test_dir = test_helper.create_temp_test_directory()
+  expect(test_dir).to.exist()
+  expect(test_dir.path).to.be.a("string")
 
-  -- Create project structure
-  test_dir.create_file("src/main.lua", "print('Hello')")
-  test_dir.create_file("src/utils.lua", "return {trim = function(s) return s:match('^%s*(.-)%s*$') end}")
-  test_dir.create_file("tests/main_test.lua", "-- Test file")
-  test_dir.create_file(".firmo-config.lua", "return {watch_mode = true}")
+  -- Create project structure using helper methods
+  test_dir:create_file("src/main.lua", "print('Hello')")
+  test_dir:create_file("src/utils.lua", "return {trim = function(s) return s:match('^%s*(.-)%s*$') end}")
+  test_dir:create_subdirectory("tests")
+  test_dir:create_file("tests/main_test.lua", "-- Test file")
+  test_dir:create_file(".firmo-config.lua", "return {watch_mode = true}")
 
   -- Test project operations
-  local files = find_project_files(test_dir.path)
+  local files = find_project_files(test_dir.path) -- Assuming this function exists
   expect(#files).to.equal(4)
 
-  local config = load_project_config(test_dir.path)
+  local config = load_project_config(test_dir.path) -- Assuming this function exists
   expect(config.watch_mode).to.equal(true)
 
-  -- Directory is cleaned up automatically
+  -- Directory and all created files/subdirs are automatically cleaned up
 end)
 ```
-
-
-The test directory object provides:
-
-
-1. A property `path` with the directory path
-2. A method `create_file` to create files with content
-3. A method `create_directory` to create subdirectories
-4. A method `file_path` to get absolute file paths
-5. A method `read_file` to read file contents
-6. A method `cleanup` to manually clean up (rarely needed)
 
 
 ### Using with_temp_test_directory
@@ -320,199 +264,37 @@ end)
 
 This approach is more concise and doesn't require creating files individually.
 
-## Test Environment Utilities
+## Utility Functions
 
+### `execute_string(code)`
 
-### Modifying Environment Variables
-
-
-For tests that depend on environment variables:
-
+Executes a string of Lua code using `load()`.
 
 ```lua
-it("should use DEBUG level from environment", function()
-  test_helper.with_environment({
-    DEBUG = "trace",
-    APP_ENV = "test"
-  }, function()
-    -- Initialize system that reads from environment
-    local logger = init_logger()
-
-    -- Test with modified environment
-    expect(logger.level).to.equal("trace")
-    expect(logger.app_env).to.equal("test")
-  end)
-
-  -- Environment is restored after function returns
-end)
+function test_helper.execute_string(code)
 ```
 
+**Parameters:**
 
+- `code` (string): The Lua code string to execute.
 
-### Changing Working Directory
+**Returns:**
 
+- `result` (any|nil): The result(s) returned by the executed code, or `nil` on error.
+- `error_message` (string?): Error message if loading or executing the code failed.
 
-For tests that depend on the current working directory:
-
+**Example:**
 
 ```lua
-it("should load config from current directory", function()
-  test_helper.with_temp_test_directory({
-    [".config"] = "test_value=42"
-  }, function(dir_path)
-    -- Run test with modified working directory
-    test_helper.with_working_directory(dir_path, function()
-      local config = load_local_config()
-      expect(config.test_value).to.equal(42)
-    end)
-  end)
+it("should execute lua code string", function()
+  local result, err = test_helper.execute_string("return 1 + 2")
+  expect(err).to_not.exist()
+  expect(result).to.equal(3)
+
+  local _, err = test_helper.execute_string("invalid lua code")
+  expect(err).to.be.a("string")
 end)
 ```
-
-
-
-### Path Separator Testing
-
-
-For testing cross-platform path handling:
-
-
-```lua
-it("should normalize paths correctly on Windows", function()
-  test_helper.with_path_separator("\\", function()
-    local result = normalize_path("dir\\subdir\\file.txt")
-    expect(result).to.equal("dir\\subdir\\file.txt")
-
-    result = normalize_path("dir/subdir/file.txt")
-    expect(result).to.equal("dir\\subdir\\file.txt")
-  end)
-end)
-it("should normalize paths correctly on Unix", function()
-  test_helper.with_path_separator("/", function()
-    local result = normalize_path("dir/subdir/file.txt")
-    expect(result).to.equal("dir/subdir/file.txt")
-
-    result = normalize_path("dir\\subdir\\file.txt")
-    expect(result).to.equal("dir/subdir/file.txt")
-  end)
-end)
-```
-
-
-
-## Mocking and Spying
-
-
-### Mocking I/O Operations
-
-
-For tests that depend on file I/O without actual files:
-
-
-```lua
-it("should handle different file scenarios", function()
-  local restore = test_helper.mock_io({
-    -- Successful read
-    ["config%.json"] = {
-      read = '{"setting": "value"}',
-      error = nil
-    },
-    -- File not found
-    ["nonexistent%.txt"] = {
-      read = nil,
-      error = "No such file or directory"
-    },
-    -- Permission denied
-    ["protected%.log"] = {
-      read = nil,
-      error = "Permission denied"
-    }
-  })
-
-  -- Test successful case
-  local config = load_config("config.json")
-  expect(config.setting).to.equal("value")
-
-  -- Test error handling for missing file
-  local success, err = pcall(function() load_config("nonexistent.txt") end)
-  expect(success).to.equal(false)
-  expect(err).to.match("No such file or directory")
-
-  -- Test error handling for protected file
-  success, err = pcall(function() load_config("protected.log") end)
-  expect(success).to.equal(false)
-  expect(err).to.match("Permission denied")
-
-  -- Restore original I/O functions
-  restore()
-end)
-```
-
-
-
-### Creating Spy Functions
-
-
-For tracking function calls without changing behavior:
-
-
-```lua
-it("should call correct functions with proper arguments", function()
-  -- Create a spy for math.max
-  local spy = test_helper.create_spy(math.max)
-
-  -- Replace the original function (in a module or global)
-  local original_max = math.max
-  math.max = spy.func
-
-  -- Call code that uses math.max
-  local result = find_largest_value({5, 10, 3, 8})
-
-  -- Verify the result
-  expect(result).to.equal(10)
-
-  -- Verify function was called correctly
-  expect(spy.called).to.equal(true)
-  expect(spy.call_count).to.equal(3) -- Called for each comparison
-
-  -- Check specific calls
-  expect(spy.calls[1].args[1]).to.equal(5)
-  expect(spy.calls[1].args[2]).to.equal(10)
-  expect(spy.calls[1].result).to.equal(10)
-
-  -- Restore original function
-  math.max = original_max
-end)
-```
-
-
-
-### Mocking Time Functions
-
-
-For tests that depend on time:
-
-
-```lua
-it("should format timestamps correctly", function()
-  -- Mock time to a specific date
-  local restore = test_helper.mock_time("2025-03-15 14:30:00")
-
-  -- Test function that uses os.time() and os.date()
-  local formatted = format_timestamp()
-  expect(formatted).to.equal("2025-03-15 14:30:00")
-
-  -- Test time difference calculations
-  local difference = calculate_time_difference("2025-03-15 13:30:00")
-  expect(difference).to.equal(3600) -- 1 hour in seconds
-
-  -- Restore original time functions
-  restore()
-end)
-```
-
-
-
 ## Best Practices
 
 
@@ -574,74 +356,28 @@ it("should handle invalid JSON", { expect_error = true }, function()
 
   expect(result).to_not.exist()
   expect(err.category).to.equal("PARSE")
-end)
-```
+### Managing Temporary Resources
 
+Follow these best practices for temporary file and directory management:
 
-
-### Managing Temporary Files
-
-
-Follow these best practices for temporary file management:
-
-
-1. **Use `create_temp_test_directory` for complex file structures**:
-
-
-```lua
-local test_dir = test_helper.create_temp_test_directory()
-test_dir.create_file("config/settings.json", '{"debug": true}')
-test_dir.create_file("src/main.lua", "print('Hello')")
-```
-
-
-
-1. **Use `with_temp_test_directory` for declarative file structures**:
-
-
-```lua
-test_helper.with_temp_test_directory({
-  ["config/settings.json"] = '{"debug": true}',
-  ["src/main.lua"] = "print('Hello')"
-}, function(dir_path, files, test_dir)
-  -- Test code
-end)
-```
-
-
-
-1. **Always register external temporary files**:
-
-
-```lua
-local file_path = create_file_using_external_library()
-test_helper.register_temp_file(file_path)
-```
-
-
-
-1. **Group related files in subdirectories**:
-
-
-```lua
-local test_dir = test_helper.create_temp_test_directory()
--- Group by module
-test_dir.create_file("logger/config.json", '{"level": "debug"}')
-test_dir.create_file("logger/output.log", "")
--- Group by feature
-test_dir.create_file("authentication/users.json", '[{"username": "test"}]')
-test_dir.create_file("authentication/roles.json", '[{"role": "admin"}]')
-```
-
-
-
-1. **Avoid deep directory nesting**:
-
-
-```lua
--- Better: flat structure with prefixes
-test_dir.create_file("logger_config.json", '{"level": "debug"}')
-test_dir.create_file("auth_users.json", '[{"username": "test"}]')
+1.  **Prefer `temp_file` module for creation:** Use `require("lib.tools.filesystem.temp_file")` functions (`create_with_content`, `create_temp_directory`) for creating simple temporary resources, as they handle registration automatically.
+2.  **Use `test_helper` for registration:** If you must create files/directories externally (e.g., complex setup, external tools), use `test_helper.register_temp_file` and `test_helper.register_temp_directory` to ensure they are tracked for cleanup.
+3.  **Use `TestDirectory` object for structures:** When tests need a controlled directory structure with multiple files/subdirectories, `test_helper.create_temp_test_directory()` provides a convenient API:
+    ```lua
+    local test_dir = test_helper.create_temp_test_directory()
+    test_dir:create_file("config/settings.json", '{"debug": true}')
+    test_dir:create_subdirectory("src")
+    test_dir:create_file("src/main.lua", "print('Hello')")
+    ```
+4.  **Use `with_temp_test_directory` for declarative structures:** For simple, predefined structures, this function is concise:
+    ```lua
+    test_helper.with_temp_test_directory({
+      ["config.json"] = '{"debug": true}',
+      ["main.lua"] = "print('Hello')"
+    }, function(dir_path, files, test_dir)
+      -- Test code using the created files/directory
+    end)
+    ```
 -- Instead of deeply nested directories
 test_dir.create_file("system/subsystem/module/component/config.json", "{}")
 ```
@@ -718,24 +454,11 @@ end)
 
 #### Files Not Being Cleaned Up
 
+If temporary files aren't being cleaned up properly:
 
-If temporary files aren't being cleaned up:
-
-
-```lua
--- Check that you're using test_helper functions
-local temp_file = test_helper.create_temp_file_with_content("test", "txt")
--- Or register external files
-local external_file = os.tmpname()
-test_helper.register_temp_file(external_file)
--- Avoid creating unregistered files
--- BAD: This file won't be cleaned up automatically
-local f = io.open("untracked_temp.txt", "w")
-f:write("This file may be left behind")
-f:close()
-```
-
-
+1.  **Check registration**: Ensure files/directories are created with `temp_file` module functions, the `TestDirectory` object's methods, or manually registered using `test_helper.register_temp_file`/`test_helper.register_temp_directory`.
+2.  **Verify test context**: Ensure `temp_file_integration.initialize(firmo)` is called (usually by the runner) so resources are tracked per test.
+3.  **Manual cleanup**: Try calling `require("lib.tools.filesystem.temp_file").cleanup_all()` explicitly at the end of your test suite run to diagnose issues.
 
 #### Error Tests Failing Unexpectedly
 
@@ -754,50 +477,6 @@ local result, err = test_helper.with_error_capture(function()
 end)() -- <-- Don't forget to call the returned function
 ```
 
-
-
-#### Mock I/O Not Working
-
-
-If mock I/O isn't working as expected:
-
-
-```lua
--- Make sure pattern matching is correct (use % to escape special characters)
-local restore = test_helper.mock_io({
-  ["config%.json"] = { -- Note the % to escape the .
-    read = '{"setting": "value"}'
-  }
-})
--- Ensure you restore after tests
-local function test_with_mocks()
-  local restore = test_helper.mock_io({...})
-
-  -- Test code
-
-  -- Don't forget to restore
-  restore()
-end
-```
-
-
-
-#### Spy Functions Not Capturing Calls
-
-
-If spy functions aren't capturing calls:
-
-
-```lua
--- Make sure you're using the .func property
-local spy = test_helper.create_spy(original_function)
--- CORRECT: Use the .func property
-module.function_name = spy.func
--- INCORRECT: This doesn't work
-module.function_name = spy
--- Remember to check .calls[index] for specific calls
-expect(spy.calls[1].args[1]).to.equal(expected_value)
-```
 
 
 
@@ -837,3 +516,6 @@ If you encounter persistent issues:
      print("Error:", error_handler.format_error(result))
    end
    ```
+## Conclusion
+
+The Test Helper module provides essential utilities for robust testing in Firmo, particularly for handling error conditions (`with_error_capture`, `expect_error`) and managing temporary test directory structures (`create_temp_test_directory`, `with_temp_test_directory`). It also allows registration of externally created temporary files/directories for cleanup and provides a simple way to execute Lua code strings. By incorporating these helpers, you can write cleaner, more reliable tests focused on validating your code's behavior.

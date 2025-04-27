@@ -1,34 +1,33 @@
---- Test definition module for Firmo
---- This module provides the core functionality for defining and structuring tests
---- in Firmo's BDD-style testing framework. It offers a hierarchical approach to testing
---- with describe blocks for grouping tests, before/after hooks for setup and teardown,
---- and various options for controlling test execution.
+--- Firmo Test Definition Module
 ---
---- Key features:
---- - Hierarchical test organization using nested describe blocks
---- - Test cases defined with 'it' functions
---- - Setup and teardown with before/after hooks
---- - Focus mode with fdescribe/fit for running specific tests
---- - Skipping tests with xdescribe/xit
---- - Test filtering by tags and patterns
---- - Structured test results for reporting
---- - Support for expected errors in tests
---- - Test isolation with automatic file cleanup
+--- Provides the core BDD-style functions (`describe`, `it`, `before`, `after`, etc.)
+--- for defining test structures, managing hooks, handling focus/skip states, filtering,
+--- and collecting structured test results.
 ---
---- @version 0.4.0
+--- @module lib.core.test_definition
 --- @author Firmo Team
----
----@class TestDefinition
----@field describe fun(name: string, fn: function, options?: {focused?: boolean, excluded?: boolean, _parent_focused?: boolean}): nil Create a test group
----@field fdescribe fun(name: string, fn: function): nil Create a focused test group
----@field xdescribe fun(name: string, fn: function): nil Create a skipped test group
----@field it fun(name: string, options_or_fn: table|function, fn?: function): nil Create a test case
----@field fit fun(name: string, options_or_fn: table|function, fn?: function): nil Create a focused test case
----@field xit fun(name: string, options_or_fn: table|function, fn?: function): nil Create a skipped test case
----@field before fun(fn: function): nil Add a setup hook for the current block
----@field after fun(fn: function): nil Add a teardown hook for the current block
----@field pending fun(message?: string): string Mark a test as pending
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 0.4.0
 
+---@class TestDefinition The public API of the test definition module.
+---@field describe fun(name: string, fn: function, options?: {focused?: boolean, excluded?: boolean, _parent_focused?: boolean}): nil Defines a test group (suite).
+---@field fdescribe fun(name: string, fn: function): nil Defines a focused test group.
+---@field xdescribe fun(name: string, fn: function): nil Defines a skipped test group.
+---@field it fun(name: string, options_or_fn: table|function, fn?: function): nil Defines an individual test case. `options_or_fn` can be the test function or an options table `{focused?: boolean, excluded?: boolean, expect_error?: boolean, tags?: string[], timeout?: number}`.
+---@field fit fun(name: string, options_or_fn: table|function, fn?: function): nil Defines a focused test case.
+---@field xit fun(name: string, options_or_fn: table|function, fn?: function): nil Defines a skipped test case.
+---@field before fun(fn: function): nil Registers a setup function to run before each test in the current block.
+---@field after fun(fn: function): nil Registers a teardown function to run after each test in the current block.
+---@field pending fun(message?: string): string Marks a test as pending by throwing a specific message.
+---@field only_tags fun(...: string): TestDefinition Sets active tags for filtering tests. Returns self for chaining.
+---@field tags fun(...: string): TestDefinition Applies tags to the current describe block. Returns self for chaining.
+---@field filter_pattern fun(pattern: string): TestDefinition Sets a Lua pattern for filtering test names. Returns self for chaining.
+---@field reset fun(): nil Resets the internal state (counters, hooks, results, focus, etc.).
+---@field get_state fun(): {level: number, passes: number, errors: number, skipped: number, focus_mode: boolean, test_results: TestResult[]} Returns the current state.
+---@field set_debug_mode fun(value: boolean): TestDefinition Enables/disables internal debug logging. Returns self for chaining.
+---@field add_test_result fun(result: TestResult): TestResult|nil Adds a structured test result to the collection. Returns the added result or nil.
+---@field STATUS TestStatus Enum containing test status constants (PASS, FAIL, SKIP, PENDING).
 local M = {}
 
 -- Forward declaration of module-level variables
@@ -42,11 +41,11 @@ local focus_mode = false
 local current_describe_block = nil
 
 -- Define test status constants
----@class TestStatus
----@field PASS string Test passed successfully
----@field FAIL string Test failed
----@field SKIP string Test was skipped
----@field PENDING string Test is pending implementation
+---@class TestStatus Enum defining possible test statuses.
+---@field PASS string Indicates a test passed successfully.
+---@field FAIL string Indicates a test failed (an assertion failed or an unexpected error occurred).
+---@field SKIP string Indicates a test was intentionally skipped (e.g., via `xit`, `xdescribe`, filtering).
+---@field PENDING string Indicates a test is marked as pending (not yet implemented) via `pending()`.
 local TEST_STATUS = {
   PASS = "pass",
   FAIL = "fail",
@@ -60,46 +59,91 @@ local errors = 0
 local skipped = 0
 local test_blocks = {}
 local test_paths = {}
----@class TestResult
----@field status string The test status (pass, fail, skip, pending)
----@field name string The name of the test
----@field path string[] The path to the test (array of describe block names plus test name)
----@field path_string string The path to the test as a string (separated by " / ")
----@field timestamp number When the test was executed (os.time() value)
----@field execution_time? number Optional execution time in seconds
----@field options? table Optional test options that were provided
----@field error? any Optional error object if the test failed
----@field error_message? string Optional formatted error message
----@field expect_error? boolean Whether the test was expected to produce an error
----@field reason? string Optional reason for skipping or pending
+---@class TestResult Represents the outcome of a single test case execution.
+---@field status string The final status of the test (`TestStatus.PASS`, `TestStatus.FAIL`, `TestStatus.SKIP`, `TestStatus.PENDING`).
+---@field name string The name of the test case (from `it(...)`).
+---@field path string[] An array representing the hierarchical path to the test (e.g., `{"Suite 1", "Sub-suite A", "Test Case X"}`).
+---@field path_string string The full path to the test represented as a single string (e.g., `"Suite 1 / Sub-suite A / Test Case X"`).
+---@field timestamp number The Unix timestamp (from `os.time()`) when the test result was recorded.
+---@field execution_time? number The duration of the test execution in seconds (optional).
+---@field options? table The options table passed to the `it` function (optional).
+---@field error? any The raw error object or value captured if the test failed unexpectedly (optional).
+---@field error_message? string A formatted string representation of the error (optional).
+---@field expect_error? boolean `true` if the test was configured with `{expect_error = true}` (optional).
+---@field reason? string An optional message explaining why a test was skipped or marked as pending (optional).
 
 -- Collection of structured test result objects
 local test_results = {}
 
 -- Error handling and logging
-local error_handler = require("lib.tools.error_handler")
-local logging = require("lib.tools.logging")
-local logger = logging.get_logger("TestDefinition")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging
 
---- Safely require a module without raising an error if it doesn't exist
----@param name string The name of the module to require
----@return table|nil The loaded module or nil if it couldn't be loaded
-local function try_require(name)
-  local success, mod = pcall(require, name)
-  if success then
-    return mod
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
   end
-  return nil
+  return result
 end
 
--- Try to load temp_file module for test isolation
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("test_definition")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+
 local temp_file = try_require("lib.tools.filesystem.temp_file")
 
--- Local utility functions
---- Merge provided options with defaults
----@param options table|nil The options provided by the user
----@param defaults table The default options to use when not provided
----@return table The merged options
+--- Merges a user-provided options table with a defaults table.
+--- Creates a new table with defaults, then overwrites with values from `options`.
+---@param options table|nil The user-provided options table. Can be nil.
+---@param defaults table The table containing default values.
+---@return table result The merged options table.
+---@private
 local function merge_options(options, defaults)
   options = options or {}
   local result = {}
@@ -109,13 +153,14 @@ local function merge_options(options, defaults)
   return result
 end
 
--- Tag validation and management
---- Check if a test has any of the required tags
----@param test_tags table Array of tags applied to the test
----@return boolean True if the test has any required tags or if no tags are required
+--- Checks if a set of test tags contains at least one of the currently active filter tags.
+--- If `active_tags` is empty, it always returns true.
+---@param test_tags table Array of tags applied to the test/block being checked.
+---@return boolean `true` if filtering is inactive OR if `test_tags` shares at least one tag with `active_tags`, `false` otherwise.
+---@private
 local function has_required_tags(test_tags)
   if not active_tags or #active_tags == 0 then
-    return true
+    return true -- No active tag filter, always passes
   end
 
   for _, tag in ipairs(active_tags) do
@@ -138,7 +183,7 @@ end
 --- "integration" or "performance" tests.
 ---
 ---@param ... string Tags to filter by
----@return table The module instance for method chaining
+---@return TestDefinition The module instance (`M`) for method chaining.
 ---
 ---@usage
 --- -- Only run tests tagged with "integration"
@@ -157,7 +202,7 @@ end
 --- Common tags might include "unit", "integration", "slow", or feature names.
 ---
 ---@param ... string Tags to apply
----@return table The module instance for method chaining
+---@return TestDefinition The module instance (`M`) for method chaining.
 ---
 ---@usage
 --- -- Tag a block of tests
@@ -180,7 +225,7 @@ end
 --- This allows for focusing on specific types of tests without modifying the code.
 ---
 ---@param pattern string Pattern to filter test names
----@return table The module instance for method chaining
+---@return TestDefinition The module instance (`M`) for method chaining.
 ---
 ---@usage
 --- -- Only run tests with "parse" in their name
@@ -227,7 +272,12 @@ end
 ---
 ---@param name string Name of the test group
 ---@param fn function Function containing the test group
----@param options? {focused?: boolean, excluded?: boolean, _parent_focused?: boolean} Options for the test group
+---@param options? {focused?: boolean, excluded?: boolean, _parent_focused?: boolean} Optional table containing flags:
+---   - `focused`: If true, marks this group as focused.
+---   - `excluded`: If true, marks this group to be skipped.
+---   - `_parent_focused`: Internal flag indicating if a parent group was focused.
+---@return nil
+---@throws table If the test group function `fn` throws an error during execution. The error is caught, logged, and execution continues, but the error might be re-thrown depending on the error handler configuration.
 ---
 ---@usage
 --- -- Basic describe block
@@ -303,10 +353,10 @@ function M.describe(name, fn, options)
 
   if not should_skip_block then
     -- Execute the test group function to register its tests
-    local success, err = error_handler.try(fn)
+    local success, err = get_error_handler().try(fn)
     if not success then
       -- Handle errors in describe blocks
-      logger.error("Error in describe block: " .. error_handler.format_error(err), {
+      get_logger().error("Error in describe block: " .. get_error_handler().format_error(err), {
         block_name = name,
         level = level,
       })
@@ -328,6 +378,7 @@ end
 ---
 ---@param name string Name of the test group
 ---@param fn function Function containing the test group
+---@return nil
 ---
 ---@usage
 --- -- Only this test group and its tests will run
@@ -356,6 +407,7 @@ end
 ---
 ---@param name string Name of the test group
 ---@param fn function Function containing the test group
+---@return nil
 ---
 ---@usage
 --- -- This entire group of tests will be skipped
@@ -383,9 +435,11 @@ end
 --- being tested. Tests can have options for controlling execution,
 --- such as focusing, skipping, or expecting errors.
 ---
----@param name string Name of the test case
----@param options_or_fn table|function Options table or test function
----@param fn? function Test function if options were provided
+---@param name string Name/description of the test case.
+---@param options_or_fn table|function Either the test function itself, or an options table `{focused?: boolean, excluded?: boolean, expect_error?: boolean, tags?: string[], timeout?: number}`.
+---@param fn? function The test function, if `options_or_fn` was an options table.
+---@return nil
+---@throws table If the test function `fn` throws an unexpected error (i.e., `expect_error` was not `true`). The error is caught, logged as a failure, and execution continues.
 ---
 ---@usage
 --- -- Basic test case
@@ -428,10 +482,10 @@ function M.it(name, options_or_fn, fn)
   })
 
   -- Always clear any existing metadata before setting new metadata
-  error_handler.set_current_test_metadata(nil)
+  get_error_handler().set_current_test_metadata(nil)
 
   -- Set error handler metadata for the test
-  error_handler.set_current_test_metadata({
+  get_error_handler().set_current_test_metadata({
     expect_error = options.expect_error,
     name = name,
   })
@@ -503,7 +557,7 @@ function M.it(name, options_or_fn, fn)
     })
 
     -- Log as skipped with proper structure
-    logger.info("Test skipped: " .. name, {
+    get_logger().info("Test skipped: " .. name, {
       test_name = name,
       test_path = table.concat(path, " / "),
       test_result = result,
@@ -517,25 +571,23 @@ function M.it(name, options_or_fn, fn)
 
   -- Always ensure metadata is cleared after the test, regardless of outcome
   local cleanup = function()
-    error_handler.set_current_test_metadata(nil)
+    get_error_handler().set_current_test_metadata(nil)
   end
 
-  local success, err = error_handler.try(function()
-    -- Set temporary file context if available
-    if temp_file and temp_file.set_current_test_context then
-      temp_file.set_current_test_context({
-        type = "test",
-        name = name,
-        path = table.concat(path, " / "),
-      })
-    end
+  local success, err = get_error_handler().try(function()
+    -- Set temporary file context
+    temp_file.set_current_test_context({
+      type = "test",
+      name = name,
+      path = table.concat(path, " / "),
+    })
 
     -- Run before hooks for each level
-    for i = 1, level do
-      for _, hook in ipairs(befores[i] or {}) do
+    for i = 1, level do -- Correctly iterate through levels
+      for _, hook in ipairs(befores[i] or {}) do -- Iterate hooks within the level loop
         hook()
       end
-    end
+    end -- Correctly close the level loop
 
     -- Run the test
     fn()
@@ -548,9 +600,7 @@ function M.it(name, options_or_fn, fn)
     end
 
     -- Clean up test context
-    if temp_file and temp_file.set_current_test_context then
-      temp_file.set_current_test_context(nil)
-    end
+    temp_file.set_current_test_context(nil)
 
     -- Run cleanup to clear metadata
     cleanup()
@@ -567,7 +617,7 @@ function M.it(name, options_or_fn, fn)
     })
 
     -- Log pass with proper structure
-    logger.info("Test passed: " .. name, {
+    get_logger().info("Test passed: " .. name, {
       test_name = name,
       test_path = table.concat(path, " / "),
       test_result = result,
@@ -596,7 +646,7 @@ function M.it(name, options_or_fn, fn)
       })
 
       -- Log pass with proper structure for expected errors
-      logger.info("Test passed with expected error: " .. name, {
+      get_logger().info("Test passed with expected error: " .. name, {
         test_name = name,
         test_path = table.concat(path, " / "),
         test_result = result,
@@ -613,15 +663,15 @@ function M.it(name, options_or_fn, fn)
         timestamp = os.time(),
         options = options,
         error = err,
-        error_message = error_handler.format_error(err),
+        error_message = get_error_handler().format_error(err),
       })
 
       -- Log error details with the structured result
-      logger.error("Test failed: " .. error_handler.format_error(err), {
+      get_logger().error("Test failed: " .. get_error_handler().format_error(err), {
         test_name = name,
         test_path = table.concat(path, " / "),
         test_result = result,
-        error_message = error_handler.format_error(err),
+        error_message = get_error_handler().format_error(err),
       })
     end
   end
@@ -635,7 +685,8 @@ end
 ---
 ---@param name string Name of the test case
 ---@param options_or_fn table|function Options table or test function
----@param fn? function Test function if options were provided
+---@param fn? function The test function, if `options_or_fn` was an options table.
+---@return nil
 ---
 ---@usage
 --- -- Only this test will run (and any other focused tests)
@@ -678,7 +729,8 @@ end
 ---
 ---@param name string Name of the test case
 ---@param options_or_fn table|function Options table or test function
----@param fn? function Test function if options were provided
+---@param fn? function The test function, if `options_or_fn` was an options table.
+---@return nil
 ---
 ---@usage
 --- -- This test will be skipped
@@ -720,6 +772,7 @@ end
 --- child block hooks, providing a way to establish test prerequisites.
 ---
 ---@param fn function Hook function to execute before each test
+---@return nil
 ---
 ---@usage
 --- -- Basic setup hook
@@ -767,6 +820,7 @@ end
 --- parent block hooks, providing a way to clean up test resources.
 ---
 ---@param fn function Hook function to execute after each test
+---@return nil
 ---
 ---@usage
 --- -- Basic temporary file usage with automatic cleanup
@@ -814,9 +868,10 @@ end
 --- It's typically called between test suite runs to ensure a clean slate
 --- and prevent state from leaking between test executions.
 ---
+---@return nil
+---
 ---@usage
 --- -- Reset before running a new test suite
---- firmo.reset()
 --- require("my_test_suite")
 ---
 --- -- Reset between individual test files
@@ -851,7 +906,7 @@ end
 --- test counts, focus mode status, and test results. This is useful for generating
 --- reports, monitoring test progress, and debugging test execution.
 ---
----@return {level: number, passes: number, errors: number, skipped: number, focus_mode: boolean, test_results: TestResult[]} Current test system state
+---@return {level: number, passes: number, errors: number, skipped: number, focus_mode: boolean, test_results: TestResult[]} state A table containing the current internal state.
 ---
 ---@usage
 --- -- Get test statistics
@@ -882,7 +937,8 @@ function M.get_state()
   }
 end
 
---- Export test status constants
+--- Enum containing test status constants (PASS, FAIL, SKIP, PENDING).
+---@field STATUS TestStatus
 M.STATUS = TEST_STATUS
 
 -- Add debug flag to test_definition module
@@ -895,7 +951,7 @@ local debug_mode = false
 --- tests or the test framework itself.
 ---
 ---@param value boolean Whether to enable debug output
----@return table The module instance for chaining
+---@return TestDefinition The module instance (`M`) for method chaining.
 ---
 ---@usage
 --- -- Enable debug mode to see detailed output
@@ -921,7 +977,7 @@ end
 --- but can also be used by test reporters or extensions to record custom test results.
 ---
 ---@param result TestResult The test result object to add
----@return TestResult|nil The added test result or nil if invalid
+---@return TestResult|nil result The added `TestResult` object, or `nil` if the input `result` was invalid.
 ---
 ---@usage
 --- -- Custom test reporter

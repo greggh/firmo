@@ -1,39 +1,94 @@
 ---@diagnostic disable: param-type-mismatch
---[[
-    mock.lua - Object mocking implementation for the Firmo testing framework
+--- Firmo Mock Object Implementation
+---
+--- This module provides comprehensive mocking capabilities for replacing real objects
+--- with controllable test doubles (mocks). Mocks allow stubbing methods/properties
+--- and verifying interactions (expectations).
+---
+--- Features:
+--- - Create mock objects wrapping existing tables (`mock.create`).
+--- - Stub methods with fixed values or custom functions (`mock_obj:stub`).
+--- - Stub methods to return values sequentially (`mock_obj:stub_in_sequence`).
+--- - Stub properties with fixed values (`mock_obj:stub_property`).
+--- - Spy on methods without changing behavior (`mock_obj:spy`).
+--- - Set expectations for method calls (`mock_obj:expect`).
+--- - Verify expectations (`mock_obj:verify`).
+--- - Restore individual or all stubbed methods/properties (`mock_obj:restore_stub`, `mock_obj:restore`).
+--- - Global restoration of all mocks (`mock.restore_all`, `mock.reset_all`).
+--- - Context manager for automatic cleanup (`mock.with_mocks`).
+--- - Integration with `lib.mocking.spy` and `lib.mocking.stub`.
+--- - Comprehensive error handling via `lib.tools.error_handler`.
+---
+--- @module lib.mocking.mock
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
-    This module provides comprehensive mocking capabilities for replacing real objects
-    with controllable test doubles. Mocks combine both stubbing and verification in one
-    powerful system.
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
 
-    Features:
-    - Create mock objects that can verify expectations
-    - Replace object methods with configurable stubs
-    - Return fixed values or custom implementations
-    - Return values in sequence to simulate changing behavior
-    - Automatically verify that expected methods were called
-    - Safe restoration of original behavior after tests
-    - Context manager (with_mocks) for automatic cleanup
-    - Comprehensive error reporting and debugging
-    - Integration with spy and stub systems
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
 
-    @module mock
-    @author Firmo Team
-    @license MIT
-    @copyright 2023-2025
-]]
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
 
-local spy = require("lib.mocking.spy")
-local stub = require("lib.mocking.stub")
-local logging = require("lib.tools.logging")
-local error_handler = require("lib.tools.error_handler")
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("assertion")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+local spy = try_require("lib.mocking.spy")
+local stub = try_require("lib.mocking.stub")
 
 -- Compatibility function for table unpacking (works with both Lua 5.1 and 5.2+)
 local unpack_table = table.unpack or unpack
-
--- Initialize module logger
-local logger = logging.get_logger("mock")
-logging.configure_from_config("mock")
 
 ---@class mockable_object
 ---@field _is_firmo_mock boolean Flag indicating this is a firmo mock object
@@ -43,28 +98,34 @@ logging.configure_from_config("mock")
 ---@field _expectations table Table of expected calls
 ---@field _verify_all_expectations_called boolean Whether to verify all expectations are called
 ---@field stub fun(self: mockable_object, name: string, implementation_or_value: any): mockable_object|nil, table? Stub a method with a return value or implementation
----@field stub_in_sequence fun(self: mockable_object, name: string, sequence_values: table): table|nil, table? Stub a method to return values in sequence
----@field restore_stub fun(self: mockable_object, name: string): mockable_object|nil, table? Restore a specific stubbed method to its original implementation
----@field restore fun(self: mockable_object): mockable_object|nil, table? Restore all stubbed methods to their original implementations
----@field verify fun(self: mockable_object): boolean|nil, table? Verify all expectations were met (all stubbed methods were called)
+---@field stub fun(self: mockable_object, name: string, implementation_or_value: any): mockable_object|nil, table? Stub a method. Returns self for chaining, or nil on error, plus optional error object. @throws table If validation or stub creation fails critically.
+---@field spy fun(self: mockable_object, name: string): mockable_object|nil, table? Spies on a method without changing behavior. Returns self or nil, error. @throws table If validation or spy creation fails critically.
+---@field expect fun(self: mockable_object, name: string): table|nil, table? Creates an expectation for a method call. Returns expectation object or nil, error. @throws table If validation or expectation creation fails critically.
+---@field stub_property fun(self: mockable_object, name: string, value: any): mockable_object|nil, table? Stubs a property with a value. Returns self or nil, error. @throws table If validation or stubbing fails critically.
+---@field stub_in_sequence fun(self: mockable_object, name: string, sequence_values: table): table|nil, table? Stub a method to return values in sequence. Returns the created sequence stub object for further configuration, or nil on error, plus optional error object. (`stub_object` type defined in `lib.mocking.stub`). @throws table If validation or stub creation fails critically.
+---@field restore_stub fun(self: mockable_object, name: string): mockable_object|nil, table? Restore a specific stubbed method/property. Returns self for chaining, or nil on error, plus optional error object. @throws table If restoration fails critically.
+---@field restore fun(self: mockable_object): mockable_object|nil, table? Restore all stubbed methods/properties. Returns self for chaining, or nil on error, plus optional error object. @throws table If restoration fails critically.
+---@field reset fun(self: mockable_object): mockable_object|nil, table? Resets the mock by restoring all stubs/properties. Alias for `restore`. Returns self or nil, error. @throws table If reset fails critically.
+---@field verify fun(self: mockable_object): boolean|nil, table? Verify expectations were met. Returns true if verification passes, false if it fails, or nil on critical error, plus optional error object. @throws table If verification fails critically.
 
----@class mock
----@field _VERSION string Module version string
----@field restore_all fun(): boolean, table? Restore all mocks to their original state
----@field create fun(target: table, options?: {verify_all_expectations_called?: boolean}): mockable_object|nil, table? Create a mock object with verifiable behavior
----@field with_mocks fun(fn: function): any, table? Context manager for mocks that automatically restores all mocks after execution
+---@class mock The public API of the mock implementation module.
+---@field _VERSION string Module version string.
+---@field restore_all fun(): boolean, table? Restores all mocks created by this module. Returns `true` on success, `false` on failure, plus optional error object. @throws table If restoration fails critically.
+---@field create fun(target: table, options?: {verify_all_expectations_called?: boolean}): mockable_object|nil, table? Creates a mock object wrapping `target`. Returns the mock object, or `nil` on error, plus optional error object. @throws table If validation or creation fails critically.
+---@field with_mocks fun(fn: function): any, table? Executes `fn` within a context ensuring automatic mock restoration. Returns the result of `fn`, or `nil` on error, plus optional error object from execution or restoration. @throws table If validation or execution fails critically.
+---@field is_mock fun(obj: any): boolean Checks if an object is a firmo mock created by this module.
+---@field reset_all fun(): boolean, table? Alias for `restore_all`. Returns `success, error?`. @throws table If reset fails critically.
+
 local mock = {
   -- Module version
   _VERSION = "1.0.0",
 }
 local _mocks = {}
 
+--- Checks if a value is a mock object created by this module.
+---@param obj any The value to check.
+---@return boolean is_mock `true` if `obj` is a table with `_is_firmo_mock == true`, `false` otherwise.
 ---@private
----@param obj any The object to check
----@return boolean is_mock Whether the object is a mock
---- Helper function to check if a table is a mock object
---- Validates if an object has the _is_firmo_mock flag set to true,
---- which identifies it as a mock object created by this module.
 local function is_mock(obj)
   return type(obj) == "table" and obj._is_firmo_mock == true
 end
@@ -88,50 +149,48 @@ function mock.is_mock(obj)
   return is_mock(obj)
 end
 
+--- Registers a newly created mock object in the internal `_mocks` list for global cleanup (`restore_all`).
+---@param mock_obj table The mock object (`mockable_object`) to register.
+---@return table|nil mock_obj The registered mock object if validation passes, otherwise `nil`.
+---@return table|nil error Error object if validation or registration fails.
+---@throws table If validation or registration fails critically.
 ---@private
----@param mock_obj table The mock object to register for cleanup
----@return table|nil mock_obj The registered mock object, or nil on error
----@return table? error Error information if registration failed
---- Helper function to register a mock for cleanup
---- Adds the mock object to the internal registry of all mocks,
---- which allows it to be automatically restored later with restore_all.
---- Validates the mock object before registering it.
 local function register_mock(mock_obj)
   -- Input validation
   if mock_obj == nil then
-    local err = error_handler.validation_error("Cannot register nil mock object", {
+    local err = get_error_handler().validation_error("Cannot register nil mock object", {
       function_name = "register_mock",
       parameter_name = "mock_obj",
       provided_value = "nil",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   if not is_mock(mock_obj) then
-    local err = error_handler.validation_error("Object is not a valid mock", {
+    local err = get_error_handler().validation_error("Object is not a valid mock", {
       function_name = "register_mock",
       parameter_name = "mock_obj",
       provided_type = type(mock_obj),
       is_table = type(mock_obj) == "table",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Registering mock for cleanup", {
+  get_logger().debug("Registering mock for cleanup", {
     target_type = type(mock_obj.target),
     stubs_count = mock_obj._stubs and #mock_obj._stubs or 0,
   })
 
   -- Use try to safely insert the mock object
-  local success, result, err = error_handler.try(function()
+  local success, result, err = get_error_handler().try(function()
     table.insert(_mocks, mock_obj)
     return mock_obj
   end)
 
   if not success then
-    local error_obj = error_handler.runtime_error(
+    local error_obj = get_error_handler().runtime_error(
       "Failed to register mock for cleanup",
       {
         function_name = "register_mock",
@@ -139,7 +198,7 @@ local function register_mock(mock_obj)
       },
       result -- On failure, result contains the error
     )
-    logger.error(error_obj.message, error_obj.context)
+    get_logger().error(error_obj.message, error_obj.context)
     return nil, error_obj
   end
 
@@ -150,8 +209,9 @@ end
 --- This is especially useful for cleaning up mocks created outside of the with_mocks context
 --- manager, or as a safety mechanism in test teardown functions.
 ---
---- @return boolean success Whether all mocks were successfully restored
---- @return table? error Error object if restoration failed with details about which mocks couldn't be restored
+--- @return boolean success Whether all mocks were successfully restored. Returns `false` if any restoration failed.
+--- @return table? error Combined error object if restoration failed for one or more mocks, contains details in `error.context.errors`.
+--- @throws table If the restoration process itself fails critically (e.g., error iterating mocks).
 ---
 --- @usage
 --- -- Create some mocks in different scopes/functions
@@ -164,7 +224,7 @@ end
 ---   print("Warning: Some mocks could not be restored: " .. err.message)
 --- end
 function mock.restore_all()
-  logger.debug("Restoring all registered mocks", {
+  get_logger().debug("Restoring all registered mocks", {
     count = #_mocks,
   })
 
@@ -173,19 +233,19 @@ function mock.restore_all()
   local errors = {}
 
   for i, mock_obj in ipairs(_mocks) do
-    logger.debug("Restoring mock", {
+    get_logger().debug("Restoring mock", {
       index = i,
       target_type = type(mock_obj.target),
     })
 
     -- Use protected call to ensure one failure doesn't prevent other mocks from being restored
-    local success, result, err = error_handler.try(function()
+    local success, result, err = get_error_handler().try(function()
       if type(mock_obj) == "table" and type(mock_obj.restore) == "function" then
         mock_obj:restore()
         return true
       else
         return false,
-          error_handler.validation_error("Invalid mock object (missing restore method)", {
+          get_error_handler().validation_error("Invalid mock object (missing restore method)", {
             function_name = "mock.restore_all",
             mock_index = i,
             mock_type = type(mock_obj),
@@ -195,7 +255,7 @@ function mock.restore_all()
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to restore mock",
         {
           function_name = "mock.restore_all",
@@ -204,7 +264,7 @@ function mock.restore_all()
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       table.insert(errors, error_obj)
     elseif result == false then
       -- The try function succeeded but the restore validation failed
@@ -217,20 +277,20 @@ function mock.restore_all()
 
   -- If there were errors, report them but continue
   if #errors > 0 then
-    logger.warn("Completed mock restoration with errors", {
+    get_logger().warn("Completed mock restoration with errors", {
       error_count = #errors,
     })
 
     -- Return a structured error summary
     return false,
-      error_handler.runtime_error("Completed mock restoration with " .. #errors .. " errors", {
+      get_error_handler().runtime_error("Completed mock restoration with " .. #errors .. " errors", {
         function_name = "mock.restore_all",
         error_count = #errors,
         errors = errors,
       })
   end
 
-  logger.debug("All mocks restored successfully")
+  get_logger().debug("All mocks restored successfully")
   return true
 end
 
@@ -239,8 +299,9 @@ end
 --- This is an alias for restore_all() with a more intuitive name for users coming from other
 --- mocking frameworks.
 ---
---- @return boolean success Whether all mocks were successfully reset
---- @return table? error Error object if reset failed with details about which mocks couldn't be reset
+--- @return boolean success Whether all mocks were successfully reset.
+--- @return table? error Error object if reset failed (same return as `restore_all`).
+--- @throws table If reset fails critically (same throws as `restore_all`).
 ---
 --- @usage
 --- -- Create some mocks in different scopes/functions
@@ -256,18 +317,16 @@ function mock.reset_all()
   return mock.restore_all()
 end
 
+--- Converts a Lua value to a string representation suitable for error messages.
+--- Handles tables recursively up to `max_depth` and recognizes Firmo matcher objects.
+---@param value any The value to convert.
+---@param max_depth? number Maximum recursion depth for tables (default: 3).
+---@return string representation A string representation of the value.
 ---@private
----@param value any The value to convert to a string for display in error messages
----@param max_depth? number Maximum recursion depth (default: 3)
----@return string representation String representation of the value
---- Convert value to string representation for error messages
---- Creates a concise, readable string representation of any value,
---- handling tables recursively (up to max_depth) and special cases
---- for different types. Used for creating descriptive error messages.
 local function value_to_string(value, max_depth)
   -- Input validation with fallback
   if max_depth ~= nil and type(max_depth) ~= "number" then
-    logger.warn("Invalid max_depth parameter type", {
+    get_logger().warn("Invalid max_depth parameter type", {
       function_name = "value_to_string",
       parameter_name = "max_depth",
       provided_type = type(max_depth),
@@ -282,7 +341,7 @@ local function value_to_string(value, max_depth)
   end
 
   -- Use protected call to catch errors during string conversion
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     if value == nil then
       return "nil"
     elseif type(value) == "string" then
@@ -311,35 +370,33 @@ local function value_to_string(value, max_depth)
   end)
 
   if not success then
-    logger.warn("Error during string conversion", {
+    get_logger().warn("Error during string conversion", {
       function_name = "value_to_string",
       value_type = type(value),
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
-    return "[Error during conversion: " .. error_handler.format_error(result) .. "]"
+    return "[Error during conversion: " .. get_error_handler().format_error(result) .. "]"
   end
 
   return result
 end
 
+--- Formats a table of function arguments into a comma-separated string for display.
+--- Uses `value_to_string` for individual argument representation.
+---@param args table|nil The array-like table of arguments. Handles `nil` input.
+---@return string formatted_args String representation like `"arg1", 2, { ... }`. Returns `"nil"` if input is nil.
 ---@private
----@param args table|nil The arguments to format for display
----@return string formatted_args String representation of the arguments
---- Format arguments for error messages and logging
---- Converts a table of arguments into a string representation,
---- handling special cases like matchers (objects with _is_matcher flag).
---- Used to create readable function call representations in error messages.
 local function format_args(args)
   -- Input validation with fallback
   if args == nil then
-    logger.warn("Nil args parameter", {
+    get_logger().warn("Nil args parameter", {
       function_name = "format_args",
     })
     return "nil"
   end
 
   if type(args) ~= "table" then
-    logger.warn("Invalid args parameter type", {
+    get_logger().warn("Invalid args parameter type", {
       function_name = "format_args",
       parameter_name = "args",
       provided_type = type(args),
@@ -349,7 +406,7 @@ local function format_args(args)
   end
 
   -- Use protected call to catch errors during args formatting
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     local parts = {}
     for i, arg in ipairs(args) do
       if type(arg) == "table" and arg._is_matcher then
@@ -362,12 +419,12 @@ local function format_args(args)
   end)
 
   if not success then
-    logger.warn("Error during args formatting", {
+    get_logger().warn("Error during args formatting", {
       function_name = "format_args",
       args_count = #args,
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
-    return "[Error during args formatting: " .. error_handler.format_error(result) .. "]"
+    return "[Error during args formatting: " .. get_error_handler().format_error(result) .. "]"
   end
 
   return result
@@ -379,8 +436,9 @@ end
 ---
 --- @param target table The object to create a mock of
 --- @param options? {verify_all_expectations_called?: boolean} Optional configuration
---- @return mockable_object|nil mock_obj The created mock object with stubbing capabilities, or nil on error
---- @return table? error Error information if creation failed
+--- @return mockable_object|nil mock_obj The created mock object (`mockable_object`), or `nil` on error.
+--- @return table|nil error Error object if creation failed.
+--- @throws table If validation or creation fails critically.
 ---
 --- @usage
 --- -- Create a basic mock
@@ -395,27 +453,27 @@ end
 function mock.create(target, options)
   -- Input validation
   if target == nil then
-    local err = error_handler.validation_error("Cannot create mock with nil target", {
+    local err = get_error_handler().validation_error("Cannot create mock with nil target", {
       function_name = "mock.create",
       parameter_name = "target",
       provided_value = "nil",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   if options ~= nil and type(options) ~= "table" then
-    local err = error_handler.validation_error("Options must be a table or nil", {
+    local err = get_error_handler().validation_error("Options must be a table or nil", {
       function_name = "mock.create",
       parameter_name = "options",
       provided_type = type(options),
       provided_value = tostring(options),
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Creating mock object", {
+  get_logger().debug("Creating mock object", {
     target_type = type(target),
     options = options or {},
   })
@@ -423,7 +481,7 @@ function mock.create(target, options)
   options = options or {}
 
   -- Use protected call to create the mock object
-  local success, mock_obj, err = error_handler.try(function()
+  local success, mock_obj, err = get_error_handler().try(function()
     local obj = {
       _is_firmo_mock = true,
       target = target,
@@ -435,7 +493,7 @@ function mock.create(target, options)
       _verify_all_expectations_called = options.verify_all_expectations_called ~= false,
     }
 
-    logger.debug("Mock object initialized", {
+    get_logger().debug("Mock object initialized", {
       verify_all_expectations = obj._verify_all_expectations_called,
     })
 
@@ -444,7 +502,7 @@ function mock.create(target, options)
 
   if success then
     -- Automatically spy on all methods in target object
-    local auto_spy_success, auto_spy_result = error_handler.try(function()
+    local auto_spy_success, auto_spy_result = get_error_handler().try(function()
       local method_count = 0
 
       for name, value in pairs(target) do
@@ -461,20 +519,20 @@ function mock.create(target, options)
     end)
 
     if auto_spy_success then
-      logger.debug("Auto-spied on methods", {
+      get_logger().debug("Auto-spied on methods", {
         function_name = "mock.create",
         method_count = auto_spy_result,
       })
     else
-      logger.warn("Error during automatic method spying", {
+      get_logger().warn("Error during automatic method spying", {
         function_name = "mock.create",
-        error = error_handler.format_error(auto_spy_result),
+        error = get_error_handler().format_error(auto_spy_result),
       })
     end
   end
 
   if not success then
-    local error_obj = error_handler.runtime_error(
+    local error_obj = get_error_handler().runtime_error(
       "Failed to create mock object",
       {
         function_name = "mock.create",
@@ -483,7 +541,7 @@ function mock.create(target, options)
       },
       mock_obj -- On failure, mock_obj contains the error
     )
-    logger.error(error_obj.message, error_obj.context)
+    get_logger().error(error_obj.message, error_obj.context)
     return nil, error_obj
   end
 
@@ -494,8 +552,9 @@ function mock.create(target, options)
   ---
   --- @param name string The method name to stub
   --- @param implementation_or_value any The implementation function or return value
-  --- @return mockable_object|nil self The mock object for method chaining, or nil on error
-  --- @return table? error Error information if stubbing failed
+  --- @return mockable_object|nil self Returns the mock object (`self`) for chaining, or `nil` on error.
+  --- @return table|nil error Error object if stubbing failed.
+  --- @throws table If validation or stub creation fails critically.
   ---
   --- @usage
   --- -- Mock a logger to capture calls without side effects
@@ -515,54 +574,54 @@ function mock.create(target, options)
   function mock_obj:stub(name, implementation_or_value)
     -- Input validation
     if name == nil then
-      local err = error_handler.validation_error("Method name cannot be nil", {
+      local err = get_error_handler().validation_error("Method name cannot be nil", {
         function_name = "mock_obj:stub",
         parameter_name = "name",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
-    logger.debug("Stubbing method", {
+    get_logger().debug("Stubbing method", {
       method_name = name,
       value_type = type(implementation_or_value),
     })
 
     -- Validate method existence
     if self.target[name] == nil then
-      local err = error_handler.validation_error("Cannot stub non-existent method", {
+      local err = get_error_handler().validation_error("Cannot stub non-existent method", {
         function_name = "mock_obj:stub",
         parameter_name = "name",
         method_name = name,
         target_type = type(self.target),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
-    logger.debug("Saving original method", {
+    get_logger().debug("Saving original method", {
       method_name = name,
       original_type = type(self.target[name]),
     })
 
     -- Use protected call to save the original method
-    logger.debug("Saving original method", {
+    get_logger().debug("Saving original method", {
       method_name = name,
       original_type = type(self.target[name]),
     })
 
     -- Use protected call to save the original method
-    local success, result, err = error_handler.try(function()
+    local success, result, err = get_error_handler().try(function()
       -- Only save if we haven't already stored this original
       if self._originals[name] == nil then
         self._originals[name] = self.target[name]
-        logger.debug("Original method saved", {
+        get_logger().debug("Original method saved", {
           method_name = name,
           original_type = type(self._originals[name]),
         })
       else
-        logger.debug("Original method already saved", {
+        get_logger().debug("Original method already saved", {
           method_name = name,
         })
       end
@@ -573,7 +632,7 @@ function mock.create(target, options)
     local stub_obj, stub_err
 
     if type(implementation_or_value) == "function" then
-      success, stub_obj, err = error_handler.try(function()
+      success, stub_obj, err = get_error_handler().try(function()
         return stub.on(self.target, name, function(...)
           local original_args = { ... }
 
@@ -600,10 +659,10 @@ function mock.create(target, options)
         end)
       end)
     else
-      logger.debug("Creating stub with return value", {
+      get_logger().debug("Creating stub with return value", {
         return_value_type = type(implementation_or_value),
       })
-      success, stub_obj, err = error_handler.try(function()
+      success, stub_obj, err = get_error_handler().try(function()
         -- For value stubs, ignore all arguments and just return the fixed value
         return stub.on(self.target, name, function()
           return implementation_or_value
@@ -612,19 +671,19 @@ function mock.create(target, options)
     end
     if not success then
       -- Restore the original method since stub creation failed
-      local restore_success, _ = error_handler.try(function()
+      local restore_success, _ = get_error_handler().try(function()
         self.target[name] = self._originals[name]
         self._originals[name] = nil
         return true
       end)
 
       if not restore_success then
-        logger.warn("Failed to restore original method after stub creation failure", {
+        get_logger().warn("Failed to restore original method after stub creation failure", {
           method_name = name,
         })
       end
 
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to create stub",
         {
           function_name = "mock_obj:stub",
@@ -633,18 +692,18 @@ function mock.create(target, options)
         },
         stub_obj -- On failure, stub_obj contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
     -- Store the stub with error handling
-    success, result, err = error_handler.try(function()
+    success, result, err = get_error_handler().try(function()
       self._stubs[name] = stub_obj
       return true
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to store stub in mock object",
         {
           function_name = "mock_obj:stub",
@@ -652,11 +711,11 @@ function mock.create(target, options)
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
-    logger.debug("Method successfully stubbed", {
+    get_logger().debug("Method successfully stubbed", {
       method_name = name,
     })
     return self
@@ -668,8 +727,9 @@ function mock.create(target, options)
   --- called with the expected arguments while allowing it to perform its normal function.
   ---
   --- @param name string The method name to spy on
-  --- @return mockable_object|nil self The mock object for method chaining, or nil on error
-  --- @return table? error Error information if spying failed
+  --- @return mockable_object|nil self Returns the mock object (`self`) for chaining, or `nil` on error.
+  --- @return table|nil error Error object if spying failed.
+  --- @throws table If validation or spy creation fails critically.
   ---
   --- @usage
   --- -- Create a mock and spy on a method
@@ -689,49 +749,49 @@ function mock.create(target, options)
   function mock_obj:spy(name)
     -- Input validation
     if name == nil then
-      local err = error_handler.validation_error("Method name cannot be nil", {
+      local err = get_error_handler().validation_error("Method name cannot be nil", {
         function_name = "mock_obj:spy",
         parameter_name = "name",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     if type(name) ~= "string" then
-      local err = error_handler.validation_error("Method name must be a string", {
+      local err = get_error_handler().validation_error("Method name must be a string", {
         function_name = "mock_obj:spy",
         parameter_name = "name",
         provided_type = type(name),
         provided_value = tostring(name),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
-    logger.debug("Spying on method", {
+    get_logger().debug("Spying on method", {
       method_name = name,
     })
 
     -- Validate method existence
     if self.target[name] == nil then
-      local err = error_handler.validation_error("Cannot spy on non-existent method", {
+      local err = get_error_handler().validation_error("Cannot spy on non-existent method", {
         function_name = "mock_obj:spy",
         parameter_name = "name",
         method_name = name,
         target_type = type(self.target),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     -- Create the spy with error handling
-    local success, spy_obj, err = error_handler.try(function()
+    local success, spy_obj, err = get_error_handler().try(function()
       return spy.on(self.target, name)
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to create spy",
         {
           function_name = "mock_obj:spy",
@@ -740,18 +800,18 @@ function mock.create(target, options)
         },
         spy_obj -- On failure, spy_obj contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
     -- Store the spy with error handling
-    success, result, err = error_handler.try(function()
+    success, result, err = get_error_handler().try(function()
       self._spies[name] = spy_obj
       return true
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to store spy in mock object",
         {
           function_name = "mock_obj:spy",
@@ -759,11 +819,11 @@ function mock.create(target, options)
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
-    logger.debug("Method successfully spied on", {
+    get_logger().debug("Method successfully spied on", {
       method_name = name,
     })
     return self
@@ -775,8 +835,9 @@ function mock.create(target, options)
   --- in the expected way during tests.
   ---
   --- @param name string The method name to expect
-  --- @return table expectation A chainable expectation object
-  --- @return table? error Error information if expectation creation failed
+  --- @return table expectation A chainable expectation object (internal structure with methods like `with`, `to.be.called`). Returns `nil` on error.
+  --- @return table|nil error Error object if expectation creation failed.
+  --- @throws table If validation or expectation creation fails critically.
   ---
   --- @usage
   --- -- Create a mock and expect a method to be called
@@ -788,44 +849,44 @@ function mock.create(target, options)
   function mock_obj:expect(name)
     -- Input validation
     if name == nil then
-      local err = error_handler.validation_error("Method name cannot be nil", {
+      local err = get_error_handler().validation_error("Method name cannot be nil", {
         function_name = "mock_obj:expect",
         parameter_name = "name",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     if type(name) ~= "string" then
-      local err = error_handler.validation_error("Method name must be a string", {
+      local err = get_error_handler().validation_error("Method name must be a string", {
         function_name = "mock_obj:expect",
         parameter_name = "name",
         provided_type = type(name),
         provided_value = tostring(name),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     -- Validate method existence
     if self.target[name] == nil then
-      local err = error_handler.validation_error("Cannot expect non-existent method", {
+      local err = get_error_handler().validation_error("Cannot expect non-existent method", {
         function_name = "mock_obj:expect",
         parameter_name = "name",
         method_name = name,
         target_type = type(self.target),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
-    logger.debug("Creating expectation for method", {
+    get_logger().debug("Creating expectation for method", {
       method_name = name,
     })
 
     -- Create a new expectation with error handling
-    local success, exp_interface, err = error_handler.try(function()
+    local success, exp_interface, err = get_error_handler().try(function()
       -- Create a new expectation object
       local expectation = {
         method_name = name,
@@ -921,7 +982,7 @@ function mock.create(target, options)
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to create expectation",
         {
           function_name = "mock_obj:expect",
@@ -930,7 +991,7 @@ function mock.create(target, options)
         },
         exp_interface -- On failure, exp_interface contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
@@ -943,8 +1004,9 @@ function mock.create(target, options)
   ---
   --- @param name string The property name to stub
   --- @param value any The value to replace the property with
-  --- @return mockable_object|nil self The mock object for method chaining, or nil on error
-  --- @return table? error Error information if stubbing failed
+  --- @return mockable_object|nil self Returns the mock object (`self`) for chaining, or `nil` on error.
+  --- @return table|nil error Error object if stubbing failed.
+  --- @throws table If validation or stubbing fails critically.
   ---
   --- @usage
   --- -- Create a mock and stub a property
@@ -960,45 +1022,45 @@ function mock.create(target, options)
   function mock_obj:stub_property(name, value)
     -- Input validation
     if name == nil then
-      local err = error_handler.validation_error("Property name cannot be nil", {
+      local err = get_error_handler().validation_error("Property name cannot be nil", {
         function_name = "mock_obj:stub_property",
         parameter_name = "name",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     if type(name) ~= "string" then
-      local err = error_handler.validation_error("Property name must be a string", {
+      local err = get_error_handler().validation_error("Property name must be a string", {
         function_name = "mock_obj:stub_property",
         parameter_name = "name",
         provided_type = type(name),
         provided_value = tostring(name),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
-    logger.debug("Stubbing property", {
+    get_logger().debug("Stubbing property", {
       property_name = name,
       value_type = type(value),
     })
 
     -- Validate property existence
     if self.target[name] == nil then
-      local err = error_handler.validation_error("Cannot stub non-existent property", {
+      local err = get_error_handler().validation_error("Cannot stub non-existent property", {
         function_name = "mock_obj:stub_property",
         parameter_name = "name",
         property_name = name,
         target_type = type(self.target),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     -- Use protected call to save the original property and set new value
-    local success, result, err = error_handler.try(function()
+    local success, result, err = get_error_handler().try(function()
       -- Save original value
       self._properties[name] = self.target[name]
 
@@ -1008,7 +1070,7 @@ function mock.create(target, options)
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to stub property",
         {
           function_name = "mock_obj:stub_property",
@@ -1018,11 +1080,11 @@ function mock.create(target, options)
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
-    logger.debug("Property successfully stubbed", {
+    get_logger().debug("Property successfully stubbed", {
       property_name = name,
     })
     return self
@@ -1035,8 +1097,9 @@ function mock.create(target, options)
   ---
   --- @param name string The method name to stub
   --- @param sequence_values table Array of values to return in sequence
-  --- @return stub_object|nil stub The created stub for method chaining, or nil on error
-  --- @return table? error Error information if stubbing failed
+  --- @return table|nil stub The created stub object (from `lib.mocking.stub`) for further sequence configuration (e.g., `:cycle_sequence`), or `nil` on error.
+  --- @return table|nil error Error object if stubbing failed.
+  --- @throws table If validation or stub creation/configuration fails critically.
   ---
   --- @usage
   --- -- Create a mock with a sequence of return values
@@ -1054,73 +1117,73 @@ function mock.create(target, options)
   function mock_obj:stub_in_sequence(name, sequence_values)
     -- Input validation
     if name == nil then
-      local err = error_handler.validation_error("Method name cannot be nil", {
+      local err = get_error_handler().validation_error("Method name cannot be nil", {
         function_name = "mock_obj:stub_in_sequence",
         parameter_name = "name",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     if type(name) ~= "string" then
-      local err = error_handler.validation_error("Method name must be a string", {
+      local err = get_error_handler().validation_error("Method name must be a string", {
         function_name = "mock_obj:stub_in_sequence",
         parameter_name = "name",
         provided_type = type(name),
         provided_value = tostring(name),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     -- Validate method existence
     if self.target[name] == nil then
-      local err = error_handler.validation_error("Cannot stub non-existent method", {
+      local err = get_error_handler().validation_error("Cannot stub non-existent method", {
         function_name = "mock_obj:stub_in_sequence",
         parameter_name = "name",
         method_name = name,
         target_type = type(self.target),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     -- Validate sequence values
     if sequence_values == nil then
-      local err = error_handler.validation_error("Sequence values cannot be nil", {
+      local err = get_error_handler().validation_error("Sequence values cannot be nil", {
         function_name = "mock_obj:stub_in_sequence",
         parameter_name = "sequence_values",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     if type(sequence_values) ~= "table" then
-      local err = error_handler.validation_error("stub_in_sequence requires a table of values", {
+      local err = get_error_handler().validation_error("stub_in_sequence requires a table of values", {
         function_name = "mock_obj:stub_in_sequence",
         parameter_name = "sequence_values",
         provided_type = type(sequence_values),
         provided_value = tostring(sequence_values),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
-    logger.debug("Creating sequence stub", {
+    get_logger().debug("Creating sequence stub", {
       method_name = name,
       sequence_length = #sequence_values,
     })
 
     -- Use protected call to save the original method
-    local success, result, err = error_handler.try(function()
+    local success, result, err = get_error_handler().try(function()
       self._originals[name] = self.target[name]
       return true
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to save original method",
         {
           function_name = "mock_obj:stub_in_sequence",
@@ -1129,7 +1192,7 @@ function mock.create(target, options)
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
@@ -1137,25 +1200,25 @@ function mock.create(target, options)
     local stub_obj
 
     -- First create the basic stub
-    success, stub_obj, err = error_handler.try(function()
+    success, stub_obj, err = get_error_handler().try(function()
       return stub.on(self.target, name, function() end)
     end)
 
     if not success then
       -- Restore the original method since stub creation failed
-      local restore_success, _ = error_handler.try(function()
+      local restore_success, _ = get_error_handler().try(function()
         self.target[name] = self._originals[name]
         self._originals[name] = nil
         return true
       end)
 
       if not restore_success then
-        logger.warn("Failed to restore original method after stub creation failure", {
+        get_logger().warn("Failed to restore original method after stub creation failure", {
           method_name = name,
         })
       end
 
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to create sequence stub",
         {
           function_name = "mock_obj:stub_in_sequence",
@@ -1164,30 +1227,30 @@ function mock.create(target, options)
         },
         stub_obj -- On failure, stub_obj contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
     -- Now configure the sequence
-    success, result, err = error_handler.try(function()
+    success, result, err = get_error_handler().try(function()
       return stub_obj:returns_in_sequence(sequence_values)
     end)
 
     if not success then
       -- Restore the original method since sequence configuration failed
-      local restore_success, _ = error_handler.try(function()
+      local restore_success, _ = get_error_handler().try(function()
         self.target[name] = self._originals[name]
         self._originals[name] = nil
         return true
       end)
 
       if not restore_success then
-        logger.warn("Failed to restore original method after sequence configuration failure", {
+        get_logger().warn("Failed to restore original method after sequence configuration failure", {
           method_name = name,
         })
       end
 
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to configure sequence returns",
         {
           function_name = "mock_obj:stub_in_sequence",
@@ -1196,7 +1259,7 @@ function mock.create(target, options)
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
@@ -1204,13 +1267,13 @@ function mock.create(target, options)
     stub_obj = result
 
     -- Store the stub with error handling
-    success, result, err = error_handler.try(function()
+    success, result, err = get_error_handler().try(function()
       self._stubs[name] = stub_obj
       return true
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to store sequence stub in mock object",
         {
           function_name = "mock_obj:stub_in_sequence",
@@ -1218,11 +1281,11 @@ function mock.create(target, options)
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
-    logger.debug("Method successfully stubbed with sequence values", {
+    get_logger().debug("Method successfully stubbed with sequence values", {
       method_name = name,
       sequence_length = #sequence_values,
     })
@@ -1236,8 +1299,9 @@ function mock.create(target, options)
   --- calls to the method will execute the original implementation.
   ---
   --- @param name string The method name to restore
-  --- @return mockable_object|nil self The mock object for method chaining, or nil on error
-  --- @return table? error Error information if restoration failed
+  --- @return mockable_object|nil self Returns the mock object (`self`) for chaining, or `nil` on error.
+  --- @return table|nil error Error object if restoration failed.
+  --- @throws table If restoration fails critically.
   ---
   --- @usage
   --- -- Set up multiple stubs
@@ -1251,33 +1315,33 @@ function mock.create(target, options)
   function mock_obj:restore_stub(name)
     -- Input validation
     if name == nil then
-      local err = error_handler.validation_error("Method name cannot be nil", {
+      local err = get_error_handler().validation_error("Method name cannot be nil", {
         function_name = "mock_obj:restore_stub",
         parameter_name = "name",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
     if type(name) ~= "string" then
-      local err = error_handler.validation_error("Method name must be a string", {
+      local err = get_error_handler().validation_error("Method name must be a string", {
         function_name = "mock_obj:restore_stub",
         parameter_name = "name",
         provided_type = type(name),
         provided_value = tostring(name),
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       return nil, err
     end
 
-    logger.debug("Attempting to restore stub", {
+    get_logger().debug("Attempting to restore stub", {
       method_name = name,
       has_original = self._originals[name] ~= nil,
     })
 
     if not self._originals[name] then
-      logger.warn("No original method found to restore", {
+      get_logger().warn("No original method found to restore", {
         function_name = "mock_obj:restore_stub",
         method_name = name,
       })
@@ -1285,11 +1349,11 @@ function mock.create(target, options)
     end
 
     -- Use protected call to restore the original method
-    local success, result, err = error_handler.try(function()
+    local success, result, err = get_error_handler().try(function()
       -- Keep a reference to the original method
       local original = self._originals[name]
 
-      logger.debug("Restoring original method", {
+      get_logger().debug("Restoring original method", {
         method_name = name,
         original_type = type(original),
         is_nil = original == nil,
@@ -1315,7 +1379,7 @@ function mock.create(target, options)
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to restore original method",
         {
           function_name = "mock_obj:restore_stub",
@@ -1325,19 +1389,19 @@ function mock.create(target, options)
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
     if not success then
-      logger.warn("Failed to clean up references after restoration", {
+      get_logger().warn("Failed to clean up references after restoration", {
         method_name = name,
-        error = error_handler.format_error(result),
+        error = get_error_handler().format_error(result),
       })
       -- We continue despite this error because the restoration was successful
     end
 
-    logger.debug("Successfully restored original method", {
+    get_logger().debug("Successfully restored original method", {
       method_name = name,
     })
     return self
@@ -1349,8 +1413,9 @@ function mock.create(target, options)
   --- more standard naming convention.
   ---
   ---
-  --- @return mockable_object|nil self The mock object for method chaining, or nil on error
-  --- @return table? error Error information if reset failed
+  --- @return mockable_object|nil self Returns the mock object (`self`) for chaining, or `nil` on error.
+  --- @return table|nil error Error object if reset failed (inherits from `restore`).
+  --- @throws table If reset fails critically (inherits from `restore`).
   ---
   --- @usage
   --- -- Create a mock with stubs and expectations
@@ -1361,7 +1426,7 @@ function mock.create(target, options)
   --- -- Reset the mock to clear all stubs and expectations
   --- mock_obj:reset()
   function mock_obj:reset()
-    logger.debug("Resetting mock object to original state")
+    get_logger().debug("Resetting mock object to original state")
     return self:restore()
   end
 
@@ -1370,8 +1435,9 @@ function mock.create(target, options)
   --- with their original implementations. After calling this method, the mock
   --- object becomes a simple wrapper with no active stubs.
   ---
-  --- @return mockable_object|nil self The mock object for method chaining, or nil on error
-  --- @return table? error Error information if restoration failed
+  --- @return mockable_object|nil self Returns the mock object (`self`) for chaining, or `nil` if restoration encounters critical errors.
+  --- @return table|nil error Combined error object if restoration of one or more methods failed. Contains details in `error.context.errors`.
+  --- @throws table If the restoration process itself fails critically (e.g., error iterating originals).
   ---
   --- @usage
   --- local mock_fs = mock.create(file_system)
@@ -1385,7 +1451,7 @@ function mock.create(target, options)
   --- -- Completely restore the original file_system
   --- mock_fs:restore()
   function mock_obj:restore()
-    logger.debug("Restoring all stubs for mock", {
+    get_logger().debug("Restoring all stubs for mock", {
       stub_count = self._stubs and #self._stubs or 0,
       original_count = self._originals and #self._originals or 0,
     })
@@ -1394,7 +1460,7 @@ function mock.create(target, options)
 
     -- Log the originals for debugging
     for name, original in pairs(self._originals) do
-      logger.debug("Found original to restore", {
+      get_logger().debug("Found original to restore", {
         method_name = name,
         original_type = type(original),
         is_nil = original == nil,
@@ -1402,7 +1468,7 @@ function mock.create(target, options)
     end
 
     -- Use protected iteration for safety
-    local success, originals = error_handler.try(function()
+    local success, originals = get_error_handler().try(function()
       -- Make a copy of the keys to allow modification during iteration
       local keys = {}
       for name, _ in pairs(self._originals) do
@@ -1412,7 +1478,7 @@ function mock.create(target, options)
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to create list of methods to restore",
         {
           function_name = "mock_obj:restore",
@@ -1420,25 +1486,25 @@ function mock.create(target, options)
         },
         originals -- On failure, originals contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
     -- Restore each method individually
     for _, name in ipairs(originals) do
-      logger.debug("Restoring original method", {
+      get_logger().debug("Restoring original method", {
         method_name = name,
         target_type = type(self.target),
       })
 
       -- Use protected call to restore the original method
       -- Use protected call to restore the original method
-      local restore_success, result, err = error_handler.try(function()
+      local restore_success, result, err = get_error_handler().try(function()
         if self._originals[name] ~= nil then
           -- Store a reference to the original function first
           local original_fn = self._originals[name]
 
-          logger.debug("Restoring original method", {
+          get_logger().debug("Restoring original method", {
             method_name = name,
             original_type = type(original_fn),
             is_nil = original_fn == nil,
@@ -1446,7 +1512,7 @@ function mock.create(target, options)
 
           -- Make sure it's actually a function
           if type(original_fn) ~= "function" then
-            logger.warn("Original value is not a function", {
+            get_logger().warn("Original value is not a function", {
               method_name = name,
               original_type = type(original_fn),
             })
@@ -1503,7 +1569,7 @@ function mock.create(target, options)
       end) -- Close the try function
 
       if not restore_success then
-        local error_obj = error_handler.runtime_error(
+        local error_obj = get_error_handler().runtime_error(
           "Failed to restore mock",
           {
             function_name = "mock_obj:restore",
@@ -1512,14 +1578,14 @@ function mock.create(target, options)
           },
           result -- On failure, result contains the error
         )
-        logger.error(error_obj.message, error_obj.context)
+        get_logger().error(error_obj.message, error_obj.context)
         table.insert(errors, error_obj)
       end
     end
     -- Clean up all references with error handling
     -- Clean up all references with error handling
     ---@diagnostic disable-next-line: lowercase-global, unused-local
-    success, result, err = error_handler.try(function()
+    success, result, err = get_error_handler().try(function()
       -- Clear our tracking collections now that everything is restored
       self._stubs = {}
       self._originals = {}
@@ -1545,8 +1611,9 @@ function mock.create(target, options)
   --- all stubbed methods are expected to be called, but this can be disabled with
   --- the verify_all_expectations_called option when creating the mock.
   ---
-  --- @return boolean|nil success Whether all expectations were met, or nil on error
-  --- @return table? error Error information if verification failed with details about which expectations were not met
+  --- @return boolean|nil success `true` if verification passes, `false` if expectations were not met, `nil` on critical error during verification.
+  --- @return table|nil error Error object if verification failed (either unmet expectations or critical error). `error.context.failures` lists unmet expectations.
+  --- @throws table If the verification process itself fails critically.
   ---
   --- @usage
   --- -- Create a mock and stub some methods
@@ -1560,7 +1627,7 @@ function mock.create(target, options)
   ---   print("Verification failed: " .. err.message)
   --- end
   function mock_obj:verify()
-    logger.debug("Verifying mock expectations", {
+    get_logger().debug("Verifying mock expectations", {
       stub_count = self._stubs and #self._stubs or 0,
       verify_all = self._verify_all_expectations_called,
     })
@@ -1568,10 +1635,10 @@ function mock.create(target, options)
     local failures = {}
 
     -- Use protected verification for safety
-    local success, result, err = error_handler.try(function()
+    local success, result, err = get_error_handler().try(function()
       if self._verify_all_expectations_called then
         for name, stub in pairs(self._stubs) do
-          logger.debug("Checking if method was called", {
+          get_logger().debug("Checking if method was called", {
             method_name = name,
             was_called = stub and stub.called,
           })
@@ -1581,18 +1648,18 @@ function mock.create(target, options)
             if
               not (
                 error_handler
-                and type(error_handler.is_suppressing_test_logs) == "function"
-                and error_handler.is_suppressing_test_logs()
+                and type(get_error_handler().is_suppressing_test_logs) == "function"
+                and get_error_handler().is_suppressing_test_logs()
               )
             then
               -- For verification failures, use warning level since this is potentially
               -- useful information in tests that are checking verification behavior
-              logger.warn("Expected method was not called", {
+              get_logger().warn("Expected method was not called", {
                 method_name = name,
               })
             else
               -- In test mode, only log at debug level
-              logger.debug("Expected method was not called (test mode)", {
+              get_logger().debug("Expected method was not called (test mode)", {
                 method_name = name,
               })
             end
@@ -1605,7 +1672,7 @@ function mock.create(target, options)
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Error during mock verification",
         {
           function_name = "mock_obj:verify",
@@ -1614,7 +1681,7 @@ function mock.create(target, options)
         },
         result -- On failure, result contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       return nil, error_obj
     end
 
@@ -1626,24 +1693,24 @@ function mock.create(target, options)
       if
         not (
           error_handler
-          and type(error_handler.is_suppressing_test_logs) == "function"
-          and error_handler.is_suppressing_test_logs()
+          and type(get_error_handler().is_suppressing_test_logs) == "function"
+          and get_error_handler().is_suppressing_test_logs()
         )
       then
         -- For mock verification failures, use error level only if not in test mode
-        logger.error("Mock verification failed", {
+        get_logger().error("Mock verification failed", {
           failure_count = #failures,
           failures = table.concat(failures, "; "),
         })
       else
         -- In test mode, only log at debug level
-        logger.debug("Mock verification failed (test mode)", {
+        get_logger().debug("Mock verification failed (test mode)", {
           failure_count = #failures,
           failures = table.concat(failures, "; "),
         })
       end
 
-      local error_obj = error_handler.validation_error(error_message, {
+      local error_obj = get_error_handler().validation_error(error_message, {
         function_name = "mock_obj:verify",
         failure_count = #failures,
         failures = failures,
@@ -1654,7 +1721,7 @@ function mock.create(target, options)
       return false, error_obj
     end
 
-    logger.debug("Mock verification passed")
+    get_logger().debug("Mock verification passed")
     return true
   end
 
@@ -1673,8 +1740,9 @@ end
 --- track and clean up all created test doubles.
 ---
 --- @param fn function The function to execute with mock context
---- @return any result The result from the function execution
---- @return table? error Error information if execution or restoration failed
+--- @return any result The result returned by the executed function `fn`, or `nil` if `fn` failed.
+--- @return table? error Error object if `fn` failed during execution or if mock restoration failed afterwards. The primary error (from `fn`) is prioritized.
+--- @throws table If validation of `fn` fails critically or if a critical error occurs during execution/restoration that isn't caught by `error_handler.try`.
 ---
 --- @usage
 --- -- Using the context manager with the modern style
@@ -1705,27 +1773,27 @@ end
 function mock.with_mocks(fn)
   -- Input validation
   if fn == nil then
-    local err = error_handler.validation_error("Function argument cannot be nil", {
+    local err = get_error_handler().validation_error("Function argument cannot be nil", {
       function_name = "mock.with_mocks",
       parameter_name = "fn",
       provided_value = "nil",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   if type(fn) ~= "function" then
-    local err = error_handler.validation_error("Function argument must be a function", {
+    local err = get_error_handler().validation_error("Function argument must be a function", {
       function_name = "mock.with_mocks",
       parameter_name = "fn",
       provided_type = type(fn),
       provided_value = tostring(fn),
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Starting mock context manager")
+  get_logger().debug("Starting mock context manager")
 
   -- Keep a local registry of all mocks created within this context
   local context_mocks = {}
@@ -1733,23 +1801,23 @@ function mock.with_mocks(fn)
   -- Track function result and errors
   local ok, result, error_during_execution, errors_during_restore
 
-  logger.debug("Initializing context-specific mock tracking")
+  get_logger().debug("Initializing context-specific mock tracking")
 
   -- Create a mock function wrapper compatible with example usage
   local mock_fn = function(target, method_name, impl_or_value)
     -- Input validation with graceful degradation
     if target == nil then
-      local err = error_handler.validation_error("Cannot create mock with nil target", {
+      local err = get_error_handler().validation_error("Cannot create mock with nil target", {
         function_name = "mock_fn",
         parameter_name = "target",
         provided_value = "nil",
       })
-      logger.error(err.message, err.context)
+      get_logger().error(err.message, err.context)
       error(err.message)
     end
 
     -- Use protected calls for mock creation and manipulation
-    local success, mock_obj, err = error_handler.try(function()
+    local success, mock_obj, err = get_error_handler().try(function()
       if method_name then
         -- Called as mock_fn(obj, "method", impl)
         -- First create the mock object
@@ -1759,7 +1827,7 @@ function mock.with_mocks(fn)
         if type(method_name) == "string" then
           mock_obj:stub(method_name, impl_or_value)
         else
-          logger.warn("Method name must be a string, skipping stubbing", {
+          get_logger().warn("Method name must be a string, skipping stubbing", {
             provided_type = type(method_name),
           })
         end
@@ -1775,7 +1843,7 @@ function mock.with_mocks(fn)
     end)
 
     if not success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to create or configure mock",
         {
           function_name = "mock_fn",
@@ -1785,25 +1853,25 @@ function mock.with_mocks(fn)
         },
         mock_obj -- On failure, mock_obj contains the error
       )
-      logger.error(error_obj.message, error_obj.context)
+      get_logger().error(error_obj.message, error_obj.context)
       error(error_obj.message)
     end
 
     return mock_obj
   end
 
-  -- Run the function with mocking modules using error_handler.try
-  local fn_success, fn_result, fn_err = error_handler.try(function()
+  -- Run the function with mocking modules using get_error_handler().try
+  local fn_success, fn_result, fn_err = get_error_handler().try(function()
     -- Create context-specific spy wrapper
     local context_spy = {
       new = function(...)
         local args = { ... }
-        local success, spy_obj, err = error_handler.try(function()
+        local success, spy_obj, err = get_error_handler().try(function()
           return spy.new(table.unpack(args))
         end)
 
         if not success then
-          local error_obj = error_handler.runtime_error(
+          local error_obj = get_error_handler().runtime_error(
             "Failed to create spy",
             {
               function_name = "context_spy.new",
@@ -1811,7 +1879,7 @@ function mock.with_mocks(fn)
             },
             spy_obj -- On failure, spy_obj contains the error
           )
-          logger.error(error_obj.message, error_obj.context)
+          get_logger().error(error_obj.message, error_obj.context)
           error(error_obj.message)
         end
 
@@ -1822,33 +1890,33 @@ function mock.with_mocks(fn)
       on = function(obj, method_name)
         -- Input validation
         if obj == nil then
-          local err = error_handler.validation_error("Cannot spy on nil object", {
+          local err = get_error_handler().validation_error("Cannot spy on nil object", {
             function_name = "context_spy.on",
             parameter_name = "obj",
             provided_value = "nil",
           })
-          logger.error(err.message, err.context)
+          get_logger().error(err.message, err.context)
           error(err.message)
         end
 
         if type(method_name) ~= "string" then
-          local err = error_handler.validation_error("Method name must be a string", {
+          local err = get_error_handler().validation_error("Method name must be a string", {
             function_name = "context_spy.on",
             parameter_name = "method_name",
             provided_type = type(method_name),
             provided_value = tostring(method_name),
           })
-          logger.error(err.message, err.context)
+          get_logger().error(err.message, err.context)
           error(err.message)
         end
 
         -- Create spy with error handling
-        local success, spy_obj, err = error_handler.try(function()
+        local success, spy_obj, err = get_error_handler().try(function()
           return spy.on(obj, method_name)
         end)
 
         if not success then
-          local error_obj = error_handler.runtime_error(
+          local error_obj = get_error_handler().runtime_error(
             "Failed to create spy on object method",
             {
               function_name = "context_spy.on",
@@ -1857,7 +1925,7 @@ function mock.with_mocks(fn)
             },
             spy_obj -- On failure, spy_obj contains the error
           )
-          logger.error(error_obj.message, error_obj.context)
+          get_logger().error(error_obj.message, error_obj.context)
           error(error_obj.message)
         end
 
@@ -1870,12 +1938,12 @@ function mock.with_mocks(fn)
     local context_stub = {
       new = function(...)
         local args = { ... }
-        local success, stub_obj, err = error_handler.try(function()
+        local success, stub_obj, err = get_error_handler().try(function()
           return stub.new(table.unpack(args))
         end)
 
         if not success then
-          local error_obj = error_handler.runtime_error(
+          local error_obj = get_error_handler().runtime_error(
             "Failed to create stub",
             {
               function_name = "context_stub.new",
@@ -1883,7 +1951,7 @@ function mock.with_mocks(fn)
             },
             stub_obj -- On failure, stub_obj contains the error
           )
-          logger.error(error_obj.message, error_obj.context)
+          get_logger().error(error_obj.message, error_obj.context)
           error(error_obj.message)
         end
 
@@ -1894,33 +1962,33 @@ function mock.with_mocks(fn)
       on = function(obj, method_name, value_or_impl)
         -- Input validation
         if obj == nil then
-          local err = error_handler.validation_error("Cannot stub nil object", {
+          local err = get_error_handler().validation_error("Cannot stub nil object", {
             function_name = "context_stub.on",
             parameter_name = "obj",
             provided_value = "nil",
           })
-          logger.error(err.message, err.context)
+          get_logger().error(err.message, err.context)
           error(err.message)
         end
 
         if type(method_name) ~= "string" then
-          local err = error_handler.validation_error("Method name must be a string", {
+          local err = get_error_handler().validation_error("Method name must be a string", {
             function_name = "context_stub.on",
             parameter_name = "method_name",
             provided_type = type(method_name),
             provided_value = tostring(method_name),
           })
-          logger.error(err.message, err.context)
+          get_logger().error(err.message, err.context)
           error(err.message)
         end
 
         -- Create stub with error handling
-        local success, stub_obj, err = error_handler.try(function()
+        local success, stub_obj, err = get_error_handler().try(function()
           return stub.on(obj, method_name, value_or_impl)
         end)
 
         if not success then
-          local error_obj = error_handler.runtime_error(
+          local error_obj = get_error_handler().runtime_error(
             "Failed to create stub on object method",
             {
               function_name = "context_stub.on",
@@ -1930,7 +1998,7 @@ function mock.with_mocks(fn)
             },
             stub_obj -- On failure, stub_obj contains the error
           )
-          logger.error(error_obj.message, error_obj.context)
+          get_logger().error(error_obj.message, error_obj.context)
           error(error_obj.message)
         end
 
@@ -1944,22 +2012,22 @@ function mock.with_mocks(fn)
       create = function(target, options)
         -- Input validation
         if target == nil then
-          local err = error_handler.validation_error("Cannot create mock with nil target", {
+          local err = get_error_handler().validation_error("Cannot create mock with nil target", {
             function_name = "context_mock.create",
             parameter_name = "target",
             provided_value = "nil",
           })
-          logger.error(err.message, err.context)
+          get_logger().error(err.message, err.context)
           error(err.message)
         end
 
         -- Create mock with error handling
-        local success, mock_obj, err = error_handler.try(function()
+        local success, mock_obj, err = get_error_handler().try(function()
           return mock.create(target, options)
         end)
 
         if not success then
-          local error_obj = error_handler.runtime_error(
+          local error_obj = get_error_handler().runtime_error(
             "Failed to create mock object",
             {
               function_name = "context_mock.create",
@@ -1968,7 +2036,7 @@ function mock.with_mocks(fn)
             },
             mock_obj -- On failure, mock_obj contains the error
           )
-          logger.error(error_obj.message, error_obj.context)
+          get_logger().error(error_obj.message, error_obj.context)
           error(error_obj.message)
         end
 
@@ -1977,20 +2045,20 @@ function mock.with_mocks(fn)
       end,
 
       restore_all = function()
-        local success, result, err = error_handler.try(function()
+        local success, result, err = get_error_handler().try(function()
           mock.restore_all()
           return true
         end)
 
         if not success then
-          local error_obj = error_handler.runtime_error(
+          local error_obj = get_error_handler().runtime_error(
             "Failed to restore all mocks",
             {
               function_name = "context_mock.restore_all",
             },
             result -- On failure, result contains the error
           )
-          logger.error(error_obj.message, error_obj.context)
+          get_logger().error(error_obj.message, error_obj.context)
           error(error_obj.message)
         end
 
@@ -2015,30 +2083,30 @@ function mock.with_mocks(fn)
   end
 
   -- Always restore mocks, even on failure
-  logger.debug("Restoring context mocks", {
+  get_logger().debug("Restoring context mocks", {
     mock_count = #context_mocks,
   })
 
   errors_during_restore = {}
 
   for i, mock_obj in ipairs(context_mocks) do
-    -- Use error_handler.try to ensure we restore all mocks even if one fails
-    logger.debug("Restoring context mock", {
+    -- Use get_error_handler().try to ensure we restore all mocks even if one fails
+    get_logger().debug("Restoring context mock", {
       index = i,
       has_restore = mock_obj and type(mock_obj) == "table" and type(mock_obj.restore) == "function",
     })
 
-    local restore_success, restore_result = error_handler.try(function()
+    local restore_success, restore_result = get_error_handler().try(function()
       if mock_obj and type(mock_obj) == "table" and type(mock_obj.restore) == "function" then
         mock_obj:restore()
         return true
       else
-        logger.debug("Cannot restore object (not a valid mock)", {
+        get_logger().debug("Cannot restore object (not a valid mock)", {
           index = i,
           obj_type = type(mock_obj),
         })
         return false,
-          error_handler.validation_error("Cannot restore object (not a valid mock)", {
+          get_error_handler().validation_error("Cannot restore object (not a valid mock)", {
             function_name = "mock.with_mocks/restore",
             index = i,
             obj_type = type(mock_obj),
@@ -2048,7 +2116,7 @@ function mock.with_mocks(fn)
 
     -- If restoration fails, capture the error but continue
     if not restore_success then
-      local error_obj = error_handler.runtime_error(
+      local error_obj = get_error_handler().runtime_error(
         "Failed to restore mock",
         {
           function_name = "mock.with_mocks/restore",
@@ -2058,18 +2126,18 @@ function mock.with_mocks(fn)
         restore_result -- On failure, restore_result contains the error
       )
       -- Use debug level instead of error to avoid confusing test output
-      logger.debug("Failed to restore mock during test", error_obj.context)
+      get_logger().debug("Failed to restore mock during test", error_obj.context)
       table.insert(errors_during_restore, error_obj)
     elseif restore_result == false then
       -- The try function succeeded but the validation failed
-      logger.debug("Skipped restoration of invalid mock object", {
+      get_logger().debug("Skipped restoration of invalid mock object", {
         index = i,
         error = "Not a valid mock with restore method",
       })
     end
   end
 
-  logger.debug("Context mocks restoration complete", {
+  get_logger().debug("Context mocks restoration complete", {
     success = #errors_during_restore == 0,
     error_count = #errors_during_restore,
   })
@@ -2087,15 +2155,15 @@ function mock.with_mocks(fn)
       end
     end
 
-    local error_obj = error_handler.runtime_error(error_message, {
+    local error_obj = get_error_handler().runtime_error(error_message, {
       function_name = "mock.with_mocks",
     }, error_during_execution)
 
     -- Properly detect test mode through the error handler
     local is_test_mode = error_handler
       and type(error_handler) == "table"
-      and type(error_handler.is_test_mode) == "function"
-      and error_handler.is_test_mode()
+      and type(get_error_handler().is_test_mode) == "function"
+      and get_error_handler().is_test_mode()
 
     -- Check if this appears to be a test-related error based on structured error properties
     local is_expected_in_test = is_test_mode
@@ -2105,7 +2173,7 @@ function mock.with_mocks(fn)
 
     if is_expected_in_test then
       -- If it's a validation error from an assertion, it's likely part of the test
-      logger.debug("Test assertion failure in mock context", {
+      get_logger().debug("Test assertion failure in mock context", {
         error = error_message,
       })
     else
@@ -2113,11 +2181,11 @@ function mock.with_mocks(fn)
       if
         not (
           error_handler
-          and type(error_handler.is_suppressing_test_logs) == "function"
-          and error_handler.is_suppressing_test_logs()
+          and type(get_error_handler().is_suppressing_test_logs) == "function"
+          and get_error_handler().is_suppressing_test_logs()
         )
       then
-        logger.error("Error during mock context execution", {
+        get_logger().error("Error during mock context execution", {
           error = error_message,
         })
       end
@@ -2125,7 +2193,7 @@ function mock.with_mocks(fn)
 
     -- If there were also errors during restoration, log them but prioritize the execution error
     if #errors_during_restore > 0 then
-      logger.warn("Additional errors occurred during mock restoration", {
+      get_logger().warn("Additional errors occurred during mock restoration", {
         error_count = #errors_during_restore,
       })
     end
@@ -2137,16 +2205,16 @@ function mock.with_mocks(fn)
   if #errors_during_restore > 0 then
     local error_messages = {}
     for i, err in ipairs(errors_during_restore) do
-      table.insert(error_messages, error_handler.format_error(err))
+      table.insert(error_messages, get_error_handler().format_error(err))
     end
 
-    local error_obj = error_handler.runtime_error("Errors occurred during mock restoration", {
+    local error_obj = get_error_handler().runtime_error("Errors occurred during mock restoration", {
       function_name = "mock.with_mocks",
       error_count = #errors_during_restore,
       errors = error_messages,
     })
     -- Use debug level to avoid confusing test output
-    logger.debug("Mock restoration issues during test", {
+    get_logger().debug("Mock restoration issues during test", {
       error_count = #errors_during_restore,
     })
 
@@ -2154,7 +2222,7 @@ function mock.with_mocks(fn)
     return result, #errors_during_restore > 0 and error_obj or nil
   end
 
-  logger.debug("Mock context completed successfully")
+  get_logger().debug("Mock context completed successfully")
   return result
 end
 

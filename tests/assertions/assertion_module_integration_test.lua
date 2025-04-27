@@ -1,4 +1,12 @@
--- Tests that the standalone assertion module works in exactly the same way as the original firmo expect
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Assertion Module Integration Test
+---
+--- Verifies that the standalone assertion module (`lib.assertion`) provides
+--- an API and behavior identical to the built-in `firmo.expect` system.
+--- Checks both successful assertions and error handling for consistency.
+---
+--- @author Firmo Team
+--- @test
 
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect

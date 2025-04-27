@@ -1,86 +1,121 @@
--- firmo codefix module
--- Implementation of code quality checking and fixing capabilities
--- Provides tools for linting, formatting, and automatically fixing common issues
-
+--- Firmo CodeFix Module
+---
+--- Implementation of code quality checking and fixing capabilities.
+--- Provides tools for integrating with external linters/formatters (StyLua, Luacheck)
+--- and applying custom automated code fixes (e.g., trailing whitespace, unused variables).
+---
+--- @module lib.tools.codefix
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 ---@class codefix_module
----@field _VERSION string Module version
----@field config {stylua_enabled: boolean, luacheck_enabled: boolean, fix_trailing_whitespace: boolean, fix_unused_variables: boolean, fix_string_concat: boolean, fix_type_annotations: boolean, fix_lua_version_compat: boolean, lua_version_target: string, custom_fixers_enabled: boolean, verbose_output: boolean, auto_backup: boolean, include_patterns: string[], exclude_patterns: string[]} Configuration options for the codefix module
----@field init fun(options?: table): codefix_module Initialize module with configuration
----@field check_stylua fun(): boolean Check if StyLua is available
----@field find_stylua_config fun(dir?: string): string|nil Find StyLua configuration file
----@field run_stylua fun(file_path: string, config_file?: string): boolean, string? Run StyLua on a file
----@field check_luacheck fun(): boolean Check if Luacheck is available
----@field find_luacheck_config fun(dir?: string): string|nil Find Luacheck configuration file
----@field parse_luacheck_output fun(output: string): {issues: table[], summary: {files: number, warnings: number, errors: number}} Parse Luacheck output
----@field run_luacheck fun(file_path: string, config_file?: string): boolean, table Run Luacheck on a file
----@field fix_trailing_whitespace fun(content: string): string Fix trailing whitespace in multiline strings
----@field fix_unused_variables fun(file_path: string, issues?: table): boolean Fix unused variables by prefixing with underscore
----@field fix_string_concat fun(content: string): string Fix string concatenation (optimize .. operator usage)
----@field fix_type_annotations fun(content: string): string Add type annotations in function documentation
----@field fix_lua_version_compat fun(content: string, target_version?: string): string Fix code for Lua version compatibility issues
----@field run_custom_fixers fun(file_path: string, issues?: table): boolean Run all custom fixers on a file
----@field fix_file fun(file_path: string): boolean, table? Main function to fix a file
----@field fix_directory fun(dir_path: string, recursive?: boolean): {fixed: number, total: number, errors: number} Fix all Lua files in a directory
----@field register_custom_fixer fun(name: string, fixer_fn: fun(content: string, file_path: string, issues?: table): string): boolean Register a custom code fixer
----@field unregister_custom_fixer fun(name: string): boolean Remove a custom code fixer
----@field backup_file fun(file_path: string): string|nil, string? Create a backup of a file before modifying
----@field restore_backup fun(backup_path: string): boolean, string? Restore a file from backup
----@field get_custom_fixers fun(): table<string, function> Get all registered custom fixers
----@field validate_lua_syntax fun(content: string): boolean, string? Check if Lua code has valid syntax
----@field format_issues fun(issues: table): string Format Luacheck issues as readable text
----@field fix_files fun(file_paths: string[]): boolean, table Fix multiple files
----@field fix_lua_files fun(directory?: string, options?: table): boolean, table Find and fix Lua files
----@field run_cli fun(args?: table): boolean Command line interface
----@field register_with_firmo fun(firmo: table): codefix_module Module interface with firmo
----@field register_custom_fixer fun(name: string, options: table): boolean Register a custom fixer with codefix
+---@class codefix_module The public API of the codefix module.
+---@field _VERSION string Module version.
+---@field config { enabled: boolean, verbose: boolean, debug: boolean, use_stylua: boolean, stylua_path: string, stylua_config: string|nil, use_luacheck: boolean, luacheck_path: string, luacheck_config: string|nil, custom_fixers: { trailing_whitespace: boolean, unused_variables: boolean, string_concat: boolean, type_annotations: boolean, lua_version_compat: boolean }, include: string[], exclude: string[], backup: boolean, backup_ext: string } Configuration options.
+---@field init fun(options?: table): codefix_module Initialize module with configuration. Returns self.
+---@field check_stylua fun(): boolean Check if StyLua executable is available.
+---@field find_stylua_config fun(dir?: string): string|nil Find StyLua configuration file (`stylua.toml` or `.stylua.toml`).
+---@field run_stylua fun(file_path: string, config_file?: string): boolean, string? Runs StyLua on a file. Returns `success, error_message?`. @throws table If validation fails.
+---@field check_luacheck fun(): boolean Check if Luacheck executable is available.
+---@field find_luacheck_config fun(dir?: string): string|nil Find Luacheck configuration file (`.luacheckrc`).
+---@field parse_luacheck_output fun(output: string): table[] Parses Luacheck raw output into an array of issue tables.
+---@field run_luacheck fun(file_path: string, config_file?: string): boolean, table[] Runs Luacheck on a file. Returns `success, issues`. @throws table If validation fails.
+---@field fix_trailing_whitespace fun(content: string): string Removes trailing whitespace from multiline string literals.
+---@field fix_unused_variables fun(file_path: string, issues?: table): boolean Fixes unused variables based on Luacheck output by prefixing with `_`. Returns `true` if modified. @throws table If validation or file IO fails critically.
+---@field fix_string_concat fun(content: string): string Optimizes string concatenation operations.
+---@field fix_type_annotations fun(content: string): string Adds basic type annotations to function docs (experimental).
+---@field fix_lua_version_compat fun(content: string, target_version?: string): string Applies basic fixes for Lua 5.1 compatibility (e.g., comments out `goto`).
+---@field run_custom_fixers fun(file_path: string, issues?: table): boolean Runs all enabled custom fixers on a file. Returns `true` if modified. @throws table If validation or file IO fails critically.
+---@field fix_file fun(file_path: string): boolean Applies all configured fixes (Luacheck -> Custom Fixers -> StyLua) to a single file. Returns overall success. @throws table If validation, IO, or sub-processes fail critically.
+---@field register_custom_fixer fun(name: string, options: {name: string, fix: function, description?: string}): boolean Registers a custom fixer function. @throws table If validation fails.
+---@field fix_files fun(file_paths: string[]): boolean, table Fixes multiple files. Returns `success, results_table`. @throws table If validation fails.
+---@field fix_lua_files fun(directory?: string, options?: { include?: string[], exclude?: string[], limit?: number, sort_by_mtime?: boolean, generate_report?: boolean, report_file?: string }): boolean, table Finds and fixes Lua files in a directory. Returns `success, results_table`. @throws table If validation fails.
+---@field run_cli fun(args?: table): boolean Command line interface entry point. Returns success.
+---@field register_with_firmo fun(firmo: table): codefix_module Registers the module and CLI commands with a Firmo instance. Returns self. @throws table If validation fails.
+---@field fix_directory fun(...) [Not Implemented] Fix all Lua files in a directory.
+---@field unregister_custom_fixer fun(...) [Not Implemented] Remove a custom code fixer.
+---@field backup_file fun(file_path: string): boolean, table? Creates a backup file. Returns `success, error?`. @throws table If validation fails. (Note: Internal helper `backup_file` exists, but not exported directly on M).
+---@field restore_backup fun(...) [Not Implemented] Restore a file from backup.
+---@field get_custom_fixers fun(...) [Not Implemented] Get all registered custom fixers.
+---@field validate_lua_syntax fun(...) [Not Implemented] Check if Lua code has valid syntax.
+---@field format_issues fun(...) [Not Implemented] Format Luacheck issues as readable text.
 
 local M = {}
-local logging = require("lib.tools.logging")
-local error_handler = require("lib.tools.error_handler")
-local fs = require("lib.tools.filesystem")
 
--- Initialize module logger
-local logger = logging.get_logger("codefix")
-logging.configure_from_config("codefix")
+--- Module version
+M._VERSION = "1.0.0"
 
--- Try to load JSON module with proper error handling
-local json
-local function load_json_module()
-  return error_handler.try(function()
-    -- Try loading JSON module from firmo first
-    local loaded_json = require("lib.reporting.json")
-    logger.debug("Loaded JSON module from firmo", {
-      module_path = "lib.reporting.json",
-    })
-    return loaded_json
-  end)
-end
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
 
-local success, loaded_json_or_error = load_json_module()
-if success then
-  json = loaded_json_or_error
-else
-  logger.debug("Failed to load JSON module from firmo", {
-    error = error_handler.format_error(loaded_json_or_error),
-  })
-
-  -- Try loading from system libraries
-  success, loaded_json_or_error = error_handler.try(function()
-    local system_json = require("json")
-    logger.debug("Loaded JSON module from system libraries", {
-      module_type = type(system_json),
-    })
-    return system_json
-  end)
-
-  if success then
-    json = loaded_json_or_error
-  else
-    logger.warn("Failed to load any JSON module, JSON-related features will be unavailable", {
-      error = error_handler.format_error(loaded_json_or_error),
-    })
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
   end
+  return result
 end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("codefix")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+local parser = try_require("lib.tools.parser")
+local json = try_require("lib.tools.json") -- Use the more complete JSON tool module
 
 -- Configuration options
 M.config = {
@@ -115,71 +150,71 @@ M.config = {
   backup_ext = ".bak", -- Extension for backup files
 }
 
----@private
 ---@param command string The shell command to execute
 ---@return string|nil output Command output or nil on error
 ---@return boolean success Whether the command succeeded
----@return number exit_code Exit code from the command
----@return string|nil error_message Error message if the command failed
--- Helper function to execute shell commands with robust error handling
+---@return number exit_code Exit code from the command.
+---@return table? error_object Error object if execution failed critically, otherwise `nil`.
+---@throws table If `command` validation fails.
+---@private
 local function execute_command(command)
   -- Validate required parameters
-  error_handler.assert(
+  get_error_handler().assert(
     command ~= nil and type(command) == "string",
     "Command must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { command_type = type(command) }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     command:len() > 0,
     "Command cannot be empty",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { command_length = command:len() }
   )
 
-  logger.debug("Executing command", {
+  get_logger().debug("Executing command", {
     command = command,
     debug_mode = M.config.debug,
   })
 
   -- Execute command with proper error handling
-  local handle_success, handle, handle_err = error_handler.safe_io_operation(function()
+  local handle_success, handle, handle_err = get_error_handler().safe_io_operation(function()
     return io.popen(command .. " 2>&1", "r")
   end, "command", { operation = "popen", command = command })
 
   if not handle_success or not handle then
-    local err_obj = error_handler.io_error("Failed to execute command", error_handler.SEVERITY.ERROR, {
+    local err_obj = get_error_handler().io_error("Failed to execute command", get_error_handler().SEVERITY.ERROR, {
       command = command,
       error = handle_err or "I/O operation failed",
     })
 
-    logger.error("Failed to execute command", {
+    get_logger().error("Failed to execute command", {
       command = command,
-      error = error_handler.format_error(err_obj),
+      error = get_error_handler().format_error(err_obj),
     })
 
     return nil, false, -1, err_obj
   end
 
   -- Read output with error handling
-  local read_success, result, read_err = error_handler.safe_io_operation(function()
+  local read_success, result, read_err = get_error_handler().safe_io_operation(function()
     return handle:read("*a")
   end, "command_output", { operation = "read", command = command })
 
   if not read_success then
-    local err_obj = error_handler.io_error("Failed to read command output", error_handler.SEVERITY.ERROR, {
+    local err_obj = get_error_handler().io_error("Failed to read command output", get_error_handler().SEVERITY.ERROR, {
       command = command,
       error = read_err or "Read operation failed",
     })
 
-    logger.error("Failed to read command output", {
+    get_logger().error("Failed to read command output", {
       command = command,
-      error = error_handler.format_error(err_obj),
+      error = get_error_handler().format_error(err_obj),
     })
 
     -- Try to close handle to avoid resource leaks
-    error_handler.try(function()
+    get_error_handler().try(function()
       handle:close()
     end)
 
@@ -187,7 +222,7 @@ local function execute_command(command)
   end
 
   -- Close handle with error handling
-  local close_success, close_result, close_err = error_handler.safe_io_operation(function()
+  local close_success, close_result, close_err = get_error_handler().safe_io_operation(function()
     return handle:close()
   end, "command_close", { operation = "close", command = command })
 
@@ -200,7 +235,7 @@ local function execute_command(command)
     reason = close_err or "Close operation failed"
     code = -1
 
-    logger.warn("Failed to close command handle properly", {
+    get_logger().warn("Failed to close command handle properly", {
       command = command,
       error = reason,
     })
@@ -208,7 +243,7 @@ local function execute_command(command)
 
   code = code or 0
 
-  logger.debug("Command execution completed", {
+  get_logger().debug("Command execution completed", {
     command = command,
     exit_code = code,
     output_length = result and #result or 0,
@@ -218,12 +253,12 @@ local function execute_command(command)
   return result, success, code, reason
 end
 
----@private
----@return string os_name The detected operating system name (windows, macos, linux, bsd, or unix)
 -- Get the operating system name with error handling
+---@return "windows"|"macos"|"linux"|"bsd"|"unix" os_name The detected operating system name.
+---@private
 local function get_os()
   -- Use path separator to detect OS type (cross-platform approach)
-  local success, os_info = error_handler.try(function()
+  local success, os_info = get_error_handler().try(function()
     local is_windows = package.config:sub(1, 1) == "\\"
 
     if is_windows then
@@ -232,8 +267,8 @@ local function get_os()
 
     -- For Unix-like systems, we can differentiate further if needed
     -- Try to use filesystem module for platform detection first
-    if fs and fs._PLATFORM then
-      local platform = fs._PLATFORM:lower()
+    if fs and get_fs()._PLATFORM then
+      local platform = get_fs()._PLATFORM:lower()
 
       if platform:match("darwin") then
         return { name = "macos", source = "filesystem_module" }
@@ -245,7 +280,7 @@ local function get_os()
     end
 
     -- Fall back to uname command for Unix-like systems
-    local uname_success, result = error_handler.safe_io_operation(function()
+    local uname_success, result = get_error_handler().safe_io_operation(function()
       local popen_cmd = "uname -s"
       local handle = io.popen(popen_cmd)
       if not handle then
@@ -277,14 +312,14 @@ local function get_os()
   end)
 
   if not success then
-    logger.warn("Failed to detect operating system", {
-      error = error_handler.format_error(os_info),
+    get_logger().warn("Failed to detect operating system", {
+      error = get_error_handler().format_error(os_info),
       fallback = "unix",
     })
     return "unix"
   end
 
-  logger.debug("Detected operating system", {
+  get_logger().debug("Detected operating system", {
     os = os_info.name,
     detection_source = os_info.source,
   })
@@ -292,89 +327,112 @@ local function get_os()
   return os_info.name
 end
 
--- Logger functions - redirected to central logging system with structured logging
+--- Logs info message if verbose or debug is enabled.
+---@param message string Log message.
+---@param context? table Additional structured data.
+---@private
 local function log_info(message, context)
   if M.config.verbose or M.config.debug then
     if type(context) == "table" then
-      logger.info(message, context)
+      get_logger().info(message, context)
     else
-      logger.info(message, { raw_message = message })
+      get_logger().info(message, { raw_message = message })
     end
   end
 end
 
+--- Logs debug message if debug is enabled.
+---@param message string Log message.
+---@param context? table Additional structured data.
+---@private
 local function log_debug(message, context)
   if M.config.debug then
     if type(context) == "table" then
-      logger.debug(message, context)
+      get_logger().debug(message, context)
     else
-      logger.debug(message, { raw_message = message })
+      get_logger().debug(message, { raw_message = message })
     end
   end
 end
 
+--- Logs warning message.
+---@param message string Log message.
+---@param context? table Additional structured data.
+---@private
 local function log_warning(message, context)
   if type(context) == "table" then
-    logger.warn(message, context)
+    get_logger().warn(message, context)
   else
-    logger.warn(message, { raw_message = message })
+    get_logger().warn(message, { raw_message = message })
   end
 end
 
+--- Logs error message.
+---@param message string Log message.
+---@param context? table Additional structured data.
+---@private
 local function log_error(message, context)
   if type(context) == "table" then
-    logger.error(message, context)
+    get_logger().error(message, context)
   else
-    logger.error(message, { raw_message = message })
+    get_logger().error(message, { raw_message = message })
   end
 end
 
+--- Logs success message (at INFO level) and prints to console.
+---@param message string Log message.
+---@param context? table Additional structured data.
+---@private
 local function log_success(message, context)
   -- Log at info level with structured data
   if type(context) == "table" then
-    logger.info(message, context)
+    get_logger().info(message, context)
   else
-    logger.info(message, { raw_message = message, success = true })
+    get_logger().info(message, { raw_message = message, success = true })
   end
 
   -- Also print to console for user feedback with [SUCCESS] prefix using safe I/O
-  error_handler.safe_io_operation(function()
+  get_error_handler().safe_io_operation(function()
     io.write("[SUCCESS] " .. message .. "\n")
   end, "console", { operation = "write_success", message = message })
 end
 
 -- Filesystem module was already loaded at the top of the file
-logger.debug("Filesystem module configuration", {
-  version = fs._VERSION,
-  platform = fs._PLATFORM,
+get_logger().debug("Filesystem module configuration", {
+  version = get_fs()._VERSION,
+  platform = get_fs()._PLATFORM,
   module_path = package.searchpath("lib.tools.filesystem", package.path),
 })
 
--- Check if a file exists with error handling
+--- Checks if a file exists using the filesystem module.
+---@param path string Path to check.
+---@return boolean exists `true` if file exists, `false` otherwise or on error.
+---@throws table If `path` validation fails.
+---@private
 local function file_exists(path)
   -- Validate required parameters
-  error_handler.assert(
+  get_error_handler().assert(
     path ~= nil and type(path) == "string",
     "Path must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { path_type = type(path) }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     path:len() > 0,
     "Path cannot be empty",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { path_length = path:len() }
   )
 
-  local success, result, err = error_handler.safe_io_operation(function()
-    return fs.file_exists(path)
+  local success, result, err = get_error_handler().safe_io_operation(function()
+    return get_fs().file_exists(path)
   end, path, { operation = "file_exists" })
 
   if not success then
     log_warning("Failed to check if file exists", {
       path = path,
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
     return false
   end
@@ -382,29 +440,34 @@ local function file_exists(path)
   return result
 end
 
--- Read a file into a string with error handling
+--- Reads file content using the filesystem module.
+---@param path string Path to read.
+---@return string|nil content File content string, or `nil` on error.
+---@return table? error Error object if reading failed.
+---@throws table If `path` validation fails.
+---@private
 local function read_file(path)
   -- Validate required parameters
-  error_handler.assert(
+  get_error_handler().assert(
     path ~= nil and type(path) == "string",
     "Path must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { path_type = type(path) }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     path:len() > 0,
     "Path cannot be empty",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { path_length = path:len() }
   )
 
-  local success, content, err = error_handler.safe_io_operation(function()
-    return fs.read_file(path)
+  local success, content, err = get_error_handler().safe_io_operation(function()
+    return get_fs().read_file(path)
   end, path, { operation = "read_file" })
 
   if not success then
-    local error_obj = error_handler.io_error("Failed to read file", error_handler.SEVERITY.ERROR, {
+    local error_obj = get_error_handler().io_error("Failed to read file", get_error_handler().SEVERITY.ERROR, {
       path = path,
       operation = "read_file",
       error = err,
@@ -412,7 +475,7 @@ local function read_file(path)
 
     log_error("Failed to read file", {
       path = path,
-      error = error_handler.format_error(error_obj),
+      error = get_error_handler().format_error(error_obj),
     })
 
     return nil, error_obj
@@ -426,36 +489,42 @@ local function read_file(path)
   return content
 end
 
--- Write a string to a file with error handling
+--- Writes content to a file using the filesystem module.
+---@param path string Path to write to.
+---@param content string Content to write.
+---@return boolean success `true` if write succeeded.
+---@return table? error Error object if writing failed.
+---@throws table If `path` or `content` validation fails.
+---@private
 local function write_file(path, content)
   -- Validate required parameters
-  error_handler.assert(
+  get_error_handler().assert(
     path ~= nil and type(path) == "string",
     "Path must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { path_type = type(path) }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     path:len() > 0,
     "Path cannot be empty",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { path_length = path:len() }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     content ~= nil,
     "Content cannot be nil",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { content_type = type(content) }
   )
 
-  local success, result, err = error_handler.safe_io_operation(function()
-    return fs.write_file(path, content)
+  local success, result, err = get_error_handler().safe_io_operation(function()
+    return get_fs().write_file(path, content)
   end, path, { operation = "write_file", content_size = type(content) == "string" and #content or 0 })
 
   if not success then
-    local error_obj = error_handler.io_error("Failed to write file", error_handler.SEVERITY.ERROR, {
+    local error_obj = get_error_handler().io_error("Failed to write file", get_error_handler().SEVERITY.ERROR, {
       path = path,
       operation = "write_file",
       error = err,
@@ -463,7 +532,7 @@ local function write_file(path, content)
 
     log_error("Failed to write file", {
       path = path,
-      error = error_handler.format_error(error_obj),
+      error = get_error_handler().format_error(error_obj),
     })
 
     return false, error_obj
@@ -477,7 +546,12 @@ local function write_file(path, content)
   return true
 end
 
--- Create a backup of a file with error handling
+--- Creates a backup copy of a file if backups are enabled in config.
+---@param path string Path to the file to back up.
+---@return boolean success `true` if backup was created successfully or skipped, `false` on error.
+---@return table? error Error object if backup failed.
+---@throws table If `path` validation fails.
+---@private
 local function backup_file(path)
   -- Skip if backups are disabled
   if not M.config.backup then
@@ -488,24 +562,24 @@ local function backup_file(path)
   end
 
   -- Validate required parameters
-  error_handler.assert(
+  get_error_handler().assert(
     path ~= nil and type(path) == "string",
     "Path must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { path_type = type(path) }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     path:len() > 0,
     "Path cannot be empty",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { path_length = path:len() }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     M.config.backup_ext ~= nil and type(M.config.backup_ext) == "string",
     "Backup extension must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { backup_ext_type = type(M.config.backup_ext) }
   )
 
@@ -515,21 +589,24 @@ local function backup_file(path)
   })
 
   -- Check if file exists before backing up
-  local file_check_success, file_exists_result = error_handler.try(function()
-    return fs.file_exists(path)
+  local file_check_success, file_exists_result = get_error_handler().try(function()
+    return get_fs().file_exists(path)
   end)
 
   if not file_check_success or not file_exists_result then
-    local error_obj =
-      error_handler.io_error("Source file does not exist or cannot be accessed", error_handler.SEVERITY.ERROR, {
+    local error_obj = get_error_handler().io_error(
+      "Source file does not exist or cannot be accessed",
+      get_error_handler().SEVERITY.ERROR,
+      {
         path = path,
         operation = "backup_file",
-      })
+      }
+    )
 
     log_error("Failed to backup file", {
       path = path,
       reason = "source file does not exist or cannot be accessed",
-      error = error_handler.format_error(error_obj),
+      error = get_error_handler().format_error(error_obj),
     })
 
     return false, error_obj
@@ -538,12 +615,12 @@ local function backup_file(path)
   -- Create backup with error handling
   local backup_path = path .. M.config.backup_ext
 
-  local success, result, err = error_handler.safe_io_operation(function()
-    return fs.copy_file(path, backup_path)
+  local success, result, err = get_error_handler().safe_io_operation(function()
+    return get_fs().copy_file(path, backup_path)
   end, path, { operation = "copy_file", backup_path = backup_path })
 
   if not success then
-    local error_obj = error_handler.io_error("Failed to create backup file", error_handler.SEVERITY.ERROR, {
+    local error_obj = get_error_handler().io_error("Failed to create backup file", get_error_handler().SEVERITY.ERROR, {
       path = path,
       backup_path = backup_path,
       operation = "backup_file",
@@ -553,7 +630,7 @@ local function backup_file(path)
     log_error("Failed to create backup file", {
       path = path,
       backup_path = backup_path,
-      error = error_handler.format_error(error_obj),
+      error = get_error_handler().format_error(error_obj),
     })
 
     return false, error_obj
@@ -566,30 +643,34 @@ local function backup_file(path)
   return true
 end
 
--- Check if a command is available with error handling
+--- Checks if a shell command exists using platform-appropriate methods (`where` or `command -v`).
+---@param cmd string Command name to check.
+---@return boolean exists `true` if the command is found in the system path.
+---@throws table If `cmd` validation fails.
+---@private
 local function command_exists(cmd)
   -- Validate required parameters
-  error_handler.assert(
+  get_error_handler().assert(
     cmd ~= nil and type(cmd) == "string",
     "Command must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { cmd_type = type(cmd) }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     cmd:len() > 0,
     "Command cannot be empty",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { cmd_length = cmd:len() }
   )
 
-  local command_check_success, os_name_or_err = error_handler.try(function()
+  local command_check_success, os_name_or_err = get_error_handler().try(function()
     return get_os()
   end)
 
   if not command_check_success then
     log_warning("Failed to get OS type for command check", {
-      error = error_handler.format_error(os_name_or_err),
+      error = get_error_handler().format_error(os_name_or_err),
       cmd = cmd,
       fallback = "unix",
     })
@@ -627,30 +708,35 @@ local function command_exists(cmd)
   return cmd_exists
 end
 
--- Find a configuration file by searching up the directory tree with error handling
+--- Finds a configuration file by searching upwards from a starting directory.
+---@param filename string The name of the configuration file to find.
+---@param start_dir? string The directory to start searching from (defaults to ".").
+---@return string|nil config_path The absolute path to the found file, or `nil` if not found or on error.
+---@throws table If `filename` or `start_dir` validation fails.
+---@private
 local function find_config_file(filename, start_dir)
   -- Validate required parameters
-  error_handler.assert(
+  get_error_handler().assert(
     filename ~= nil and type(filename) == "string",
     "Filename must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { filename_type = type(filename) }
   )
 
-  error_handler.assert(
+  get_error_handler().assert(
     filename:len() > 0,
     "Filename cannot be empty",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { filename_length = filename:len() }
   )
 
   -- Process optional parameters with defaults
   start_dir = start_dir or "."
 
-  error_handler.assert(
+  get_error_handler().assert(
     type(start_dir) == "string",
     "Start directory must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { start_dir_type = type(start_dir) }
   )
 
@@ -660,12 +746,12 @@ local function find_config_file(filename, start_dir)
   })
 
   -- Use try/catch pattern for the entire search process
-  local search_success, search_result = error_handler.try(function()
+  local search_success, search_result = get_error_handler().try(function()
     local current_dir = start_dir
 
     -- Get absolute path with error handling
-    local abs_success, abs_path = error_handler.try(function()
-      return fs.get_absolute_path(current_dir)
+    local abs_success, abs_path = get_error_handler().try(function()
+      return get_fs().get_absolute_path(current_dir)
     end)
 
     if abs_success and abs_path then
@@ -674,7 +760,7 @@ local function find_config_file(filename, start_dir)
       -- Fallback for absolute path using shell command if filesystem module fails
       log_warning("Failed to get absolute path with filesystem module", {
         dir = current_dir,
-        error = error_handler.format_error(abs_path),
+        error = get_error_handler().format_error(abs_path),
         fallback = "using shell pwd command",
       })
 
@@ -699,8 +785,8 @@ local function find_config_file(filename, start_dir)
 
       -- Construct config path with error handling
       local config_path
-      local join_success, joined_path = error_handler.try(function()
-        return fs.join_paths(current_dir, filename)
+      local join_success, joined_path = get_error_handler().try(function()
+        return get_fs().join_paths(current_dir, filename)
       end)
 
       if join_success and joined_path then
@@ -710,7 +796,7 @@ local function find_config_file(filename, start_dir)
         log_warning("Failed to join paths with filesystem module", {
           dir = current_dir,
           filename = filename,
-          error = error_handler.format_error(joined_path),
+          error = get_error_handler().format_error(joined_path),
           fallback = "using string concatenation",
         })
 
@@ -718,7 +804,7 @@ local function find_config_file(filename, start_dir)
       end
 
       -- Check if file exists with error handling
-      local exists_success, file_exists_result = error_handler.try(function()
+      local exists_success, file_exists_result = get_error_handler().try(function()
         return file_exists(config_path)
       end)
 
@@ -731,15 +817,15 @@ local function find_config_file(filename, start_dir)
       end
 
       -- Move up one directory with error handling
-      local parent_success, parent_dir = error_handler.try(function()
-        return fs.get_directory_name(current_dir)
+      local parent_success, parent_dir = get_error_handler().try(function()
+        return get_fs().get_directory_name(current_dir)
       end)
 
       if not parent_success or not parent_dir then
         -- Fallback for get_directory_name if filesystem module fails
         log_warning("Failed to get parent directory with filesystem module", {
           dir = current_dir,
-          error = error_handler.format_error(parent_dir),
+          error = get_error_handler().format_error(parent_dir),
           fallback = "using string pattern matching",
         })
 
@@ -782,7 +868,7 @@ local function find_config_file(filename, start_dir)
     log_error("Error while searching for config file", {
       filename = filename,
       start_dir = start_dir,
-      error = error_handler.format_error(search_result),
+      error = get_error_handler().format_error(search_result),
     })
     return nil
   end
@@ -790,13 +876,19 @@ local function find_config_file(filename, start_dir)
   return search_result
 end
 
--- Find files matching patterns with error handling
+--- Finds files matching include/exclude patterns using `get_fs().discover_files` or a Lua-based fallback.
+---@param include_patterns string[] Array of Lua patterns to include.
+---@param exclude_patterns string[] Array of Lua patterns to exclude.
+---@param start_dir string Directory to start the search from.
+---@return string[] files A table containing absolute paths of matching files. Returns empty table on error.
+---@throws table If parameter validation fails.
+---@private
 local function find_files(include_patterns, exclude_patterns, start_dir)
   -- Validate and process parameters
-  error_handler.assert(
+  get_error_handler().assert(
     include_patterns ~= nil,
     "Include patterns parameter is required",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { include_patterns_type = type(include_patterns) }
   )
 
@@ -804,10 +896,10 @@ local function find_files(include_patterns, exclude_patterns, start_dir)
     include_patterns = { include_patterns }
   end
 
-  error_handler.assert(
+  get_error_handler().assert(
     type(include_patterns) == "table",
     "Include patterns must be a table or string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { include_patterns_type = type(include_patterns) }
   )
 
@@ -816,10 +908,10 @@ local function find_files(include_patterns, exclude_patterns, start_dir)
       exclude_patterns = { exclude_patterns }
     end
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(exclude_patterns) == "table",
       "Exclude patterns must be a table or string",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { exclude_patterns_type = type(exclude_patterns) }
     )
   else
@@ -828,10 +920,10 @@ local function find_files(include_patterns, exclude_patterns, start_dir)
 
   start_dir = start_dir or "."
 
-  error_handler.assert(
+  get_error_handler().assert(
     type(start_dir) == "string",
     "Start directory must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { start_dir_type = type(start_dir) }
   )
 
@@ -842,30 +934,30 @@ local function find_files(include_patterns, exclude_patterns, start_dir)
   })
 
   -- Use try/catch pattern for the entire file finding process
-  local find_success, result = error_handler.try(function()
+  local find_success, result = get_error_handler().try(function()
     -- Normalize path with error handling
-    local norm_success, normalized_dir = error_handler.try(function()
-      return fs.normalize_path(start_dir)
+    local norm_success, normalized_dir = get_error_handler().try(function()
+      return get_fs().normalize_path(start_dir)
     end)
 
     if not norm_success or not normalized_dir then
       log_warning("Failed to normalize directory path", {
         directory = start_dir,
-        error = error_handler.format_error(normalized_dir),
+        error = get_error_handler().format_error(normalized_dir),
         fallback = "using original path",
       })
       normalized_dir = start_dir
     end
 
     -- Get absolute path with error handling
-    local abs_success, absolute_dir = error_handler.try(function()
-      return fs.get_absolute_path(normalized_dir)
+    local abs_success, absolute_dir = get_error_handler().try(function()
+      return get_fs().get_absolute_path(normalized_dir)
     end)
 
     if not abs_success or not absolute_dir then
       log_warning("Failed to get absolute directory path", {
         directory = normalized_dir,
-        error = error_handler.format_error(absolute_dir),
+        error = get_error_handler().format_error(absolute_dir),
         fallback = "using normalized path",
       })
       absolute_dir = normalized_dir
@@ -877,24 +969,24 @@ local function find_files(include_patterns, exclude_patterns, start_dir)
     })
 
     -- Use filesystem discover_files function with error handling
-    local discover_success, files = error_handler.try(function()
-      return fs.discover_files({ absolute_dir }, include_patterns, exclude_patterns)
+    local discover_success, files = get_error_handler().try(function()
+      return get_fs().discover_files({ absolute_dir }, include_patterns, exclude_patterns)
     end)
 
     if not discover_success or not files then
-      local error_obj = error_handler.create(
+      local error_obj = get_error_handler().create(
         "Failed to discover files using filesystem module",
-        error_handler.CATEGORY.IO,
-        error_handler.SEVERITY.ERROR,
+        get_error_handler().CATEGORY.IO,
+        get_error_handler().SEVERITY.ERROR,
         {
           directory = absolute_dir,
-          error = error_handler.format_error(files),
+          error = get_error_handler().format_error(files),
         }
       )
 
       log_error("Failed to discover files", {
         directory = absolute_dir,
-        error = error_handler.format_error(error_obj),
+        error = get_error_handler().format_error(error_obj),
         fallback = "falling back to Lua-based file discovery",
       })
 
@@ -914,7 +1006,7 @@ local function find_files(include_patterns, exclude_patterns, start_dir)
   if not find_success then
     log_error("Error during file discovery", {
       directory = start_dir,
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
       fallback = "returning empty file list",
     })
     return {}
@@ -923,13 +1015,19 @@ local function find_files(include_patterns, exclude_patterns, start_dir)
   return result
 end
 
--- Implementation of Lua-based file finding using filesystem module with error handling
+--- Lua-based fallback for finding files recursively using `fs.scan_directory` and pattern matching.
+---@param include_patterns string[] Array of Lua patterns to include.
+---@param exclude_patterns string[] Array of Lua patterns to exclude.
+---@param dir string The absolute directory path to start scanning from.
+---@return string[] files A table containing absolute paths of matching files. Returns empty table on error.
+---@throws table If parameter validation fails.
+---@private
 local function find_files_lua(include_patterns, exclude_patterns, dir)
   -- Validate and process parameters
-  error_handler.assert(
+  get_error_handler().assert(
     include_patterns ~= nil,
     "Include patterns parameter is required",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { include_patterns_type = type(include_patterns) }
   )
 
@@ -937,10 +1035,10 @@ local function find_files_lua(include_patterns, exclude_patterns, dir)
     include_patterns = { include_patterns }
   end
 
-  error_handler.assert(
+  get_error_handler().assert(
     type(include_patterns) == "table",
     "Include patterns must be a table or string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { include_patterns_type = type(include_patterns) }
   )
 
@@ -949,20 +1047,20 @@ local function find_files_lua(include_patterns, exclude_patterns, dir)
       exclude_patterns = { exclude_patterns }
     end
 
-    error_handler.assert(
+    get_error_handler().assert(
       type(exclude_patterns) == "table",
       "Exclude patterns must be a table or string",
-      error_handler.CATEGORY.VALIDATION,
+      get_error_handler().CATEGORY.VALIDATION,
       { exclude_patterns_type = type(exclude_patterns) }
     )
   else
     exclude_patterns = {}
   end
 
-  error_handler.assert(
+  get_error_handler().assert(
     dir ~= nil and type(dir) == "string",
     "Directory must be a string",
-    error_handler.CATEGORY.VALIDATION,
+    get_error_handler().CATEGORY.VALIDATION,
     { dir_type = type(dir) }
   )
 
@@ -973,35 +1071,35 @@ local function find_files_lua(include_patterns, exclude_patterns, dir)
   })
 
   -- Use try/catch pattern for the file finding process
-  local find_success, result = error_handler.try(function()
+  local find_success, result = get_error_handler().try(function()
     -- Normalize directory path with error handling
-    local norm_success, normalized_dir = error_handler.try(function()
-      return fs.normalize_path(dir)
+    local norm_success, normalized_dir = get_error_handler().try(function()
+      return get_fs().normalize_path(dir)
     end)
 
     if not norm_success or not normalized_dir then
       log_warning("Failed to normalize directory path", {
         directory = dir,
-        error = error_handler.format_error(normalized_dir),
+        error = get_error_handler().format_error(normalized_dir),
         fallback = "using original path",
       })
       normalized_dir = dir
     end
 
     -- Use scan_directory to get all files recursively with error handling
-    local scan_success, all_files = error_handler.try(function()
-      return fs.scan_directory(normalized_dir, true)
+    local scan_success, all_files = get_error_handler().try(function()
+      return get_fs().scan_directory(normalized_dir, true)
     end)
 
     if not scan_success or not all_files then
-      local error_obj = error_handler.io_error("Failed to scan directory", error_handler.SEVERITY.ERROR, {
+      local error_obj = get_error_handler().io_error("Failed to scan directory", get_error_handler().SEVERITY.ERROR, {
         directory = normalized_dir,
-        error = error_handler.format_error(all_files),
+        error = get_error_handler().format_error(all_files),
       })
 
       log_error("Failed to scan directory for files", {
         directory = normalized_dir,
-        error = error_handler.format_error(error_obj),
+        error = get_error_handler().format_error(error_obj),
         fallback = "returning empty file list",
       })
 
@@ -1017,7 +1115,7 @@ local function find_files_lua(include_patterns, exclude_patterns, dir)
       local include_file = false
 
       -- Check include patterns with error handling
-      local include_success, include_result = error_handler.try(function()
+      local include_success, include_result = get_error_handler().try(function()
         for _, pattern in ipairs(include_patterns) do
           if file_path:match(pattern) then
             return true
@@ -1030,7 +1128,7 @@ local function find_files_lua(include_patterns, exclude_patterns, dir)
         if error_count < max_errors then
           log_warning("Error while checking include patterns", {
             file = file_path,
-            error = error_handler.format_error(include_result),
+            error = get_error_handler().format_error(include_result),
           })
           error_count = error_count + 1
         elseif error_count == max_errors then
@@ -1044,12 +1142,12 @@ local function find_files_lua(include_patterns, exclude_patterns, dir)
 
       -- Check exclude patterns with error handling if file is included
       if include_file then
-        local exclude_success, exclude_result = error_handler.try(function()
+        local exclude_success, exclude_result = get_error_handler().try(function()
           for _, pattern in ipairs(exclude_patterns) do
             -- Get relative path with error handling
             local rel_path
-            local rel_success, rel_path_result = error_handler.try(function()
-              return fs.get_relative_path(file_path, normalized_dir)
+            local rel_success, rel_path_result = get_error_handler().try(function()
+              return get_fs().get_relative_path(file_path, normalized_dir)
             end)
 
             if rel_success and rel_path_result then
@@ -1066,7 +1164,7 @@ local function find_files_lua(include_patterns, exclude_patterns, dir)
           if error_count < max_errors then
             log_warning("Error while checking exclude patterns", {
               file = file_path,
-              error = error_handler.format_error(exclude_result),
+              error = get_error_handler().format_error(exclude_result),
             })
             error_count = error_count + 1
           elseif error_count == max_errors then
@@ -1101,7 +1199,7 @@ local function find_files_lua(include_patterns, exclude_patterns, dir)
   if not find_success then
     log_error("Error during Lua-based file discovery", {
       directory = dir,
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
       fallback = "returning empty file list",
     })
     return {}
@@ -1110,9 +1208,9 @@ local function find_files_lua(include_patterns, exclude_patterns, dir)
   return result
 end
 
---- Initialize module with configuration
----@param options? table Custom configuration options to override defaults
----@return codefix_module The module instance for method chaining
+--- Initializes the codefix module, merging provided options with defaults.
+---@param options? table Custom configuration options to override defaults (structure matches `M.config`).
+---@return codefix_module self The module instance (`M`) for method chaining.
 function M.init(options)
   options = options or {}
 
@@ -1135,8 +1233,8 @@ end
 -- StyLua Integration Functions --
 ----------------------------------
 
---- Check if StyLua is available in the system
----@return boolean available Whether StyLua is available
+--- Checks if the StyLua executable (specified by `M.config.stylua_path`) exists and is executable.
+---@return boolean available `true` if StyLua is found, `false` otherwise.
 function M.check_stylua()
   if not command_exists(M.config.stylua_path) then
     log_warning("StyLua not found at: " .. M.config.stylua_path)
@@ -1147,9 +1245,9 @@ function M.check_stylua()
   return true
 end
 
---- Find StyLua configuration file in the given directory or its ancestors
----@param dir? string Directory to start searching from (default: current directory)
----@return string|nil config_path Path to the found configuration file, or nil if not found
+--- Finds a StyLua configuration file (`stylua.toml` or `.stylua.toml`) by searching upwards from a directory.
+---@param dir? string Directory to start searching from (defaults to current directory ".").
+---@return string|nil config_path Absolute path to the found configuration file, or `nil` if not found.
 function M.find_stylua_config(dir)
   local config_file = M.config.stylua_config
 
@@ -1169,9 +1267,10 @@ end
 
 --- Run StyLua on a file to format it
 ---@param file_path string Path to the file to format
----@param config_file? string Path to StyLua configuration file (optional)
----@return boolean success Whether the formatting succeeded
----@return string? error_message Error message if formatting failed
+---@param config_file? string Optional path to a specific StyLua configuration file to use.
+---@return boolean success `true` if StyLua ran successfully (exit code 0), `false` otherwise.
+---@return string? error_message Raw output from StyLua if it failed, `nil` otherwise.
+---@throws table If `file_path` validation fails.
 function M.run_stylua(file_path, config_file)
   if not M.config.use_stylua then
     log_debug("StyLua is disabled, skipping")
@@ -1217,8 +1316,8 @@ end
 -- Luacheck Integration Functions --
 -----------------------------------
 
---- Check if Luacheck is available in the system
----@return boolean available Whether Luacheck is available
+--- Checks if the Luacheck executable (specified by `M.config.luacheck_path`) exists and is executable.
+---@return boolean available `true` if Luacheck is found, `false` otherwise.
 function M.check_luacheck()
   if not command_exists(M.config.luacheck_path) then
     log_warning("Luacheck not found at: " .. M.config.luacheck_path)
@@ -1229,9 +1328,9 @@ function M.check_luacheck()
   return true
 end
 
---- Find Luacheck configuration file in the given directory or its ancestors
----@param dir? string Directory to start searching from (default: current directory)
----@return string|nil config_path Path to the found configuration file, or nil if not found
+--- Finds a Luacheck configuration file (`.luacheckrc` or `luacheck.rc`) by searching upwards from a directory.
+---@param dir? string Directory to start searching from (defaults to current directory ".").
+---@return string|nil config_path Absolute path to the found configuration file, or `nil` if not found.
 function M.find_luacheck_config(dir)
   local config_file = M.config.luacheck_config
 
@@ -1250,8 +1349,9 @@ function M.find_luacheck_config(dir)
 end
 
 --- Parse Luacheck output into a structured format
----@param output string The raw output from Luacheck command
----@return table issues Array of parsed issues with file, line, col, code, and message fields
+--- Parses the raw text output from the `luacheck --codes` command into a structured array of issues.
+---@param output string The raw output string from Luacheck.
+---@return table[] issues An array of issue tables, each containing `{ file, line, col, code, message }`. Returns empty table if output is nil or unparseable.
 function M.parse_luacheck_output(output)
   if not output then
     return {}
@@ -1280,9 +1380,10 @@ end
 
 --- Run Luacheck on a file to check for issues
 ---@param file_path string Path to the file to check
----@param config_file? string Path to Luacheck configuration file (optional)
----@return boolean success Whether the check succeeded (may have warnings but no errors)
----@return table issues Array of issues found by Luacheck
+---@param config_file? string Optional path to a specific Luacheck configuration file to use.
+---@return boolean success `true` if Luacheck ran without errors (exit code 0 or 1), `false` if errors occurred (exit code > 1) or if Luacheck is unavailable.
+---@return table[] issues An array of issue tables parsed from Luacheck's output.
+---@throws table If `file_path` validation fails.
 function M.run_luacheck(file_path, config_file)
   if not M.config.use_luacheck then
     log_debug("Luacheck is disabled, skipping")
@@ -1328,9 +1429,9 @@ end
 -- Custom Fixer Functions --
 -----------------------------
 
---- Fix trailing whitespace in multiline strings
----@param content string The source code content to fix
----@return string fixed_content The fixed content with trailing whitespace removed
+--- Removes trailing whitespace found within Lua multiline string literals (`[[...]]`).
+---@param content string The source code content to fix.
+---@return string fixed_content The content with trailing whitespace potentially removed from multiline strings.
 function M.fix_trailing_whitespace(content)
   if not M.config.custom_fixers.trailing_whitespace then
     return content
@@ -1346,10 +1447,12 @@ function M.fix_trailing_whitespace(content)
   return fixed_content
 end
 
---- Fix unused variables by prefixing them with underscore
----@param file_path string Path to the file to fix
----@param issues? table Array of issues from Luacheck
----@return boolean modified Whether any changes were made
+--- Attempts to fix unused local variables and arguments reported by Luacheck by prefixing their names with an underscore (`_`).
+--- Reads the file content, applies changes based on issue locations, and writes the file back if modified.
+---@param file_path string Path to the file to fix.
+---@param issues? table[] Optional array of issues from a previous Luacheck run. If not provided, this fixer does nothing.
+---@return boolean modified `true` if the file content was modified and saved, `false` otherwise.
+---@throws table If `file_path` validation or critical file I/O fails.
 function M.fix_unused_variables(file_path, issues)
   if not M.config.custom_fixers.unused_variables or not issues then
     return false
@@ -1409,9 +1512,10 @@ function M.fix_unused_variables(file_path, issues)
   return false
 end
 
---- Fix string concatenation by optimizing .. operator usage
----@param content string The source code content to fix
----@return string fixed_content The fixed content with optimized string concatenations
+--- Performs basic optimizations on string concatenations (`..`).
+--- Merges consecutive string literals being concatenated.
+---@param content string The source code content to fix.
+---@return string fixed_content The content with potential concatenation optimizations applied.
 function M.fix_string_concat(content)
   if not M.config.custom_fixers.string_concat then
     return content
@@ -1428,9 +1532,10 @@ function M.fix_string_concat(content)
   return fixed_content
 end
 
---- Add type annotations in function documentation comments
----@param content string The source code content to fix
----@return string fixed_content The fixed content with added type annotations
+--- **Experimental:** Attempts to add basic JSDoc type annotations (`---@param name any`, `---@return any`) to function definitions that lack them.
+--- May produce incorrect or incomplete annotations. Disabled by default.
+---@param content string The source code content to modify.
+---@return string fixed_content The content with potential annotations added.
 function M.fix_type_annotations(content)
   if not M.config.custom_fixers.type_annotations then
     return content
@@ -1475,10 +1580,11 @@ function M.fix_type_annotations(content)
   return fixed_content
 end
 
---- Fix code for Lua version compatibility issues
----@param content string The source code content to fix
----@param target_version? string Target Lua version to make code compatible with (default: "5.1")
----@return string fixed_content The fixed content with compatibility adjustments
+--- Applies basic transformations to Lua code to improve compatibility with older versions (currently targets Lua 5.1).
+--- Comments out `goto` and labels, replaces `table.pack`, replaces `bit32` calls with `bit` calls. Disabled by default.
+---@param content string The source code content to fix.
+---@param target_version? string Target Lua version string (default: "5.1"). Only "5.1" is currently supported.
+---@return string fixed_content The content with potential compatibility fixes applied.
 function M.fix_lua_version_compat(content, target_version)
   if not M.config.custom_fixers.lua_version_compat then
     return content
@@ -1509,10 +1615,12 @@ function M.fix_lua_version_compat(content, target_version)
   return fixed_content
 end
 
---- Run all custom fixers on a file
----@param file_path string Path to the file to fix
----@param issues? table Array of issues from Luacheck
----@return boolean modified Whether any changes were made
+--- Runs all enabled custom fixers (`fix_trailing_whitespace`, `fix_string_concat`, `fix_type_annotations`, `fix_lua_version_compat`, `fix_unused_variables`) on a file's content.
+--- Reads the file, applies fixes sequentially, and writes back if modified.
+---@param file_path string Path to the file to fix.
+---@param issues? table[] Optional array of issues from Luacheck (used by `fix_unused_variables`).
+---@return boolean modified `true` if any fixer modified the content and the file was saved, `false` otherwise.
+---@throws table If `file_path` validation or critical file I/O fails.
 function M.run_custom_fixers(file_path, issues)
   log_info("Running custom fixers on " .. file_path)
 
@@ -1583,9 +1691,11 @@ function M.run_custom_fixers(file_path, issues)
   return modified
 end
 
---- Main function to fix a file by running all available fixers
----@param file_path string Path to the file to fix
----@return boolean success Whether the file was successfully fixed
+--- Applies the full code fixing process to a single file: Luacheck (optional) -> Custom Fixers -> StyLua (optional) -> Luacheck verification (optional).
+--- Creates backups if enabled. Logs progress and results.
+---@param file_path string Path to the file to fix.
+---@return boolean success `true` if all enabled steps completed successfully (Luacheck may have warnings but not errors), `false` otherwise.
+---@throws table If validation, file I/O, or external tool execution fails critically.
 function M.fix_file(file_path)
   if not M.config.enabled then
     log_debug("Codefix is disabled, skipping")
@@ -1625,10 +1735,12 @@ function M.fix_file(file_path)
   return stylua_success and luacheck_success
 end
 
---- Fix multiple files by running all available fixers on each
----@param file_paths string[] Array of file paths to fix
----@return boolean success Whether all files were successfully fixed
----@return table results Results for each file, with success status and error message if any
+--- Fixes multiple files by calling `M.fix_file` for each path in the input array.
+--- Logs overall progress and summary statistics.
+---@param file_paths string[] Array of file paths to fix.
+---@return boolean success `true` if *all* files were fixed successfully, `false` otherwise.
+---@return table results An array of result tables, one for each file: `{ file: string, success: boolean, error?: string }`.
+---@throws table If `file_paths` validation fails.
 function M.fix_files(file_paths)
   if not M.config.enabled then
     log_debug("Codefix is disabled, skipping")
@@ -1698,11 +1810,19 @@ function M.fix_files(file_paths)
   return failure_count == 0, results
 end
 
---- Find and fix Lua files in a directory matching specified patterns
----@param directory? string Directory to search for Lua files (default: current directory)
----@param options? table Options for filtering and fixing files { include?: string[], exclude?: string[], limit?: number, sort_by_mtime?: boolean, generate_report?: boolean, report_file?: string }
----@return boolean success Whether all files were successfully fixed
----@return table results Results for each file, with success status and error message if any
+--- Finds Lua files in a directory (using include/exclude patterns) and fixes them using `M.fix_files`.
+--- Optionally generates a JSON report of the results.
+---@param directory? string Directory to search for Lua files (default: current directory ".").
+---@param options? { include?: string[], exclude?: string[], limit?: number, sort_by_mtime?: boolean, generate_report?: boolean, report_file?: string } Options for filtering and fixing:
+---  - `include`: Array of include patterns (defaults to `M.config.include`).
+---  - `exclude`: Array of exclude patterns (defaults to `M.config.exclude`).
+---  - `limit`: Maximum number of files to process.
+---  - `sort_by_mtime`: Sort files by modification time (newest first) before processing.
+---  - `generate_report`: Generate a JSON report file.
+---  - `report_file`: Path for the JSON report file (default "codefix_report.json").
+---@return boolean success `true` if file discovery and fixing of all found files succeeded, `false` otherwise.
+---@return table results The results table returned by `M.fix_files`.
+---@throws table If validation or file discovery/fixing fails critically.
 function M.fix_lua_files(directory, options)
   directory = directory or "."
   options = options or {}
@@ -1797,14 +1917,14 @@ function M.fix_lua_files(directory, options)
     local report_file = options.report_file or "codefix_report.json"
     local json_content = json.encode(report)
 
-    logger.debug("Generating report file", {
+    get_logger().debug("Generating report file", {
       report_file = report_file,
       report_size = #json_content,
       successful_files = report.successful,
       failed_files = report.failed,
     })
 
-    local success, err = fs.write_file(report_file, json_content)
+    local success, err = get_fs().write_file(report_file, json_content)
     if success then
       log_info("Wrote detailed report to " .. report_file)
     else
@@ -1815,7 +1935,10 @@ function M.fix_lua_files(directory, options)
   return success, results
 end
 
--- Command line interface
+--- Command line interface entry point for the codefix tool.
+--- Parses arguments for `fix`, `check`, `find`, and `help` commands and executes the corresponding action.
+---@param args? table Optional array of arguments (defaults to global `arg`). Args should typically start with the command name (e.g., `{ "fix", "src/" }`).
+---@return boolean success Whether the CLI command executed successfully.
 function M.run_cli(args)
   args = args or {}
 
@@ -1939,14 +2062,14 @@ function M.run_cli(args)
       log_info(string.format("Found %d matching files:", #files))
       for _, file in ipairs(files) do
         -- Log at debug level, but use direct io.write for console output
-        logger.debug("Found matching file", { path = file })
+        get_logger().debug("Found matching file", { path = file })
         io.write(file .. "\n")
       end
     end
 
     return true
   elseif command == "help" then
-    logger.debug("Displaying codefix help text")
+    get_logger().debug("Displaying codefix help text")
 
     -- Use the logging module's info function for consistent help text display
     logging.info("firmo codefix usage:")
@@ -1980,7 +2103,13 @@ function M.run_cli(args)
   end
 end
 
--- Module interface with firmo
+--- Registers the codefix module and its commands with a Firmo framework instance.
+--- Adds `firmo.codefix_options`, `firmo.fix_file`, `firmo.fix_files`, `firmo.fix_lua_files`,
+--- `firmo.codefix` namespace, and CLI commands (`fix`, `check`, `find`).
+--- Also registers a custom reporter to potentially run codefix after tests.
+---@param firmo table The Firmo instance to register with.
+---@return codefix_module self The codefix module instance (`M`).
+---@throws table If `firmo` validation fails critically (via `error_handler.assert`).
 function M.register_with_firmo(firmo)
   if not firmo then
     return
@@ -2023,7 +2152,7 @@ function M.register_with_firmo(firmo)
         return
       end
 
-      logger.debug("Codefix reporter initialized", {
+      get_logger().debug("Codefix reporter initialized", {
         test_count = #results.tests,
         options = options,
       })
@@ -2033,7 +2162,7 @@ function M.register_with_firmo(firmo)
       for _, test in ipairs(results.tests) do
         if test.source_file and not test_files[test.source_file] then
           test_files[test.source_file] = true
-          logger.debug("Found source file in test results", {
+          get_logger().debug("Found source file in test results", {
             source_file = test.source_file,
           })
         end
@@ -2051,7 +2180,7 @@ function M.register_with_firmo(firmo)
         M.config.enabled = true
         M.config.verbose = options.verbose or false
 
-        logger.info("Running codefix on test source files", {
+        get_logger().info("Running codefix on test source files", {
           file_count = #files_to_fix,
           verbose = M.config.verbose,
         })
@@ -2059,7 +2188,7 @@ function M.register_with_firmo(firmo)
         local success, fix_results = M.fix_files(files_to_fix)
 
         if success then
-          logger.info("All files fixed successfully", {
+          get_logger().info("All files fixed successfully", {
             file_count = #files_to_fix,
           })
           io.write("✅ All files fixed successfully\n")
@@ -2076,7 +2205,7 @@ function M.register_with_firmo(firmo)
             end
           end
 
-          logger.warn("Some files could not be fixed", {
+          get_logger().warn("Some files could not be fixed", {
             total_files = #files_to_fix,
             successful_files = successful,
             failed_files = failed,
@@ -2087,7 +2216,12 @@ function M.register_with_firmo(firmo)
     end)
   end
 
-  -- Register a custom fixer with codefix
+  --- Registers a custom fixer function or object.
+  --- The fixer function receives `(content, file_path, issues?)` and should return the modified content string.
+  ---@param name string A unique name for the custom fixer.
+  ---@param options {name: string, fix: function, description?: string} A table containing the fixer's name, the fixer function (`fix`), and an optional description.
+  ---@return boolean success `true` if registration was successful.
+  ---@throws table If validation fails (e.g., missing `name` or `fix` function).
   function M.register_custom_fixer(name, options)
     if not options or not options.fix or not options.name then
       log_error("Custom fixer requires a name and fix function")
@@ -2107,13 +2241,10 @@ function M.register_with_firmo(firmo)
     return true
   end
 
-  -- Try to load and register the markdown module
-  local ok, markdown = pcall(require, "lib.tools.markdown")
-  if ok and markdown then
-    markdown.register_with_codefix(M)
-    if M.config.verbose then
-      logger.info("Registered markdown fixing capabilities")
-    end
+  local markdown = try_require("lib.tools.markdown")
+  markdown.register_with_codefix(M)
+  if M.config.verbose then
+    get_logger().info("Registered markdown fixing capabilities")
   end
 
   return M

@@ -423,8 +423,8 @@ expect({name = "John"}).to.have_property("name", "John")
 
    ```lua
    it("should handle error case", function()
-     expect(actual_value).to.exist("Value should exist here")
-     expect(actual_value).to.equal(expected, "Values should match")
+     expect(actual_value).to.exist() -- Value should exist here
+     expect(actual_value).to.equal(expected) -- Values should match
    end)
    ```
 
@@ -445,57 +445,21 @@ expect({name = "John"}).to.have_property("name", "John")
 ## Coverage Module Requirements
 
 
-### Core Functionality
+### Core Functionality (Debug Hook Based)
 
+-   ALWAYS ensure proper debug hook lifecycle management (`init`, `shutdown`, `pause`, `resume`).
+-   The system tracks execution counts (`lib/coverage`). Assertions mark lines as 'covered' (`lib/assertion`). Ensure reporting reflects this distinction if relevant.
+-   Data processing/normalization for reporting should be maintained.
+-   Maintain backward compatibility where feasible.
+-   ALWAYS preserve existing error handling integration (`error_handler`).
 
+### Considerations for Debug Hook Coverage
 
-- NEVER remove existing lifecycle management (start/stop/reset)
-- NEVER remove three-state coverage tracking
-- NEVER remove data processing/normalization
-- ALWAYS maintain backward compatibility
-- ALWAYS preserve existing error handling
-
-
-### Temporary File Management
-
-
-
-1. ALWAYS use test_helper.create_temp_test_directory() for instrumented files:
-
-   ```lua
-   local test_dir = test_helper.create_temp_test_directory()
-   local temp_path = test_dir.create_file("instrumented.lua", content)
-   ```
-
-
-2. NEVER manually clean up temp files:
-
-   ```lua
-   -- WRONG: Manual cleanup
-   os.remove(temp_file)
-
-   -- CORRECT: Let test_helper handle cleanup
-   test_helper.register_temp_file(temp_file)
-   ```
-
-
-3. ALWAYS use proper path mapping:
-
-   ```lua
-   -- Map temp paths back to original paths for reporting
-   local original_path = sourcemap.get_original_path(temp_path)
-   ```
-
-
-4. NEVER modify original source files:
-
-   ```lua
-   -- WRONG: Modifying original
-   fs.write_file(original_path, instrumented_code)
-
-   -- CORRECT: Using temp file
-   test_dir.create_file("temp.lua", instrumented_code)
-   ```
+1.  **Hook Management:** Ensure `debug.sethook` is correctly installed and removed by `coverage.init()` and `coverage.shutdown()`.
+2.  **File Access:** The hook needs to access original source files to map execution lines. Ensure correct paths and permissions.
+3.  **Coroutine Handling:** The LuaCov integration handles standard coroutines, but be mindful of complex async patterns.
+4.  **Performance:** Debug hooks add overhead. Use `coverage.pause()`/`resume()` for non-relevant sections if performance is critical. Configure `savestepsize` appropriately.
+5.  **Configuration:** Use `central_config` (`coverage.include`, `coverage.exclude`, etc.) to control which files are tracked.
 
 ### Available Tools
 

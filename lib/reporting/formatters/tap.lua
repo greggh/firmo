@@ -1,13 +1,67 @@
 --- TAP Formatter for Coverage Reports
--- Generates Test Anything Protocol (TAP) format coverage reports
--- @module reporting.formatters.tap
--- @author Firmo Team
--- @version 1.0.0
+---
+--- Generates coverage reports in the Test Anything Protocol (TAP) version 13 format.
+--- Treats overall coverage and each file's coverage against configured thresholds
+--- as individual test points, suitable for consumption by TAP parsers.
+---
+--- @module lib.reporting.formatters.tap
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
-local Formatter = require("lib.reporting.formatters.base")
-local error_handler = require("lib.tools.error_handler")
-local central_config = require("lib.core.central_config")
-local filesystem = require("lib.tools.filesystem")
+--- @class CoverageReportFileStats Simplified structure expected by this formatter.
+--- @field path string File path.
+--- @field summary table { coverage_percent: number, total_lines: number, covered_lines: number, executed_lines?: number, not_covered_lines?: number }
+--- @field lines? table<number, { covered?: boolean, executed?: boolean, execution_count?: number }> Line data (used for uncovered lines).
+--- @field functions? table<string, { executed?: boolean, execution_count?: number, start_line?: number, name?: string }> Function data (used for function coverage).
+
+--- @class CoverageReportSummary Simplified structure expected by this formatter.
+--- @field coverage_percent number Overall coverage percentage.
+--- @field total_files number Total number of files.
+--- @field total_lines number Total lines across all files.
+--- @field covered_lines number Total covered lines across all files.
+--- @field executed_lines? number Total executed lines across all files.
+--- @field not_covered_lines? number Total lines not covered.
+
+--- @class CoverageReportData Expected structure for coverage data input.
+--- @field summary CoverageReportSummary Overall summary statistics.
+--- @field files table<string, CoverageReportFileStats> Map of file paths to file data.
+
+---@class TAPFormatter : Formatter TAP Formatter for coverage reports.
+--- Generates coverage reports in the Test Anything Protocol (TAP) version 13 format.
+--- Treats overall coverage and each file's coverage as separate test points.
+---@field _VERSION string Module version.
+---@field validate fun(self: TAPFormatter, coverage_data: CoverageReportData): boolean, string? Validates coverage data, ensuring the 'files' section exists. Returns `true` or `false, error_message`.
+---@field format fun(self: TAPFormatter, coverage_data: CoverageReportData, options?: { threshold?: number, file_threshold?: number, detailed?: boolean, list_uncovered?: boolean, list_uncovered_lines?: boolean }): string|nil, table? Formats coverage data as a TAP string. Returns `tap_string, nil` or `nil, error`. @throws table If validation fails.
+---@field build_tap fun(self: TAPFormatter, data: CoverageReportData, options: table): string Builds the TAP content string. Returns TAP string. @private
+---@field write fun(self: TAPFormatter, tap_content: string, output_path: string, options?: table): boolean, table? Writes the TAP content to a file. Returns `true, nil` or `false, error`. @throws table If writing fails critically.
+---@field register fun(formatters: table): boolean, table? Registers the TAP formatter with the main registry. Returns `true, nil` or `false, error`. @throws table If validation fails.
+
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+local Formatter = try_require("lib.reporting.formatters.base")
 
 -- Create TAP formatter class
 local TAPFormatter = Formatter.extend("tap", "tap")
@@ -15,7 +69,12 @@ local TAPFormatter = Formatter.extend("tap", "tap")
 --- TAP Formatter version
 TAPFormatter._VERSION = "1.0.0"
 
--- Validate coverage data structure for TAP formatter
+--- Validates the coverage data structure for TAP format.
+--- Ensures the base validation passes and the `files` section exists.
+---@param self TAPFormatter The formatter instance.
+---@param coverage_data CoverageReportData The coverage data to validate.
+---@return boolean success `true` if validation passes.
+---@return string? error_message Error message string if validation failed.
 function TAPFormatter:validate(coverage_data)
   -- Call base class validation first
   local valid, err = Formatter.validate(self, coverage_data)
@@ -28,11 +87,22 @@ function TAPFormatter:validate(coverage_data)
   return true
 end
 
--- Format coverage data as TAP
+--- Formats coverage data into a TAP version 13 string.
+---@param self TAPFormatter The formatter instance.
+---@param coverage_data CoverageReportData The coverage data structure.
+---@param options? { threshold?: number, file_threshold?: number, detailed?: boolean, list_uncovered?: boolean, list_uncovered_lines?: boolean } Formatting options:
+---  - `threshold` (number, default 80): Overall coverage threshold for the main test point.
+---  - `file_threshold` (number, default `threshold`): Coverage threshold for individual file test points.
+---  - `detailed` (boolean, default true): Include YAML diagnostic blocks with details.
+---  - `list_uncovered` (boolean, default false): Include list of uncovered functions in YAML diagnostics.
+---  - `list_uncovered_lines` (boolean, default false): Include list/ranges of uncovered lines in YAML diagnostics.
+---@return string|nil tap_content The generated TAP content as a single string, or `nil` on validation error.
+---@return table? error Error object if validation failed.
+---@throws table If `normalize_coverage_data` or `build_tap` fails critically.
 function TAPFormatter:format(coverage_data, options)
   -- Parameter validation
   if not coverage_data then
-    return nil, error_handler.validation_error("Coverage data is required", { formatter = self.name })
+    return nil, get_error_handler().validation_error("Coverage data is required", { formatter = self.name })
   end
 
   -- Apply options with defaults
@@ -50,7 +120,12 @@ function TAPFormatter:format(coverage_data, options)
   return tap_content
 end
 
--- Build TAP format content
+--- Builds the TAP format content string.
+---@param self TAPFormatter The formatter instance.
+---@param data CoverageReportData The normalized coverage data.
+---@param options table The formatting options.
+---@return string tap_content The generated TAP string.
+---@private
 function TAPFormatter:build_tap(data, options)
   local lines = {}
 
@@ -257,17 +332,27 @@ function TAPFormatter:build_tap(data, options)
   return table.concat(lines, "\n")
 end
 
--- Write the report to the filesystem
+--- Writes the generated TAP content to a file.
+--- Inherits the write logic (including directory creation) from the base `Formatter`.
+---@param self TAPFormatter The formatter instance.
+---@param tap_content string The TAP content string to write.
+---@param output_path string The path to the output file.
+---@param options? table Optional options passed to the base `write` method (currently unused by base).
+---@return boolean success `true` if writing succeeded.
+---@return table? error Error object if writing failed.
+---@throws table If writing fails critically.
 function TAPFormatter:write(tap_content, output_path, options)
   return Formatter.write(self, tap_content, output_path, options)
 end
 
 --- Register the TAP formatter with the formatters registry
--- @param formatters table The formatters registry
--- @return boolean success Whether registration was successful
+---@param formatters table The main formatters registry object (must contain `coverage` table).
+---@return boolean success `true` if registration succeeded.
+---@return table? error Error object if validation failed.
+---@throws table If validation fails critically.
 function TAPFormatter.register(formatters)
   if not formatters or type(formatters) ~= "table" then
-    local err = error_handler.validation_error("Invalid formatters registry", {
+    local err = get_error_handler().validation_error("Invalid formatters registry", {
       operation = "register",
       formatter = "tap",
       provided_type = type(formatters),

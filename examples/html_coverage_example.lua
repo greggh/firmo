@@ -1,9 +1,26 @@
+--- html_coverage_example.lua
+--
+-- This example provides a sample module (`Calculator`) and associated tests
+-- specifically designed to demonstrate how different code execution states are
+-- visualized in Firmo's HTML coverage reports.
+--
+-- Running this file with `lua test.lua --coverage --format=html ...` will generate
+-- an HTML report clearly showing:
+--   1. **Covered code (green):** Code executed and validated by assertions.
+--   2. **Executed-but-not-covered code (yellow):** Code executed during tests but not validated by assertions.
+--   3. **Uncovered code (red):** Code never executed during tests.
+--
+-- This helps users understand the nuances of coverage reporting beyond simple line execution.
+--
+-- Run embedded tests: lua test.lua --coverage --format=html examples/html_coverage_example.lua
+--
+
 --[[
   html_coverage_example.lua
-  
+
   Example that demonstrates HTML coverage reports with execution vs. coverage distinction.
   This example is designed to clearly show the difference between:
-  
+
   1. Code that is executed and validated by tests (covered)
   2. Code that is executed but not validated (executed-not-covered)
   3. Code that is never executed (uncovered)
@@ -12,12 +29,21 @@
 -- Import modules
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local fs = require("lib.tools.filesystem")
+local error_handler = require("lib.tools.error_handler")
+local logging = require("lib.tools.logging")
 
--- Sample Calculator implementation to test
+-- Setup logger
+local logger = logging.get_logger("HTMLCoverageExample")
+
+--- Sample Calculator implementation to test coverage states.
 local Calculator = {}
 
--- This function will be covered (executed and validated)
+--- Adds two numbers. Includes validation.
+-- This function is designed to be fully covered by tests.
+-- @param a number The first number.
+-- @param b number The second number.
+-- @return number|nil The sum, or nil on error.
+-- @return string|nil An error message if inputs are invalid.
 function Calculator.add(a, b)
   if type(a) ~= "number" or type(b) ~= "number" then
     return nil, "Both arguments must be numbers"
@@ -25,7 +51,13 @@ function Calculator.add(a, b)
   return a + b
 end
 
--- This function will be executed but not validated
+--- Subtracts two numbers. Includes validation.
+-- This function is designed to be executed but not validated by tests,
+-- demonstrating the 'executed-but-not-covered' state.
+-- @param a number The first number.
+-- @param b number The second number.
+-- @return number|nil The difference, or nil on error.
+-- @return string|nil An error message if inputs are invalid.
 function Calculator.subtract(a, b)
   if type(a) ~= "number" or type(b) ~= "number" then
     return nil, "Both arguments must be numbers"
@@ -33,7 +65,12 @@ function Calculator.subtract(a, b)
   return a - b
 end
 
--- This function will not be executed at all
+--- Multiplies two numbers. Includes validation.
+-- This function is designed to be completely uncovered by tests.
+-- @param a number The first number.
+-- @param b number The second number.
+-- @return number|nil The product, or nil on error.
+-- @return string|nil An error message if inputs are invalid.
 function Calculator.multiply(a, b)
   if type(a) ~= "number" or type(b) ~= "number" then
     return nil, "Both arguments must be numbers"
@@ -42,39 +79,42 @@ function Calculator.multiply(a, b)
 end
 
 -- Run tests with coverage tracking
+--- Test suite for the Calculator module, designed to generate specific coverage states.
 describe("HTML Coverage Report Example", function()
-  
-  -- Tests that both execute and validate code (coverage)
+  --- Tests for the `Calculator.add` function. These tests execute
+  -- the function and validate its output, resulting in 'covered' lines.
   describe("add function", function()
     it("correctly adds two numbers", function()
       local result = Calculator.add(5, 3)
       expect(result).to.equal(8) -- This validates the execution
     end)
-    
+
     it("handles invalid inputs", function()
       local result, err = Calculator.add("string", 10)
       expect(result).to_not.exist()
       expect(err).to.equal("Both arguments must be numbers")
     end)
   end)
-  
-  -- Tests that execute code but don't validate it
+
+  --- Tests for the `Calculator.subtract` function. These tests execute
+  -- the function but do *not* validate its output, resulting in
+  -- 'executed-but-not-covered' lines.
   describe("subtract function", function()
     it("executes the subtract function without validating it", function()
       local result = Calculator.subtract(10, 4)
       -- No validations here, so this is executed but not covered
     end)
   end)
-  
+
   -- No tests for multiply function, so it will not be executed at all
 end)
 
 -- Display instructions
-print("\nRunning this example with the coverage flag will generate an HTML report.")
-print("Execute the following command to see the HTML coverage report:")
-print("\n  lua test.lua --coverage --format=html examples/html_coverage_example.lua\n")
-print("The HTML report will show:")
-print("1. add function: Covered (green) - executed and validated by tests")
-print("2. subtract function: Executed-not-covered (yellow) - executed but not validated")
-print("3. multiply function: Uncovered (red) - never executed during tests")
-print("\nAfter running the command, open the generated HTML file in a web browser.\n")
+logger.info("\nRunning this example with the coverage flag will generate an HTML report.")
+logger.info("Execute the following command to see the HTML coverage report:")
+logger.info("\n  lua test.lua --coverage --format=html examples/html_coverage_example.lua\n")
+logger.info("The HTML report will show:")
+logger.info("1. add function: Covered (green) - executed and validated by tests")
+logger.info("2. subtract function: Executed-but-not-covered (yellow) - executed but not validated")
+logger.info("3. multiply function: Uncovered (red) - never executed during tests")
+logger.info("\nAfter running the command, open the generated HTML file in a web browser.\n")

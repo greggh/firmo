@@ -1,13 +1,21 @@
---[[
-  Stub Module Tests
-
-  Tests for the stub functionality in the Firmo mocking system.
-  Stubs replace real functions with test doubles that have
-  pre-programmed behavior.
-
-  @module tests.mocking.stub_test
-  @copyright 2023-2025 Firmo Team
-]]
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Stub Module Tests
+---
+--- Tests for the stub functionality (`lib.mocking.stub`) in the Firmo mocking system.
+--- Stubs replace real functions with test doubles that have pre-programmed behavior.
+---
+--- The test suite covers:
+--- - Basic stub creation (`stub()`, `stub_module.new()`) with return values.
+--- - Stubbing object methods (`stub_module.on`).
+--- - Sequence stubbing (`returns_in_sequence`, `cycle_sequence`, `when_exhausted`).
+--- - Error handling (`throws`).
+--- - Stub identification (`is_stub`).
+--- - Restoration (`restore`).
+--- - Note: Several tests are currently skipped (`reset`, `when_called_with`, `when`, conditional `throws`) due to unimplemented features.
+--- Uses `after` hooks for cleanup and `test_helper` for error verification.
+---
+--- @author Firmo Team
+--- @test
 
 -- Adjust path to find modules
 package.path = "../?.lua;../lib/?.lua;../lib/?/init.lua;" .. package.path
@@ -20,12 +28,6 @@ local before, after = firmo.before, firmo.after
 -- Required modules
 local stub_module = require("lib.mocking.stub")
 local test_helper = require("lib.tools.test_helper")
-local logging = require("lib.tools.logging")
-local error_handler = require("lib.tools.error_handler")
-
--- Initialize logger
-local logger = logging.get_logger("stub_test")
-logging.configure_from_config("stub_test")
 
 -- Stub alias for convenience in tests
 local stub = stub_module.new

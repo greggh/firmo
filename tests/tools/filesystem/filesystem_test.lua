@@ -1,10 +1,23 @@
--- Comprehensive tests for the filesystem module
+--- Filesystem Module Tests (Comprehensive)
+---
+--- Provides extensive tests for the `lib.tools.filesystem` module, covering:
+--- - Core File Operations: Write, read, append, delete, copy, move.
+--- - Directory Operations: Create, delete, recursive delete, copy, listing (with/without hidden).
+--- - Path Operations: Join, normalize, extract directory/file/base names, extension, absolute path check.
+--- - Alias Functions: Verifying aliases like `remove_directory`, `remove_file`, `get_filename`, etc.
+--- - Information Functions: Existence checks, size, modification time, symlink handling.
+--- - Error Handling: Verifying behavior with invalid paths, types, and non-existent files/directories.
+--- Uses `before`/`after` hooks for setting up and tearing down temporary test directories
+--- and `test_helper` for error verification.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
-local fs = require("lib.tools.filesystem")
-local test_helper = require("lib.tools.test_helper")
-local error_handler = require("lib.tools.error_handler")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
+
+local test_helper = require("lib.tools.test_helper")
+local fs = require("lib.tools.filesystem")
 
 -- Initialize logging
 local logging = require("lib.tools.logging")

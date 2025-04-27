@@ -1,18 +1,41 @@
--- Parallel JSON Output Example
--- Shows how firmo can use JSON output for parallel test execution
+--- parallel_json_example.lua
+--
+-- This procedural example script demonstrates parallel test execution using
+-- `firmo.parallel.run_tests` with the `results_format = "json"` option,
+-- which is typically used for inter-process communication and result aggregation.
+--
+-- It works by:
+-- 1. Creating several temporary test files with varying outcomes.
+-- 2. Running these test files in parallel using `firmo.parallel.run_tests`
+--    with JSON output enabled.
+-- 3. Displaying the aggregated results returned by the parallel runner.
+--
+-- Run this example directly: lua examples/parallel_json_example.lua
+--
 
 -- Import the testing framework
-local firmo = require("firmo")
+local firmo = require("firmo") -- Needed for firmo.pending
+local error_handler = require("lib.tools.error_handler")
 local fs = require("lib.tools.filesystem")
+local logging = require("lib.tools.logging")
+local temp_file = require("lib.tools.filesystem.temp_file")
 
--- Create multiple test files
-local function write_test_file(name, pass, fail, skip)
-  local file_path = os.tmpname() .. ".lua"
+-- Setup logger
+local logger = logging.get_logger("ParallelJsonExample")
 
+--- Creates a temporary test file with a specified number of passing,
+-- failing, and skipped tests.
+-- @param temp_dir_obj table The temp_file directory object.
+-- @param name string Base name for the test file (e.g., "Test1").
+-- @param pass number Number of passing tests to generate.
+-- @param fail number Number of failing tests to generate.
+-- @param skip number Number of skipped tests to generate.
+-- @return string abs_path The absolute path to the created temporary test file.
+local function write_test_file(temp_dir_obj, name, pass, fail, skip)
   local content = [[
 -- Test file: ]] .. name .. [[
 
-local firmo = require "firmo"
+local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 
 describe("]] .. name .. [[", function()
@@ -68,30 +91,44 @@ describe("]] .. name .. [[", function()
 end)
 ]]
 
-  local success, err = fs.write_file(file_path, content)
-  if not success then
-    error("Failed to create test file: " .. file_path .. " - " .. (err or "unknown error"))
+  local abs_path, err = temp_dir_obj:create_file(name .. ".lua", content)
+  if not abs_path then
+    error("Failed to create test file: " .. name .. ".lua - " .. (err and err.message or "unknown error"))
   end
+  return abs_path
+end
 
-  return file_path
+-- Create temporary directory
+local temp_dir, err = temp_file.create_temp_directory("parallel_json_")
+if not temp_dir then
+  logger.error("Failed to create temporary directory: " .. tostring(err))
+  return
 end
 
 -- Create 3 test files with different passing/failing/skipping patterns
 local test_files = {
-  write_test_file("Test1", 3, 1, 1), -- 3 pass, 1 fail, 1 skip
-  write_test_file("Test2", 5, 0, 0), -- 5 pass, 0 fail, 0 skip
-  write_test_file("Test3", 2, 2, 1), -- 2 pass, 2 fail, 1 skip
+  write_test_file(temp_dir, "Test1", 3, 1, 1), -- 3 pass, 1 fail, 1 skip
+  write_test_file(temp_dir, "Test2", 5, 0, 0), -- 5 pass, 0 fail, 0 skip
+  write_test_file(temp_dir, "Test3", 2, 2, 1), -- 2 pass, 2 fail, 1 skip
 }
 
-print("Created test files:")
+logger.info("Created test files:")
 for i, file in ipairs(test_files) do
-  print("  " .. i .. ". " .. file)
+  logger.info("  " .. i .. ". " .. file)
 end
 
 -- Run the tests in parallel
-local parallel = require("lib.tools.parallel")
+local parallel_loaded, parallel = pcall(require, "lib.tools.parallel")
+if not parallel_loaded then
+  logger.error("Parallel module not found. Cannot run parallel tests.")
+  temp_file.cleanup_all()
+  return
+end
+
+-- NOTE: Verify API signature.
 parallel.register_with_firmo(firmo)
 
+-- NOTE: Verify API signature.
 local results = parallel.run_tests(test_files, {
   workers = 2,
   verbose = true,
@@ -99,69 +136,17 @@ local results = parallel.run_tests(test_files, {
   results_format = "json", -- Enable JSON output
 })
 
--- Clean up the test files
-for _, file in ipairs(test_files) do
-  local success, err = fs.delete_file(file)
-  if not success then
-    print("Warning: Failed to delete test file " .. file .. ": " .. (err or "unknown error"))
-  end
-end
-
--- Manually count the results from test outputs
-local total_tests = 0
-local passed_tests = 0
-local failed_tests = 0
-local skipped_tests = 0
-
--- Function to count tests manually from output (for verification)
-local function count_tests_from_output(output)
-  local tests = 0
-  local passes = 0
-  local fails = 0
-  local skips = 0
-
-  -- Remove ANSI color codes for better pattern matching
-  output = output:gsub("\027%[[^m]*m", "")
-
-  for line in output:gmatch("[^\r\n]+") do
-    if line:match("PASS%s+should") then
-      passes = passes + 1
-      tests = tests + 1
-    elseif line:match("FAIL%s+should") then
-      fails = fails + 1
-      tests = tests + 1
-    elseif line:match("SKIP%s+should") or line:match("PENDING:%s+") then
-      skips = skips + 1
-      tests = tests + 1
-    end
-  end
-
-  return tests, passes, fails, skips
-end
-
--- Verify our parallel execution results by manually counting tests
-for _, worker_output in ipairs(results.worker_outputs or {}) do
-  local tests, passes, fails, skips = count_tests_from_output(worker_output)
-  total_tests = total_tests + tests
-  passed_tests = passed_tests + passes
-  failed_tests = failed_tests + fails
-  skipped_tests = skipped_tests + skips
-end
+-- Removed manual cleanup loop
 
 -- Output the aggregated results
-print("\nParallel Test Results:")
-print("  Total tests: " .. (results.passed + results.failed + results.skipped))
+logger.info("\nParallel Test Results:")
+print("  Total tests: " .. (results.passed + results.failed + results.skipped)) -- Keep result print
 print("  Passed: " .. results.passed)
 print("  Failed: " .. results.failed)
 print("  Skipped: " .. results.skipped)
 print("  Total time: " .. string.format("%.2f", results.elapsed) .. " seconds")
 
--- Show verification results
-print("\nVerification (manually counted):")
-print("  Total tests: " .. total_tests)
-print("  Passed: " .. passed_tests)
-print("  Failed: " .. failed_tests)
-print("  Skipped: " .. skipped_tests)
+-- Removed manual counting verification block
 
--- Return success status
-return results.failed == 0
+-- Cleanup temporary files
+temp_file.cleanup_all()

@@ -58,7 +58,7 @@ end)
 ### firmo.only_tags(...)
 
 
-Filters tests to only run those with the specified tags.
+Filters tests to only run those matching at least one of the specified tags (OR logic).
 **Parameters:**
 
 
@@ -81,63 +81,147 @@ firmo.only_tags("fast", "critical")
 
 
 
-### firmo.filter(pattern)
+### firmo.filter_pattern(pattern)
 
-
-Filters tests to only run those with names matching the specified pattern.
+Filters tests to only run those with names matching the specified Lua pattern.
 **Parameters:**
-
 
 - `pattern` (string): A Lua pattern to match against test names
 
 **Returns:**
 
-
 - The firmo object (for chaining)
 
 **Example:**
-
 
 ```lua
 -- Only run tests with "validation" in their name
-firmo.filter("validation")
+firmo.filter_pattern("validation")
 -- Only run tests that match a specific pattern
-firmo.filter("^user%s+%w+$")
+firmo.filter_pattern("^user%s+%w+$")
 ```
 
 
+### firmo.reset()
 
-### firmo.reset_filters()
-
-
-Clears all active filters.
+Resets the internal state of the test system, clearing all test definitions, hooks, results, filters, focus mode, and counters. This is typically called between test suite runs or file executions to ensure a clean state.
 **Returns:**
 
-
-- The firmo object (for chaining)
+- `nil`
 
 **Example:**
-
 
 ```lua
 -- Apply a filter
 firmo.only_tags("unit")
 -- Run some tests...
--- Clear the filter
-firmo.reset_filters()
+-- Clear all filters, hooks, results, etc.
+firmo.reset()
 ```
 
 
+## Focusing and Skipping Tests
+
+Firmo allows you to focus on specific tests or suites, or temporarily skip them, using prefixed versions of `describe` and `it`.
+
+### Focus Mode
+
+When any test or suite is marked as "focused" (using `fit` or `fdescribe`), Firmo enters "Focus Mode". In this mode, only focused tests and tests within focused suites will run. All other tests will be skipped. This is useful for isolating specific tests during development or debugging.
+
+**Example:**
+
+```lua
+describe("Regular Suite", function()
+  it("This test will be skipped", function() end)
+end)
+
+fdescribe("Focused Suite", function()
+  it("This test WILL run", function() end)
+
+  fit("This focused test WILL run", function() end)
+end)
+
+describe("Another Regular Suite", function()
+  fit("This focused test WILL run", function() end)
+
+  it("This test will be skipped", function() end)
+end)
+```
+
+### fdescribe(name, fn)
+
+Defines a focused test group. Equivalent to `describe(name, fn, {focused = true})`. All tests within this block will run when focus mode is active, and this block itself activates focus mode.
+
+### fit(name, options_or_fn, fn?)
+
+Defines a focused test case. Equivalent to `it(name, options_or_fn, fn)` but implicitly adds `{focused = true}` to the options if `options_or_fn` is a table. This test will run when focus mode is active, and it activates focus mode.
+
+**Parameters:**
+
+- `name` (string): Name/description of the test case.
+- `options_or_fn` (table|function): Either the test function itself, or an options table `{focused?: boolean, excluded?: boolean, expect_error?: boolean, tags?: string[], timeout?: number}`. The `focused = true` flag will be automatically added if an options table is provided.
+- `fn?` (function): The test function, if `options_or_fn` was an options table.
+
+### xdescribe(name, fn)
+
+Defines a skipped test group. Equivalent to `describe(name, fn, {excluded = true})`. All tests within this block will be skipped.
+
+### xit(name, options_or_fn, fn?)
+
+Defines a skipped test case. Equivalent to `it(name, options_or_fn, fn)` but implicitly adds `{excluded = true}` to the options if `options_or_fn` is a table. This test will be skipped.
+
+**Parameters:**
+
+- `name` (string): Name/description of the test case.
+- `options_or_fn` (table|function): Either the test function itself, or an options table `{focused?: boolean, excluded?: boolean, expect_error?: boolean, tags?: string[], timeout?: number}`. The `excluded = true` flag will be automatically added if an options table is provided.
+- `fn?` (function): The test function, if `options_or_fn` was an options table.
+
+**Example Usage:**
+
+```lua
+-- Temporarily skip this whole block
+xdescribe("Work in Progress", function()
+  it("Feature A", function() end)
+end)
+
+describe("Stable Features", function()
+  it("Works fine", function() end)
+
+  -- Skip just this test
+  xit("Temporarily broken test", function() end)
+end)
+```
+
+```
+
+### Best Practices
+
+1. **Use focus temporarily**: `fdescribe` and `fit` should be used as temporary development tools, not committed to your codebase permanently.
+2. **Clean up before committing**: Remove or convert focused tests back to regular tests before committing code.
+3. **Document excluded tests**: When using `xdescribe` or `xit` in committed code, add a comment explaining why the test is excluded and when it might be re-enabled.
+4. **Avoid excluding in production**: Like focused tests, excluded tests should generally be temporary. Fix failing tests rather than permanently excluding them.
+5. **Combine with tags**: For more permanent test organization, use tags instead of focus/exclude.
+6. **CI protection**: Configure your CI pipeline to fail if focused tests are detected in committed code to prevent accidentally skipping tests in production.
+7. **Use for debugging**: Focus is particularly useful during debugging to quickly iterate on a problematic test without running the entire suite.
+
+### Implementation Details
+
+When any test is marked as focused, the `firmo.focus_mode` flag is set to `true`. This causes all non-focused tests to be skipped during execution. When tests are excluded, they are effectively replaced with empty functions that never run.
+The focus system is implemented to be explicit and deterministic, ensuring that:
+
+1. Focus takes precedence over normal execution
+2. Exclusion takes precedence over focus
+3. The order of execution remains consistent
+
+This makes the behavior predictable and reliable for development and debugging workflows.
 
 ## Filtering from the Command Line
-
-
 Firmo supports filtering tests from the command line when running tests directly.
 
 ### --tags Option
 
 
-The `--tags` option allows you to specify tags to filter by, separated by commas.
+The `--tags` option allows you to specify tags to filter by, separated by commas. This uses OR logic: tests matching *any* of the specified tags will be included.
 **Example:**
 
 
@@ -233,7 +317,7 @@ describe("String utilities", function()
   end)
 end)
 -- Run only tests related to formatting
-firmo.filter("format")
+firmo.filter_pattern("format")
 firmo.run_discovered("./tests")
 ```
 
@@ -246,15 +330,16 @@ firmo.run_discovered("./tests")
 ```lua
 -- Test suite setup
 local function run_tests(options)
-  -- Reset any previous filters
-  firmo.reset_filters()
+  -- Reset any previous filters, hooks, state, etc.
+  firmo.reset()
   -- Apply tags filter if specified
   if options.tags then
-    firmo.only_tags(unpack(options.tags))
+    local unpack_table = table.unpack or unpack -- Lua 5.1 compatibility
+    firmo.only_tags(unpack_table(options.tags))
   end
   -- Apply name filter if specified
   if options.pattern then
-    firmo.filter(options.pattern)
+    firmo.filter_pattern(options.pattern)
   end
   -- Run the tests
   return firmo.run_discovered("./tests")

@@ -1,46 +1,104 @@
----@class LogFormatterIntegration
----@field _VERSION string Module version
----@field enhance_formatters fun(): boolean Enable logging integration for all formatters
----@field create_test_logger fun(test_name: string, test_context: table): table Create a logger with test context
----@field integrate_with_reporting fun(options?: table): table Integrate logging with the reporting system
----@field create_log_formatter fun(): table Create a specialized formatter for log output
+--- Logging and Formatter Integration
+---
+--- Integrates the Firmo logging system with test output formatters, allowing
+--- formatters to log messages. Also provides a factory for creating loggers
+--- with attached test context.
+---
+--- @module lib.tools.logging.formatter_integration
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
--- Integration between logging system and test output formatters
--- This module enhances test output with structured logging information
-
+---@class LogFormatterIntegration The public API for the logging/formatter integration module.
+---@field _VERSION string Module version.
+---@field enhance_formatters fun(): table|nil, string? Enhances all registered formatters in `lib.reporting.formatters` with logging methods. Returns the formatters table or `nil, error_message`. @throws error If logger cannot be created.
+---@field create_test_logger fun(test_name: string, test_context: table): table Creates a logger instance wrapped to automatically include test context in log entries.
+---@field integrate_with_reporting fun(options?: table): table|nil, string? Patches the `lib.reporting` module to add logging around key reporting actions. Returns the patched reporting module or `nil, error_message`. @throws error If logger cannot be created or original function calls fail.
+---@field create_log_formatter fun(): table|nil, string? Creates a specialized formatter instance designed for writing structured logs (JSON or text) to a file. Returns the formatter object or `nil, error_message`. @throws table If formatter module not available, directory creation fails, or file writing fails critically.
 local M = {}
 M._VERSION = "1.0.0"
 
--- Try to load modules
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
+
+-- Local helper for safe requires without dependency on error_handler
 local function try_require(module_name)
-  -- Check if there's a mock require function in _G
-  if _G.try_require then
-    local result = _G.try_require(module_name)
-    if result then
-      return result
-    end
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
   end
-  
-  -- Fall back to real require if no mock or mock returns nil
-  local success, module = pcall(require, module_name)
-  if success then
-    return module
-  end
-  return nil
+  return result
 end
 
--- Load required modules
----@type Logging|nil
-local logging = try_require("lib.tools.logging")
----@type Filesystem
-local fs = require("lib.tools.filesystem")
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
 
--- Get a formatter-specific logger
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("assertion")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
+--- Gets a logger instance specifically named for a formatter.
+---@param formatter_name string The name of the formatter (e.g., "html", "json").
+---@return table logger A logger instance (from `lib.tools.logging`).
+---@private
 local function get_formatter_logger(formatter_name)
-  return logging.get_logger("formatter." .. formatter_name)
+  return get_logger("formatter." .. formatter_name)
 end
 
--- Helper function to get all keys from a table as an array
+--- Helper function to get sorted keys from a table.
+---@param tbl table Input table.
+---@return string[] Sorted keys array.
+---@private
 local function get_table_keys(tbl)
   local keys = {}
   if type(tbl) == "table" then
@@ -53,108 +111,113 @@ local function get_table_keys(tbl)
 end
 
 -- Note: We removed deep_copy function as it's not needed
--- Helper function to enhance a formatter with logging capabilities
+--- Adds logging methods (log_info, log_debug, etc.) directly to a formatter object.
+---@param formatter table The formatter object/table to enhance.
+---@param name string The name of the formatter (for logging context).
+---@param registry_type string The type of registry it belongs to ("coverage", "quality", "results").
+---@return table formatter The enhanced formatter object. Returns original object if input not a table.
+---@private
 local function enhance_formatter(formatter, name, registry_type)
-  -- Get logger for this formatter
-  local logger = get_formatter_logger(name)
-  
+
   -- Only enhance if it's actually a table
   if type(formatter) ~= "table" then
-    logger.warn("Cannot enhance non-table formatter", {
+    get_formatter_logger().warn("Cannot enhance non-table formatter", {
       name = name,
-      type = type(formatter)
+      type = type(formatter),
     })
     return formatter
   end
-  
+
   -- Log what we're enhancing
-  logger.debug("Enhancing formatter", {
+  get_formatter_logger().debug("Enhancing formatter", {
     name = name,
     registry = registry_type,
     formatter_type = formatter.type,
-    formatter_name = formatter.name
+    formatter_name = formatter.name,
   })
-  
+
   -- Add logging capabilities directly to the formatter
-  formatter._logger = logger
-  
+  formatter._logger = get_formatter_logger()
+
   formatter.log_debug = function(self, message, params)
     self._logger.debug(message, params)
   end
-  
+
   formatter.log_info = function(self, message, params)
     self._logger.info(message, params)
   end
-  
+
   formatter.log_error = function(self, message, params)
     self._logger.error(message, params)
   end
-  
+
   formatter.log_warn = function(self, message, params)
     self._logger.warn(message, params)
   end
-  
+
   -- Log successful enhancement
-  logger.debug("Formatter enhancement complete", {
+  get_formatter_logger().debug("Formatter enhancement complete", {
     name = name,
     registry = registry_type,
     type = formatter.type,
-    has_logger = formatter._logger ~= nil
+    has_logger = formatter._logger ~= nil,
   })
-  
+
   return formatter
 end
 
--- Enhance formatters with logging capabilities
+--- Enhances all registered formatters in the main `lib.reporting.formatters` registry
+--- by adding logging methods (`log_info`, `log_debug`, etc.) to each formatter object.
+--- Patches the formatter registry's `init` function to ensure future formatters are also enhanced.
+---@return table|nil formatters The enhanced formatters registry table, or `nil` if the registry module is unavailable.
+---@return string? error_message Error message if the formatters module could not be loaded.
+---@throws error If `get_formatter_logger` fails.
 function M.enhance_formatters()
   -- Get formatters module inside the function to honor any mocking
   local formatters = try_require("lib.reporting.formatters")
-  
+
   -- Return error if formatters module is not available
   if not formatters then
     return nil, "Formatters module not available"
   end
 
-  -- Create logger for the enhancement process
-  local logger = get_formatter_logger("integration")
-  
   -- Save original init function
   local original_init = formatters.init
-  
+
   -- Log initial state
-  logger.debug("Starting formatter enhancement", {
+  get_formatter_logger().debug("Starting formatter enhancement", {
     has_coverage = formatters.coverage ~= nil,
     coverage_test = formatters.coverage and formatters.coverage.test ~= nil,
     test_type = formatters.coverage and formatters.coverage.test and formatters.coverage.test.type,
-    test_name = formatters.coverage and formatters.coverage.test and formatters.coverage.test.name
+    test_name = formatters.coverage and formatters.coverage.test and formatters.coverage.test.name,
   })
 
   -- Work directly with formatters table, no need for local references
   -- Enhance formatters in coverage registry if it exists
   if formatters.coverage then
     for name, formatter in pairs(formatters.coverage) do
-      logger.debug("Enhancing coverage formatter", {
+      get_formatter_logger().debug("Enhancing coverage formatter", {
         name = name,
         type = formatter.type,
-        has_logger = formatter._logger ~= nil
+        has_logger = formatter._logger ~= nil,
       })
       -- Enhance in place without reassignment
       enhance_formatter(formatter, name, "coverage")
-      logger.debug("Enhanced coverage formatter", {
+      get_formatter_logger().debug("Enhanced coverage formatter", {
         name = name,
         type = formatter.type,
-        has_logger = formatter._logger ~= nil
+        has_logger = formatter._logger ~= nil,
       })
     end
   end
-  
+
   -- Enhance formatters in quality registry if it exists
   if formatters.quality then
     for name, formatter in pairs(formatters.quality) do
       enhance_formatter(formatter, name, "quality")
     end
   end
-  
+
   -- Enhance formatters in results registry if it exists
   if formatters.results then
     for name, formatter in pairs(formatters.results) do
@@ -164,8 +227,8 @@ function M.enhance_formatters()
 
   -- Override formatter initialization to handle runtime additions
   formatters.init = function(...)
-    logger.debug("Formatter initialization triggered")
-    
+    get_formatter_logger().debug("Formatter initialization triggered")
+
     -- Call original init if it exists
     if type(original_init) == "function" then
       local success, result = pcall(original_init, ...)
@@ -182,23 +245,27 @@ function M.enhance_formatters()
   end
 
   -- Final verification
-  logger.debug("Enhancement complete", {
+  get_formatter_logger().debug("Enhancement complete", {
     has_coverage = formatters.coverage ~= nil,
     coverage_test = formatters.coverage and formatters.coverage.test ~= nil,
     test_type = formatters.coverage and formatters.coverage.test and formatters.coverage.test.type,
-    test_name = formatters.coverage and formatters.coverage.test and formatters.coverage.test.name
+    test_name = formatters.coverage and formatters.coverage.test and formatters.coverage.test.name,
   })
-  
+
   return formatters
 end
 
--- Create a logger that adds test context to log messages
+--- Creates a logger instance that automatically includes test context (`test_name` and fields from `test_context`)
+--- in the `params` table of every log entry. Also provides `.step()` and `.with_context()` methods.
+---@param test_name string The name of the test.
+---@param test_context table A table containing additional context (e.g., `{ file = "path", tags = {} }`).
+---@return table test_logger A logger instance with context-aware methods (debug, info, warn, error, fatal, trace, step, with_context).
 function M.create_test_logger(test_name, test_context)
   -- Clean test name for use as module name
   local module_name = "test." .. (test_name:gsub("%s+", "_"):gsub("[^%w_]", ""))
 
   -- Get a logger for this test
-  local logger = logging.get_logger(module_name)
+  local logger = get_logging().get_logger(module_name)
 
   -- Create wrapper that adds test context
   local test_logger = {}
@@ -262,18 +329,20 @@ function M.create_test_logger(test_name, test_context)
   return test_logger
 end
 
--- Integrate with the test reporting system
+--- Integrates logging with the reporting module by patching key reporting functions
+--- (`test_start`, `test_end`, `generate`) to log information before and after execution.
+---@param options? table Optional configuration (currently unused).
+---@return table|nil reporting_module The patched `lib.reporting` module instance, or `nil` if the reporting module is unavailable.
+---@return string? error_message Error message if the reporting module could not be loaded.
+---@throws error If `get_formatter_logger` fails or if the original reporting function calls fail within the wrapper.
 function M.integrate_with_reporting(options)
   options = options or {}
 
   -- Load reporting module
-  local reporting = try_require("lib.reporting")
-  if not reporting then
-    return nil, "Reporting module not available"
-  end
+  local reporting = get_error_handler().try_require("lib.reporting")
 
   -- Create a logger for the reporting module
-  local report_logger = logging.get_logger("reporting")
+  local report_logger = get_logging().get_logger("reporting")
 
   -- Log options for the integration
   report_logger.debug("Integrating logging with reporting", options)
@@ -337,15 +406,14 @@ function M.integrate_with_reporting(options)
   return reporting
 end
 
--- Create a specialized formatter for log-friendly output
+--- Creates a specialized formatter instance specifically designed for writing structured logs to a file.
+--- Can output in JSON or a simple text format.
+---@return table|nil log_formatter A formatter object with `init`, `format`, `format_json`, `format_text`, `format_coverage`, `format_quality`, `format_results` methods, or `nil` if the base formatter module is unavailable.
+---@return string? error_message Error message if the base formatter module could not be loaded.
+---@throws table If required modules (`filesystem`, `logging`) are unavailable, or if file operations fail critically during formatting/writing.
 function M.create_log_formatter()
   -- Get formatters module inside the function to honor any mocking
-  local formatters = try_require("lib.reporting.formatters")
-  
-  -- Return error if formatters module is not available
-  if not formatters then
-    return nil, "Formatters module not available"
-  end
+  local formatters = get_error_handler().try_require("lib.reporting.formatters")
 
   -- Define the formatter
   local log_formatter = {
@@ -387,9 +455,9 @@ function M.create_log_formatter()
       local output_file = self.options.output_file or "test-results.log.json"
 
       -- Ensure parent directory exists
-      local dir = fs.get_directory_name(output_file)
+      local dir = get_fs().get_directory_name(output_file)
       if dir and dir ~= "" then
-        local success, err = fs.ensure_directory_exists(dir)
+        local success, err = get_fs().ensure_directory_exists(dir)
         if not success then
           self.logger.error("Failed to create parent directory", {
             directory = dir,
@@ -448,7 +516,7 @@ function M.create_log_formatter()
         .. "}}"
 
       -- Write content to file
-      local success, err = fs.write_file(output_file, content)
+      local success, err = get_fs().write_file(output_file, content)
       if not success then
         self.logger.error("Failed to write output file", {
           output_file = output_file,
@@ -472,9 +540,9 @@ function M.create_log_formatter()
       local output_file = self.options.output_file or "test-results.log.txt"
 
       -- Ensure parent directory exists
-      local dir = fs.get_directory_name(output_file)
+      local dir = get_fs().get_directory_name(output_file)
       if dir and dir ~= "" then
-        local success, err = fs.ensure_directory_exists(dir)
+        local success, err = get_fs().ensure_directory_exists(dir)
         if not success then
           self.logger.error("Failed to create parent directory", {
             directory = dir,
@@ -517,7 +585,7 @@ function M.create_log_formatter()
       content = content .. string.format("Total Duration: %.3fms\n", results.duration)
 
       -- Write content to file
-      local success, err = fs.write_file(output_file, content)
+      local success, err = get_fs().write_file(output_file, content)
       if not success then
         self.logger.error("Failed to write output file", {
           output_file = output_file,
@@ -571,7 +639,7 @@ function M.create_log_formatter()
         type = "coverage",
         name = "log",
         format = log_formatter.format_coverage,
-        description = "Log-optimized coverage formatter"
+        description = "Log-optimized coverage formatter",
       }
     end
 
@@ -580,7 +648,7 @@ function M.create_log_formatter()
         type = "quality",
         name = "log",
         format = log_formatter.format_quality,
-        description = "Log-optimized quality formatter"
+        description = "Log-optimized quality formatter",
       }
     end
 
@@ -589,7 +657,7 @@ function M.create_log_formatter()
         type = "results",
         name = "log",
         format = log_formatter.format_results,
-        description = "Log-optimized results formatter"
+        description = "Log-optimized results formatter",
       }
     end
   end

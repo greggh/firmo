@@ -29,9 +29,14 @@ To enable quality validation for your tests:
 ```lua
 -- In your test file or setup module
 local quality = require("lib.quality")
+-- Initialize and enable via direct call (less common)
 quality.init({
   enabled = true,
   level = 3 -- Comprehensive level
+})
+```
+
+Using the central configuration system (Recommended):
 })
 ```
 
@@ -97,8 +102,7 @@ Firmo's quality validation provides five progressive quality levels:
 
 ### Configuring Quality Options
 
-
-You can configure quality validation through the central configuration system:
+You can configure quality validation primarily through the central configuration system (`.firmo-config.lua` or using `central_config.set`). Alternatively, use `quality.configure({})` programmatically.
 
 
 ```lua
@@ -133,42 +137,58 @@ Or directly in your code:
 ```lua
 local quality = require("lib.quality")
 local central_config = require("lib.core.central_config")
--- Update config settings
+
+-- Example: Update config settings via central_config
 central_config.set("quality.enabled", true)
 central_config.set("quality.level", 3)
--- Or initialize directly
-quality.init({
-  enabled = true,
-  level = 3,
-  strict = false
+central_config.set("quality.strict", false)
+
+-- Example: Configure directly using the quality module API
+-- This merges with existing config (central or default)
+quality.configure({
+  level = 4,         -- Override level
+  verbose = true     -- Enable verbose logging for quality module
 })
 ```
+## Generating Quality Reports
 
+Quality reports are typically generated as part of the overall test run when the `--quality` flag is used, leveraging the reporting system. The format is specified using the general `--format` flag, and the output directory using `--report-dir` or central configuration.
 
--- Generate a JSON report
-firmo.generate_quality_report("json", "./quality-report.json")
--- Generate a summary report (returns text, doesn't write to file)
-local summary = firmo.generate_quality_report("summary")
-
-
-```text
-From the command line:
 ```bash
+# Run tests with quality checks and generate an HTML quality report
+# The report will usually be saved in ./coverage-reports/quality-report.html
+lua test.lua --quality --format=html tests/
 
+# Generate a JSON report instead
+lua test.lua --quality --format=json --report-dir=./my-reports tests/
+```
 
+You can also generate report content programmatically using `quality.report()`:
 
-# Generate HTML quality report
+```lua
+local quality = require("lib.quality")
+local reporting = require("lib.reporting") -- Needed for file writing
 
+-- Assume quality data has been collected...
 
-lua test.lua --quality --quality-format=html --quality-output=./reports/quality.html tests/
+-- Get HTML report content
+local html_content = quality.report("html")
+if html_content then
+  reporting.write_file("./reports/quality.html", html_content)
+end
 
-# Generate JSON quality report 
+-- Get JSON report data
+local json_data = quality.report("json")
+if json_data then
+  reporting.write_file("./reports/quality.json", json_data) -- write_file handles JSON encoding
+end
 
-
-lua test.lua --quality --quality-format=json --quality-output=./reports/quality.json tests/
-
-
-```text
+-- Get summary report text
+local summary_text = quality.report("summary")
+if summary_text then
+  print(summary_text)
+end
+```
 
 ### Interpreting Quality Reports
 
@@ -191,22 +211,19 @@ Quality reports provide information about:
 
 
 You can define custom quality rules for specific project needs:
+The `custom_rules` configuration option accepts a table where keys are rule names and values are typically booleans to enable/disable built-in checks or potentially functions for custom validation logic (check source for specific implementation). Example structure:
+
 ```lua
-
-
-firmo.quality_options.custom_rules = {
-  require_describe_block = true,       -- Tests must be in describe blocks
-  min_assertions_per_test = 2,         -- Minimum number of assertions per test
-  require_error_assertions = true,     -- Tests must include error assertions
-  require_mock_verification = true,    -- Mocks must be verified
-  max_test_name_length = 60,           -- Maximum test name length
-  require_setup_teardown = true,       -- Tests must use setup/teardown
-  naming_pattern = "^should_.*$",      -- Test name pattern requirement
-  max_nesting_level = 3                -- Maximum nesting level for describes
-}
-
-
-```text
+local central_config = require("lib.core.central_config")
+central_config.set("quality.custom_rules", {
+  -- These are illustrative examples; actual rule keys may differ.
+  require_describe_block = true,
+  min_assertions_per_test = 2,
+  -- You might define a custom function:
+  -- custom_check_naming = function(test_data) ... return boolean, message ... end
+})
+```
+Consult the source code (`lib/quality/init.lua` and `level_checkers.lua`) for the exact built-in custom rules available and how to define new ones.
 
 ### Integration with CI/CD
 
@@ -222,12 +239,12 @@ Quality validation can be integrated into CI/CD pipelines to enforce quality sta
 lua test.lua --quality --quality-level=3 --quality-format=json --quality-output=./quality-report.json tests/
 
 # Optional: Fail the build if quality level isn't met
-
-
-if ! lua scripts/check_quality_level.lua ./quality-report.json 3; then
-  echo "Quality validation failed!"
-  exit 1
-fi
+# This requires a custom script (`check_quality_level.lua`) to parse the report
+# and check the achieved level against the target (e.g., level 3).
+# if ! lua scripts/check_quality_level.lua ./coverage-reports/quality-report.json 3; then
+#   echo "Quality validation failed!"
+#   exit 1
+# fi
 
 
 ```text
@@ -237,153 +254,67 @@ fi
 
 You can check quality programmatically:
 ```lua
+local quality = require("lib.quality")
+local test_helper = require("lib.tools.test_helper") -- For error capture example
 
+-- Example: Check quality of a specific file
+local meets, issues = quality.check_file("tests/my_test.lua", 3) -- Check against level 3
 
-local firmo = require("firmo")
--- Run tests with quality validation enabled
-firmo.start_quality({
-  level = 3,
-  strict = true
-})
-firmo.run_discovered("./tests")
--- Check if quality meets specified level
-if firmo.quality_meets_level(3) then
-  print("Quality meets level 3 standards!")
-else
-  print("Quality does not meet level 3 standards")
-
-  -- Get quality data for analysis
-  local quality_data = firmo.get_quality_data()
-
-  -- Output specific issues
-  for _, issue in ipairs(quality_data.issues) do
-    print("Issue in test: " .. issue.test)
-    print("  " .. issue.message)
+if not meets then
+  print("File does not meet quality level 3:")
+  for _, issue in ipairs(issues or {}) do
+    print(string.format("  Test '%s': %s", issue.test or "N/A", issue.issue or "Unknown issue"))
   end
 end
 
+-- Example: Programmatically check if the overall collected data meets a level
+-- (Assumes quality.init() was called and tests were run)
+local overall_meets = quality.meets_level(3)
+if overall_meets then
+  print("Overall quality meets level 3 standards!")
+else
+  print("Overall quality does not meet level 3 standards.")
+  -- Get report data for analysis
+  local report_data = quality.report("json") -- Get data as Lua table
+  if report_data and report_data.summary and report_data.summary.issues then
+     print("Issues found:")
+     for _, issue_category in ipairs(report_data.summary.issues) do
+        print(string.format("  - %s: %d occurrences (%s)", issue_category.category, issue_category.count, issue_category.severity))
+     end
+  end
+end
 
-```text
-
+```
 ## Error Handling
 
+The quality module functions typically return success status and potential issues or errors.
 
-The Quality module provides comprehensive error handling patterns that you should follow in your tests to ensure robustness.
+-   `check_file` returns `meets (boolean), issues (table|nil)`.
+-   `validate_test_quality` returns `meets (boolean), issues (table|nil)`.
+-   `report` returns `content (string|table|nil), error (table|nil)`.
 
-### Standardized Error Handling Patterns
-
-
-#### 1. Use test_helper.with_error_capture() for Function Calls
-
-
-```lua
-
-
-local quality, load_error = test_helper.with_error_capture(function()
-  return require("lib.quality")
-end)()
-expect(load_error).to_not.exist("Failed to load quality module: " .. tostring(load_error))
-expect(quality).to.exist()
-
-
-```text
-
-#### 2. Proper Resource Creation and Cleanup
-
+Check the return values to handle potential problems:
 
 ```lua
+local quality = require("lib.quality")
+local test_helper = require("lib.tools.test_helper")
+local expect = require("firmo").expect -- Assuming Firmo's expect
 
+it("should handle missing files gracefully", function()
+  -- check_file returns false, issues for missing files
+  local meets, issues = quality.check_file("non_existent_file.lua", 1)
 
--- Track created test files
-local test_files = {}
--- Create test files with error handling
-local file_path, create_err = temp_file.create_with_content(content, "lua")
-expect(create_err).to_not.exist("Failed to create test file: " .. tostring(create_err))
-table.insert(test_files, file_path)
--- Clean up in after() hook
-after(function()
-  for _, filename in ipairs(test_files) do
-    -- Remove file with error handling
-    local success, err = pcall(function()
-      temp_file.remove(filename)
-    end)
-
-    if not success and logger then
-      logger.warn("Failed to remove test file: " .. tostring(err))
-    end
-  end
-  test_files = {}
+  expect(meets).to.equal(false)
+  -- Issues table might contain details, depending on implementation
+  -- expect(issues).to.exist()
 end)
 
+it("should handle report generation errors", function()
+  -- Simulate condition where report generation might fail (e.g., invalid format)
+  local report_content, err = quality.report("invalid-format")
 
-```text
-
-#### 3. Testing Error Conditions
-
-
-```lua
-
-
-it("should handle missing files gracefully", { expect_error = true }, function()
-  -- Try to check a non-existent file
-  local result, err = test_helper.with_error_capture(function()
-    return quality.check_file("non_existent_file.lua", 1)
-  end)()
-
-  -- The check should either return false or an error
-  if result ~= nil then
-    expect(result).to.equal(false, "check_file should return false for non-existent files")
-  else
-    expect(err).to.exist("check_file should error for non-existent files")
-  end
+  expect(report_content).to_not.exist()
+  expect(err).to.exist()
+  expect(err.message).to.match("Unknown report format")
 end)
-
-
-```text
-
-#### 4. Graceful Logger Initialization
-
-
-```lua
-
-
-local logger
-local logger_init_success, result = pcall(function()
-  local logging = require("lib.tools.logging")
-  logger = logging.get_logger("test.quality")
-  return true
-end)
-if not logger_init_success then
-  print("Warning: Failed to initialize logger: " .. tostring(result))
-  -- Create a minimal logger as fallback
-  logger = {
-    debug = function() end,
-    info = function() end,
-    warn = function(msg) print("WARN: " .. msg) end,
-    error = function(msg) print("ERROR: " .. msg) end
-  }
-end
-
-
-```text
-
-### Parameter Validation
-
-
-Always validate input parameters in functions that work with the quality module:
-```lua
-
-
-local function check_test_quality(file_path, quality_level)
-  -- Validate parameters
-  if not file_path or file_path == "" then
-    return false, "Invalid file path"
-  end
-
-  if not quality_level or type(quality_level) ~= "number" or 
-     quality_level < 1 or quality_level > 5 then
-    return false, "Invalid quality level: must be between 1 and 5"
-  end
-
-  -- Continue with implementation...
-}
+```

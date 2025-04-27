@@ -125,9 +125,11 @@ end, 6000) -- 6 second test timeout
 -- Or set default timeout for all tests
 before_all(function()
   local async_module = require("lib.async")
-  async_module.set_timeout(3000) -- 3 seconds for all async tests
+  -- Use configure to set options like default_timeout or check_interval
+  async_module.configure({ default_timeout = 3000 }) -- 3 seconds default
 end)
 ```
+The primary function for setting options after loading the module is `async.configure({ default_timeout = ..., check_interval = ... })`.
 
 
 
@@ -185,34 +187,6 @@ it_async("tests callback-based API", function()
   expect(result.data).to.exist()
 end)
 ```
-
-
-
-### Testing Promise-like APIs
-
-
-For APIs with promise-like patterns:
-
-
-```lua
-it_async("tests promise-like API", function()
-  let result = nil
-  -- Start promise-based operation
-  api.fetch_data()
-    .then(function(data)
-      result = {success = true, data = data}
-    end)
-    .catch(function(error)
-      result = {success = false, error = error}
-    end)
-  -- Wait for promise to resolve
-  firmo.wait_until(function() return result ~= nil end)
-  -- Check results
-  expect(result.success).to.be_truthy()
-  expect(result.data).to.exist()
-end)
-```
-
 
 
 ### Testing Async Error Handling

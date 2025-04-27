@@ -1,6 +1,15 @@
 #!/usr/bin/env lua
--- Markdown formatting tool for firmo
--- Replaces the shell scripts in scripts/markdown/
+--- Markdown Fixing Script
+---
+--- Applies markdown fixes (heading levels, list numbering, comprehensive)
+--- to specified markdown files or directories using the `lib.tools.markdown` module.
+--- Replaces the functionality of older shell scripts.
+---
+--- Usage: lua scripts/fix_markdown.lua [options] [files_or_directories...]
+---
+--- @author Firmo Team
+--- @version 1.0.0
+--- @script
 
 -- Get the root directory
 local script_dir = arg[0]:match("(.-)[^/\\]+$") or "./"
@@ -12,49 +21,72 @@ local root_dir = script_dir .. "../"
 -- Add library directories to package path
 package.path = root_dir .. "?.lua;" .. root_dir .. "lib/?.lua;" .. root_dir .. "lib/?/init.lua;" .. package.path
 
--- Initialize logging system
-local logging
+-- Lazy-load dependencies to avoid circular dependencies
 ---@diagnostic disable-next-line: unused-local
-local ok, err = pcall(function()
-  logging = require("lib.tools.logging")
-end)
-if not ok or not logging then
-  -- Fall back to standard print if logging module isn't available
-  logging = {
-    configure = function() end,
-    get_logger = function()
-      return {
-        info = print,
-        error = print,
-        warn = print,
-        debug = print,
-        verbose = print,
-      }
+local _error_handler, _logging, _fs
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("fix_markdown")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
     end,
   }
 end
 
--- Get logger for fix_markdown module
----@diagnostic disable-next-line: redundant-parameter
-local logger = logging.get_logger("fix_markdown")
--- Configure from config if possible
-logging.configure_from_config("fix_markdown")
+local markdown = try_require("lib.tools.markdown")
 
--- Try to load the markdown module
-local ok, markdown = pcall(require, "lib.tools.markdown")
-if not ok then
-  -- Try alternative paths
-  ok, markdown = pcall(require, "tools.markdown")
-  if not ok then
-    logger.error("Failed to load module", { module = "markdown" })
-    os.exit(1)
-  end
-end
-
--- Print usage information
+--- Prints usage information and exits.
+---@return nil
+---@private
 local function print_usage()
   -- Still use print directly for help info to ensure it's always visible
-  -- regardless of logger configuration
   print("Usage: fix_markdown.lua [options] [files_or_directories...]")
   print("Options:")
   print("  --help, -h          Show this help message")
@@ -73,21 +105,29 @@ local function print_usage()
   os.exit(0)
 end
 
--- Load the filesystem module
-local fs = require("lib.tools.filesystem")
-logger.debug("Loaded filesystem module", { version = fs._VERSION })
-
--- Function to check if path is a directory
+--- Checks if a path is a directory using the filesystem module.
+---@param path string The path to check.
+---@return boolean True if the path is a directory, false otherwise.
+---@private
 local function is_directory(path)
-  return fs.directory_exists(path)
+  return get_fs().directory_exists(path)
 end
 
--- Function to check if path is a file
+--- Checks if a path is a file using the filesystem module.
+---@param path string The path to check.
+---@return boolean True if the path is a file, false otherwise.
+---@private
 local function is_file(path)
-  return fs.file_exists(path)
+  return get_fs().file_exists(path)
 end
 
--- Function to fix a single markdown file
+--- Reads, fixes, and writes back a single markdown file based on the specified mode.
+--- Uses the `lib.tools.markdown` module for fixing logic.
+---@param file_path string The path to the markdown file.
+---@param fix_mode "heading-levels"|"list-numbering"|"comprehensive" The type of fix to apply.
+---@return boolean True if the file was successfully fixed and written, false otherwise (e.g., not markdown, read/write error, no changes needed).
+---@private
+---@throws table If filesystem or markdown module operations fail critically.
 local function fix_markdown_file(file_path, fix_mode)
   -- Skip non-markdown files
   if not file_path:match("%.md$") then
@@ -95,9 +135,9 @@ local function fix_markdown_file(file_path, fix_mode)
   end
 
   -- Read file using filesystem module
-  local content, err = fs.read_file(file_path)
+  local content, err = get_fs().read_file(file_path)
   if not content then
-    logger.error("Failed to read file", { file_path = file_path, error = err })
+    get_logger().error("Failed to read file", { file_path = file_path, error = err })
     return false
   end
 
@@ -125,13 +165,13 @@ local function fix_markdown_file(file_path, fix_mode)
 
   -- Only write back if there were changes
   if fixed ~= content then
-    local success, write_err = fs.write_file(file_path, fixed)
+    local success, write_err = get_fs().write_file(file_path, fixed)
     if not success then
-      logger.error("Failed to write file", { file_path = file_path, error = write_err })
+      get_logger().error("Failed to write file", { file_path = file_path, error = write_err })
       return false
     end
 
-    logger.info("Fixed markdown file", { file_path = file_path })
+    get_logger().info("Fixed markdown file", { file_path = file_path })
     return true
   end
 
@@ -156,16 +196,16 @@ while i <= #arg do
     fix_mode = "comprehensive"
     i = i + 1
   elseif arg[i] == "--version" then
-    logger.info("fix_markdown.lua v1.0.0")
-    logger.info("Part of firmo - Enhanced Lua testing framework")
+    get_logger().info("fix_markdown.lua v1.0.0")
+    get_logger().info("Part of firmo - Enhanced Lua testing framework")
     os.exit(0)
   elseif not arg[i]:match("^%-") then
     -- Not a flag, assume it's a file or directory path
     table.insert(paths, arg[i])
     i = i + 1
   else
-    logger.error("Unknown option", { option = arg[i] })
-    logger.error("Use --help to see available options")
+    get_logger().error("Unknown option", { option = arg[i] })
+    get_logger().error("Use --help to see available options")
     os.exit(1)
   end
 end
@@ -205,9 +245,9 @@ for _, path in ipairs(paths) do
     end
 
     if #normalized_files == 0 then
-      logger.warn("No markdown files found", { directory = path })
+      get_logger().warn("No markdown files found", { directory = path })
     else
-      logger.info("Found markdown files", { count = #normalized_files, directory = path })
+      get_logger().info("Found markdown files", { count = #normalized_files, directory = path })
 
       -- Process all found files in this directory
       for _, file_path in ipairs(normalized_files) do
@@ -218,15 +258,15 @@ for _, path in ipairs(paths) do
       end
     end
   else
-    logger.warn("Invalid path", { path = path, reason = "not found or not a markdown file" })
+    get_logger().warn("Invalid path", { path = path, reason = "not found or not a markdown file" })
   end
 end
 
 -- Show summary statistics
 if total_files_processed == 0 then
-  logger.info("No markdown files processed")
+  get_logger().info("No markdown files processed")
 else
-  logger.info("Markdown fixing complete", {
+  get_logger().info("Markdown fixing complete", {
     fixed_count = total_files_fixed,
     total_count = total_files_processed,
   })
@@ -238,11 +278,11 @@ else
     ---@diagnostic disable-next-line: unused-local
     for i, path in ipairs(paths) do
       if is_file(path) and path:match("%.md$") then
-        logger.debug("Processed path", { type = "file", path = path })
+        get_logger().debug("Processed path", { type = "file", path = path })
       elseif is_directory(path) then
-        logger.debug("Processed path", { type = "directory", path = path })
+        get_logger().debug("Processed path", { type = "directory", path = path })
       else
-        logger.debug("Processed path", { type = "unknown", path = path })
+        get_logger().debug("Processed path", { type = "unknown", path = path })
       end
     end
   end

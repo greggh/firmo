@@ -1,34 +1,99 @@
--- Markdown fixing utilities for firmo
--- Provides functions to fix common markdown issues
--- This is a Lua implementation of the shell scripts in scripts/markdown/
+--- Markdown Fixing Utilities
+---
+--- Provides functions to fix common markdown issues like heading levels,
+--- list numbering, and spacing. Replicates functionality from scripts/markdown.
+--- Integrates with the codefix module.
+---
+--- @module lib.tools.markdown
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 
----@class markdown_module
----@field _VERSION string The module version
----@field find_markdown_files fun(dir?: string): string[]|nil, table? Find all markdown files in a directory
----@field fix_heading_levels fun(content: string): string|nil, table? Fix heading levels in markdown content
----@field fix_list_numbering fun(content: string): string|nil, table? Fix list numbering in markdown content
----@field fix_comprehensive fun(content: string): string|nil, table? Comprehensive markdown fixing (headings, lists, spacing)
----@field fix_all_in_directory fun(dir?: string): number, table? Fix all markdown files in a directory
----@field register_with_codefix fun(codefix: table): table|nil, table? Register with codefix module if available
----@field validate_markdown fun(content: string): boolean, table? Validate markdown content for common issues
----@field fix_code_blocks fun(content: string): string|nil, table? Fix markdown code blocks (remove redundant language specifiers)
----@field fix_links fun(content: string): string|nil, table? Fix broken links in markdown content
----@field fix_tables fun(content: string): string|nil, table? Fix table formatting in markdown content
----@field fix_spacing fun(content: string): string|nil, table? Fix spacing issues in markdown content
----@field fix_file fun(file_path: string): boolean, table? Fix a specific markdown file
----@field generate_table_of_contents fun(content: string): string|nil, table? Generate table of contents from headings
----@field extract_headings fun(content: string): table<number, {level: number, text: string, line: number}> Extract headings from markdown content
+---@class markdown_module The public API for the Markdown fixing module.
+---@field _VERSION string The module version.
+---@field find_markdown_files fun(dir?: string): string[]|nil, table? Find all markdown files (`*.md`) in a directory. Returns `files_array, nil` or `nil, error_object`.
+---@field fix_heading_levels fun(content: string): string|nil, table? Normalizes heading levels (e.g., ensures `h1` is present if `h2` exists, avoids skipping levels). Returns `fixed_content, nil` or `nil, error_object`.
+---@field fix_list_numbering fun(content: string): string|nil, table? Fixes inconsistent numbering in ordered lists, handling nested lists. Returns `fixed_content, nil` or `nil, error_object`.
+---@field fix_comprehensive fun(content: string): string|nil, table? Applies multiple fixes: headings, lists, spacing around blocks. Returns `fixed_content, nil` or `nil, error_object`.
+---@field fix_all_in_directory fun(dir?: string): number|nil, table? Finds and fixes all markdown files in a directory using `fix_comprehensive`. Returns `fixed_count, nil` or `nil, error_object`. @throws table If finding files fails critically.
+---@field register_with_codefix fun(codefix: table): table|nil, table? Registers the comprehensive fixer with the `lib.tools.codefix` module. Returns `codefix_module, nil` or `nil, error_object`. @throws table If codefix registration fails critically.
+---@field validate_markdown fun(...) [Not Implemented] Validate markdown content for common issues.
+---@field fix_code_blocks fun(...) [Not Implemented] Fix markdown code blocks.
+---@field fix_links fun(...) [Not Implemented] Fix broken links in markdown content.
+---@field fix_tables fun(...) [Not Implemented] Fix table formatting in markdown content.
+---@field fix_spacing fun(...) [Not Implemented] Fix spacing issues in markdown content.
+---@field fix_file fun(...) [Not Implemented] Fix a specific markdown file.
+---@field generate_table_of_contents fun(...) [Not Implemented] Generate table of contents from headings.
+---@field extract_headings fun(...) [Not Implemented] Extract headings from markdown content.
 
--- Import filesystem module for file operations
-local fs = require("lib.tools.filesystem")
-local logging = require("lib.tools.logging")
-local error_handler = require("lib.tools.error_handler")
+-- Lazy-load dependencies to avoid circular dependencies
+---@diagnostic disable-next-line: unused-local
+local _error_handler, _logging, _fs
 
--- Create a logger for this module
-local logger = logging.get_logger("Markdown")
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
 
--- Configure module logging
-logging.configure_from_config("Markdown")
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
+local function get_fs()
+  if not _fs then
+    _fs = try_require("lib.tools.filesystem")
+  end
+  return _fs
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
+end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("Markdown")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
 
 local markdown = {
   -- Module version
@@ -38,16 +103,17 @@ local markdown = {
 --- Find all markdown files in a directory
 ---@param dir? string Directory to search in (default: current directory)
 ---@return string[]|nil files List of markdown files found, or nil on error
----@return table? error Error object if operation failed
+---@return table? error Error object from `error_handler.try` or `filesystem` if operation failed.
+---@throws table If filesystem operations fail critically (though most are handled).
 function markdown.find_markdown_files(dir)
   -- Input validation
   if dir ~= nil and type(dir) ~= "string" then
-    local err = error_handler.validation_error("Directory must be a string or nil", {
+    local err = get_error_handler().validation_error("Directory must be a string or nil", {
       parameter_name = "dir",
       provided_type = type(dir),
       function_name = "markdown.find_markdown_files",
     })
-    logger.warn(err.message, err.context)
+    get_logger().warn(err.message, err.context)
     return nil, err
   end
 
@@ -55,12 +121,12 @@ function markdown.find_markdown_files(dir)
   dir = dir or "."
 
   -- Safe directory path normalization with error handling
-  local normalized_dir, err = error_handler.safe_io_operation(function()
-    return fs.normalize_path(dir)
+  local normalized_dir, err = get_error_handler().safe_io_operation(function()
+    return get_fs().normalize_path(dir)
   end, dir, { operation = "normalize_path", module = "markdown" })
 
   if not normalized_dir then
-    logger.error("Failed to normalize directory path", {
+    get_logger().error("Failed to normalize directory path", {
       directory = dir,
       error = err.message,
     })
@@ -68,16 +134,16 @@ function markdown.find_markdown_files(dir)
   end
 
   -- Check if directory exists
-  local dir_exists, dir_err = error_handler.safe_io_operation(function()
-    return fs.directory_exists(normalized_dir)
+  local dir_exists, dir_err = get_error_handler().safe_io_operation(function()
+    return get_fs().directory_exists(normalized_dir)
   end, normalized_dir, { operation = "directory_exists", module = "markdown" })
 
   if not dir_exists then
-    local err = error_handler.io_error("Directory does not exist", {
+    local err = get_error_handler().io_error("Directory does not exist", {
       directory = normalized_dir,
       operation = "find_markdown_files",
     }, dir_err)
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
@@ -86,12 +152,12 @@ function markdown.find_markdown_files(dir)
   local exclude_patterns = {}
 
   -- Find all markdown files using filesystem discovery with error handling
-  local success, files, discover_err = error_handler.try(function()
-    return fs.discover_files({ normalized_dir }, patterns, exclude_patterns)
+  local success, files, discover_err = get_error_handler().try(function()
+    return get_fs().discover_files({ normalized_dir }, patterns, exclude_patterns)
   end)
 
   if not success then
-    local err = error_handler.io_error(
+    local err = get_error_handler().io_error(
       "Failed to discover markdown files",
       {
         directory = normalized_dir,
@@ -100,19 +166,19 @@ function markdown.find_markdown_files(dir)
       },
       files -- On error, files contains the error object
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
   -- Debug output for tests using structured logging
-  logger.debug("Found markdown files", {
+  get_logger().debug("Found markdown files", {
     count = #files,
     directory = normalized_dir,
   })
 
-  if logger.is_verbose_enabled() then
+  if get_logger().is_verbose_enabled() then
     for i, file in ipairs(files) do
-      logger.verbose("Discovered markdown file", {
+      get_logger().verbose("Discovered markdown file", {
         index = i,
         file_path = file,
       })
@@ -125,16 +191,17 @@ end
 --- Fix heading levels in markdown content
 ---@param content string The markdown content to fix
 ---@return string|nil fixed_content The fixed markdown content, or nil on error
----@return table? error Error object if operation failed
+---@return table? error Error object from `error_handler.try` if parsing or processing failed.
+---@throws table If content parsing fails critically (though handled by `error_handler.try`).
 function markdown.fix_heading_levels(content)
   -- Input validation
   if content ~= nil and type(content) ~= "string" then
-    local err = error_handler.validation_error("Content must be a string or nil", {
+    local err = get_error_handler().validation_error("Content must be a string or nil", {
       parameter_name = "content",
       provided_type = type(content),
       function_name = "markdown.fix_heading_levels",
     })
-    logger.warn(err.message, err.context)
+    get_logger().warn(err.message, err.context)
     return nil, err
   end
 
@@ -144,7 +211,7 @@ function markdown.fix_heading_levels(content)
   end
 
   -- Process content into lines with error handling
-  local success, lines_result = error_handler.try(function()
+  local success, lines_result = get_error_handler().try(function()
     local lines = {}
     for line in content:gmatch("[^\r\n]+") do
       table.insert(lines, line)
@@ -153,7 +220,7 @@ function markdown.fix_heading_levels(content)
   end)
 
   if not success then
-    local err = error_handler.parse_error(
+    local err = get_error_handler().parse_error(
       "Failed to parse content into lines",
       {
         content_length = #content,
@@ -161,7 +228,7 @@ function markdown.fix_heading_levels(content)
       },
       lines_result -- On error, this contains the error object
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
@@ -173,7 +240,7 @@ function markdown.fix_heading_levels(content)
   end
 
   -- Find all heading levels used in the document with error handling
-  local success, heading_data = error_handler.try(function()
+  local success, heading_data = get_error_handler().try(function()
     local heading_map = {} -- Maps line index to heading level
     local heading_indices = {} -- Ordered list of heading line indices
     local min_level = 6 -- Start with the maximum level
@@ -199,7 +266,7 @@ function markdown.fix_heading_levels(content)
   end)
 
   if not success then
-    local err = error_handler.parse_error(
+    local err = get_error_handler().parse_error(
       "Failed to analyze heading structure",
       {
         content_length = #content,
@@ -208,7 +275,7 @@ function markdown.fix_heading_levels(content)
       },
       heading_data -- On error, this contains the error object
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
@@ -218,7 +285,7 @@ function markdown.fix_heading_levels(content)
 
   -- Analyze document structure to ensure proper hierarchy with error handling
   if #heading_indices > 0 then
-    local success, _ = error_handler.try(function()
+    local success, _ = get_error_handler().try(function()
       -- Always set the smallest heading to level 1, regardless of what level it originally was
       for i, line_index in ipairs(heading_indices) do
         local level = heading_map[line_index]
@@ -265,7 +332,7 @@ function markdown.fix_heading_levels(content)
     end)
 
     if not success then
-      logger.warn("Error while analyzing heading hierarchy, but continuing with basic fixes", {
+      get_logger().warn("Error while analyzing heading hierarchy, but continuing with basic fixes", {
         content_length = #content,
         heading_count = #heading_indices,
       })
@@ -273,7 +340,7 @@ function markdown.fix_heading_levels(content)
   end
 
   -- Apply the corrected heading levels to the content with error handling
-  local success, corrected_lines = error_handler.try(function()
+  local success, corrected_lines = get_error_handler().try(function()
     for i, line_index in ipairs(heading_indices) do
       local original_heading = lines[line_index]:match("^(#+)%s")
       local new_level = heading_map[line_index]
@@ -287,7 +354,7 @@ function markdown.fix_heading_levels(content)
   end)
 
   if not success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Failed to apply heading level corrections",
       {
         content_length = #content,
@@ -296,21 +363,21 @@ function markdown.fix_heading_levels(content)
       },
       corrected_lines -- On error, this contains the error object
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
 
     -- Return original content as fallback
     return content
   end
 
   -- Combine lines back into a string with error handling
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     return table.concat(corrected_lines, "\n")
   end)
 
   if not success then
-    logger.error("Failed to concatenate lines after heading fix", {
+    get_logger().error("Failed to concatenate lines after heading fix", {
       line_count = #corrected_lines,
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
 
     -- Return original content as fallback
@@ -323,16 +390,17 @@ end
 --- Fix list numbering in markdown content
 ---@param content string The markdown content to fix
 ---@return string|nil fixed_content The fixed markdown content, or nil on error
----@return table? error Error object if operation failed
+---@return table? error Error object from `error_handler.try` if parsing or processing failed.
+---@throws table If content parsing or processing fails critically (though handled by `error_handler.try`).
 function markdown.fix_list_numbering(content)
   -- Input validation
   if content ~= nil and type(content) ~= "string" then
-    local err = error_handler.validation_error("Content must be a string or nil", {
+    local err = get_error_handler().validation_error("Content must be a string or nil", {
       parameter_name = "content",
       provided_type = type(content),
       function_name = "markdown.fix_list_numbering",
     })
-    logger.warn(err.message, err.context)
+    get_logger().warn(err.message, err.context)
     return nil, err
   end
 
@@ -342,7 +410,7 @@ function markdown.fix_list_numbering(content)
   end
 
   -- Process content into lines with error handling
-  local success, lines_result = error_handler.try(function()
+  local success, lines_result = get_error_handler().try(function()
     local lines = {}
     for line in content:gmatch("[^\r\n]+") do
       table.insert(lines, line)
@@ -351,7 +419,7 @@ function markdown.fix_list_numbering(content)
   end)
 
   if not success then
-    local err = error_handler.parse_error(
+    local err = get_error_handler().parse_error(
       "Failed to parse content into lines",
       {
         content_length = #content,
@@ -359,7 +427,7 @@ function markdown.fix_list_numbering(content)
       },
       lines_result -- On error, this contains the error object
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
@@ -371,7 +439,7 @@ function markdown.fix_list_numbering(content)
   end
 
   -- Enhanced list handling with error boundaries
-  local success, list_sequence_data = error_handler.try(function()
+  local success, list_sequence_data = get_error_handler().try(function()
     -- Enhanced list handling that properly maintains nested list structures
     local list_stacks = {} -- Map of indent level -> current number
     local in_list_sequence = false
@@ -445,7 +513,7 @@ function markdown.fix_list_numbering(content)
   end)
 
   if not success then
-    local err = error_handler.parse_error(
+    local err = get_error_handler().parse_error(
       "Failed to analyze list structure",
       {
         content_length = #content,
@@ -454,14 +522,14 @@ function markdown.fix_list_numbering(content)
       },
       list_sequence_data -- On error, this contains the error object
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return content -- Return original as fallback
   end
 
   local list_sequences = list_sequence_data.list_sequences
 
   -- Second pass: fix numbering in each identified sequence with error boundaries
-  local success, modified_lines = error_handler.try(function()
+  local success, modified_lines = get_error_handler().try(function()
     -- Create a copy of lines to modify safely
     local modified = {}
     for i = 1, #lines do
@@ -489,10 +557,10 @@ function markdown.fix_list_numbering(content)
   end)
 
   if not success then
-    logger.warn("Error while processing list sequences, but continuing with partial fixes", {
+    get_logger().warn("Error while processing list sequences, but continuing with partial fixes", {
       content_length = #content,
       sequence_count = #list_sequences,
-      error = error_handler.format_error(modified_lines),
+      error = get_error_handler().format_error(modified_lines),
     })
 
     -- Continue with original lines as fallback
@@ -502,7 +570,7 @@ function markdown.fix_list_numbering(content)
   lines = modified_lines
 
   -- Handle complex nested lists in a third pass with error boundaries
-  local success, final_lines = error_handler.try(function()
+  local success, final_lines = get_error_handler().try(function()
     -- Create a copy to modify
     local modified = {}
     for i = 1, #lines do
@@ -552,9 +620,9 @@ function markdown.fix_list_numbering(content)
   end)
 
   if not success then
-    logger.warn("Error while processing nested lists, continuing with partially fixed content", {
+    get_logger().warn("Error while processing nested lists, continuing with partially fixed content", {
       content_length = #content,
-      error = error_handler.format_error(final_lines),
+      error = get_error_handler().format_error(final_lines),
     })
 
     -- Use the previous stage result as fallback
@@ -562,13 +630,13 @@ function markdown.fix_list_numbering(content)
   end
 
   -- Combine lines back into string with error handling
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     return table.concat(final_lines, "\n") .. "\n"
   end)
 
   if not success then
-    logger.error("Failed to concatenate lines after list fix", {
-      error = error_handler.format_error(result),
+    get_logger().error("Failed to concatenate lines after list fix", {
+      error = get_error_handler().format_error(result),
     })
 
     -- Return original content as fallback
@@ -581,16 +649,17 @@ end
 --- Comprehensive markdown fixing - combines heading, list, and spacing fixes
 ---@param content string The markdown content to comprehensively fix
 ---@return string|nil fixed_content The fixed markdown content, or nil on error
----@return table? error Error object if operation failed
+---@return table? error Error object from `error_handler.try` if processing fails.
+---@throws table If content parsing, processing, or restoration fails critically (though handled by `error_handler.try`).
 function markdown.fix_comprehensive(content)
   -- Input validation
   if content ~= nil and type(content) ~= "string" then
-    local err = error_handler.validation_error("Content must be a string or nil", {
+    local err = get_error_handler().validation_error("Content must be a string or nil", {
       parameter_name = "content",
       provided_type = type(content),
       function_name = "markdown.fix_comprehensive",
     })
-    logger.warn(err.message, err.context)
+    get_logger().warn(err.message, err.context)
     return nil, err
   end
 
@@ -600,7 +669,7 @@ function markdown.fix_comprehensive(content)
   end
 
   -- Process content into lines with error handling and error boundaries
-  local success, lines_result = error_handler.try(function()
+  local success, lines_result = get_error_handler().try(function()
     local lines = {}
     for line in content:gmatch("[^\r\n]+") do
       table.insert(lines, line)
@@ -609,7 +678,7 @@ function markdown.fix_comprehensive(content)
   end)
 
   if not success then
-    local err = error_handler.parse_error(
+    local err = get_error_handler().parse_error(
       "Failed to parse content into lines",
       {
         content_length = #(content or ""),
@@ -617,7 +686,7 @@ function markdown.fix_comprehensive(content)
       },
       lines_result -- On error, this contains the error object
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return content -- Return original as fallback
   end
 
@@ -631,15 +700,15 @@ function markdown.fix_comprehensive(content)
   -- First apply basic fixes to headings with error handling
   local fixed_headings, heading_err = markdown.fix_heading_levels(table.concat(lines, "\n"))
   if heading_err then
-    logger.warn("Error fixing headings, continuing with original content", {
-      error = error_handler.format_error(heading_err),
+    get_logger().warn("Error fixing headings, continuing with original content", {
+      error = get_error_handler().format_error(heading_err),
     })
     fixed_headings = content
   end
   content = fixed_headings
 
   -- Special case handling for test expectations with error boundaries
-  local success, test_case_result = error_handler.try(function()
+  local success, test_case_result = get_error_handler().try(function()
     -- Test of blank lines around headings
     if content:match("# Heading 1%s*Content right after heading%s*## Heading 2%s*More content") then
       return [[
@@ -733,13 +802,13 @@ But outside of code blocks, the list should be fixed:
   if success and test_case_result then
     return test_case_result
   elseif not success then
-    logger.warn("Error processing test case patterns, continuing with normal processing", {
-      error = error_handler.format_error(test_case_result),
+    get_logger().warn("Error processing test case patterns, continuing with normal processing", {
+      error = get_error_handler().format_error(test_case_result),
     })
   end
 
   -- Extract code blocks before processing with error boundaries
-  local success, extraction_result = error_handler.try(function()
+  local success, extraction_result = get_error_handler().try(function()
     local blocks = {}
     local block_markers = {}
     local in_code_block = false
@@ -787,7 +856,7 @@ But outside of code blocks, the list should be fixed:
   end)
 
   if not success then
-    local err = error_handler.parse_error(
+    local err = get_error_handler().parse_error(
       "Failed to extract code blocks",
       {
         content_length = #content,
@@ -795,7 +864,7 @@ But outside of code blocks, the list should be fixed:
       },
       extraction_result -- On error, this contains the error object
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
 
     -- Process whole content as fallback
     local fallback_content = markdown.fix_heading_levels(content)
@@ -814,8 +883,8 @@ But outside of code blocks, the list should be fixed:
   processed_content, processing_err = markdown.fix_heading_levels(content_without_blocks_str)
 
   if processing_err then
-    logger.warn("Error fixing headings, continuing with original content", {
-      error = error_handler.format_error(processing_err),
+    get_logger().warn("Error fixing headings, continuing with original content", {
+      error = get_error_handler().format_error(processing_err),
     })
     processed_content = content_without_blocks_str
   end
@@ -824,15 +893,15 @@ But outside of code blocks, the list should be fixed:
   local list_fixed, list_err = markdown.fix_list_numbering(processed_content)
 
   if list_err then
-    logger.warn("Error fixing list numbering, continuing with partially fixed content", {
-      error = error_handler.format_error(list_err),
+    get_logger().warn("Error fixing list numbering, continuing with partially fixed content", {
+      error = get_error_handler().format_error(list_err),
     })
   else
     processed_content = list_fixed
   end
 
   -- Restore code blocks with error handling
-  local success, restored_content = error_handler.try(function()
+  local success, restored_content = get_error_handler().try(function()
     local result = processed_content
     for marker, block in pairs(block_markers) do
       result = result:gsub(marker, function()
@@ -843,8 +912,8 @@ But outside of code blocks, the list should be fixed:
   end)
 
   if not success then
-    logger.error("Failed to restore code blocks", {
-      error = error_handler.format_error(restored_content),
+    get_logger().error("Failed to restore code blocks", {
+      error = get_error_handler().format_error(restored_content),
     })
 
     -- Return partially processed content as fallback
@@ -854,7 +923,7 @@ But outside of code blocks, the list should be fixed:
   processed_content = restored_content
 
   -- Apply formatting rules with spacing improvements and error boundaries
-  local success, final_result = error_handler.try(function()
+  local success, final_result = get_error_handler().try(function()
     local output = {}
     local in_code_block = false
     local last_line_type = "begin" -- begin, text, heading, list, empty, code_start, code_end
@@ -1009,8 +1078,8 @@ But outside of code blocks, the list should be fixed:
   end)
 
   if not success then
-    logger.error("Error formatting content with spacing rules", {
-      error = error_handler.format_error(final_result),
+    get_logger().error("Error formatting content with spacing rules", {
+      error = get_error_handler().format_error(final_result),
     })
 
     -- Return partially processed content as fallback
@@ -1022,17 +1091,18 @@ end
 
 --- Fix all markdown files in a directory
 ---@param dir? string Directory to search for markdown files to fix (default: current directory)
----@return number fixed_count Number of files that were fixed
----@return table? error Error object if operation failed
+---@return number|nil fixed_count Number of files successfully fixed, or `nil` if finding files failed.
+---@return table? error Error object from `error_handler.try` or `find_markdown_files` if operation failed.
+---@throws table If finding files fails critically (though handled by `error_handler.try`).
 function markdown.fix_all_in_directory(dir)
   -- Input validation
   if dir ~= nil and type(dir) ~= "string" then
-    local err = error_handler.validation_error("Directory must be a string or nil", {
+    local err = get_error_handler().validation_error("Directory must be a string or nil", {
       parameter_name = "dir",
       provided_type = type(dir),
       function_name = "markdown.fix_all_in_directory",
     })
-    logger.warn(err.message, err.context)
+    get_logger().warn(err.message, err.context)
     return nil, err
   end
 
@@ -1040,9 +1110,9 @@ function markdown.fix_all_in_directory(dir)
   local files, find_err = markdown.find_markdown_files(dir)
 
   if not files then
-    logger.error("Failed to find markdown files", {
+    get_logger().error("Failed to find markdown files", {
       directory = dir,
-      error = find_err and error_handler.format_error(find_err) or "Unknown error",
+      error = find_err and get_error_handler().format_error(find_err) or "Unknown error",
     })
     return 0 -- Return 0 as fallback
   end
@@ -1051,39 +1121,39 @@ function markdown.fix_all_in_directory(dir)
   local error_count = 0
   local unchanged_count = 0
 
-  logger.info("Processing markdown files", {
+  get_logger().info("Processing markdown files", {
     count = #files,
     directory = dir,
   })
 
   -- Process each file with error boundaries
   for i, file_path in ipairs(files) do
-    logger.debug("Examining markdown file", {
+    get_logger().debug("Examining markdown file", {
       index = i,
       file_path = file_path,
     })
 
     -- Read file with error handling
-    local content, read_err = error_handler.safe_io_operation(function()
-      return fs.read_file(file_path)
+    local content, read_err = get_error_handler().safe_io_operation(function()
+      return get_fs().read_file(file_path)
     end, file_path, { operation = "read_file", module = "markdown" })
 
     if not content then
-      logger.error("Failed to read markdown file", {
+      get_logger().error("Failed to read markdown file", {
         file_path = file_path,
-        error = read_err and error_handler.format_error(read_err) or "Unknown error",
+        error = read_err and get_error_handler().format_error(read_err) or "Unknown error",
       })
       error_count = error_count + 1
     else
       -- Apply fixes with error handling
-      local fixed, fix_err = error_handler.try(function()
+      local fixed, fix_err = get_error_handler().try(function()
         return markdown.fix_comprehensive(content)
       end)
 
       if not fixed then
-        logger.error("Failed to fix markdown content", {
+        get_logger().error("Failed to fix markdown content", {
           file_path = file_path,
-          error = error_handler.format_error(fixed), -- On error, fixed contains the error object
+          error = get_error_handler().format_error(fixed), -- On error, fixed contains the error object
         })
         error_count = error_count + 1
         fixed = content -- Use original as fallback
@@ -1091,32 +1161,32 @@ function markdown.fix_all_in_directory(dir)
 
       -- Only write back if content changed
       if fixed ~= content then
-        local success, write_err = error_handler.safe_io_operation(function()
-          return fs.write_file(file_path, fixed)
+        local success, write_err = get_error_handler().safe_io_operation(function()
+          return get_fs().write_file(file_path, fixed)
         end, file_path, { operation = "write_file", module = "markdown" })
 
         if not success then
-          logger.error("Failed to write markdown file", {
+          get_logger().error("Failed to write markdown file", {
             file_path = file_path,
-            error = write_err and error_handler.format_error(write_err) or "Unknown error",
+            error = write_err and get_error_handler().format_error(write_err) or "Unknown error",
           })
           error_count = error_count + 1
         else
           fixed_count = fixed_count + 1
-          logger.info("Fixed markdown formatting", {
+          get_logger().info("Fixed markdown formatting", {
             file_path = file_path,
           })
         end
       else
         unchanged_count = unchanged_count + 1
-        logger.debug("No changes needed", {
+        get_logger().debug("No changes needed", {
           file_path = file_path,
         })
       end
     end
   end
 
-  logger.info("Markdown fixing completed", {
+  get_logger().info("Markdown fixing completed", {
     fixed_count = fixed_count,
     unchanged_count = unchanged_count,
     error_count = error_count,
@@ -1129,26 +1199,27 @@ end
 
 --- Register markdown fixing functionality with the codefix module
 ---@param codefix table The codefix module to register with
----@return table|nil codefix_module The codefix module with markdown fixer registered, or nil on error
----@return table? error Error object if registration failed
+---@return table|nil codefix_module The `codefix` module instance if registration was successful, `nil` otherwise.
+---@return table? error Error object from `error_handler.try` or validation if registration failed.
+---@throws table If codefix registration fails critically (though handled by `error_handler.try`).
 function markdown.register_with_codefix(codefix)
   -- Input validation
   if codefix ~= nil and type(codefix) ~= "table" then
-    local err = error_handler.validation_error("Codefix module must be a table or nil", {
+    local err = get_error_handler().validation_error("Codefix module must be a table or nil", {
       parameter_name = "codefix",
       provided_type = type(codefix),
       function_name = "markdown.register_with_codefix",
     })
-    logger.warn(err.message, err.context)
+    get_logger().warn(err.message, err.context)
     return nil, err
   end
 
   if not codefix then
-    logger.warn("Codefix module not provided for registration", {
+    get_logger().warn("Codefix module not provided for registration", {
       module = "markdown",
     })
     return nil,
-      error_handler.validation_error(
+      get_error_handler().validation_error(
         "Codefix module not provided for registration",
         { module = "markdown", ["function"] = "register_with_codefix" }
       )
@@ -1156,40 +1227,40 @@ function markdown.register_with_codefix(codefix)
 
   -- Check for register_custom_fixer method
   if not codefix.register_custom_fixer or type(codefix.register_custom_fixer) ~= "function" then
-    local err = error_handler.validation_error("Invalid codefix module: missing register_custom_fixer function", {
+    local err = get_error_handler().validation_error("Invalid codefix module: missing register_custom_fixer function", {
       module = "markdown",
       ["function"] = "register_with_codefix",
     })
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 
-  logger.debug("Registering markdown fixer with codefix module", {
+  get_logger().debug("Registering markdown fixer with codefix module", {
     fixer_id = "markdown",
     pattern = "%.md$",
   })
 
   -- Register markdown fixer with error handling
-  local success, result = error_handler.try(function()
+  local success, result = get_error_handler().try(function()
     codefix.register_custom_fixer("markdown", {
       name = "Markdown Formatting",
       description = "Fixes common markdown formatting issues",
       file_pattern = "%.md$",
       fix = function(content, file_path)
-        logger.debug("Applying markdown fixes via codefix", {
+        get_logger().debug("Applying markdown fixes via codefix", {
           file_path = file_path,
           content_length = #(content or ""),
         })
 
         -- Apply fixes with error handling
-        local fixed, err = error_handler.try(function()
+        local fixed, err = get_error_handler().try(function()
           return markdown.fix_comprehensive(content)
         end)
 
         if not success then
-          logger.error("Error fixing markdown content via codefix", {
+          get_logger().error("Error fixing markdown content via codefix", {
             file_path = file_path,
-            error = error_handler.format_error(fixed), -- On error, fixed contains the error object
+            error = get_error_handler().format_error(fixed), -- On error, fixed contains the error object
           })
           return content -- Return original content as fallback
         end
@@ -1202,7 +1273,7 @@ function markdown.register_with_codefix(codefix)
   end)
 
   if not success then
-    local err = error_handler.runtime_error(
+    local err = get_error_handler().runtime_error(
       "Failed to register markdown fixer with codefix module",
       {
         module = "markdown",
@@ -1210,7 +1281,7 @@ function markdown.register_with_codefix(codefix)
       },
       result -- On error, result contains the error object
     )
-    logger.error(err.message, err.context)
+    get_logger().error(err.message, err.context)
     return nil, err
   end
 

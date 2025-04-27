@@ -1,7 +1,27 @@
--- Tests for parallel execution functionality
+---@diagnostic disable: missing-parameter, param-type-mismatch
+--- Parallel Test Execution Tests
+---
+--- Verifies the functionality of the `lib.tools.parallel` module, including:
+--- - Default and custom configuration (workers, timeout, fail_fast).
+--- - Running multiple test files concurrently (`run_tests`).
+--- - Aggregating results correctly (pass/fail counts, file lists).
+--- - Handling test failures across workers.
+--- - Implementing `fail_fast` behavior.
+--- - Enforcing timeouts.
+--- - Uses `before`/`after` hooks for setup/teardown, including creating temporary test files
+---   and ensuring cleanup via the `temp_file` module.
+--- - Uses `test_helper.with_error_capture` for robust error testing.
+---
+--- @author Firmo Team
+--- @test
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local before, after = firmo.before, firmo.after
+local error_handler = require("lib.tools.error_handler")
+
+-- Import logging module for proper logging
+local logging = require("lib.tools.logging")
+local logger = logging.get_logger("parallel_test")
 
 -- Import filesystem module for file operations
 local fs = require("lib.tools.filesystem")
@@ -15,8 +35,6 @@ local parallel = require("lib.tools.parallel")
 -- Import central_config for configuration
 local central_config = require("lib.core.central_config")
 
--- Import logging module for proper logging
-local logging = require("lib.tools.logging")
 -- Import the temp_file module for proper test file management
 local temp_file = require("lib.tools.filesystem.temp_file")
 
@@ -24,7 +42,13 @@ local temp_file = require("lib.tools.filesystem.temp_file")
 local TEST_DIR
 local TEST_FILES = {}
 
--- Function to create a test file with specified parameters
+--- Creates a temporary test file with the specified content.
+--- Registers the file with the `temp_file` module for automatic cleanup.
+---@param name string Base name for the test file (e.g., "passing_test").
+---@param content string The Lua code content for the test file.
+---@return string|nil file_path The full path to the created file, or nil on error.
+---@return table? error Error object if file creation or writing failed.
+---@private
 local function create_test_file(name, content)
   -- Ensure the directory exists first
   if not TEST_DIR then
@@ -49,7 +73,11 @@ local function create_test_file(name, content)
   return file_path
 end
 
--- Function to cleanup test files
+--- Cleans up the temporary directory used for test files in this test suite.
+--- Primarily relies on the `temp_file` module's automatic cleanup.
+--- This function serves as a fallback/log mechanism if `temp_file` fails.
+---@return nil
+---@private
 local function cleanup_test_files()
   -- Files registered with temp_file will be cleaned up automatically
   -- This is just for additional cleanup if needed
@@ -62,7 +90,7 @@ local function cleanup_test_files()
       return true
     end)()
     if not success and err then
-      logging.warn("Failed to cleanup test directory", { error = err, directory = TEST_DIR })
+      logger.warn("Failed from cleanup test directory", { error = err, directory = TEST_DIR })
     end
     -- Clear the test files table
     TEST_FILES = {}
@@ -103,7 +131,9 @@ describe("Parallel Execution Module", function()
     expect(passing_err).to_not.exist("Failed to create passing test file")
     expect(passing_path).to.exist()
 
-    local failing_path, failing_err = create_test_file("failing_test", [[
+    local failing_path, failing_err = create_test_file(
+      "failing_test",
+      [[
       local firmo = require("firmo")
       local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 
@@ -143,7 +173,7 @@ describe("Parallel Execution Module", function()
     expect(slow_path).to.exist()
     -- Reset the parallel module to a clean state
     local reset_result, reset_err = test_helper.with_error_capture(function()
-      return parallel.full_reset()  -- This is enough for initial setup
+      return parallel.full_reset() -- This is enough for initial setup
     end)()
     expect(reset_err).to_not.exist("Failed to reset parallel module")
 
@@ -152,13 +182,13 @@ describe("Parallel Execution Module", function()
       central_config.set({
         parallel = {
           workers = 4, -- Use module default
-          timeout = 60,  -- Match module default
+          timeout = 60, -- Match module default
           output_buffer_size = 1024,
           verbose = false,
           show_worker_output = false, -- Don't show output during tests
           fail_fast = false,
           aggregate_coverage = true,
-        }
+        },
       })
       return true
     end)()
@@ -185,10 +215,10 @@ describe("Parallel Execution Module", function()
 
     -- Reset the parallel module back to defaults
     local reset_result, reset_err = test_helper.with_error_capture(function()
-      return parallel.full_reset()  -- This handles both cancellation and reset
+      return parallel.full_reset() -- This handles both cancellation and reset
     end)()
     if reset_err then
-      logging.warn("Failed to reset parallel module", { error = reset_err })
+      logger.warn("Failed to reset parallel module", { error = reset_err })
     end
     central_config.reset()
   end)
@@ -198,15 +228,15 @@ describe("Parallel Execution Module", function()
       parallel.reset()
       return true
     end)()
-    
+
     expect(reset_err).to_not.exist("Failed to reset parallel module")
-    
+
     -- Test that the parallel module has default configuration values
     expect(parallel.options).to.exist("Parallel options not defined")
     expect(parallel.options.workers).to.be.a("number")
     expect(parallel.options.timeout).to.be.a("number")
     expect(parallel.options.fail_fast).to.be.a("boolean")
-    
+
     -- Test for specific default values
     local debug_config = parallel.debug_config()
     expect(debug_config.local_config).to.exist("Local configuration not found in debug_config")
@@ -219,9 +249,9 @@ describe("Parallel Execution Module", function()
       parallel.reset()
       return true
     end)()
-    
+
     expect(reset_err).to_not.exist("Failed to reset parallel module")
-    
+
     -- Check worker count directly from options
     local workers = parallel.options.workers
     expect(workers).to.exist("Worker count should exist")
@@ -239,12 +269,12 @@ describe("Parallel Execution Module", function()
       fail_fast = false,
     }
     -- Log test execution for debugging
-    logging.debug("Running test files in parallel", {
+    logger.debug("Running test files in parallel", {
       files = {
         fs.join_paths(TEST_DIR, "passing_test.lua"),
-        fs.join_paths(TEST_DIR, "slow_test.lua")
+        fs.join_paths(TEST_DIR, "slow_test.lua"),
       },
-      options = options
+      options = options,
     })
 
     -- Run the passing and slow tests in parallel with error handling
@@ -278,12 +308,12 @@ describe("Parallel Execution Module", function()
       fail_fast = false,
     }
     -- Log test execution for debugging
-    logging.debug("Running test files in parallel with expected failure", {
+    logger.debug("Running test files in parallel with expected failure", {
       files = {
         fs.join_paths(TEST_DIR, "passing_test.lua"),
-        fs.join_paths(TEST_DIR, "failing_test.lua")
+        fs.join_paths(TEST_DIR, "failing_test.lua"),
       },
-      options = options
+      options = options,
     })
 
     -- Run the passing and failing tests in parallel
@@ -293,19 +323,19 @@ describe("Parallel Execution Module", function()
         fs.join_paths(TEST_DIR, "failing_test.lua"),
       }, options)
     end)()
-    
+
     -- We should get results, but with failures indicated
     expect(results).to.exist("Parallel run results should exist even with failures")
     -- Check file execution
     expect(results.files_run).to.exist("Should have list of files run")
     expect(#results.files_run).to.equal(2, "Should have run 2 test files")
-    
+
     -- Check result fields conditionally
     if results.total ~= nil then
       expect(results.total).to.be_greater_than(0, "Should have run some tests")
     end
     expect(results.elapsed).to.exist("Should have elapsed time")
-  end)  -- Close handle failures test
+  end) -- Close handle failures test
 
   it("should stop execution on first failure when fail_fast is enabled", { expect_error = true }, function()
     -- Configure options just for this test
@@ -316,7 +346,7 @@ describe("Parallel Execution Module", function()
       show_worker_output = false,
       fail_fast = true,
     }
-    
+
     -- Create an additional test file that would run if fail_fast didn't work
     local very_slow_path, very_slow_err = create_test_file(
       "very_slow_test",
@@ -342,12 +372,12 @@ describe("Parallel Execution Module", function()
 
     expect(very_slow_err).to_not.exist("Failed to create very slow test file")
     -- Log test execution for debugging
-    logging.debug("Running test files with fail_fast enabled", {
+    logger.debug("Running test files with fail_fast enabled", {
       files = {
         fs.join_paths(TEST_DIR, "failing_test.lua"),
-        fs.join_paths(TEST_DIR, "very_slow_test.lua")
+        fs.join_paths(TEST_DIR, "very_slow_test.lua"),
       },
-      options = options
+      options = options,
     })
 
     -- Run a failing test first (which should trigger fail_fast) and then the very slow test
@@ -357,21 +387,21 @@ describe("Parallel Execution Module", function()
         fs.join_paths(TEST_DIR, "very_slow_test.lua"),
       }, options)
     end)()
-    
+
     -- Validate the results - fail_fast should prevent the very slow test from completing
     expect(results).to.exist("Parallel run results should exist with fail_fast")
-    
+
     -- Check file execution
     expect(results.files_run).to.exist("Should have list of files run")
     expect(#results.files_run).to.be_greater_than(0, "Should have tracked at least one file")
-    
+
     -- Check result fields conditionally
     if results.total ~= nil then
       expect(results.total).to.be_greater_than(0, "Should have run some tests")
     end
     -- Check timing
     expect(results.elapsed).to.be_less_than(10, "Should not wait for the very slow test")
-  end)  -- Close the fail-fast test
+  end) -- Close the fail-fast test
 
   it("should handle timeouts gracefully", { expect_error = true }, function()
     local options = {
@@ -381,11 +411,11 @@ describe("Parallel Execution Module", function()
       show_worker_output = false,
       fail_fast = false,
     }
-    
+
     -- Log test execution for debugging
-    logging.debug("Running test with short timeout", {
+    logger.debug("Running test with short timeout", {
       files = { fs.join_paths(TEST_DIR, "slow_test.lua") },
-      options = options
+      options = options,
     })
 
     -- Run the slow test with a short timeout
@@ -394,18 +424,17 @@ describe("Parallel Execution Module", function()
         fs.join_paths(TEST_DIR, "slow_test.lua"),
       }, options)
     end)()
-    
+
     -- Validate the results - the test should timeout and be considered a failure
     expect(results).to.exist("Parallel run results should exist even with timeouts")
     expect(results.files_run).to.exist("Should have list of files run")
     expect(#results.files_run).to.equal(1, "Should have run 1 test file")
-    
+
     -- Check execution results conditionally
     if results.total ~= nil then
       expect(results.total).to.exist("Should have total test count")
     end
     -- Check timing
     expect(results.elapsed).to.be_less_than(3, "Timeout should prevent long execution")
-  end)  -- Close the timeout test
-
-end)  -- Close the describe block
+  end) -- Close the timeout test
+end) -- Close the describe block

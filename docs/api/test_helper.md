@@ -13,7 +13,6 @@ The Test Helper module provides utilities to make it easier to test error condit
 - [Test Directory Utilities](#test-directory-utilities)
 - [Utility Functions](#utility-functions)
 
-
 ## Module Overview
 
 
@@ -48,8 +47,7 @@ function test_helper.with_error_capture(func)
 
 **Returns:**
 
-
-- (function): A wrapped function that returns `nil, error_object` when an error occurs
+- (function): A new function that wraps the original `func`. When this new function is called, it executes `func` safely. It returns `result, nil` on success, or `nil, error_object` if `func` throws an error.
 
 **Example:**
 
@@ -100,91 +98,6 @@ local err = test_helper.expect_error(function()
 end, "Invalid input")
 -- Additional assertions on the error object
 expect(err.category).to.equal("VALIDATION")
-```
-
-
-
-### with_suppressed_output
-
-
-Executes a function with stdout and stderr temporarily suppressed.
-
-
-```lua
-function test_helper.with_suppressed_output(func)
-```
-
-
-**Parameters:**
-
-
-- `func` (function): The function to execute with suppressed output
-
-**Returns:**
-
-
-- (any): The return value from the function
-- (string): Captured stdout output
-- (string): Captured stderr output
-
-**Example:**
-
-
-```lua
-local result, stdout, stderr = test_helper.with_suppressed_output(function()
-  print("This won't be displayed")
-  io.stderr:write("This error won't be displayed")
-  return "result"
-end)
-expect(result).to.equal("result")
-expect(stdout).to.match("This won't be displayed")
-expect(stderr).to.match("This error won't be displayed")
-```
-
-
-
-### mock_io
-
-
-Temporarily mocks io.open and related functions for testing I/O operations.
-
-
-```lua
-function test_helper.mock_io(mocks)
-```
-
-
-**Parameters:**
-
-
-- `mocks` (table): Table of file path patterns and mock behaviors
-
-**Returns:**
-
-
-- (function): Function to restore original I/O functions
-
-**Example:**
-
-
-```lua
-local restore = test_helper.mock_io({
-  ["config%.json"] = {
-    read = '{"setting": "value"}',
-    error = nil
-  },
-  ["nonexistent%.txt"] = {
-    read = nil,
-    error = "No such file or directory"
-  }
-})
--- Test code that uses io.open
-local f = io.open("config.json", "r")
-local content = f:read("*a")
-f:close()
-expect(content).to.equal('{"setting": "value"}')
--- Restore original I/O functions
-restore()
 ```
 
 
@@ -264,90 +177,47 @@ test_helper.register_temp_directory(dir_path)
 ```
 
 
-
-### create_temp_directory
-
-
-Creates a temporary directory.
-
-
-```lua
-function test_helper.create_temp_directory(name_prefix)
-```
-
-
-**Parameters:**
-
-
-- `name_prefix` (string, optional): Prefix for the directory name
-
-**Returns:**
-
-
-- (string|nil): Path to the created temporary directory, or nil on error
-- (table, optional): Error object if operation failed
-
-**Example:**
-
-
-```lua
-local temp_dir, err = test_helper.create_temp_directory("test_")
-expect(err).to_not.exist()
--- Use the directory in tests
-fs.write_file(temp_dir .. "/config.json", '{"setting": "value"}')
--- Directory is automatically cleaned up after test completes
-```
-
-
-
-## Test Directory Utilities
-
-
 ### create_temp_test_directory
 
-
-Creates a temporary test directory with utility functions for managing test files.
-
+Creates a temporary test directory with helper methods for managing files within it. The directory itself is automatically registered for cleanup.
 
 ```lua
----@return TestDirectory test_directory Directory object with helper methods
 function test_helper.create_temp_test_directory()
 ```
 
-
 **Returns:**
 
-
-- (TestDirectory): A test directory object with utility methods
+- `test_directory` (TestDirectory): An object representing the temporary directory with the following properties and methods:
+  - `path` (string): The absolute path to the created temporary directory.
+  - `create_file(file_path, content)`: Creates a file within the test directory (relative `file_path`). Handles subdirectories. Returns the full path. Registers the file for cleanup.
+  - `read_file(file_path)`: Reads a file within the test directory (relative `file_path`). Returns `content|nil, error?`.
+  - `create_subdirectory(subdir_path)`: Creates a subdirectory within the test directory (relative `subdir_path`). Returns the full path. Registers the subdirectory for cleanup.
+  - `file_exists(file_name)`: Checks if a file exists within the test directory (relative `file_name`).
+  - `unique_filename(prefix?, extension?)`: Generates a unique filename (not path) suitable for use within this directory.
+  - `create_numbered_files(basename, content_pattern, count)`: Creates multiple numbered files (e.g., `base_001.txt`). Returns an array of full paths. Registers files for cleanup.
+  - `write_file(filename, content)`: Writes content to a file (relative `filename`) and registers it for cleanup. Returns `success?, error?`.
 
 **Example:**
 
-
 ```lua
 local test_dir = test_helper.create_temp_test_directory()
--- Create files in the directory
-test_dir.create_file("config.json", '{"setting": "value"}')
-test_dir.create_file("src/main.lua", "print('Hello')")
--- Use the directory in tests
-local config_path = test_dir.path .. "/config.json"
-expect(fs.file_exists(config_path)).to.be_truthy()
--- Directory is automatically cleaned up after test completes
+expect(test_dir).to.exist()
+expect(test_dir.path).to.be.a("string")
+
+-- Create a file
+local file_path = test_dir.create_file("my_config.txt", "data=123")
+expect(test_dir.file_exists("my_config.txt")).to.be_truthy()
+
+-- Create a file in a subdirectory
+local nested_path = test_dir.create_file("subdir/nested.log", "Log entry")
+expect(test_dir.file_exists("subdir/nested.log")).to.be_truthy()
+
+-- Read content
+local content = test_dir.read_file("my_config.txt")
+expect(content).to.equal("data=123")
+
+-- Directory and all created files are automatically cleaned up
 ```
-
-
-The `TestDirectory` object has the following methods and properties:
-
-
-- `path` (string): The absolute path to the test directory
-- `create_file(file_name, content)` (function): Creates a file within the directory, automatically creating parent directories as needed
-- `create_subdirectory(subdir_name)` (function): Creates a subdirectory
-- `file_exists(file_name)` (function): Checks if a file exists in the test directory
-- `read_file(file_name)` (function): Reads a file within the directory
-- `unique_filename(prefix, extension)` (function): Generates a unique filename in the directory
-- `create_numbered_files(basename, content_pattern, count)` (function): Creates multiple numbered files
-- `write_file(filename, content)` (function): Writes a file and registers it for cleanup
-
-
 ### with_temp_test_directory
 
 
@@ -403,187 +273,30 @@ end)
 
 
 
-## Utility Functions
+### execute_string
 
-
-### with_environment
-
-
-Temporarily modifies environment variables for a test.
-
+Executes a string of Lua code using `load()`.
 
 ```lua
-function test_helper.with_environment(env_vars, func)
+function test_helper.execute_string(code)
 ```
-
 
 **Parameters:**
 
-
-- `env_vars` (table): A table of environment variables to set
-- `func` (function): Function to execute with the modified environment
+- `code` (string): The Lua code string to execute.
 
 **Returns:**
 
-
-- (any): The return value from the function
-
-**Example:**
-
-
-```lua
-local result = test_helper.with_environment({
-  DEBUG = "1",
-  LOG_LEVEL = "trace"
-}, function()
-  -- Code that uses environment variables
-  return check_debug_setting()
-end)
-expect(result).to.be_truthy()
-```
-
-
-
-### with_working_directory
-
-
-Temporarily changes the working directory for a test.
-
-
-```lua
-function test_helper.with_working_directory(dir_path, func)
-```
-
-
-**Parameters:**
-
-
-- `dir_path` (string): The directory to change to
-- `func` (function): Function to execute in the directory
-
-**Returns:**
-
-
-- (any): The return value from the function
+- `result` (any|nil): The result(s) returned by the executed code, or `nil` on error.
+- `error_message` (string?): Error message if loading or executing the code failed.
 
 **Example:**
 
-
 ```lua
-local result = test_helper.with_working_directory("tests/fixtures", function()
-  -- Code that relies on current working directory
-  return load_relative_file("data.json")
-end)
-expect(result).to_not.equal(nil)
-```
+local result, err = test_helper.execute_string("return 1 + 2")
+expect(err).to_not.exist()
+expect(result).to.equal(3)
 
-
-
-### with_path_separator
-
-
-Temporarily changes the path separator for cross-platform testing.
-
-
-```lua
-function test_helper.with_path_separator(separator, func)
-```
-
-
-**Parameters:**
-
-
-- `separator` (string): The path separator to use ("/" or "\\")
-- `func` (function): Function to execute with the modified separator
-
-**Returns:**
-
-
-- (any): The return value from the function
-
-**Example:**
-
-
-```lua
--- Test Windows path handling
-local result = test_helper.with_path_separator("\\", function()
-  return fs.normalize_path("dir\\subdir\\file.txt")
-end)
-expect(result).to.equal("dir\\subdir\\file.txt")
-```
-
-
-
-### mock_time
-
-
-Mocks os.time and os.date for time-dependent tests.
-
-
-```lua
-function test_helper.mock_time(time_value)
-```
-
-
-**Parameters:**
-
-
-- `time_value` (number|string): Unix timestamp or date string
-
-**Returns:**
-
-
-- (function): Function to restore original time functions
-
-**Example:**
-
-
-```lua
--- Mock time to a specific date
-local restore = test_helper.mock_time("2025-01-15 12:00:00")
--- Test code that depends on time
-local timestamp = os.time()
-local formatted = os.date("%Y-%m-%d", timestamp)
-expect(formatted).to.equal("2025-01-15")
--- Restore original time functions
-restore()
-```
-
-
-
-### create_spy
-
-
-Creates a spy function for tracing calls.
-
-
-```lua
-function test_helper.create_spy(func)
-```
-
-
-**Parameters:**
-
-
-- `func` (function, optional): Original function to wrap
-
-**Returns:**
-
-
-- (table): Spy object with call history and the spy function
-
-**Example:**
-
-
-```lua
-local spy = test_helper.create_spy(math.max)
--- Call the spy function
-local result = spy.func(5, 10)
--- Verify calls
-expect(result).to.equal(10)
-expect(spy.called).to.equal(true)
-expect(spy.call_count).to.equal(1)
-expect(spy.calls[1].args[1]).to.equal(5)
-expect(spy.calls[1].args[2]).to.equal(10)
-expect(spy.calls[1].result).to.equal(10)
+local _, err = test_helper.execute_string("invalid lua code")
+expect(err).to.be.a("string")
 ```

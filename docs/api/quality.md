@@ -44,11 +44,11 @@ Level constants are provided for ease of use:
 
 ```lua
 quality.LEVEL_BASIC -- 1
-quality.LEVEL_STRUCTURED -- 2
+quality.LEVEL_BASIC         -- 1
+quality.LEVEL_STRUCTURED    -- 2
 quality.LEVEL_COMPREHENSIVE -- 3
-quality.LEVEL_ADVANCED -- 4
-quality.LEVEL_COMPLETE -- 5
-```
+quality.LEVEL_ADVANCED      -- 4
+quality.LEVEL_COMPLETE      -- 5
 
 
 
@@ -87,7 +87,35 @@ quality.init({
   level = quality.LEVEL_COMPREHENSIVE, -- Level 3
 })
 ```
+### configure(options)
 
+Configures the quality module, merging provided options with defaults and central configuration.
+Updates logger settings based on debug/verbose flags.
+
+```lua
+quality.configure({
+  level = 3,
+  strict = true,
+  verbose = true
+})
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| options.enabled | boolean | Enable/disable quality validation |
+| options.level | number | Set the required quality level (1-5) |
+| options.strict | boolean | Enable/disable strict mode |
+| options.custom_rules | table | Define custom quality rules |
+| options.coverage_data | table | Provide coverage data for validation |
+| options.debug | boolean | Enable debug logging for the module |
+| options.verbose | boolean | Enable verbose logging for the module |
+**Returns:** The quality module for method chaining
+**Example:**
+
+```lua
+-- Enable quality level 3 and verbose logging
+quality.configure({ level = 3, verbose = true })
+```
 
 
 ### reset()
@@ -325,319 +353,6 @@ local json_data = quality.report("json")
 local html = quality.report("html")
 fs.write_file("quality-report.html", html)
 ```
-
-
-
-### save_report(file_path, format)
-
-
-Save a quality report to a file in the specified format.
-
-
-```lua
-local success, err = quality.save_report("quality-report.html", "html")
-```
-
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| file_path | string | The path where to save the quality report |
-| format | string | Report format ("summary", "json", "html") |
-**Returns:**
-
-
-- `success` (boolean): Whether the report was successfully saved
-- `error` (string, optional): Error message if saving failed
-
-**Example:**
-
-
-```lua
--- Save a quality report in HTML format
-local success, err = quality.save_report("quality-report.html", "html")
-if not success then
-  print("Failed to save report: " .. err)
-end
--- Save a quality report using defaults from central configuration
-local success = quality.save_report("quality-report.json")
-```
-
-
-
-### get_report_data()
-
-
-Get structured data for quality report generation.
-
-
-```lua
-local data = quality.get_report_data()
-```
-
-
-**Returns:** Quality report data structure
-**Example:**
-
-
-```lua
-local data = quality.get_report_data()
-print("Overall quality level: " .. data.level)
-print("Tests analyzed: " .. data.summary.tests_analyzed)
-print("Quality percentage: " .. data.summary.quality_percent .. "%")
-```
-
-
-
-### summary_report()
-
-
-Generate a simplified summary report with key metrics.
-
-
-```lua
-local summary = quality.summary_report()
-```
-
-
-**Returns:** Summary report as table
-**Example:**
-
-
-```lua
-local summary = quality.summary_report()
-print("Quality level: " .. summary.level_name)
-print("Tests passing: " .. summary.tests_passing_quality .. "/" .. summary.tests_analyzed)
-print("Quality score: " .. summary.quality_pct .. "%")
-```
-
-
-
-## Helper Functions
-
-
-### get_level_name(level)
-
-
-Get the descriptive name for a quality level.
-
-
-```lua
-local name = quality.get_level_name(3)
-```
-
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| level | number | Quality level number (1-5) |
-**Returns:** Level name as string
-**Example:**
-
-
-```lua
-local name = quality.get_level_name(3)
-print(name) -- "comprehensive"
-```
-
-
-
-### meets_level(level)
-
-
-Check if quality metrics meet a specific level requirement.
-
-
-```lua
-local meets = quality.meets_level(3)
-```
-
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| level | number | Quality level to check against (defaults to configured level) |
-**Returns:** Whether the quality meets the specified level requirement
-**Example:**
-
-
-```lua
-if quality.meets_level(3) then
-  print("Quality meets level 3 standards!")
-else
-  print("Quality does not meet level 3 standards")
-end
-```
-
-
-
-### get_level_requirements(level)
-
-
-Get requirements for a specific quality level.
-
-
-```lua
-local requirements = quality.get_level_requirements(3)
-```
-
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| level | number | Quality level to get requirements for |
-**Returns:** Requirements table for the specified level
-**Example:**
-
-
-```lua
-local requirements = quality.get_level_requirements(3)
-print("Level 3 requires " .. requirements.min_assertions_per_test .. " assertions per test")
-```
-
-
-
-## Integration with Other Modules
-
-
-### Central Configuration Integration
-
-
-The quality module integrates with the centralized configuration system:
-
-
-```lua
--- In .firmo-config.lua
-return {
-  quality = {
-    enabled = true,
-    level = 3,
-    strict = false
-  },
-  reporting = {
-    formats = {
-      quality = {
-        default = "html"
-      }
-    }
-  }
-}
-```
-
-
-
-### Coverage Integration
-
-
-The quality module can validate against coverage thresholds:
-
-
-```lua
--- Initialize quality with coverage data
-local coverage = require("lib.coverage")
-quality.init({
-  enabled = true,
-  level = 3,
-  coverage_data = coverage
-})
--- Coverage threshold is checked when validating at higher quality levels
-local meets, issues = quality.check_file("tests/my_test.lua", 5)
-```
-
-
-
-### Reporting Integration
-
-
-The quality module uses the reporting module for output:
-
-
-```lua
--- Generate a report in the format configured in central_config
-local report = quality.report()
--- Save a report using the reporting module
-local success = quality.save_report("quality-report.html", "html")
-```
-
-
-
-# Quality Module API
-
-
-The quality module in firmo provides test quality validation with customizable levels and reporting capabilities.
-
-## Overview
-
-
-The quality module analyzes test structure, assertions, and organization to validate that tests meet specified quality criteria. It supports five quality levels (from basic to complete) and can generate reports highlighting areas for improvement.
-
-## Basic Usage
-
-
-
-```lua
--- Enable quality validation in a test file
-local firmo = require('firmo')
-firmo.quality_options.enabled = true
-firmo.quality_options.level = 3 -- Comprehensive quality level
--- Run tests with quality validation
-firmo.run_discovered('./tests')
--- Generate a quality report
-local report = firmo.generate_quality_report('html', './quality-report.html')
-```
-
-
-From the command line:
-
-
-```bash
-
-# Run tests with quality validation at level 3
-
-
-lua firmo.lua --quality --quality-level 3 tests/
-```
-
-
-
-## Quality Levels
-
-
-The quality module defines five progressive quality levels:
-
-
-1. **Basic (Level 1)**
-   - At least one assertion per test
-   - Proper test and describe block naming
-   - No empty test blocks
-2. **Standard (Level 2)**
-   - Multiple assertions per test
-   - Testing of basic functionality
-   - Error case handling
-   - Clear test organization
-3. **Comprehensive (Level 3)**
-   - Edge case testing
-   - Type checking assertions
-   - Proper mock/stub usage
-   - Isolated test setup and teardown
-4. **Advanced (Level 4)**
-   - Boundary condition testing
-   - Complete mock verification
-   - Integration and unit test separation
-   - Performance validation where applicable
-5. **Complete (Level 5)**
-   - 100% branch coverage
-   - Security vulnerability testing
-   - Comprehensive API contract testing
-   - Full dependency isolation
-
-
-## Configuration Options
-
-
-The quality module can be configured through the `firmo.quality_options` table:
-
-
-```lua
-firmo.quality_options = {
-  enabled = true,        -- Enable quality validation (default: false)
-  level = 3,             -- Quality level to enforce (1-5, default: 1)
   format = "html",       -- Default format for reports (html, json, summary)
   output = "./quality",  -- Default output location for reports
   strict = false,        -- Strict mode - fail on first issue (default: false)

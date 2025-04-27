@@ -1,7 +1,8 @@
 # Assertion Module API Reference
 
+---@diagnostic disable: unused-local
 
-The assertion module provides a comprehensive, standalone implementation of expect-style assertions for the Firmo testing framework. It includes a rich set of chainable assertions, deep equality comparisons, and structured error reporting.
+The assertion module provides a comprehensive, standalone implementation of expect-style assertions for the Firmo testing framework. It includes a rich set of chainable assertions, deep equality comparisons, type checking (`isa`), structured error reporting, and integration with the coverage system.
 
 ## Core Functions
 
@@ -76,6 +77,8 @@ Type checking function that works with both basic types and metatables.
 - `string`: Success message (for internal use)
 - `string`: Failure message (for internal use)
 
+**Throws:** An error if `expected_type` is not a string or table.
+
 **Example:**
 
 
@@ -83,59 +86,6 @@ Type checking function that works with both basic types and metatables.
 local assertion = require("lib.assertion")
 local result = assertion.isa(42, "number")
 -- result is true
-```
-
-
-
-### assertion.stringify(value, [depth], [visited])
-
-
-Converts any value to a readable string representation with proper formatting for different types.
-**Parameters:**
-
-
-- `value` (any): The value to stringify
-- `depth` (number, optional): Current depth for recursive calls (default: 0)
-- `visited` (table, optional): Table for tracking visited objects (for internal use)
-
-**Returns:**
-
-
-- `string`: A string representation of the value
-
-**Example:**
-
-
-```lua
-local assertion = require("lib.assertion")
-local str = assertion.stringify({a = 1, b = {c = 2}})
--- str is "{ a = 1, b = { c = 2 } }"
-```
-
-
-
-### assertion.diff_values(v1, v2)
-
-
-Generates a human-readable diff between two values.
-**Parameters:**
-
-
-- `v1` (any): First value to compare
-- `v2` (any): Second value to compare
-
-**Returns:**
-
-
-- `string`: A formatted string showing the differences
-
-**Example:**
-
-
-```lua
-local assertion = require("lib.assertion")
-local diff = assertion.diff_values({a = 1, b = 2}, {a = 1, b = 3})
--- diff contains details of the difference in the b field
 ```
 
 
@@ -265,7 +215,15 @@ expect(42).to_not.be_falsy()
 ```
 
 
+### .be_nil()
 
+Asserts that a value is exactly `nil`.
+**Example:**
+
+```lua
+expect(nil).to.be_nil()
+expect(false).to_not.be_nil()
+```
 ### .match(pattern)
 
 
@@ -326,38 +284,31 @@ expect({1, 2, 3}).to.contain(2) -- Table containment
 
 
 
-### .contain.key(key)
-
+### .key(key)
 
 Asserts that a table contains the specified key.
 **Parameters:**
-
 
 - `key` (any): The key to check for
 
 **Example:**
 
-
 ```lua
-expect({name = "test", id = 1}).to.contain.key("name")
+expect({name = "test", id = 1}).to.have.key("name")
 ```
 
 
-
-### .contain.keys(keys)
-
+### .keys(keys)
 
 Asserts that a table contains all the specified keys.
 **Parameters:**
-
 
 - `keys` (table): An array of keys to check for
 
 **Example:**
 
-
 ```lua
-expect({a = 1, b = 2, c = 3}).to.contain.keys({"a", "b"})
+expect({a = 1, b = 2, c = 3}).to.have.keys({"a", "b"})
 ```
 
 
@@ -503,7 +454,22 @@ expect(3).to.be_less_than(5)
 ```
 
 
+### .be_between(min, max)
 
+Asserts that a number is between the specified minimum and maximum values (inclusive).
+**Parameters:**
+
+- `min` (number): The minimum value (inclusive)
+- `max` (number): The maximum value (inclusive)
+
+**Example:**
+
+```lua
+expect(5).to.be_between(1, 10)
+expect(1).to.be_between(1, 10)
+expect(10).to.be_between(1, 10)
+expect(11).to_not.be_between(1, 10)
+```
 ### .be_between(min, max)
 
 
@@ -541,7 +507,20 @@ expect(0.1 + 0.2).to.be_approximately(0.3, 0.0001)
 ```
 
 
+### .be_approximately(target, delta)
 
+Asserts that a number is approximately equal to the target value within the specified delta.
+**Parameters:**
+
+- `target` (number): The target value to compare against
+- `delta` (number): The maximum allowed difference (default: 0.0001)
+
+**Example:**
+
+```lua
+expect(0.1 + 0.2).to.be_approximately(0.3) -- Uses default delta
+expect(3.14159).to.be_approximately(3.14, 0.01)
+```
 ### .be.positive()
 
 
@@ -609,7 +588,34 @@ expect("Hello").to_not.be.lowercase()
 ```
 
 
+### .start_with(prefix)
 
+Asserts that a string starts with the specified prefix.
+**Parameters:**
+
+- `prefix` (string): The expected starting substring
+
+**Example:**
+
+```lua
+expect("hello world").to.start_with("hello")
+expect("test").to_not.start_with("best")
+```
+
+
+### .end_with(suffix)
+
+Asserts that a string ends with the specified suffix.
+**Parameters:**
+
+- `suffix` (string): The expected ending substring
+
+**Example:**
+
+```lua
+expect("hello world").to.end_with("world")
+expect("testing").to_not.end_with("fest")
+```
 ### .change(value_fn, [change_fn])
 
 
@@ -629,6 +635,23 @@ expect(function() obj.count = obj.count + 1 end).to.change(function() return obj
 ```
 
 
+### .satisfy(predicate)
+
+Asserts that a value satisfies a custom predicate function.
+**Parameters:**
+
+- `predicate` (function): A function that takes the value and returns `true` if satisfied, `false` otherwise.
+
+**Example:**
+
+```lua
+local function is_positive_number(v)
+  return type(v) == "number" and v > 0
+end
+expect(10).to.satisfy(is_positive_number)
+expect(-5).to_not.satisfy(is_positive_number)
+expect("hello").to_not.satisfy(is_positive_number)
+```
 
 ### .increase(value_fn)
 
@@ -849,54 +872,52 @@ end)
 
 
 
-## Error Assertions
+## Error Assertions (`.throw`)
 
+These assertions check if a function throws an error.
 
-### .throw.error()
+### .throw()
 
+Asserts that a function throws any error when called. Also aliased as `.throw.error()`.
 
-Asserts that a function throws an error when called.
 **Example:**
 
-
 ```lua
-expect(function() error("Error") end).to.throw.error()
+expect(function() error("Error") end).to.throw()
+expect(function() return 1 end).to_not.throw()
 ```
-
 
 
 ### .throw.error_matching(pattern)
 
+Asserts that a function throws an error whose message matches the given Lua pattern.
 
-Asserts that a function throws an error matching the given pattern.
 **Parameters:**
 
-
-- `pattern` (string): Lua pattern to match against the error message
+- `pattern` (string): Lua pattern to match against the error message.
 
 **Example:**
 
-
 ```lua
 expect(function() error("Invalid input") end).to.throw.error_matching("Invalid")
+expect(function() error("Other error") end).to_not.throw.error_matching("Invalid")
 ```
-
 
 
 ### .throw.error_type(type)
 
-
 Asserts that a function throws an error of the specified type.
+
 **Parameters:**
 
-
-- `type` (string): The expected error type ("string", "table", etc.)
+- `type` (string): The expected error type ("string", "table", etc.). Checks `type()` of the error value.
 
 **Example:**
 
-
 ```lua
 expect(function() error("Error message") end).to.throw.error_type("string")
+expect(function() error({}) end).to.throw.error_type("table")
+expect(function() return 1 end).to_not.throw.error_type("string")
 ```
 
 
