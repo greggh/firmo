@@ -197,6 +197,7 @@ local config = {
   buffer_size = 0, -- Buffer size (0 = no buffering)
   buffer_flush_interval = 5, -- Seconds between auto-flush (if buffering)
   standard_metadata = {}, -- Standard metadata fields to include in all logs
+  _configured = false, -- Track if module is configured to avoid circular deps
 }
 
 -- ANSI color codes
@@ -248,6 +249,24 @@ local function get_timestamp()
   return os.date("%Y-%m-%d %H:%M:%S")
 end
 
+--- Ensures the logging module is configured
+--- This helper function contains the configuration logic that was previously
+--- in get_logger(), moved here to break the circular dependency.
+---@private
+local function _ensure_configured()
+  if not config._configured then
+    -- Check if central_config is available and initialized
+    local ok, central_config = pcall(require, "lib.core.central_config")
+    if ok and central_config and central_config._initialized then
+      M.configure_from_config("central_config")
+    else
+      -- Fall back to defaults if central_config isn't available
+      M.configure({ level = M.LEVELS.INFO })
+    end
+    config._configured = true
+  end
+end
+
 --- Check if logging is enabled for a specific level and module
 ---@param level number The numeric log level to check.
 ---@param module_name? string The optional module name to check against specific levels/filters.
@@ -255,7 +274,7 @@ end
 ---@private
 local function is_enabled(level, module_name)
   if config.silent then
-    return false
+    return false -- Silent mode overrides all logging
   end
 
   -- Ensure level is a number
@@ -1054,9 +1073,6 @@ end
 ---   logger.debug("Performance statistics", stats)
 --- end
 function M.get_logger(module_name)
-  -- First configure the logger from central config
-  M.configure_from_config("central_config")
-
   local logger = {}
 
   --- Log a fatal level message through this logger
@@ -1064,6 +1080,7 @@ function M.get_logger(module_name)
   --- @param params? table Additional context parameters to include
   --- @return boolean Whether the message was logged
   logger.fatal = function(message, params)
+    _ensure_configured()
     log(M.LEVELS.FATAL, module_name, message, params)
   end
 
@@ -1072,6 +1089,7 @@ function M.get_logger(module_name)
   --- @param params? table Additional context parameters to include
   --- @return boolean Whether the message was logged
   logger.error = function(message, params)
+    _ensure_configured()
     log(M.LEVELS.ERROR, module_name, message, params)
   end
 
@@ -1080,6 +1098,7 @@ function M.get_logger(module_name)
   --- @param params? table Additional context parameters to include
   --- @return boolean Whether the message was logged
   logger.warn = function(message, params)
+    _ensure_configured()
     log(M.LEVELS.WARN, module_name, message, params)
   end
 
@@ -1088,6 +1107,7 @@ function M.get_logger(module_name)
   --- @param params? table Additional context parameters to include
   --- @return boolean Whether the message was logged
   logger.info = function(message, params)
+    _ensure_configured()
     log(M.LEVELS.INFO, module_name, message, params)
   end
 
@@ -1096,6 +1116,7 @@ function M.get_logger(module_name)
   --- @param params? table Additional context parameters to include
   --- @return boolean Whether the message was logged
   logger.debug = function(message, params)
+    _ensure_configured()
     log(M.LEVELS.DEBUG, module_name, message, params)
   end
 
@@ -1104,6 +1125,7 @@ function M.get_logger(module_name)
   --- @param params? table Additional context parameters to include
   --- @return boolean Whether the message was logged
   logger.trace = function(message, params)
+    _ensure_configured()
     log(M.LEVELS.TRACE, module_name, message, params)
   end
 
@@ -1112,6 +1134,7 @@ function M.get_logger(module_name)
   --- @param params? table Additional context parameters to include
   --- @return boolean Whether the message was logged
   logger.verbose = function(message, params)
+    _ensure_configured()
     log(M.LEVELS.VERBOSE, module_name, message, params)
   end
 

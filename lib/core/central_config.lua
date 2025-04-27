@@ -14,11 +14,53 @@
 ---@diagnostic disable-next-line: unused-local
 local _error_handler, _logging, _fs
 
+-- Track initialization state to avoid recursion
+local _initializing = false
+local _initialized = false
+
+-- Bootstrap logger for use during initialization
+local function get_bootstrap_logger()
+  -- Set a global debug flag if the --debug argument is present
+  if not _G._firmo_debug_mode then
+    _G._firmo_debug_mode = false
+
+    -- Detect debug mode from command line arguments
+    if arg then
+      for _, v in ipairs(arg) do
+        if v == "--debug" then
+          _G._firmo_debug_mode = true
+          break
+        end
+      end
+    end
+  end
+
+  return {
+    error = function(msg)
+      print("[ERROR] " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] " .. msg)
+    end,
+    debug = function(msg)
+      if _G._firmo_debug_mode then
+        print("[DEBUG] " .. msg)
+      end
+    end,
+    trace = function(msg)
+      print("[TRACE] " .. msg)
+    end,
+  }
+end
+
 -- Local helper for safe requires without dependency on error_handler
 local function try_require(module_name)
   local success, result = pcall(require, module_name)
   if not success then
-    print("Warning: Failed to load module:", module_name, "Error:", result)
+    get_bootstrap_logger().warn("Failed to load module: " .. module_name .. " Error: " .. tostring(result))
     return nil
   end
   return result
@@ -45,6 +87,10 @@ end
 --- Get the logging module with lazy loading to avoid circular dependencies
 ---@return table|nil The logging module or nil if not available
 local function get_logging()
+  -- Use bootstrap logger during initialization
+  if not _initialized then
+    return nil
+  end
   if not _logging then
     _logging = try_require("lib.tools.logging")
   end
@@ -54,29 +100,17 @@ end
 --- Get a logger instance for this module
 ---@return table A logger instance (either real or stub)
 local function get_logger()
+  -- Use bootstrap logger during initialization
+  if not _initialized then
+    return get_bootstrap_logger()
+  end
+
   local logging = get_logging()
   if logging then
     local logger = logging.get_logger("central_config")
     return logger
   end
-  -- Return a stub logger if logging module isn't available
-  return {
-    error = function(msg)
-      print("[ERROR] " .. msg)
-    end,
-    warn = function(msg)
-      print("[WARN] " .. msg)
-    end,
-    info = function(msg)
-      print("[INFO] " .. msg)
-    end,
-    debug = function(msg)
-      print("[DEBUG] " .. msg)
-    end,
-    trace = function(msg)
-      print("[TRACE] " .. msg)
-    end,
-  }
+  return get_bootstrap_logger()
 end
 
 ---@class central_config The public API of the central configuration module.
@@ -102,6 +136,9 @@ local M = {}
 
 -- Module version
 M._VERSION = "0.3.0"
+
+-- Mark module initialization as started
+_initializing = true
 
 -- Configuration storage
 local config = {
@@ -988,7 +1025,7 @@ function M.register_module(module_name, schema, defaults)
   end
 
   -- Log the registration operation
-  log("debug", "Registering module configuration", {
+  log("debug", "Registering module configuration: " .. module_name, {
     module = module_name,
     has_schema = schema ~= nil,
     has_defaults = defaults ~= nil,
@@ -1006,7 +1043,7 @@ function M.register_module(module_name, schema, defaults)
       log("warn", err.message, err.context)
     else
       config.schemas[module_name] = M.serialize(schema) -- Use serialize to prevent modification
-      log("debug", "Registered schema for module", {
+      log("debug", "Registered schema for module: " .. module_name, {
         module = module_name,
         schema_keys = table.concat(
           (function()
@@ -1090,7 +1127,7 @@ function M.register_module(module_name, schema, defaults)
       end
       apply_defaults(config.values[module_name], defaults)
 
-      log("debug", "Applied defaults for module", {
+      log("debug", "Applied defaults for module: " .. module_name, {
         module = module_name,
         default_keys = table.concat(
           (function()
@@ -2136,6 +2173,8 @@ local function init()
     -- Return module anyway to prevent crashes
   end
 
+  _initializing = false
+  _initialized = true
   return M
 end
 
