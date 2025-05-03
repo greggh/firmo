@@ -10,17 +10,14 @@
 -- Run embedded tests: lua test.lua examples/focused_tests_example.lua
 --
 
-local error_handler = require("lib.tools.error_handler")
 local firmo = require("firmo")
 local logging = require("lib.tools.logging")
 
 -- Setup logger
 local logger = logging.get_logger("FocusedExample")
 
--- Extract the functions we need
-local describe = firmo.describe
-local fdescribe = firmo.fdescribe
-local xdescribe = firmo.xdescribe
+-- Extract the functions we need, including focused/excluded variants
+local describe, fdescribe, xdescribe = firmo.describe, firmo.fdescribe, firmo.xdescribe
 local it = firmo.it
 local fit = firmo.fit
 local xit = firmo.xit
@@ -30,63 +27,83 @@ local expect = firmo.expect
 local excluded_test_ran = false
 
 -- Standard describe block
---- A standard test suite containing a mix of normal, focused, and excluded tests.
+--- A standard test suite containing a mix of normal, focused (`fit`), and excluded (`xit`) tests.
+--- @within examples.focused_tests_example
 describe("Standard tests", function()
-  it("runs normally", function()
+  --- A regular test case that runs unless focus mode is active elsewhere.
+  it("runs normally (if no fit/fdescribe is active)", function()
+    logger.info("Executing 'runs normally' test...")
     expect(1 + 1).to.equal(2)
   end)
 
-  it("also runs normally", function()
+  --- Another regular test case.
+  it("also runs normally (if no fit/fdescribe is active)", function()
+    logger.info("Executing 'also runs normally' test...")
     expect("test").to.be.a("string")
   end)
 
-  -- Focused test - only this will run if we're in focus mode
-  fit("is focused and will always run", function()
-    expect(true).to.be.truthy()
+  --- A focused test case (`fit`). If any `fit` or `fdescribe` exists, only focused items run.
+  fit("is focused using 'fit' and WILL run", function()
+    logger.info("Executing FOCUSED 'fit' test...")
+    expect(true).to.be_truthy()
   end)
 
-  -- Excluded test - this will be skipped
-  xit("is excluded and will not run", function()
+  --- An excluded test case (`xit`). This test will always be skipped.
+  xit("is excluded using 'xit' and WILL NOT run", function()
     excluded_test_ran = true
     expect(false).to.be.truthy() -- This would fail if it ran
   end)
 end)
 
--- Focused describe block - all tests inside will run even in focus mode
---- A focused test suite (`fdescribe`). All tests within this block will run
--- when focus mode is active (i.e., if any `fit` or `fdescribe` exists).
-fdescribe("Focused test group", function()
-  it("will run because parent is focused", function()
+-- Focused describe block - all tests inside will run because the suite is focused
+--- A focused test suite (`fdescribe`). All tests within this block WILL run
+-- because the suite itself is focused (unless individually excluded with `xit`).
+--- @within examples.focused_tests_example
+fdescribe("Focused test group (fdescribe)", function()
+  --- A regular `it` within an `fdescribe` WILL run.
+  it("will run because parent suite is focused", function()
+    logger.info("Executing test within FOCUSED 'fdescribe'...")
     expect({ 1, 2, 3 }).to.contain(2)
   end)
 
-  it("also runs because parent is focused", function()
+  --- Another regular `it` within an `fdescribe` WILL run.
+  it("also runs because parent suite is focused", function()
+    logger.info("Executing another test within FOCUSED 'fdescribe'...")
     expect("hello").to.match("he..o")
   end)
 
-  -- Excluded test still doesn't run even in focused parent
-  xit("is excluded despite focused parent", function()
+  --- An excluded test (`xit`) within an `fdescribe` WILL NOT run.
+  xit("is excluded using 'xit' despite focused parent suite", function()
     expect(nil).to.exist() -- Would fail if it ran
   end)
 end)
 
 -- Excluded describe block - none of these tests will run
---- An excluded test suite (`xdescribe`). No tests within this block will run,
+--- An excluded test suite (`xdescribe`). No tests within this block WILL run,
 -- regardless of focus mode or individual test focus (`fit`).
-xdescribe("Excluded test group", function()
-  it("will not run because parent is excluded", function()
+--- @within examples.focused_tests_example
+xdescribe("Excluded test group (xdescribe)", function()
+  --- A regular `it` within an `xdescribe` WILL NOT run.
+  it("will NOT run because parent suite is excluded", function()
+    excluded_test_ran = true
     expect(1).to.be(2) -- Would fail if it ran
   end)
 
-  fit("focused but parent is excluded so still won't run", function()
+  --- A focused `fit` within an `xdescribe` WILL NOT run.
+  fit("is focused using 'fit' but WILL NOT run due to excluded parent suite", function()
+    excluded_test_ran = true
     expect(false).to.be.truthy() -- Would fail if it ran
   end)
 end)
 
 -- Example of better error messages
---- A test suite demonstrating enhanced error messages, specifically table diffs.
+--- A test suite demonstrating enhanced error messages from assertions, specifically table diffs.
+--- This test *will* run in focus mode because of the `fit` and `fdescribe` above.
+--- @within examples.focused_tests_example
 describe("Enhanced error messages", function()
-  it("shows detailed diffs for tables", function()
+  --- This test is INTENTIONALLY designed to FAIL to demonstrate the detailed diff output
+  -- provided by Firmo when comparing tables with `to.equal`.
+  it("shows detailed table diffs on failure", function()
     local expected = {
       name = "example",
       values = { 1, 2, 3, 4 },

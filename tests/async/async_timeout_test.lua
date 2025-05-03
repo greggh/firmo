@@ -10,9 +10,15 @@
 ---
 --- @author Firmo Team
 --- @test
-package.path = "../?.lua;" .. package.path
+-- Extract the testing functions we need
 local firmo = require("firmo")
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
+
 local it_async = firmo.it_async
 local async = firmo.async
 

@@ -10,7 +10,6 @@
 -- Run this example directly: lua examples/hash_example.lua
 --
 
-local error_handler = require("lib.tools.error_handler")
 local hash = require("lib.tools.hash")
 local test_helper = require("lib.tools.test_helper")
 local logging = require("lib.tools.logging")
@@ -18,8 +17,8 @@ local logging = require("lib.tools.logging")
 -- Setup logger
 local logger = logging.get_logger("HashExample")
 
--- Create a test directory
-local test_dir = test_helper.create_temp_test_directory()
+-- Create a temporary directory managed by test_helper for automatic cleanup
+local test_dir = test_helper.create_temp_test_directory("hash_example_")
 
 -- Example 1: Basic string hashing
 logger.info("\nExample 1: Basic String Hashing")
@@ -80,8 +79,9 @@ local cache = {}
 
 --- Simulates an expensive computation based on input string length.
 -- This function's results will be cached in the example.
--- @param input string The input string.
--- @return number The computed result.
+--- @param input string The input string.
+--- @return number The computed result (length of input plus a large constant).
+--- @within examples.hash_example
 local function compute_expensive_result(input)
   -- Simulate expensive computation
   local result = 0
@@ -93,9 +93,9 @@ end
 
 --- Retrieves a result for the given input, using a simple hash-based cache.
 -- If the result for the input's hash is not in the cache, it computes it
--- using `compute_expensive_result` and stores it.
--- @param input string The input string.
--- @return number The cached or newly computed result.
+--- @param input string The input string to get the result for.
+--- @return number The cached or newly computed result.
+--- @within examples.hash_example
 local function get_cached_result(input)
   local input_hash = hash.hash_string(input)
   if not cache[input_hash] then

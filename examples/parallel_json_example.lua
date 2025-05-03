@@ -15,8 +15,6 @@
 
 -- Import the testing framework
 local firmo = require("firmo") -- Needed for firmo.pending
-local error_handler = require("lib.tools.error_handler")
-local fs = require("lib.tools.filesystem")
 local logging = require("lib.tools.logging")
 local temp_file = require("lib.tools.filesystem.temp_file")
 
@@ -24,13 +22,14 @@ local temp_file = require("lib.tools.filesystem.temp_file")
 local logger = logging.get_logger("ParallelJsonExample")
 
 --- Creates a temporary test file with a specified number of passing,
--- failing, and skipped tests.
--- @param temp_dir_obj table The temp_file directory object.
+-- failing, and skipped tests. Registers the file for cleanup.
+-- @param temp_dir_obj table The temp_file directory helper object.
 -- @param name string Base name for the test file (e.g., "Test1").
 -- @param pass number Number of passing tests to generate.
 -- @param fail number Number of failing tests to generate.
 -- @param skip number Number of skipped tests to generate.
 -- @return string abs_path The absolute path to the created temporary test file.
+--- @within examples.parallel_json_example
 local function write_test_file(temp_dir_obj, name, pass, fail, skip)
   local content = [[
 -- Test file: ]] .. name .. [[
@@ -124,12 +123,18 @@ if not parallel_loaded then
   temp_file.cleanup_all()
   return
 end
+-- Registration with firmo is likely handled implicitly by requiring the parallel module
+-- or by the test runner setup. We remove the explicit registration call.
 
--- NOTE: Verify API signature.
-parallel.register_with_firmo(firmo)
+-- Ensure parallel run function exists on the firmo object after potential registration.
+if not firmo.parallel or not firmo.parallel.run_tests then
+  logger.error("Parallel run function (`firmo.parallel.run_tests`) not found. Cannot run parallel tests.")
+  temp_file.cleanup_all()
+  return
+end
 
--- NOTE: Verify API signature.
-local results = parallel.run_tests(test_files, {
+logger.info("\nRunning tests in parallel with JSON results format...")
+local results = firmo.parallel.run_tests(test_files, {
   workers = 2,
   verbose = true,
   show_worker_output = true,
@@ -146,7 +151,9 @@ print("  Failed: " .. results.failed)
 print("  Skipped: " .. results.skipped)
 print("  Total time: " .. string.format("%.2f", results.elapsed) .. " seconds")
 
--- Removed manual counting verification block
+-- The 'results' table returned when using results_format="json"
+-- typically contains aggregated counts (passed, failed, skipped, etc.).
+-- Further processing would involve parsing the JSON output if saved to files.
 
 -- Cleanup temporary files
 temp_file.cleanup_all()

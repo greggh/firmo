@@ -58,9 +58,15 @@
 ---@field stub fun(value_or_fn?: any): table|nil, table|nil Creates a stub function that returns a value or executes a given function (depends on `lib.mocking` module).
 ---@field with_mocks fun(fn: function): any Executes a function and automatically cleans up any mocks created within it (depends on `lib.mocking` module).
 ---@field async fun(fn: function): function Wraps a function to run in a managed coroutine, enabling `await` and `wait_until` (depends on `lib.async` module).
+---@field it_async fun(fn: function): function Wraps a function to run in a managed coroutine, enabling `await` and `wait_until` (depends on `lib.async` module).
 ---@field await fun(ms: number): nil Pauses execution within an `async` function for a specified duration (uses `lib.async`).
 ---@field wait_until fun(condition: function, timeout?: number, check_interval?: number): boolean Pauses execution within an `async` function until a condition returns true or a timeout occurs (uses `lib.async`).
 ---@field parallel_async fun(operations: table, timeout?: number): table Runs multiple async operations concurrently within an `async` function (uses `lib.async`).
+---@field fit_async fun(description: string, options_or_fn: table|function, fn?: function, timeout_ms?: number): nil Defines a focused asynchronous test case using `firmo.fit`. Only focused tests run if any exist.
+---@field xit_async fun(description: string, options_or_fn: table|function, fn?: function, timeout_ms?: number): nil Defines a skipped asynchronous test case using `firmo.xit`. It will not be run.
+---@field describe_async fun(name: string, fn: function, options?: {focused?: boolean, excluded?: boolean}): nil Defines an asynchronous test group (suite) using `firmo.describe`. Tests inside can use async features.
+---@field fdescribe_async fun(name: string, fn: function): nil Defines a focused asynchronous test group using `firmo.fdescribe`. Only focused suites/tests run if any exist.
+---@field xdescribe_async fun(name: string, fn: function): nil Defines a skipped asynchronous test group using `firmo.xdescribe`. All tests inside will be skipped.
 ---@field configure_async fun(options: {timeout?: number, interval?: number}): firmo Configures global options for the async module (e.g., default timeout).
 
 -- firmo v0.7.5 - Enhanced Lua test framework
@@ -318,6 +324,12 @@ if async_module then
   firmo.await = async_module.await
   firmo.wait_until = async_module.wait_until
   firmo.parallel_async = async_module.parallel_async
+  firmo.fit_async = async_module.fit_async
+  firmo.xit_async = async_module.xit_async
+  firmo.describe_async = async_module.describe_async
+  firmo.fdescribe_async = async_module.fdescribe_async
+  firmo.xdescribe_async = async_module.xdescribe_async
+  firmo.configure_async = async_module.configure -- Expose configure
 
   -- Configure the async module with our options
   if firmo.async_options and firmo.async_options.timeout then
@@ -409,6 +421,13 @@ local module = setmetatable({
   it_async = firmo.it_async,
   await = firmo.await,
   wait_until = firmo.wait_until,
+  parallel_async = firmo.parallel_async,
+  fit_async = firmo.fit_async,
+  xit_async = firmo.xit_async,
+  describe_async = firmo.describe_async,
+  fdescribe_async = firmo.fdescribe_async,
+  xdescribe_async = firmo.xdescribe_async,
+  configure_async = firmo.configure_async,
 
   -- Export interactive mode
   interactive = interactive,

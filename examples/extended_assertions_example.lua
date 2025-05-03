@@ -12,16 +12,23 @@
 -- Run embedded tests: lua test.lua examples/extended_assertions_example.lua
 --
 
+-- Extract the testing functions we need
 local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
 
--- Import the test functions
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-
---- Main test suite demonstrating various extended assertions.
+--- Main test suite demonstrating various extended assertions provided by Firmo.
+--- @within examples.extended_assertions_example
 describe("Extended Assertions Demo", function()
-  --- Tests assertions related to collections (tables, strings).
+  --- Tests assertions related to collections (tables, strings) like length and emptiness.
+  --- @within examples.extended_assertions_example
   describe("Collection Assertions", function()
-    it("demonstrates length and size assertions", function()
+    --- Tests `to.have_length`, `to.have_size`, and `to.be.empty`.
+    it("demonstrates length, size, and emptiness assertions", function()
       -- String length checks
       local name = "Alice"
       expect(name).to.have_length(5)
@@ -42,9 +49,11 @@ describe("Extended Assertions Demo", function()
     end)
   end)
 
-  --- Tests assertions related to numeric properties.
+  --- Tests assertions related to numeric properties like sign and integer status.
+  --- @within examples.extended_assertions_example
   describe("Numeric Assertions", function()
-    it("demonstrates numeric property assertions", function()
+    --- Tests `to.be.positive`, `to.be.negative`, and `to.be.integer`.
+    it("demonstrates positive, negative, and integer assertions", function()
       -- Positive number check
       local positive = 42
       expect(positive).to.be.positive()
@@ -63,9 +72,11 @@ describe("Extended Assertions Demo", function()
     end)
   end)
 
-  --- Tests assertions related to string properties like case.
+  --- Tests assertions related to string properties like casing.
+  --- @within examples.extended_assertions_example
   describe("String Assertions", function()
-    it("demonstrates string case assertions", function()
+    --- Tests `to.be.uppercase` and `to.be.lowercase`.
+    it("demonstrates string case assertions (uppercase/lowercase)", function()
       -- Uppercase check
       local uppercase = "HELLO WORLD"
       expect(uppercase).to.be.uppercase()
@@ -81,9 +92,11 @@ describe("Extended Assertions Demo", function()
     end)
   end)
 
-  --- Tests assertions related to the structure and content of tables (objects).
+  --- Tests assertions related to the structure and content of tables (often used like objects).
+  --- @within examples.extended_assertions_example
   describe("Object Structure Assertions", function()
-    it("demonstrates property existence checks", function()
+    --- Tests `to.have_property` for checking key existence and optionally value equality.
+    it("demonstrates property existence and value checks", function()
       -- Property existence
       local user = {
         name = "John",
@@ -101,8 +114,9 @@ describe("Extended Assertions Demo", function()
       expect(user).to_not.have_property("name", "Jane")
     end)
 
-    it("demonstrates schema validation", function()
-      -- Object with nested structure
+    --- Tests `to.match_schema` for validating table structure against expected types and values.
+    it("demonstrates schema validation using match_schema", function()
+      -- Example object with nested structure
       local product = {
         id = "prod-123",
         name = "Laptop",
@@ -146,8 +160,10 @@ describe("Extended Assertions Demo", function()
   end)
 
   --- Tests assertions that check the behavior or side effects of functions.
+  --- @within examples.extended_assertions_example
   describe("Function Behavior Assertions", function()
-    it("demonstrates change assertions", function()
+    --- Tests `to.change` and `to_not.change` for detecting side effects.
+    it("demonstrates detecting changes using change()", function()
       local counter = { value = 10 }
 
       -- Function that changes a value
@@ -172,7 +188,8 @@ describe("Extended Assertions Demo", function()
       end)
     end)
 
-    it("demonstrates increase and decrease assertions", function()
+    --- Tests `to.increase` and `to.decrease` for checking changes in numeric values.
+    it("demonstrates detecting increase/decrease in values", function()
       local counter = { value = 10 }
 
       -- Function that increases a value
@@ -200,9 +217,11 @@ describe("Extended Assertions Demo", function()
     end)
   end)
 
-  --- Tests the `deep_equal` assertion for comparing complex nested tables.
+  --- Tests the `to.deep_equal` assertion for comparing complex nested tables recursively.
+  --- @within examples.extended_assertions_example
   describe("Deep Equality Assertions", function()
-    it("demonstrates deep equality with complex objects", function()
+    --- Tests `to.deep_equal` with identical and modified nested tables.
+    it("demonstrates deep equality comparison for complex objects", function()
       -- Two objects with the same nested structure
       local obj1 = {
         user = {

@@ -9,7 +9,7 @@
 --- @author Firmo Team
 --- @license MIT
 --- @copyright 2023-2025
---- @version 1.0.0
+--- @version 1.0.1
 
 ---@class async_module The public API for the async module.
 ---@field _VERSION string Module version.
@@ -27,6 +27,11 @@
 ---@field enable_timeout_testing fun(): function Enables a special mode for testing timeout behavior internally. Returns a function to disable the mode.
 ---@field is_timeout_testing fun(): boolean Returns true if timeout testing mode is enabled. Internal use.
 ---@field it_async fun(description: string, options_or_fn: table|function, fn?: function, timeout_ms?: number): nil Defines an asynchronous test case using `firmo.it`. The test function `fn` runs in an async context.
+---@field fit_async fun(description: string, options_or_fn: table|function, fn?: function, timeout_ms?: number): nil Defines a focused asynchronous test case using `firmo.fit`. Only focused tests run if any exist.
+---@field xit_async fun(description: string, options_or_fn: table|function, fn?: function, timeout_ms?: number): nil Defines a skipped asynchronous test case using `firmo.xit`. It will not be run.
+---@field describe_async fun(name: string, fn: function, options?: {focused?: boolean, excluded?: boolean}): nil Defines an asynchronous test group (suite) using `firmo.describe`. Tests inside can use async features.
+---@field fdescribe_async fun(name: string, fn: function): nil Defines a focused asynchronous test group using `firmo.fdescribe`. Only focused suites/tests run if any exist.
+---@field xdescribe_async fun(name: string, fn: function): nil Defines a skipped asynchronous test group using `firmo.xdescribe`. All tests inside will be skipped.
 ---@field create_deferred fun(): table Deprecated/Placeholder: Functionality not fully implemented.
 ---@field all fun(promises: {table}): table Deprecated/Placeholder: Promise functionality not fully implemented.
 ---@field race fun(promises: {table}): any Deprecated/Placeholder: Promise functionality not fully implemented.
@@ -37,14 +42,14 @@
 ---@field set_check_interval fun(ms: number): async_module Sets the default interval for `wait_until`.
 ---@field cancel fun(operation: table): boolean Deprecated/Placeholder: Functionality not fully implemented.
 ---@field poll fun(fn: function, interval: number, timeout_ms?: number): table Deprecated/Placeholder: Functionality not fully implemented.
----@field timeout fun(promise: table, ms: number): table Deprecated/Placeholder: Promise functionality not fully implemented.
+---@field timeout fun(promise: table, ms: number): table Deprecated/Placeholder: Functionality not fully implemented.
 ---@field defer fun(fn: function, delay?: number): table Deprecated/Placeholder: Functionality not fully implemented.
 
 local async_module = {}
 
 -- Lazy-load dependencies to avoid circular dependencies
 ---@diagnostic disable-next-line: unused-local
-local _logging, _central_config
+local _logging, _central_config, _firmo
 
 -- Local helper for safe requires without dependency on error_handler
 local function try_require(module_name)
@@ -90,6 +95,15 @@ local function get_logger()
       print("[TRACE] " .. msg)
     end,
   }
+end
+
+--- Get the firmo module with lazy loading to avoid circular dependencies
+---@return table|nil The firmo module or nil if not available
+local function get_firmo()
+  if not _firmo then
+    _firmo = try_require("firmo")
+  end
+  return _firmo
 end
 
 -- Default configuration
@@ -983,6 +997,197 @@ function async_module.it_async(description, options_or_fn, fn, timeout_ms)
       end
     end
   end)
+end
+
+--- Create a focused async-aware test case
+--- This function is a convenience wrapper around `async_module.it_async` that sets the `focused` option to true.
+--- When focus mode is active (because at least one test or suite is focused using `fit_async` or `fdescribe_async`),
+--- only the focused items will be run. All other tests will be skipped.
+---
+---@param description string The description of the test case.
+---@param options_or_fn table|function Either an options table (e.g., `{ expect_error = true }`) or the async test function itself.
+---@param fn? function The async test function, if `options_or_fn` was an options table.
+---@param timeout_ms? number Optional timeout in milliseconds for this specific test case.
+---@return nil Registers the focused test case using `firmo.fit`.
+---@throws string If arguments are invalid or if the underlying `async_module.it_async` call fails.
+---
+---@usage
+--- -- Focus on this specific async test
+--- async.fit_async("processes data quickly", function()
+---   async.await(10)
+---   expect(get_data_status()).to.equal("processed")
+--- end)
+---
+--- -- This test will be skipped if focus mode is active
+--- async.it_async("handles regular operations", function()
+---   -- ...
+--- end)
+function async_module.fit_async(description, options_or_fn, fn, timeout_ms)
+  local options = {}
+  local async_fn
+
+  -- Handle parameter flexibility
+  if type(options_or_fn) == "function" then
+    async_fn = options_or_fn
+    timeout_ms = fn -- 3rd arg is timeout if 2nd is fn
+  elseif type(options_or_fn) == "table" then
+    options = options_or_fn
+    async_fn = fn
+    -- timeout_ms is already the 4th arg
+  else
+    error("Second argument to fit_async must be an options table or the test function", 2)
+  end
+
+  -- Ensure options is a table and set focused flag
+  options = options or {}
+  options.focused = true
+
+  -- Delegate to it_async with modified options
+  return async_module.it_async(description, options, async_fn, timeout_ms)
+end
+
+--- Create a skipped async-aware test case
+--- This function is a convenience wrapper around `async_module.it_async` that sets the `excluded` option to true.
+--- The test case defined with `xit_async` will be recorded but not executed. This is useful for temporarily
+--- disabling tests that are broken, incomplete, or irrelevant to the current task.
+---
+---@param description string The description of the test case.
+---@param options_or_fn table|function Either an options table (e.g., `{ expect_error = true }`) or the async test function itself.
+---@param fn? function The async test function, if `options_or_fn` was an options table.
+---@param timeout_ms? number Optional timeout (ignored as test is skipped, but kept for signature consistency).
+---@return nil Registers the skipped test case using `firmo.xit`.
+---@throws string If arguments are invalid or if the underlying `async_module.it_async` call fails (though failure during skip registration is less likely).
+---
+---@usage
+--- -- Skip this async test temporarily
+--- async.xit_async("integrates with external service", function()
+---   -- This code will not run
+---   async.await(1000)
+---   expect(service_status()).to.equal("ready")
+--- end)
+---
+--- -- Other async tests will run normally
+--- async.it_async("performs basic operations", function()
+---   async.await(10)
+---   expect(true).to.be_truthy()
+--- end)
+function async_module.xit_async(description, options_or_fn, fn, timeout_ms)
+  local options = {}
+  local async_fn
+
+  -- Handle parameter flexibility
+  if type(options_or_fn) == "function" then
+    async_fn = options_or_fn
+    timeout_ms = fn -- 3rd arg is timeout if 2nd is fn
+  elseif type(options_or_fn) == "table" then
+    options = options_or_fn
+    async_fn = fn
+    -- timeout_ms is already the 4th arg
+  else
+    error("Second argument to xit_async must be an options table or the test function", 2)
+  end
+
+  -- Ensure options is a table and set excluded flag
+  options = options or {}
+  options.excluded = true
+
+  -- Delegate to it_async with modified options
+  return async_module.it_async(description, options, async_fn, timeout_ms)
+end
+
+--- Create an async-aware test group (suite)
+--- This function allows defining a test group where tests (`it_async`, `fit_async`, `xit_async`)
+--- within the group can utilize async features (`await`, `wait_until`, `parallel_async`).
+--- It delegates the group definition (including nesting, hooks, and filtering logic)
+--- to `firmo.describe`. The async nature applies to the *contents* of the group, not the group definition itself.
+---
+---@param name string Name of the test group.
+---@param fn function Function containing the test group's definitions (e.g., `it_async` calls, nested `describe_async`).
+---@param options? {focused?: boolean, excluded?: boolean} Optional table containing flags:
+---   - `focused`: If true, marks this group as focused (via `firmo.fdescribe`).
+---   - `excluded`: If true, marks this group to be skipped (via `firmo.xdescribe`).
+---@return nil Registers the test group using `firmo.describe`.
+---@throws string If `firmo.describe` is not available or if the underlying `describe` call fails.
+---
+---@usage
+--- -- Define a group for async tests
+--- async.describe_async("Async Database Operations", function()
+---   before(function()
+---     -- Setup connection (can be sync or async setup)
+---   end)
+---
+---   it_async("should fetch user data", function()
+---     local data = nil
+---     db.fetch_user_async(1, function(res) data = res end)
+---     async.wait_until(function() return data ~= nil end)
+---     expect(data.id).to.equal(1)
+---   end)
+---
+---   after(function()
+---     -- Teardown connection
+---   end)
+--- end)
+function async_module.describe_async(name, fn, options)
+  local firmo = get_firmo()
+  if not firmo or type(firmo.describe) ~= "function" then
+    error("describe_async() requires firmo.describe function to be available", 2)
+  end
+
+  -- Delegate to the core describe function
+  return firmo.describe(name, fn, options)
+end
+
+--- Create a focused async-aware test group
+--- This function is a convenience wrapper around `async_module.describe_async` that sets the `focused` option to true.
+--- When focus mode is active, only focused suites (defined with `fdescribe_async`) and focused tests
+--- (defined with `fit_async`) will be run.
+---
+---@param name string Name of the test group.
+---@param fn function Function containing the test group's definitions.
+---@return nil Registers the focused test group using `firmo.fdescribe`.
+---@throws string If the underlying `describe_async` call fails.
+---
+---@usage
+--- -- Focus on this group of async tests
+--- async.fdescribe_async("Critical Async Feature", function()
+---   it_async("must complete successfully", function()
+---     -- ... async test logic ...
+---   end)
+--- end)
+---
+--- -- This group will be skipped if focus mode is active
+--- async.describe_async("Non-critical Features", function()
+---   -- ... other tests ...
+--- end)
+function async_module.fdescribe_async(name, fn)
+  return async_module.describe_async(name, fn, { focused = true })
+end
+
+--- Create a skipped async-aware test group
+--- This function is a convenience wrapper around `async_module.describe_async` that sets the `excluded` option to true.
+--- All tests and hooks defined within this group will be skipped during test execution.
+---
+---@param name string Name of the test group.
+---@param fn function Function containing the test group's definitions (these will be skipped).
+---@return nil Registers the skipped test group using `firmo.xdescribe`.
+---@throws string If the underlying `describe_async` call fails (though failure during skip registration is less likely).
+---
+---@usage
+--- -- Skip this entire group of async tests
+--- async.xdescribe_async("Legacy Async Code", function()
+---   it_async("uses old patterns", function()
+---     -- This test will not run
+---   end)
+--- end)
+---
+--- -- Other groups run normally
+--- async.describe_async("Current Async Features", function()
+---   it_async("works as expected", function()
+---     -- This test runs
+---   end)
+--- end)
+function async_module.xdescribe_async(name, fn)
+  return async_module.describe_async(name, fn, { excluded = true })
 end
 
 return async_module

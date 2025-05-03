@@ -1,9 +1,6 @@
 # Firmo Knowledge
 
-
 ## CRITICAL: Project Organization Rules
-
-
 
 1. **Directory Structure**:
    - ALL implementation code goes in /lib
@@ -24,10 +21,7 @@
    - ALWAYS use temp files for instrumentation
    - Use test_helper and temp_file modules for file management
 
-
 ### Implementation Boundaries
-
-
 
 1. **Coverage v3 Directory (lib/coverage/v3/)**:
    - Complete rewrite/replacement allowed
@@ -54,15 +48,13 @@
    - Don't duplicate existing functionality
    - Don't add coverage-specific features to generic modules
 
-
 ### Implementation Strategy
-
-
 
 - Build new functionality in v3 directory
 - Use core modules for infrastructure
 - Keep v3 changes isolated from rest of codebase
 - Don't touch anything outside v3 directory
+
 1. **Code Quality Requirements**:
    - NEVER simplify code just to make tests pass
    - NEVER implement workarounds or hacks
@@ -71,13 +63,9 @@
    - Implementation must be robust and complete
    - No shortcuts or temporary solutions
 
-
 ## Available Tools and Modules
 
-
 ### Temporary File Management
-
-
 
 - Use test_helper.create_temp_test_directory() for test files
 - temp_file module handles automatic cleanup
@@ -86,10 +74,7 @@
 - NEVER call cleanup functions directly in tests
 - The test runner uses temp_file_integration.lua to track test contexts and clean up temp files automatically after each test completes
 
-
 ### Filesystem Operations
-
-
 
 - fs module provides safe file operations
 - Use fs.copy_file() for safe file copying
@@ -97,10 +82,7 @@
 - Use fs.write_file() for safe file writing
 - Handle all fs operations with proper error checking
 
-
 ### Configuration System
-
-
 
 - Use central_config for all settings
 - NEVER create custom configuration systems
@@ -108,12 +90,9 @@
 - NEVER remove existing config integration
 - Use .firmo-config.lua for project-wide settings
 
-
 ## Error Handling in Tests
 
-
 CRITICAL: When writing tests that expect errors:
-
 
 1. ALWAYS use `{ expect_error = true }` flag in test definition:
 
@@ -122,7 +101,6 @@ CRITICAL: When writing tests that expect errors:
      -- Test code here
    end)
    ```
-
 
 2. ALWAYS use `test_helper.with_error_capture()` to capture expected errors:
 
@@ -135,28 +113,27 @@ CRITICAL: When writing tests that expect errors:
    expect(err.message).to.match("expected error message")
    ```
 
-
 3. NEVER create workarounds to handle expected errors. The framework provides proper error handling mechanisms.
 4. ALWAYS read error handling documentation and test files before implementing error handling.
 5. Look for similar error handling patterns in existing tests.
 
-
 ## Project Overview
-
-
 
 - Enhanced Lua testing framework with BDD-style nested test blocks
 - Provides comprehensive testing capabilities including assertions, mocking, coverage analysis, quality analysis, benchmarking, code fixing, and documentation fixing (markdown).
 - Currently in alpha state - not for production use unless helping with development
 
-
 ## Minimal Test Example
 
-
-
 ```lua
-local firmo = require('firmo')
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
 describe('Calculator', function()
   before(function()
     -- Setup runs before each test
@@ -174,14 +151,9 @@ describe('Calculator', function()
 end)
 ```
 
-
-
 ## Critical Rules
 
-
 ### Configuration System
-
-
 
 - ALWAYS use central_config module for settings
 - NEVER create custom configuration systems
@@ -189,10 +161,7 @@ end)
 - NEVER remove existing config integration
 - Use .firmo-config.lua for project-wide settings
 
-
 ### Special Case Code Policy
-
-
 
 - NEVER add special case code for specific files/situations
 - NO file-specific logic or hardcoded paths
@@ -200,10 +169,7 @@ end)
 - NO specialized handling for specific cases
 - Solutions must be general purpose and work for all files
 
-
 ### Coverage Module Rules
-
-
 
 - NEVER import coverage module in test files
 - NEVER manually set coverage status
@@ -211,10 +177,7 @@ end)
 - NEVER manipulate coverage data directly
 - ALWAYS run tests properly via test.lua
 
-
 ## Essential Commands
-
-
 
 - Run all tests: `lua test.lua tests/`
 - Run specific test: `lua test.lua tests/reporting_test.lua`
@@ -224,17 +187,14 @@ end)
 - Run with coverage (LCOV): `lua test.lua --coverage --format=lcov tests/`
 - Run with watch mode: `lua test.lua --watch tests/`
 
-
 ## JSDoc-Style Type Annotations
-
 
 CRITICAL: Any code changes MUST include updates to affected JSDoc annotations.
 Example:
 
-
 ```lua
 ---@class ModuleName
----@field function_name fun(param: type): return_type Description 
+---@field function_name fun(param: type): return_type Description
 ---@field another_function fun(param1: type, param2?: type): return_type|nil, error? Description
 local M = {}
 --- Description of what the function does
@@ -246,11 +206,7 @@ function M.function_name(name, optional_param)
 end
 ```
 
-
-
 ## Error Handling Diagnostic Patterns
-
-
 
 ```lua
 -- pcall Pattern
@@ -268,18 +224,13 @@ end)
 local value = table[key]
 ```
 
-
-
 ## Lua Compatibility
-
-
 
 - ALWAYS use table unpacking compatibility:
 
   ```lua
   local unpack_table = table.unpack or unpack
   ```
-
 
 - Use # operator for table length:
 
@@ -289,8 +240,6 @@ local value = table[key]
   ```
 
 ## Assertion Style Guide
-
-
 
 ```lua
 -- CORRECT: firmo expect-style assertions
@@ -305,11 +254,7 @@ assert.is_not_nil(value)         -- wrong
 assert.equals(expected, actual)  -- wrong
 ```
 
-
-
 ## Extended Assertions
-
-
 
 ```lua
 -- Collection assertions
@@ -328,11 +273,7 @@ expect({name = "John"}).to.have_property("name")
 expect({name = "John"}).to.have_property("name", "John")
 ```
 
-
-
 ## Error Testing Best Practices
-
-
 
 1. ALWAYS use expect_error flag when the test expects and error and that error is a passing test:
 
@@ -346,7 +287,6 @@ expect({name = "John"}).to.have_property("name", "John")
    end)
    ```
 
-
 2. ALWAYS use test_helper.with_error_capture() when the test expects and error and that error is a passing test.
 3. Be flexible with error categories
 4. Use pattern matching for messages
@@ -355,31 +295,21 @@ expect({name = "John"}).to.have_property("name", "John")
 7. Clean up resources properly
 8. Document expected error behavior
 
-
 ## Documentation Links
-
-
 
 - Tasks: `/home/gregg/Projects/lua-library/firmo/docs/firmo/plan.md`
 - Architecture: `/home/gregg/Projects/lua-library/firmo/docs/firmo/architecture.md`
 
-
 ## Test Development and Debugging
 
-
 ### Test-Driven Development (TDD)
-
-
 
 - Write tests before implementation
 - Run tests frequently
 - Keep test cases focused
 - Add edge cases separately
 
-
 ### CRITICAL: Error Resolution Process
-
-
 
 1. ALWAYS read complete test output
 2. Find exact ERROR line and message
@@ -388,10 +318,7 @@ expect({name = "John"}).to.have_property("name", "John")
 5. Verify error is fixed before moving on
 6. Never assume error cause without evidence
 
-
 ### Common Error Resolution Mistakes
-
-
 
 - Assuming error cause without reading message
 - Fixing assumed issues instead of actual error
@@ -399,10 +326,7 @@ expect({name = "John"}).to.have_property("name", "John")
 - Making multiple changes before re-running tests
 - Ignoring exact error location and line numbers
 
-
 ### Test Debugging Best Practices
-
-
 
 1. Run failing test in isolation:
 
@@ -410,14 +334,12 @@ expect({name = "John"}).to.have_property("name", "John")
    lua test.lua tests/specific_test.lua
    ```
 
-
 2. Enable debug logging if needed:
 
    ```lua
    local logger = logging.get_logger("test")
    logger.set_level(logging.LEVELS.DEBUG)
    ```
-
 
 3. Add debug assertions:
 
@@ -427,7 +349,6 @@ expect({name = "John"}).to.have_property("name", "John")
      expect(actual_value).to.equal(expected) -- Values should match
    end)
    ```
-
 
 4. Check error location:
 
@@ -444,14 +365,13 @@ expect({name = "John"}).to.have_property("name", "John")
 
 ## Coverage Module Requirements
 
-
 ### Core Functionality (Debug Hook Based)
 
--   ALWAYS ensure proper debug hook lifecycle management (`init`, `shutdown`, `pause`, `resume`).
--   The system tracks execution counts (`lib/coverage`). Assertions mark lines as 'covered' (`lib/assertion`). Ensure reporting reflects this distinction if relevant.
--   Data processing/normalization for reporting should be maintained.
--   Maintain backward compatibility where feasible.
--   ALWAYS preserve existing error handling integration (`error_handler`).
+- ALWAYS ensure proper debug hook lifecycle management (`init`, `shutdown`, `pause`, `resume`).
+- The system tracks execution counts (`lib/coverage`). Assertions mark lines as 'covered' (`lib/assertion`). Ensure reporting reflects this distinction if relevant.
+- Data processing/normalization for reporting should be maintained.
+- Maintain backward compatibility where feasible.
+- ALWAYS preserve existing error handling integration (`error_handler`).
 
 ### Considerations for Debug Hook Coverage
 
@@ -462,8 +382,6 @@ expect({name = "John"}).to.have_property("name", "John")
 5.  **Configuration:** Use `central_config` (`coverage.include`, `coverage.exclude`, etc.) to control which files are tracked.
 
 ### Available Tools
-
-
 
 1. test_helper provides:
    - create_temp_test_directory()
@@ -480,13 +398,9 @@ expect({name = "John"}).to.have_property("name", "John")
    - Directory management
    - Path manipulation
 
-
 ## Code Assessment and Recovery
 
-
 ### Component Assessment Process
-
-
 
 1. **Read All Related Files**:
    - Read implementation files
@@ -509,10 +423,7 @@ expect({name = "John"}).to.have_property("name", "John")
    - Note missing tests
    - Identify critical issues
 
-
 ### Recovery Strategy
-
-
 
 1. **Fix Critical Issues First**:
    - Fix syntax errors immediately
@@ -535,10 +446,7 @@ expect({name = "John"}).to.have_property("name", "John")
    - Keep correct error handling
    - Keep proper module structure
 
-
 ### Common Recovery Mistakes
-
-
 
 1. **Rushing to Fix**:
    - Fixing without full assessment
@@ -556,10 +464,7 @@ expect({name = "John"}).to.have_property("name", "John")
    - Missing test gaps
    - Missing critical issues
 
-
 ### Recovery Best Practices
-
-
 
 1. **Document Everything**:
    - List all issues found
@@ -577,13 +482,9 @@ expect({name = "John"}).to.have_property("name", "John")
    - Validate all tests
    - Confirm all functionality
 
-
 ## CRITICAL: Code Reuse and Existing Modules
 
-
 ### Before Writing ANY Code
-
-
 
 1. **ALWAYS Check Existing Modules First**:
    - Search ALL core modules for needed functionality

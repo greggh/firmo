@@ -1,44 +1,66 @@
---- html_formatter_example.lua
---
--- This example demonstrates the advanced features of Firmo's HTML coverage
--- report formatter, including themes, syntax highlighting, interactive elements,
--- line execution counts, and branch coverage visualization. It shows how to
--- configure these features using the `central_config` system.
---
--- @note This example bypasses the standard runner's coverage handling and uses
--- `coverage.start/stop/get_data` directly within tests (violating Rule HgnQwB8GQ5BqLAH8MkKpay).
--- This is done *only* to demonstrate report generation based on coverage data
--- captured during specific test flows within this example file. In standard practice,
--- coverage is handled by the test runner.
---
--- Run embedded tests: lua test.lua --coverage examples/html_formatter_example.lua
---
+--- Example demonstrating advanced features of the HTML coverage report formatter.
+---
+--- This example showcases:
+--- - Generating HTML reports using `reporting.auto_save_reports`.
+--- - Configuring HTML formatter options via `central_config` (theme, syntax highlighting, line numbers, etc.).
+--- - Demonstration of dark/light themes.
+--- - Verification of syntax highlighting for keywords, strings, comments, numbers.
+--- - Illustration of interactive features like collapsible sections and execution counts.
+---
+--- **Important Note on Coverage:**
+--- This example intentionally bypasses the standard Firmo test runner's coverage handling
+--- (violating Rule ySVa5TBNltJZQjpbZzXWfP / HgnQwB8GQ5BqLAH8MkKpay) by directly calling
+--- `coverage.start()`, `coverage.stop()`, and `coverage.get_data()` within the test file.
+--- **This is strictly for demonstration purposes** to show how the reporting module interacts
+--- with captured coverage data structures. In a real project, coverage should **always** be
+--- managed by the test runner (`lua test.lua --coverage ...`) and not directly within test files.
+---
+--- @module examples.html_formatter_example
+--- @see lib.reporting.formatters.html
+--- @see lib.reporting
+--- @see lib.coverage
+--- @see lib.core.central_config
+--- @usage
+--- Run embedded tests (coverage is handled internally for demo):
+--- ```bash
+--- lua test.lua examples/html_formatter_example.lua
+--- ```
+--- Run with runner coverage (results may differ slightly from internal demo):
+--- ```bash
+--- lua test.lua --coverage examples/html_formatter_example.lua
+--- ```
 
--- Import the firmo framework
+-- Extract the testing functions we need
 local firmo = require("firmo")
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local before, after = firmo.before, firmo.after
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
 
 -- Import required modules
 local reporting = require("lib.reporting")
 local coverage = require("lib.coverage")
 local fs = require("lib.tools.filesystem") -- Needed to read report content for verification
-local test_helper = require("lib.tools.test_helper")
 local error_handler = require("lib.tools.error_handler")
 local logging = require("lib.tools.logging")
-local central_config = require("lib.core.central_config") -- For consistency, though auto_save wraps it
 
 -- Setup logger
 local logger = logging.get_logger("HTMLFormatterExample")
 
 --- Example code module with features designed to demonstrate
 -- HTML formatter capabilities like syntax highlighting and branch coverage.
+--- @class SyntaxExamples
+--- @field advanced_function fun(input: table, options?: table): table|nil, table|nil Processes a table with nested conditions.
+--- @field process_text fun(text: string): string Processes text with string operations.
+--- @within examples.html_formatter_example
 local syntax_examples = {
   --- Example function with comments, strings, and nested conditional blocks.
   -- @param input table The input table to process.
-  -- @param options table|nil Optional settings (e.g., `debug`).
-  -- @return table|nil result The processed table, or nil on error.
-  -- @return table|nil err An error object if validation fails.
+  -- @param options? table Optional settings (e.g., `debug: boolean`).
+  -- @return table|nil result The processed table (`{ [key]=processed_value }`), or `nil` on error.
+  -- @return table|nil err A validation error object if `input` is not a table.
   advanced_function = function(input, options)
     -- Default options
     options = options or {}
@@ -90,7 +112,7 @@ local syntax_examples = {
 
   --- Example function with string operations (gsub, escapes) to demonstrate syntax highlighting.
   -- @param text string The input text.
-  -- @return string processed The processed text.
+  -- @return string processed The processed text (escaped, trimmed, spaces normalized). Returns empty string if input is invalid.
   process_text = function(text)
     -- Check input
     if not text or type(text) ~= "string" then
@@ -111,23 +133,10 @@ local syntax_examples = {
   end,
 }
 
--- Example tests to generate coverage
---- Test suite demonstrating HTML formatter f  -- Resources to clean up
-local temp_dir
--- Removed report_files table, cleanup handled by test_helper
-
--- Create a temp directory before tests
-before(function()
-  temp_dir = test_helper.create_temp_test_directory()
-end)
-
--- Clean up after tests (directory managed by test_helper)
-after(function()
-  temp_dir = nil
-end)
-
---- Basic tests for the syntax_examples module to generate coverage data.
+--- Basic tests for the `syntax_examples` module to generate coverage data.
+--- @within examples.html_formatter_example
 describe("Syntax example tests", function()
+  --- Tests the successful execution path of `advanced_function`.
   it("should process advanced functions correctly", function()
     -- Test the function to generate coverage
     local input = {
@@ -143,6 +152,7 @@ describe("Syntax example tests", function()
     expect(result.items).to.deep_equal({ "one", "two" })
   end)
 
+  --- Tests the error handling path of `advanced_function` for invalid input.
   it("should handle non-table input gracefully", { expect_error = true }, function()
     local result, err = syntax_examples.advanced_function("not a table")
     expect(result).to.be_nil()
@@ -150,6 +160,7 @@ describe("Syntax example tests", function()
     expect(err.message).to.match("must be a table")
   end)
 
+  --- Tests the `process_text` function.
   it("should process text correctly", function()
     local input = '  Hello "world" \n with   spaces  '
     local result = syntax_examples.process_text(input)
@@ -158,9 +169,11 @@ describe("Syntax example tests", function()
 end)
 
 --- Tests demonstrating specific HTML formatter features and configurations.
+--- @within examples.html_formatter_example
 describe("HTML formatter features", function()
+  --- Tests generating reports with both dark and light themes.
   it("demonstrates dark/light theme support", function()
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule HgnQwB8GQ5BqLAH8MkKpay)
+    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
     coverage.start()
 
     -- Generate some coverage data
@@ -171,7 +184,7 @@ describe("HTML formatter features", function()
 
     syntax_examples.process_text("Test string with\nnewlines")
 
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule HgnQwB8GQ5BqLAH8MkKpay)
+    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
     coverage.stop()
 
     -- Get the coverage data
@@ -228,8 +241,9 @@ describe("HTML formatter features", function()
     end
   end)
 
+  --- Tests syntax highlighting features for various Lua constructs and line detail display.
   it("demonstrates syntax highlighting and line details", function()
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule HgnQwB8GQ5BqLAH8MkKpay)
+    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
     coverage.start()
 
     -- Generate some coverage data
@@ -240,7 +254,7 @@ describe("HTML formatter features", function()
       mix = "mixed value",
     })
 
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule HgnQwB8GQ5BqLAH8MkKpay)
+    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
     coverage.stop()
 
     -- Get the coverage data
@@ -286,8 +300,9 @@ describe("HTML formatter features", function()
     end
   end)
 
+  --- Tests interactive elements like collapsible sections, execution counts, and sorting.
   it("demonstrates interactive features", function()
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule HgnQwB8GQ5BqLAH8MkKpay)
+    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
     coverage.start()
 
     -- Generate some coverage data
@@ -298,7 +313,7 @@ describe("HTML formatter features", function()
 
     syntax_examples.process_text("Another test")
 
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule HgnQwB8GQ5BqLAH8MkKpay)
+    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
     coverage.stop()
 
     -- Get the coverage data
@@ -343,8 +358,10 @@ describe("HTML formatter features", function()
   end)
 end)
 
---- Informational block describing how to use the HTML report.
+--- Informational block describing how to use the generated HTML report.
+--- @within examples.html_formatter_example
 describe("HTML report instructions", function()
+  --- Logs instructions and explanations of the HTML report's features to the console.
   it("describes how to use the HTML reports", function()
     logger.info("HTML Report Instructions: To view the generated HTML reports, open them in a browser.")
 

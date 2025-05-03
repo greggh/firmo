@@ -14,13 +14,21 @@
 --
 
 -- Import required modules
-local error_handler = require("lib.tools.error_handler")
 local reporting = require("lib.reporting")
 local fs = require("lib.tools.filesystem")
 local central_config = require("lib.core.central_config")
-local firmo = require("firmo") -- Needed for describe/it/expect
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local before, after = firmo.before, firmo.after
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
+---@type fun(callback: function) before Setup function that runs before each test
+local before = firmo.before
+---@type fun(callback: function) after Teardown function that runs after each test
+local after = firmo.after
 local logging = require("lib.tools.logging")
 local test_helper = require("lib.tools.test_helper")
 local temp_file = require("lib.tools.filesystem.temp_file") -- For cleanup
@@ -28,78 +36,88 @@ local temp_file = require("lib.tools.filesystem.temp_file") -- For cleanup
 -- Setup logger
 local logger = logging.get_logger("LCOVExample")
 
--- Create mock coverage data (consistent with other examples)
+-- Create mock coverage data (consistent with other examples, using execution_count)
+--- @type MockCoverageData (See csv_example.lua for full definition)
 local mock_coverage_data = {
   files = {
     ["src/calculator.lua"] = {
       lines = {
-        [1] = true, -- This line was covered
-        [2] = true, -- This line was covered
-        [3] = true, -- This line was covered
-        [5] = false, -- This line was not covered
-        [6] = true, -- This line was covered
-        [8] = false, -- This line was not covered
-        [9] = false, -- This line was not covered
+        [1] = { executable = true, execution_count = 1 },
+        [2] = { executable = true, execution_count = 1 },
+        [3] = { executable = true, execution_count = 1 },
+        [5] = { executable = true, execution_count = 0 },
+        [6] = { executable = true, execution_count = 1 },
+        [8] = { executable = true, execution_count = 0 },
+        [9] = { executable = true, execution_count = 0 },
       },
       functions = {
-        ["add"] = true, -- This function was covered
-        ["subtract"] = true, -- This function was covered
-        ["multiply"] = false, -- This function was not covered
-        ["divide"] = false, -- This function was not covered
+        ["add"] = { name = "add", execution_count = 1 },
+        ["subtract"] = { name = "subtract", execution_count = 1 },
+        ["multiply"] = { name = "multiply", execution_count = 0 },
+        ["divide"] = { name = "divide", execution_count = 0 },
       },
       total_lines = 10,
+      executable_lines = 7,
       covered_lines = 4,
       total_functions = 4,
       covered_functions = 2,
+      line_coverage_percent = (4 / 7) * 100,
+      function_coverage_percent = (2 / 4) * 100,
     },
     ["src/utils.lua"] = {
       lines = {
-        [1] = true, -- This line was covered
-        [2] = true, -- This line was covered
-        [4] = true, -- This line was covered
-        [5] = true, -- This line was covered
-        [7] = false, -- This line was not covered
+        [1] = { executable = true, execution_count = 1 },
+        [2] = { executable = true, execution_count = 1 },
+        [4] = { executable = true, execution_count = 1 },
+        [5] = { executable = true, execution_count = 1 },
+        [7] = { executable = true, execution_count = 0 },
       },
       functions = {
-        ["validate"] = true, -- This function was covered
-        ["format"] = false, -- This function was not covered
+        ["validate"] = { name = "validate", execution_count = 1 },
+        ["format"] = { name = "format", execution_count = 0 },
       },
       total_lines = 8,
+      executable_lines = 5,
       covered_lines = 4,
       total_functions = 2,
       covered_functions = 1,
+      line_coverage_percent = (4 / 5) * 100,
+      function_coverage_percent = (1 / 2) * 100,
     },
   },
   summary = {
     total_files = 2,
     covered_files = 2,
     total_lines = 18,
+    executable_lines = 12,
     covered_lines = 8,
     total_functions = 6,
     covered_functions = 3,
-    line_coverage_percent = 44.4, -- 8/18
-    function_coverage_percent = 50.0, -- 3/6
-    overall_percent = 47.2, -- (44.4 + 50.0) / 2
+    line_coverage_percent = (8 / 12) * 100, -- ~66.7%
+    function_coverage_percent = (3 / 6) * 100, -- 50.0%
+    overall_percent = (8 / 12) * 100,
   },
 }
 
 -- Create tests to demonstrate the LCOV formatter
+-- Create tests to demonstrate the LCOV formatter
 --- Test suite demonstrating LCOV report generation and configuration.
+--- @within examples.lcov_example
 describe("LCOV Formatter Example", function()
-  local temp_dir
+  local temp_dir -- Stores the temporary directory helper object
 
-  -- Setup: Create a temporary directory for reports before tests run
+  --- Setup hook: Create a temporary directory for reports.
   before(function()
     temp_dir = test_helper.create_temp_test_directory()
   end)
 
-  -- Teardown: Release reference (directory cleaned up by test_helper)
+  --- Teardown hook: Release reference. Directory cleaned automatically.
   after(function()
     temp_dir = nil
   end)
 
-  --- Test case for generating a basic LCOV coverage report.
-  it("generates basic LCOV coverage report", function()
+  --- Tests generating a basic LCOV coverage report with default settings.
+  it("generates basic LCOV coverage report with defaults", function()
     -- Generate LCOV report
     logger.info("Generating basic LCOV coverage report...")
     local lcov_report = reporting.format_coverage(mock_coverage_data, "lcov")
@@ -119,6 +137,7 @@ describe("LCOV Formatter Example", function()
     local success, err = fs.write_file(file_path, lcov_report)
 
     -- Check if write was successful
+    expect(err).to.be_nil() -- Check for nil error string
     expect(success).to.be_truthy()
 
     logger.info("Basic LCOV report saved to: " .. file_path)
@@ -129,8 +148,7 @@ describe("LCOV Formatter Example", function()
     print(lcov_report:sub(1, 300) .. "...\n") -- Print preview
   end)
 
-  --- Test case demonstrating LCOV formatter configuration options
-  -- (including function data, test name, path prefix).
+  --- Tests configuring LCOV formatter options (functions, test name, paths).
   it("demonstrates LCOV formatter configuration options", function()
     -- Configure LCOV formatter options via central_config
     central_config.set("reporting.formatters.lcov", {
@@ -153,6 +171,7 @@ describe("LCOV Formatter Example", function()
     local success, err = fs.write_file(file_path, lcov_report)
 
     -- Check if write was successful
+    expect(err).to.be_nil() -- Check for nil error string
     expect(success).to.be_truthy()
 
     logger.info("Configured LCOV report saved to: " .. file_path)
@@ -163,15 +182,15 @@ describe("LCOV Formatter Example", function()
     print(lcov_report:sub(1, 300) .. "...\n") -- Print preview
   end)
 
-  --- Test case providing example configurations for integrating LCOV reports
-  -- with common CI/CD platforms (GitHub Actions, GitLab CI, Jenkins).
-  it("demonstrates CI integration with LCOV reports", function()
+  --- Informational test providing example CI/CD configurations for using LCOV reports.
+  it("discusses CI integration with LCOV reports", function()
     -- Generate LCOV report
     local lcov_report = reporting.format_coverage(mock_coverage_data, "lcov")
 
     -- Save to the standard location that most CI tools expect
     local file_path = fs.join_paths(temp_dir.path, "lcov.info")
     local success, err = fs.write_file(file_path, lcov_report)
+    expect(err).to.be_nil()
     expect(success).to.be_truthy()
 
     logger.info("CI-ready LCOV report saved to: " .. file_path)

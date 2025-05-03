@@ -1,23 +1,51 @@
---[[
-  filesystem_example.lua
-
-  Comprehensive example of the filesystem module in Firmo.
-  This example demonstrates file operations with proper error
-  handling and best practices for file system interactions.
-]]
-
+--- Comprehensive example demonstrating the Firmo filesystem module.
+---
+--- This example showcases various features of the `lib.tools.filesystem` module,
+--- including:
+--- - Basic file operations: writing (`fs.write_file`), reading (`fs.read_file`), appending (`fs.append_file`).
+--- - Existence checks: `fs.file_exists`, `fs.directory_exists`, `fs.is_file`.
+--- - Directory operations: creating (`fs.create_directory`), listing (`fs.list_directory`, `fs.list_files_recursive`).
+--- - File finding and filtering: `fs.find_files`.
+--- - Path manipulation: `fs.join_paths`, `fs.get_directory_name`, `fs.get_file_name`, `fs.basename`, `fs.get_extension`, `fs.normalize_path`, `fs.get_absolute_path`.
+--- - Temporary file and directory management using `temp_file` module helpers (`with_temp_file`, `with_temp_directory`).
+--- - Advanced operations: copying (`fs.copy_file`), moving (`fs.move_file`), removing files/directories (`fs.remove_file`, `fs.remove_directory`).
+--- - Demonstrates proper error handling patterns for filesystem operations using return values (`nil, error_string`).
+--- - Integrates filesystem operations within Firmo tests (`describe`, `it`, `expect`).
+--- - Highlights best practices for interacting with the filesystem.
+---
+--- @module examples.filesystem_example
+--- @see lib.tools.filesystem
+--- @see lib.tools.filesystem.temp_file
+--- @see lib.tools.error_handler
+--- @see lib.tools.test_helper
+--- @usage
+--- Run this example directly to see file operations logged to the console:
+--- ```bash
+--- lua examples/filesystem_example.lua
+--- ```
+--- Run the embedded Firmo tests to verify filesystem functions:
+--- ```bash
+--- lua test.lua examples/filesystem_example.lua
+--- ```
 
 -- Import required modules
-local firmo = require("firmo")
 local fs = require("lib.tools.filesystem")
 local error_handler = require("lib.tools.error_handler")
 local temp_file = require("lib.tools.filesystem.temp_file")
 local test_helper = require("lib.tools.test_helper") -- Added test_helper import
-local central_config = require("lib.core.central_config")
 
--- Test functions
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local before, after = firmo.before, firmo.after
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
+---@type fun(callback: function) before Setup function that runs before each test
+local before = firmo.before
+---@type fun(callback: function) after Teardown function that runs after each test
+local after = firmo.after
 
 -- Create a logger
 local logging = require("lib.tools.logging")
@@ -26,32 +54,39 @@ local logger = logging.get_logger("FSExample")
 print("\n== FILESYSTEM MODULE EXAMPLE ==\n")
 print("PART 1: Basic File Operations\n")
 
--- Create a temporary directory for our examples
-local temp_dir = test_helper.create_temp_test_directory()
+-- Create a temporary directory managed by test_helper for automatic cleanup
+local temp_dir = test_helper.create_temp_test_directory("filesystem_example_")
 print("Created temporary directory:", temp_dir.path)
 
 -- Example 1: Writing Files
 print("\nExample 1: Writing Files")
 
 -- Simple file writing
+print("\nExample 1: Writing Files")
+
+-- Simple file writing
 local simple_file_path = fs.join_paths(temp_dir.path, "simple.txt")
-local write_result, write_err = fs.write_file(simple_file_path, "Hello, world!")
-if write_result then
+local write_success, write_err = fs.write_file(simple_file_path, "Hello, world!")
+if write_success then
   print("Successfully wrote to simple.txt")
 else
-  print("Error writing file:", write_err) -- Use direct error string
+  print("Error writing simple.txt:", write_err) -- Use direct error string
 end
 
--- Writing without specific options (defaults handle creation)
+-- Writing another file
 local options_file_path = fs.join_paths(temp_dir.path, "options.txt")
 local options_result, options_err = fs.write_file(options_file_path, "File with options")
 if options_result then
   print("Successfully wrote to options.txt")
 else
-  print("Error writing file:", options_err) -- Use direct error string
+  print("Error writing options.txt:", options_err) -- Use direct error string
 end
 
 -- Example 2: Reading Files
+print("\nExample 2: Reading Files")
+
+print("\nExample 2: Reading Files")
+
 print("\nExample 2: Reading Files")
 
 -- Read an existing file
@@ -59,7 +94,7 @@ local content, read_err = fs.read_file(simple_file_path)
 if content then
   print("Read from simple.txt:", content)
 else
-  print("Error reading file:", read_err) -- Use direct error string
+  print("Error reading simple.txt:", read_err) -- Use direct error string
 end
 
 -- Try to read a non-existent file
@@ -72,7 +107,8 @@ else
 end
 
 -- Example 3: Checking File Existence
-print("\nExample 3: Checking File Existence")
+
+print("\nExample 3: Checking File/Directory Existence")
 
 -- Check if a file exists
 local file_exists = fs.file_exists(simple_file_path)
@@ -90,21 +126,21 @@ print("Temp directory exists:", dir_exists)
 print("\nPART 2: Directory Operations\n")
 
 -- Example 4: Creating Directories
-print("Example 4: Creating Directories")
+print("\nExample 4: Creating Directories")
 
--- Create a new directory
+-- Create a new nested directory structure
 local nested_dir = fs.join_paths(temp_dir.path, "nested", "structure")
-local mkdir_result, mkdir_err = fs.create_directory(nested_dir)
-if mkdir_result then
+local mkdir_success, mkdir_err = fs.create_directory(nested_dir)
+if mkdir_success then
   print("Successfully created directory:", nested_dir)
 else
-  print("Error creating directory:", mkdir_err) -- Use direct error string
+  print("Error creating nested directory:", mkdir_err) -- Use direct error string
 end
 
--- Create a file in the nested directory
+-- Create a file within the nested directory
 local nested_file = fs.join_paths(nested_dir, "nested.txt")
-local nested_result, nested_err = fs.write_file(nested_file, "Nested file content")
-if nested_result then
+local nested_write_success, nested_err = fs.write_file(nested_file, "Nested file content")
+if nested_write_success then
   print("Successfully wrote to nested file:", nested_file)
 else
   print("Error writing nested file:", nested_err) -- Use direct error string
@@ -145,7 +181,7 @@ if root_items then
     print("  " .. item_type .. ": " .. item)
   end
 else
-  print("Error listing directory:", root_err) -- Use direct error string
+  print("Error listing root directory:", root_err) -- Use direct error string
 end
 
 -- List files recursively
@@ -375,28 +411,30 @@ fs.write_file(source_file, "Content to copy and move")
 
 -- Copy the file
 local copy_dest = fs.join_paths(temp_dir.path, "copy.txt")
-local copy_result, copy_err = fs.copy_file(source_file, copy_dest)
-if copy_result then
+local copy_success, copy_err = fs.copy_file(source_file, copy_dest)
+if copy_success then
   print("Successfully copied file to:", copy_dest)
 
   -- Verify the copy
-  local copy_content = fs.read_file(copy_dest)
+  local copy_content, copy_read_err = fs.read_file(copy_dest)
+  expect(copy_read_err).to.be_nil() -- Check read error
   print("Copy content:", copy_content)
 else
   print("Error copying file:", copy_err) -- Use direct error string
 end
 
--- Move the file
+-- Move the copied file
 local move_dest = fs.join_paths(temp_dir.path, "moved.txt")
-local move_result, move_err = fs.move_file(copy_dest, move_dest)
-if move_result then
+local move_success, move_err = fs.move_file(copy_dest, move_dest)
+if move_success then
   print("Successfully moved file to:", move_dest)
 
   -- Verify the source no longer exists
   print("Source still exists:", fs.file_exists(copy_dest))
 
   -- Verify the destination
-  local move_content = fs.read_file(move_dest)
+  local move_content, move_read_err = fs.read_file(move_dest)
+  expect(move_read_err).to.be_nil() -- Check read error
   print("Moved content:", move_content)
 else
   print("Error moving file:", move_err) -- Use direct error string
@@ -415,21 +453,21 @@ fs.write_file(fs.join_paths(remove_dir, "subdir", "file3.txt"), "Content 3")
 
 -- Remove a single file
 local file1_path = fs.join_paths(remove_dir, "file1.txt")
-local file_remove_result, file_remove_err = fs.remove_file(file1_path)
-if file_remove_result then
-  print("Removed single file")
-  print("File still exists:", fs.file_exists(file1_path))
+local file_remove_success, file_remove_err = fs.remove_file(file1_path)
+if file_remove_success then
+  print("Removed single file:", file1_path)
+  print("File still exists after removal:", fs.file_exists(file1_path))
 else
   print("Error removing file:", file_remove_err) -- Use direct error string
 end
 
--- Remove directory and contents recursively
-local dir_remove_result, dir_remove_err = fs.remove_directory(remove_dir, true) -- Use correct function with recursive flag
-if dir_remove_result then
-  print("Removed directory recursively")
-  print("Directory still exists:", fs.directory_exists(remove_dir))
+-- Remove the entire directory and its remaining contents recursively
+local dir_remove_success, dir_remove_err = fs.remove_directory(remove_dir, true) -- Set recursive = true
+if dir_remove_success then
+  print("Removed directory recursively:", remove_dir)
+  print("Directory still exists after removal:", fs.directory_exists(remove_dir))
 else
-  print("Error removing directory:", dir_remove_err) -- Use direct error string
+  print("Error removing directory recursively:", dir_remove_err) -- Use direct error string
 end
 
 -- PART 6: Error Handling
@@ -438,9 +476,12 @@ print("\nPART 6: Error Handling in Filesystem Operations\n")
 -- Example 12: Proper Error Handling with Filesystem Operations
 print("Example 12: Proper Error Handling")
 
----@param file_path any The path to the configuration file
----@return table|nil config The parsed configuration if successful, nil otherwise
----@return table|nil error An error object if the operation failed
+--- Simulates processing a configuration file, demonstrating robust error handling
+--- for file existence and reading using `error_handler` objects.
+--- @param file_path any The path to the configuration file to process.
+--- @return table|nil config The processed configuration table if successful, `nil` otherwise.
+--- @return table|nil error An error object (from `error_handler`) if any operation failed.
+--- @within examples.filesystem_example
 function process_config_file(file_path)
   -- Validate input
   if type(file_path) ~= "string" then
@@ -456,14 +497,16 @@ function process_config_file(file_path)
     return nil, error_handler.io_error("Config file does not exist", { file_path = file_path, operation = "read" })
   end
 
-  -- Read the file with error handling
-  local content, read_err = fs.read_file(file_path)
+  local content, read_err_str = fs.read_file(file_path)
   if not content then
-    -- Propagate error string directly
-    return nil, error_handler.wrap_error(read_err, "Failed to read config file content", { operation = "process_config_file" })
+    -- Wrap the string error from fs.read_file into a proper error object
+    local io_err =
+      error_handler.io_error(read_err_str or "Unknown read error", { file_path = file_path, operation = "read" })
+    return nil,
+      error_handler.wrap_error(io_err, "Failed to read config file content", { operation = "process_config_file" })
   end
 
-  -- Process the content (simplified for example)
+  -- Process the content (simplified example: assumes key=value pairs per line)
   local config = {}
   for line in content:gmatch("[^\r\n]+") do
     local key, value = line:match("^([%w_]+)%s*=%s*(.+)$")
@@ -524,44 +567,52 @@ print("\nPART 7: Unit Testing Filesystem Code\n")
 
 -- Example 13: Testing File Operations
 print("Example 13: Testing File Operations")
+print("\nExample 13: Testing Filesystem Operations with Firmo\n")
 
--- Create a test directory for our tests
-local test_dir = test_helper.create_temp_test_directory()
-
--- Unit tests for file operations
-describe("File Operations", function()
+-- Unit tests for basic file operations using Firmo's testing framework
+--- @within examples.filesystem_example
+describe("File Operations Tests", function()
   local test_file
 
-  -- Set up before each test
+  local test_file
+  local test_dir_helper -- Use the helper from test_helper
+
+  --- Setup hook: Create a unique temp directory and define file path before each test.
   before(function()
-    test_file = fs.join_paths(test_dir.path, "test_file.txt")
+    test_dir_helper = test_helper.create_temp_test_directory("file_ops_")
+    test_file = fs.join_paths(test_dir_helper.path, "test_file.txt")
   end)
 
-  -- Clean up after each test
+  --- Teardown hook: Release references. Directory is cleaned automatically.
   after(function()
     if fs.file_exists(test_file) then
       fs.remove_file(test_file)
     end
+    test_file = nil
+    test_dir_helper = nil -- Allow GC, directory cleanup handled by test_helper
   end)
 
+  --- Tests basic file writing and reading using `fs.write_file` and `fs.read_file`.
   it("can write and read a file", function()
     local content = "Test content " .. os.time()
 
     -- Write to the file
-    local write_result, write_err = fs.write_file(test_file, content)
-    expect(write_err).to_not.exist("Write error: " .. tostring(write_err)) -- Check for nil error string
-    expect(write_result).to.be_truthy()
+    local write_success, write_err = fs.write_file(test_file, content)
+    expect(write_err).to.be_nil() -- Expect nil error string on success
+    expect(write_success).to.be_truthy()
+
     -- Check file exists
     expect(fs.file_exists(test_file)).to.be_truthy()
 
     -- Read the file
     local read_content, read_err = fs.read_file(test_file)
-    expect(read_err).to_not.exist("Read error: " .. tostring(read_err)) -- Check for nil error string
+    expect(read_err).to.be_nil() -- Expect nil error string on success
     expect(read_content).to.equal(content)
   end)
 
-  it("handles missing files correctly", { expect_error = true }, function()
-    local missing_file = fs.join_paths(test_dir.path, "does_not_exist.txt")
+  --- Tests how reading a non-existent file is handled by `fs.read_file` (returns `nil, error_string`).
+  it("handles reading missing files correctly", function()
+    local missing_file = fs.join_paths(test_dir_helper.path, "does_not_exist.txt")
 
     -- Ensure file doesn't exist
     if fs.file_exists(missing_file) then
@@ -572,81 +623,84 @@ describe("File Operations", function()
     expect(fs.file_exists(missing_file)).to.equal(false)
 
     -- Try to read missing file
-    -- Try to read missing file (should return nil, error string)
-    local content, err = fs.read_file(missing_file)
+    -- Try to read missing file
+    local content, err_str = fs.read_file(missing_file)
 
-    -- Verify error
-    expect(content).to.equal(nil)
-    expect(err).to.be.a("string") -- Expect an error string
-    expect(err).to.match("file does not exist") -- Expect a relevant message
+    -- Verify result and error string
+    expect(content).to.be_nil()
+    expect(err_str).to.be.a("string")
+    expect(err_str).to.match("file does not exist")
   end)
 
-  it("can append to files", function()
+  --- Tests appending content to an existing file using `fs.append_file`.
+  it("can append to files using append_file", function()
     -- Initial content
     local initial = "Initial content\n"
-    local write_result, _ = fs.write_file(test_file, initial)
-    expect(write_result).to.be_truthy()
+    local write_success, write_err = fs.write_file(test_file, initial)
+    expect(write_err).to.be_nil()
+    expect(write_success).to.be_truthy()
 
     -- Append content
     local append = "Appended content"
-    local append_result, append_err = fs.append_file(test_file, append) -- Use append_file
-    expect(append_err).to_not.exist("Append error: " .. tostring(append_err)) -- Check for nil error string
-    expect(append_result).to.be_truthy()
+    local append_success, append_err = fs.append_file(test_file, append)
+    expect(append_err).to.be_nil() -- Check for nil error string
+    expect(append_success).to.be_truthy()
 
     -- Read combined content
-    local read_content, _ = fs.read_file(test_file)
+    local read_content, read_err = fs.read_file(test_file)
+    expect(read_err).to.be_nil()
     expect(read_content).to.equal(initial .. append)
   end)
 end)
 
--- Example 14: Testing Directory Operations
-print("\nExample 14: Testing Directory Operations")
+-- Unit tests for directory operations
+--- @within examples.filesystem_example
+describe("Directory Operations Tests", function()
+  local test_dir_helper -- Stores the temp dir helper object
 
-describe("Directory Operations", function()
-  local base_dir
-
-  -- Create a unique directory for each test
+  --- Setup hook: Create a unique temp directory before each test.
   before(function()
     base_dir = fs.join_paths(test_dir.path, "dir_tests_" .. os.time())
     fs.create_directory(base_dir)
+    test_dir_helper = test_helper.create_temp_test_directory("dir_ops_")
   end)
 
-  -- Clean up after tests
+  --- Teardown hook: Release references. Directory is cleaned up automatically by `test_helper`.
   after(function()
-    if fs.directory_exists(base_dir) then
-      fs.remove_directory(base_dir, true) -- Use correct function with recursive flag
-    end
+    test_dir_helper = nil -- Allow GC
   end)
 
+  --- Tests creating nested directories using `fs.create_directory`.
   it("can create nested directories", function()
-    local nested_dir = fs.join_paths(base_dir, "level1", "level2", "level3")
+    local nested_dir = fs.join_paths(test_dir_helper.path, "level1", "level2", "level3")
 
     -- Create the nested directories
-    local result, err = fs.create_directory(nested_dir)
-    expect(err).to_not.exist("Directory creation error: " .. tostring(err)) -- Check for nil error string
-    expect(result).to.be_truthy()
+    local success, err = fs.create_directory(nested_dir)
+    expect(err).to.be_nil() -- Expect nil error string on success
+    expect(success).to.be_truthy()
 
     -- Verify directories exist
     expect(fs.directory_exists(nested_dir)).to.be_truthy()
-    expect(fs.directory_exists(fs.join_paths(base_dir, "level1", "level2"))).to.be_truthy()
-    expect(fs.directory_exists(fs.join_paths(base_dir, "level1"))).to.be_truthy()
+    expect(fs.directory_exists(fs.join_paths(test_dir_helper.path, "level1", "level2"))).to.be_truthy()
+    expect(fs.directory_exists(fs.join_paths(test_dir_helper.path, "level1"))).to.be_truthy()
   end)
 
+  --- Tests listing directory contents using `fs.list_directory`.
   it("can list directory contents", function()
-    -- Create test files
-    fs.write_file(fs.join_paths(base_dir, "file1.txt"), "Content 1")
-    fs.write_file(fs.join_paths(base_dir, "file2.txt"), "Content 2")
-    fs.create_directory(fs.join_paths(base_dir, "subdir"))
+    -- Create test files and a subdirectory
+    test_dir_helper:create_file("file1.txt", "Content 1")
+    test_dir_helper:create_file("file2.txt", "Content 2")
+    fs.create_directory(fs.join_paths(test_dir_helper.path, "subdir")) -- Create dir directly
 
     -- List directory
-    local entries, err = fs.list_directory(base_dir)
-    expect(err).to_not.exist("Listing error: " .. tostring(err)) -- Check for nil error string
+    local entries, err = fs.list_directory(test_dir_helper.path)
+    expect(err).to.be_nil() -- Expect nil error string on success
     expect(entries).to.exist()
 
     -- Should have 3 entries
     expect(#entries).to.equal(3)
 
-    -- Should contain our files and directory
+    -- Check if the expected entries are present (order might vary)
     local has_file1 = false
     local has_file2 = false
     local has_subdir = false
@@ -668,9 +722,10 @@ describe("Directory Operations", function()
     expect(has_subdir).to.be_truthy("Missing subdir")
   end)
 
+  --- Tests removing a directory and its contents recursively using `fs.remove_directory`.
   it("can remove directories recursively", function()
     -- Create a structure to remove
-    local remove_path = fs.join_paths(base_dir, "to_remove")
+    local remove_path = fs.join_paths(test_dir_helper.path, "to_remove")
     fs.create_directory(remove_path)
     fs.write_file(fs.join_paths(remove_path, "file.txt"), "Content")
     fs.create_directory(fs.join_paths(remove_path, "subdir"))
@@ -683,9 +738,9 @@ describe("Directory Operations", function()
     expect(fs.file_exists(fs.join_paths(remove_path, "subdir", "nested.txt"))).to.be_truthy()
 
     -- Remove recursively
-    local result, err = fs.remove_directory(remove_path, true) -- Use correct function with recursive flag
-    expect(err).to_not.exist("Removal error: " .. tostring(err)) -- Check for nil error string
-    expect(result).to.be_truthy()
+    local success, err = fs.remove_directory(remove_path, true) -- Set recursive = true
+    expect(err).to.be_nil() -- Expect nil error string on success
+    expect(success).to.be_truthy()
 
     -- Verify removal
     expect(fs.directory_exists(remove_path)).to.equal(false)

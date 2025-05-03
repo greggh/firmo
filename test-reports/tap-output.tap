@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites>
+  <testsuite name="CoverageTests"
+             tests="1"
+             errors="0"
+             failures="1"
+             skipped="0"
+             time="0.01"
+             timestamp="2025-05-02T19:58:39"
+             hostname="">
+    <properties>
+      <property name="coverage_tool" value="Firmo Coverage" />
+      <property name="formatter_version" value="1.0.0" />
+    </properties>
+    <testcase classname="CoverageTests" name="OverallCoverage" time="0.01">
+      <properties>
+        <property name="coverage_percent" value="0.00" />
+        <property name="threshold" value="80" />
+        <property name="total_files" value="0" />
+        <property name="total_lines" value="0" />
+        <property name="covered_lines" value="0" />
+        <property name="executed_lines" value="0" />
+      </properties>
+      <failure message="Overall coverage below threshold" type="CoverageFailure">
+        Coverage: 0.00% (threshold: 80%)
+      </failure>
+    </testcase>
+  </testsuite>
+</testsuites>

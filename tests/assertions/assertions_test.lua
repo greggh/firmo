@@ -13,10 +13,16 @@
 ---
 --- @author Firmo Team
 --- @test
-local firmo = require("firmo")
 
 local test_helper = try_require("lib.tools.test_helper")
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
 
 describe("Core Assertions", function()
   describe("Basic Assertions", function()

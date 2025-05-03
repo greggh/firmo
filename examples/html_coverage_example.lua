@@ -26,24 +26,34 @@
   3. Code that is never executed (uncovered)
 ]]
 
--- Import modules
+-- Extract the testing functions we need
 local firmo = require("firmo")
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local error_handler = require("lib.tools.error_handler")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
+
 local logging = require("lib.tools.logging")
 
 -- Setup logger
 local logger = logging.get_logger("HTMLCoverageExample")
 
---- Sample Calculator implementation to test coverage states.
+--- Sample Calculator module implementation used to demonstrate different coverage states.
+--- @class Calculator
+--- @field add fun(a: number, b: number): number|nil, string|nil Adds two numbers (fully covered).
+--- @field subtract fun(a: number, b: number): number|nil, string|nil Subtracts two numbers (executed-not-covered).
+--- @field multiply fun(a: number, b: number): number|nil, string|nil Multiplies two numbers (uncovered).
+--- @within examples.html_coverage_example
 local Calculator = {}
 
 --- Adds two numbers. Includes validation.
--- This function is designed to be fully covered by tests.
--- @param a number The first number.
--- @param b number The second number.
--- @return number|nil The sum, or nil on error.
--- @return string|nil An error message if inputs are invalid.
+--- This function is designed to be fully covered by tests (green in HTML report).
+--- @param a number The first number.
+--- @param b number The second number.
+--- @return number|nil The sum, or `nil` on error.
+--- @return string|nil An error message if inputs are invalid.
 function Calculator.add(a, b)
   if type(a) ~= "number" or type(b) ~= "number" then
     return nil, "Both arguments must be numbers"
@@ -52,12 +62,12 @@ function Calculator.add(a, b)
 end
 
 --- Subtracts two numbers. Includes validation.
--- This function is designed to be executed but not validated by tests,
--- demonstrating the 'executed-but-not-covered' state.
--- @param a number The first number.
--- @param b number The second number.
--- @return number|nil The difference, or nil on error.
--- @return string|nil An error message if inputs are invalid.
+--- This function is designed to be executed but *not* validated by tests,
+--- demonstrating the 'executed-but-not-covered' state (yellow in HTML report).
+--- @param a number The first number.
+--- @param b number The second number.
+--- @return number|nil The difference, or `nil` on error.
+--- @return string|nil An error message if inputs are invalid.
 function Calculator.subtract(a, b)
   if type(a) ~= "number" or type(b) ~= "number" then
     return nil, "Both arguments must be numbers"
@@ -66,11 +76,11 @@ function Calculator.subtract(a, b)
 end
 
 --- Multiplies two numbers. Includes validation.
--- This function is designed to be completely uncovered by tests.
--- @param a number The first number.
--- @param b number The second number.
--- @return number|nil The product, or nil on error.
--- @return string|nil An error message if inputs are invalid.
+--- This function is designed to be completely *uncovered* by tests (red in HTML report).
+--- @param a number The first number.
+--- @param b number The second number.
+--- @return number|nil The product, or `nil` on error.
+--- @return string|nil An error message if inputs are invalid.
 function Calculator.multiply(a, b)
   if type(a) ~= "number" or type(b) ~= "number" then
     return nil, "Both arguments must be numbers"
@@ -79,28 +89,35 @@ function Calculator.multiply(a, b)
 end
 
 -- Run tests with coverage tracking
---- Test suite for the Calculator module, designed to generate specific coverage states.
+--- Test suite for the Calculator module, designed to generate specific coverage states
+-- for demonstration in the HTML report.
+--- @within examples.html_coverage_example
 describe("HTML Coverage Report Example", function()
   --- Tests for the `Calculator.add` function. These tests execute
-  -- the function and validate its output, resulting in 'covered' lines.
-  describe("add function", function()
+  -- the function and validate its output using `expect`, resulting in 'covered' (green) lines.
+  --- @within examples.html_coverage_example
+  describe("add function (Covered)", function()
+    --- Tests the happy path for addition.
     it("correctly adds two numbers", function()
       local result = Calculator.add(5, 3)
       expect(result).to.equal(8) -- This validates the execution
     end)
 
+    --- Tests the error handling path for addition.
     it("handles invalid inputs", function()
       local result, err = Calculator.add("string", 10)
-      expect(result).to_not.exist()
-      expect(err).to.equal("Both arguments must be numbers")
+      expect(result).to_not.exist() -- Validates nil return
+      expect(err).to.equal("Both arguments must be numbers") -- Validates error message
     end)
   end)
 
   --- Tests for the `Calculator.subtract` function. These tests execute
-  -- the function but do *not* validate its output, resulting in
-  -- 'executed-but-not-covered' lines.
-  describe("subtract function", function()
-    it("executes the subtract function without validating it", function()
+  -- the function but do *not* validate its output using `expect`, resulting in
+  -- 'executed-but-not-covered' (yellow) lines.
+  --- @within examples.html_coverage_example
+  describe("subtract function (Executed-Not-Covered)", function()
+    --- Executes subtract but has no `expect` calls.
+    it("executes the subtract function without validating its result", function()
       local result = Calculator.subtract(10, 4)
       -- No validations here, so this is executed but not covered
     end)

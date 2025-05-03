@@ -17,9 +17,6 @@
 --- @author Firmo Team
 --- @test
 
--- Adjust path to find modules
-package.path = "../?.lua;../lib/?.lua;../lib/?/init.lua;" .. package.path
-
 -- Import firmo
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect

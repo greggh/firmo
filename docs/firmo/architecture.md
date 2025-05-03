@@ -41,7 +41,6 @@ firmo.lua                  # Main entry point and public API
 │   │       ├── formatter.lua # Base report formatter
 │   │       ├── html.lua      # HTML reporter with syntax highlighting
 │   │       ├── json.lua      # JSON reporter with pretty printing
-│   │       ├── json.lua      # JSON reporter with pretty printing
 │   │       ├── lcov.lua      # LCOV report formatter
 │   │       └── cobertura.lua # Cobertura XML formatter (Moved from reporting)
 │   │
@@ -84,7 +83,7 @@ firmo.lua                  # Main entry point and public API
 │   │   ├── summary.lua   # Text summary reports (coverage/quality)
 │   │   └── csv.lua       # CSV test reports
 │   │
-│   ├── async/             # Asynchronous testing utilities
+│   ├── async/             # Asynchronous testing utilities (it_async, describe_async, etc.)
 │   │   └── init.lua
 │   │
 │   └── quality/           # Test quality validation (Partially Implemented)
@@ -339,6 +338,10 @@ Several utility modules provide supporting functionality:
 - 🔄 Interactive Mode (`lib/tools/interactive`): Basic structure exists but lacks full implementation and features documented in guides.
 - 🔄 Parallel (`lib/tools/parallel`): Core functionality exists but may have unimplemented helper functions.
 
+
+## Change History
+
+- 2025-04-28: Removed duplicate JSON reporter reference (now consolidated in tools/json/init.lua)
 
 ## Implementation Timeline (Spring 2025)
 

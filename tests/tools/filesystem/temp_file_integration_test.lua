@@ -14,27 +14,27 @@
 --- @author Firmo Team
 --- @test
 
--- Load dependencies first
-local firmo_import = require("firmo") -- use a different name to avoid conflicts
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
+---@type fun(callback: function) before Setup function that runs before each test
+local before = firmo.before
+---@type fun(callback: function) after Teardown function that runs after each test
+local after = firmo.after
 
-local temp_file_import = require("lib.tools.filesystem.temp_file")
-local temp_file_integration_import = require("lib.tools.filesystem.temp_file_integration")
-local fs_import = require("lib.tools.filesystem")
-local test_helper_import = require("lib.tools.test_helper")
-
--- Make local copies to avoid upvalue issues
-local firmo = firmo_import
-local temp_file = temp_file_import
-local temp_file_integration = temp_file_integration_import
-local fs = fs_import
-local test_helper = test_helper_import
-
--- Unpack test functions
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local before, after = firmo.before, firmo.after
+local temp_file = require("lib.tools.filesystem.temp_file")
+local temp_file_integration = require("lib.tools.filesystem.temp_file_integration")
+local fs = require("lib.tools.filesystem")
+local test_helper = require("lib.tools.test_helper")
 
 describe("temp_file_integration", function()
   -- Initialize the integration at the start
+
   before(function()
     -- Since we're making direct changes to the local firmo instance,
     -- expose it globally for tests and reset the integration each time

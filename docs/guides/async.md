@@ -413,6 +413,96 @@ it_async("uses sequential async flow", function()
 end)
 ```
 
+### Async Suites and Focus/Skip
+
+Similar to synchronous tests, Firmo allows grouping asynchronous tests using `describe_async`, `fdescribe_async`, and `xdescribe_async`, as well as focusing or skipping individual tests with `fit_async` and `xit_async`.
+
+#### Grouping with `describe_async`
+
+Use `describe_async` to group related async tests. It works just like `describe`, allowing nesting and the use of `before`/`after` hooks. Tests defined within `describe_async` can be either synchronous (`it`) or asynchronous (`it_async`).
+
+```lua
+local firmo = require("firmo")
+local describe_async, it_async, it, before, after, await =
+  firmo.describe_async, firmo.it_async, firmo.it, firmo.before, firmo.after, firmo.await
+
+describe_async("Async User API", function()
+  before(function()
+    -- Runs before each test in this suite
+  end)
+
+  it_async("fetches user profile", function()
+    await(50) -- Simulate API call
+    -- ... assertions ...
+  end)
+
+  it("validates input synchronously", function()
+    -- Sync validation logic
+    expect(validate_input("test")).to.be_truthy()
+  end)
+
+  describe_async("Nested Async Group", function()
+    it_async("handles nested async operation", function()
+      await(20)
+      -- ... assertions ...
+    end)
+  end)
+
+  after(function()
+    -- Runs after each test in this suite
+  end)
+end)
+```
+
+#### Focusing with `fdescribe_async` and `fit_async`
+
+When debugging or developing, you can focus on specific async suites or tests. If any `fdescribe_async` or `fit_async` calls exist, the test runner will *only* execute those focused items and skip everything else.
+
+```lua
+local firmo = require("firmo")
+local describe_async, fdescribe_async, it_async, fit_async, await =
+  firmo.describe_async, firmo.fdescribe_async, firmo.it_async, firmo.fit_async, firmo.await
+
+-- Focus on this entire suite
+fdescribe_async("Critical Feature X", function()
+  it_async("test part 1", function() await(10) end)
+  it_async("test part 2", function() await(10) end)
+end)
+
+describe_async("Another Feature Y", function()
+  -- This test will be skipped because the suite above is focused
+  it_async("test part 3", function() await(10) end)
+
+  -- Focus only on this specific test within the suite
+  fit_async("test part 4 - focused", function() await(10) end)
+
+  -- This test will also be skipped because the test above is focused
+  it_async("test part 5", function() await(10) end)
+end)
+```
+In the example above, if run normally, only "test part 1", "test part 2", and "test part 4 - focused" would execute.
+
+#### Skipping with `xdescribe_async` and `xit_async`
+
+To temporarily disable async suites or tests, use the `x` prefixed versions. These items will be reported as skipped but their code will not run.
+
+```lua
+local firmo = require("firmo")
+local describe_async, xdescribe_async, it_async, xit_async, await =
+  firmo.describe_async, firmo.xdescribe_async, firmo.it_async, firmo.xit_async, firmo.await
+
+-- Skip this entire suite
+xdescribe_async("Legacy Feature Z", function()
+  it_async("test legacy part 1", function() await(10) end) -- Will not run
+end)
+
+describe_async("Current Feature W", function()
+  -- Skip only this specific test
+  xit_async("test part 6 - unstable", function() await(10) end) -- Will not run
+
+  it_async("test part 7", function() await(10) end) -- Will run
+end)
+```
 
 
 ### 7. Isolate Tests

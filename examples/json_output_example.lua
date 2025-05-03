@@ -9,36 +9,44 @@
 -- Run with JSON output: lua test.lua --format=json examples/json_output_example.lua
 --
 
--- Import the testing framework
-local firmo = require("firmo")
-local error_handler = require("lib.tools.error_handler")
 local logging = require("lib.tools.logging")
 
 -- Setup logger
 local logger = logging.get_logger("JSONOutputExample")
 
--- Define aliases
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
 
 -- Example test suite
---- Test suite containing examples of passing, failing, and skipped tests.
+--- Test suite containing examples of passing, failing, and skipped tests
+-- specifically to demonstrate the structure of the JSON output format.
+--- @within examples.json_output_example
 describe("JSON Output Example", function()
+  --- A simple passing test.
   it("should pass this test", function()
     expect(1 + 1).to.equal(2)
   end)
 
+  --- Another simple passing test.
   it("should pass this test too", function()
     expect(true).to.be(true)
   end)
 
   --- Example of a skipped test using `firmo.pending`.
   -- @pending This test is intentionally skipped using firmo.pending.
-  it("should skip this test", function()
+  it("should skip this test using firmo.pending", function()
     firmo.pending("Skipping for the example")
   end)
 
+  --- A test designed to fail to show the 'failure' structure in JSON output.
   it("should fail this test for demonstration", function()
-    expect(1).to.equal(2) -- This will fail
+    expect(1).to.equal(2) -- This assertion will fail
   end)
 end)
 

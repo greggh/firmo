@@ -11,19 +11,22 @@
 -- Run embedded tests: lua test.lua examples/formatter_config_example.lua
 --
 
-local firmo = require("firmo")
 local central_config = require("lib.core.central_config")
-local error_handler = require("lib.tools.error_handler")
-local reporting = require("lib.reporting") -- Keep for context, though direct config calls removed
 local logging = require("lib.tools.logging")
 
 -- Setup logger
 local logger = logging.get_logger("FormatterConfigExample")
 
--- Test functions
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
 
-logger.info("Formatter Configuration Example")
+logger.info("--- Formatter Configuration Example ---")
 logger.info("===============================")
 logger.info("This example demonstrates how to configure formatters using the central configuration system")
 
@@ -94,14 +97,17 @@ else
   end
 end
 
-logger.info("\n5. Simple test for demonstration:")
--- Write a simple test
---- Basic test suite included for demonstration purposes.
+logger.info("\n5. Basic test suite for demonstration:")
+--- Basic test suite included to allow running this file with the test runner
+-- and potentially see effects of configuration on output formats like summary.
+--- @within examples.formatter_config_example
 describe("Basic test", function()
+  --- A simple passing test.
   it("should pass", function()
     expect(true).to.be.truthy()
   end)
 
+  --- Another simple passing test.
   it("should have proper equality", function()
     expect({ 1, 2, 3 }).to.equal({ 1, 2, 3 })
   end)

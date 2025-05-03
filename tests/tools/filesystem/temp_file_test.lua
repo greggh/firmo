@@ -14,22 +14,18 @@
 --- @author Firmo Team
 --- @test
 
--- Load dependencies first
-local firmo_import = require("firmo") -- use a different name to avoid conflicts
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
 
-local temp_file_import = require("lib.tools.filesystem.temp_file")
-local fs_import = require("lib.tools.filesystem")
-local test_helper_import = require("lib.tools.test_helper")
-
--- Make local copies to avoid upvalue issues
-local firmo = firmo_import
-local temp_file = temp_file_import
-local fs = fs_import
-local test_helper = test_helper_import
-
--- Unpack test functions
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local before, after = firmo.before, firmo.after
+local temp_file = require("lib.tools.filesystem.temp_file")
+local fs = require("lib.tools.filesystem")
+local test_helper = require("lib.tools.test_helper")
 
 describe("temp_file", function()
   -- No need to track files for manual cleanup - the temp_file system handles this automatically

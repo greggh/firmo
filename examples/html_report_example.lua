@@ -13,23 +13,39 @@
 -- Run embedded tests: lua test.lua examples/html_report_example.lua
 --
 
+-- Extract the testing functions we need
 local firmo = require("firmo")
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local before, after = firmo.before, firmo.after -- Import before/after for setup
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
+---@type fun(callback: function) before Setup function that runs before each test
+local before = firmo.before
+---@type fun(callback: function) after Teardown function that runs after each test
+local after = firmo.after
 
 -- Import required modules
-local error_handler = require("lib.tools.error_handler")
-local fs = require("lib.tools.filesystem") -- Keep for path joining if needed
 local reporting = require("lib.reporting")
 local test_helper = require("lib.tools.test_helper")
 local logging = require("lib.tools.logging")
-local central_config = require("lib.core.central_config") -- For consistency
 local temp_file = require("lib.tools.filesystem.temp_file") -- For cleanup
 
 -- Setup logger
 local logger = logging.get_logger("HTMLReportExample")
 
--- Mock test results data
+-- Mock test results data structure for demonstration.
+--- @class MockTestResults
+--- @field name string The name of the test suite.
+--- @field timestamp string ISO 8601 timestamp of the test run.
+--- @field tests number Total number of tests executed.
+--- @field failures number Number of tests that failed assertions.
+--- @field errors number Number of tests that encountered runtime errors.
+--- @field skipped number Number of tests that were skipped.
+--- @field time number Total execution time in seconds.
+--- @field test_cases TestCaseData[] An array of individual test case results.
+--- @within examples.html_report_example
 local test_results = {
   name = "HTML Report Example",
   timestamp = "2025-01-01T00:00:00Z", -- Static timestamp
@@ -38,6 +54,14 @@ local test_results = {
   errors = 1,
   skipped = 1,
   time = 0.15, -- Execution time in seconds
+  --- @class TestCaseData
+  --- @field name string Name of the test case.
+  --- @field classname string Name of the test suite/class containing the test.
+  --- @field time number Execution time for this test case in seconds.
+  --- @field status "pass"|"fail"|"error"|"skipped"|"pending" The status of the test.
+  --- @field failure? { message: string, type: string, details?: string } Failure details if status is "fail".
+  --- @field error? { message: string, type: string, details?: string } Error details if status is "error".
+  --- @field skip_message? string Reason for skipping if status is "skipped".
   test_cases = {
     {
       name = "addition works correctly",
@@ -101,21 +125,23 @@ local test_results = {
   },
 }
 
---- Test suite demonstrating HTML report generation for test results.
+--- Test suite demonstrating HTML report generation for test results using `auto_save_reports`.
+--- @within examples.html_report_example
 describe("HTML Report Generator", function()
-  local temp_dir
+  local temp_dir -- Stores the temporary directory helper object
 
-  -- Create a temp directory before tests
+  --- Setup hook: Create a temporary directory for the report.
   before(function()
     temp_dir = test_helper.create_temp_test_directory()
   end)
 
-  -- Clean up temp directory reference after tests
+  --- Teardown hook: Release reference. Directory cleaned automatically by `test_helper`.
   after(function()
     temp_dir = nil
   end)
 
-  it("generates HTML report using auto_save_reports with config", function()
+  --- Tests generating an HTML report using `reporting.auto_save_reports` and custom configuration.
+  it("generates HTML report using auto_save_reports with custom config", function()
     -- Configure HTML report options
     local config = {
       report_dir = temp_dir.path,
@@ -136,10 +162,11 @@ describe("HTML Report Generator", function()
     -- Verify the HTML report was created successfully
     expect(results.html).to.exist("HTML results entry should exist")
     expect(results.html.success).to.be_truthy("HTML report saving should succeed")
+    expect(results.html.path).to.be.a("string", "HTML report path should be returned")
 
     if results.html.success then
-      logger.info("HTML report saved to directory: " .. temp_dir.path)
-      logger.info("HTML report file: " .. results.html.path)
+      logger.info("HTML report generation successful.")
+      logger.info("Report saved to: " .. results.html.path)
     else
       logger.error("Failed to generate HTML report", { error = results.html.error })
     end

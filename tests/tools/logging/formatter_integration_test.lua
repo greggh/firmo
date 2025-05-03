@@ -11,8 +11,14 @@
 --- @author Firmo Team
 --- @test
 
+-- Extract the testing functions we need
 local firmo = require("firmo")
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
 
 local formatter_integration = require("lib.tools.logging.formatter_integration")
 local logging = require("lib.tools.logging")

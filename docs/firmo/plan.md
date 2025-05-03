@@ -43,11 +43,10 @@ the codebase to verify they aren't used and remove them if needed.
 - lib/core/fix_expect.lua
 - lib/tools/hash/init.lua
 
-  44.1|**Outcome:**
-  44.2|- `lib/core/init.lua`: Removed (unused).
-  44.3|- `lib/core/fix_expect.lua`: Removed (unused and obsolete).
-  44.4|- `lib/tools/hash/init.lua`: Kept (used in examples/tests).
-  44.5|
+  **Outcome:**
+  `lib/core/init.lua`: Removed (unused).
+  `lib/core/fix_expect.lua`: Removed (unused and obsolete).
+  `lib/tools/hash/init.lua`: Kept (used in examples/tests).
 
 ### 7. lib/core/module_reset.lua review/audit
 
@@ -76,19 +75,11 @@ We have two JSON modules. One in lib/reporting/json.lua and one in lib/tools/jso
 The lib/tools/json/init.lua seems like the more complete module. Should we remove the
 lib/reporting/json.lua and replace any uses of it in firmo with the lib/tools/json/init.lau module?
 
-### 10. firmo.lua try_require update
-
-This sub-plan is documented in the docs/firmo/firmo_try_require_update_plan.md
-
-### 11. complete try_require update
-
-This sub-plan is documented in the docs/firmo/complete_try_require_update_plan.md
-
-### 12. add fit_async, xit_async, describe_async, fdescribe_async, xdescribe_async
+### 10. add fit_async, xit_async, describe_async, fdescribe_async, xdescribe_async
 
 This sub-plan is documented in the docs/firmo/add_more_async_functions_plan.md
 
-### 13. Review pcall and xpcall usage in the codebase
+### 11. Review pcall and xpcall usage in the codebase
 
 This sub-plan is documented in the docs/firmo/pcall_update_plan.md
 
@@ -103,7 +94,5 @@ This sub-plan is documented in the docs/firmo/pcall_update_plan.md
 - [x] lib/core/module_reset.lua review/audit
 - [x] version_bump.lua and version_check.lua updates
 - [x] Duplicate JSON modules
-- [x] firmo.lua try_require update
-- [x] complete try_require update
-- [ ] add fit_async, xit_async, describe_async, fdescribe_async, xdescribe_async
+- [x] add fit_async, xit_async, describe_async, fdescribe_async, xdescribe_async
 - [ ] Review pcall and xpcall usage in the codebase

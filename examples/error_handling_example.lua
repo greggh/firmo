@@ -16,7 +16,6 @@
 --
 
 -- Import the required modules
-local firmo = require("firmo")
 local error_handler = require("lib.tools.error_handler")
 local test_helper = require("lib.tools.test_helper")
 local fs = require("lib.tools.filesystem")
@@ -25,11 +24,16 @@ local temp_file = require("lib.tools.filesystem.temp_file") -- Needed for cleanu
 
 -- Set up logging
 local logger = logging.get_logger("ErrorHandlingExample")
--- NOTE: Commenting out logger calls due to internal error in logging module (gsub issue).
+-- NOTE: Using print() as fallback for some output due to potential logger issues observed previously.
 
--- Testing functions
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local before, after = firmo.before, firmo.after
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
 
 -- logger.info("\n== ERROR HANDLING SYSTEM EXAMPLE ==\n")
 -- logger.info("PART 1: Error Categories and Creation\n")
@@ -50,7 +54,9 @@ end
 -- logger.info("\nExample 1: Creating Basic Errors")
 
 --- Creates and prints a basic general error using `error_handler.create`.
--- @return table err The created error object.
+--- Creates and prints a basic general error using `error_handler.create`.
+--- @return table err The created error object.
+--- @within examples.error_handling_example
 local function create_basic_error()
   -- Create a general error
   local err = error_handler.create(
@@ -128,8 +134,9 @@ print("- Expected Format:", format_error.context.expected_format)
 --- Simulates reading a config file, demonstrating the `nil, error` return pattern.
 -- Includes input validation and simulated I/O errors.
 -- @param path any The path to the configuration file.
----@return table|nil config The configuration if successful, nil otherwise
----@return table|nil error An error object if the operation failed
+---@return table|nil config The loaded configuration table if successful, `nil` otherwise.
+---@return table|nil error An error object if the operation failed.
+--- @within examples.error_handling_example
 function read_config_file(path)
   -- Validation
   if type(path) ~= "string" then
@@ -190,9 +197,11 @@ end
 
 ---@private
 --- Simulates parsing JSON content, returning nil, error on failure.
--- @param content string|nil The JSON content to parse.
----@return table|nil parsed The parsed JSON data if successful, nil otherwise
----@return table|nil error An error object if parsing failed
+--- Simulates parsing JSON content, returning `nil, error` on failure.
+--- @param content string|nil The JSON content string to parse.
+--- @return table|nil parsed The parsed Lua table if successful, `nil` otherwise.
+--- @return table|nil error An error object if parsing failed.
+--- @within examples.error_handling_example
 function parse_json(content)
   -- Simulating parsing failures for invalid JSON
   if not content or not content:match("{") then
@@ -205,11 +214,12 @@ function parse_json(content)
 end
 
 ---@private
---- Simulates loading a JSON config file, calling `parse_json` and propagating errors.
--- Adds file path context to errors from `parse_json`.
--- @param path any The path to the JSON configuration file.
----@return table|nil config The parsed configuration if successful, nil otherwise
----@return table|nil error An error object if the operation failed
+--- Simulates loading a JSON config file by reading content (simulated) and calling `parse_json`.
+--- Propagates errors from `parse_json`, adding file path context.
+--- @param path any The path to the JSON configuration file (used for context).
+--- @return table|nil config The parsed configuration table if successful, `nil` otherwise.
+--- @return table|nil error An error object if validation or loading/parsing failed.
+--- @within examples.error_handling_example
 function load_json_config(path)
   -- Validation
   if type(path) ~= "string" then
@@ -243,9 +253,10 @@ end
 
 --- Simulates initializing a system using a configuration loaded by `load_json_config`.
 -- Demonstrates wrapping and propagating errors from lower-level functions.
--- @param config_path any The path to the configuration file.
--- @return {initialized: boolean, config: table}|nil result Initialization result if successful, nil otherwise.
--- @return table|nil error An error object if initialization failed.
+--- @param config_path any The path to the configuration file (passed to `load_json_config`).
+--- @return table|nil result A table `{ initialized = true, config = table }` if successful, `nil` otherwise.
+--- @return table|nil error An error object if initialization failed (wrapping original error).
+--- @within examples.error_handling_example
 function initialize_with_config(config_path)
   -- Load the configuration
   local config, load_err = load_json_config(config_path)
@@ -314,10 +325,13 @@ end
 -- logger.info("Example 5: Try/catch Pattern with error_handler.try")
 
 --- A function that performs division and throws a standard Lua error (wrapped error object)
--- if the denominator is zero.
--- @param a number The numerator.
----@param b number The denominator
----@return number The result of the division
+--- A function that performs division and throws a standardized error object
+-- using `error()` if the denominator is zero.
+--- @param a number The numerator.
+--- @param b number The denominator.
+--- @return number The result of the division.
+--- @throws table An error object if `b` is 0.
+--- @within examples.error_handling_example
 function divide(a, b)
   if b == 0 then
     error(error_handler.validation_error("Division by zero", { numerator = a, denominator = b }))
@@ -327,10 +341,11 @@ end
 
 --- Safely calls the `divide` function using `error_handler.try` to catch errors.
 -- Returns `result, nil` on success and `nil, error` on failure.
--- @param a number The numerator.
--- @param b number The denominator.
--- @return number|nil result The result of the division if successful, nil otherwise.
--- @return table|nil error An error object if division failed.
+--- @param a number The numerator.
+--- @param b number The denominator.
+--- @return number|nil result The result of the division if successful, `nil` otherwise.
+--- @return table|nil error An error object if division failed (caught by `try`).
+--- @within examples.error_handling_example
 function safe_divide(a, b)
   local success, result, err = error_handler.try(function()
     return divide(a, b)
@@ -438,9 +453,10 @@ end
 -- logger.info("Example 7: Testing Error Conditions")
 
 --- Validates a user object, returning `nil, error` if validation fails.
--- @param user any The user object to validate.
----@return table|nil user The validated user object if valid, nil otherwise
----@return table|nil error An error object if validation failed
+--- @param user any The user object to validate (expected table with `name` and `age`).
+--- @return table|nil user The original user table if validation passes, `nil` otherwise.
+--- @return table|nil error A validation error object if validation fails.
+--- @within examples.error_handling_example
 function validate_user(user)
   if type(user) ~= "table" then
     return nil,
@@ -466,9 +482,11 @@ function validate_user(user)
   return user
 end
 
--- Unit tests for the validate_user function
---- Test suite demonstrating how to test functions that return errors.
+-- Unit tests for the validate_user function using Firmo
+--- Test suite demonstrating how to test functions that return errors using Firmo.
+--- @within examples.error_handling_example
 describe("User Validation", function()
+  --- Tests the success path with a valid user object.
   it("accepts valid users", function()
     local user = { name = "John", age = 30 }
     local result, err = validate_user(user)
@@ -479,6 +497,7 @@ describe("User Validation", function()
     expect(result.age).to.equal(30)
   end)
 
+  --- Tests rejection of non-table input using `expect_error` and `with_error_capture`.
   it("rejects non-table input", { expect_error = true }, function()
     local result, err = test_helper.with_error_capture(function()
       return validate_user("not a table")
@@ -490,6 +509,7 @@ describe("User Validation", function()
     expect(err.message).to.match("must be a table")
   end)
 
+  --- Tests that a user object missing the 'name' property is rejected.
   it("requires a name property", { expect_error = true }, function()
     local result, err = test_helper.with_error_capture(function()
       return validate_user({ age = 30 })
@@ -501,7 +521,8 @@ describe("User Validation", function()
     expect(err.message).to.match("name property")
   end)
 
-  it("requires a valid age", { expect_error = true }, function()
+  --- Tests that a user object with an invalid (negative) age is rejected.
+  it("requires a valid non-negative age", { expect_error = true }, function()
     local result, err = test_helper.with_error_capture(function()
       return validate_user({ name = "John", age = -10 })
     end)()
@@ -512,7 +533,8 @@ describe("User Validation", function()
     expect(err.message).to.match("valid age")
   end)
 
-  it("handles nil age", { expect_error = true }, function()
+  --- Tests that a user object with a missing (nil) age is rejected.
+  it("handles missing (nil) age", { expect_error = true }, function()
     local result, err = test_helper.with_error_capture(function()
       return validate_user({ name = "John" })
     end)()
@@ -524,11 +546,13 @@ describe("User Validation", function()
     expect(err.context.provided_value).to.equal(nil)
   end)
 
-  -- Using expect_error helper for more concise test
-  it("rejects invalid age type with expect_error", { expect_error = true }, function()
+  --- Uses the more concise `test_helper.expect_error` to check for specific error messages.
+  it("rejects invalid age type using test_helper.expect_error", { expect_error = true }, function()
+    -- expect_error takes the function to call and an optional pattern/string to match in the error message.
+    -- It returns the error object if the function errors and the message matches, otherwise it throws.
     local err = test_helper.expect_error(function()
       validate_user({ name = "John", age = "thirty" })
-    end, "valid age")
+    end, "valid age") -- Checks that the error message contains "valid age"
 
     expect(err).to.exist()
     expect(err.category).to.equal(error_handler.CATEGORY.VALIDATION)

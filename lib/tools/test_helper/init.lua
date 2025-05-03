@@ -6,6 +6,7 @@
 ---@field register_temp_file fun(file_path: string): boolean Registers a file for automatic cleanup via `temp_file`.
 ---@field register_temp_directory fun(dir_path: string): boolean Registers a directory for automatic cleanup via `temp_file`.
 ---@field execute_string fun(code: string): any|nil, string? Executes a string of Lua code using `load()`. Returns results or `nil, error_message`.
+---@field expect_async_error fun(async_fn: function, timeout_ms: number, message_pattern?: string): table Asserts that an async function throws an error within a timeout, optionally matching the message. Returns the error object. @throws table If the function succeeds, times out, or the message doesn't match.
 --- Firmo Test Helper Module
 ---
 --- This module provides utility functions specifically designed to simplify writing
@@ -49,7 +50,7 @@
 
 -- Lazy-load dependencies to avoid circular dependencies
 ---@diagnostic disable-next-line: unused-local
-local _error_handler, _fs
+local _error_handler, _fs, _async
 
 -- Local helper for safe requires without dependency on error_handler
 local function try_require(module_name)
@@ -77,6 +78,15 @@ local function get_error_handler()
     _error_handler = try_require("lib.tools.error_handler")
   end
   return _error_handler
+end
+
+--- Get the async module with lazy loading
+---@return table|nil The async module or nil if not available
+local function get_async()
+  if not _async then
+    _async = try_require("lib.async")
+  end
+  return _async
 end
 
 local temp_file = try_require("lib.tools.filesystem.temp_file")
@@ -108,6 +118,11 @@ function helper.with_error_capture(fn)
 
     -- Clear test metadata
     get_error_handler().set_current_test_metadata(nil)
+
+    if results == nil then
+      -- If the function didn't return anything, treat it as an error
+      results = { nil, { message = "Function did not return any value" } }
+    end
 
     -- Handle functions that return (nil, error_object) successfully
     if
@@ -168,14 +183,16 @@ function helper.with_error_capture(fn)
                 original_context = thrown_err.context,
                 assertion_type = result.context and result.context.action,
                 test_error = true,
-                test_error = true,
               },
               thrown_err -- Preserve original error as cause
             )
         end
 
         -- 1c. Has a nested cause that might be TEST_EXPECTED
-        if type(thrown_err.cause) == "table" and thrown_err.cause.category == get_error_handler().CATEGORY.TEST_EXPECTED then -- Use get_error_handler()
+        if
+          type(thrown_err.cause) == "table"
+          and thrown_err.cause.category == get_error_handler().CATEGORY.TEST_EXPECTED
+        then -- Use get_error_handler()
           return nil,
             get_error_handler().test_expected_error(
               thrown_err.message,
@@ -566,6 +583,144 @@ helper.execute_string = function(code)
     return nil, err
   end
   return fn()
+end
+
+--- Asserts that an asynchronous function throws an error within a specified timeout.
+--- It leverages `lib.async.parallel_async` to manage the execution and timeout.
+--- If the function completes successfully, times out before throwing, or throws an error
+--- whose message does not match the optional pattern, this helper will throw a test assertion failure.
+---
+---@param async_fn function The asynchronous function (must be usable with `async.async`) expected to throw.
+---@param timeout_ms number The maximum time in milliseconds to wait for the error to occur.
+---@param message_pattern? string Optional Lua pattern to match against the error message.
+---@return table error The captured and validated error object (normalized to `TEST_EXPECTED` category).
+---@throws table If the `async_fn` succeeds, if it times out before throwing an error, if the async module is unavailable, or if `message_pattern` is provided and the error message does not match.
+---
+---@usage
+--- it_async("handles async failure within timeout", function()
+---   local failing_op = async.async(function()
+---     async.await(50)
+---     error("Operation failed as expected")
+---   end)
+---
+---   -- Assert that the operation fails within 100ms with a specific message
+---   local err = test_helper.expect_async_error(failing_op, 100, "Operation failed")
+---   expect(err).to.exist()
+---   expect(err.message).to.match("Operation failed")
+--- end)
+function helper.expect_async_error(async_fn, timeout_ms, message_pattern)
+  -- Validate arguments
+  if type(async_fn) ~= "function" then
+    error(get_error_handler().validation_error("First argument to expect_async_error must be a function"))
+  end
+  if type(timeout_ms) ~= "number" or timeout_ms <= 0 then
+    error(get_error_handler().validation_error("Second argument (timeout_ms) must be a positive number"))
+  end
+  if message_pattern ~= nil and type(message_pattern) ~= "string" then
+    error(get_error_handler().validation_error("Third argument (message_pattern) must be a string if provided"))
+  end
+
+  -- Get required modules
+  local async_module = get_async()
+  if not async_module then
+    error(get_error_handler().internal_error("Async module (lib.async) is required for expect_async_error"))
+  end
+  local error_handler = get_error_handler() -- Already loaded via helper functions
+
+  -- Set up test expectation context
+  local caller_info = debug.getinfo(2, "Sl")
+  error_handler.set_current_test_metadata({
+    name = debug.getinfo(2, "n").name or "unknown",
+    expect_error = true,
+    caller_info = caller_info,
+    function_info = debug.getinfo(async_fn, "Sl"),
+    explicit_expect_error = true,
+    async_expected_error = true, -- Custom flag
+  })
+
+  -- Wrap the user's function and get the executor
+  local executor = async_module.async(async_fn)()
+
+  -- Run using parallel_async for timeout handling
+  local success, err_raw = pcall(async_module.parallel_async, { executor }, timeout_ms)
+
+  -- Always clear the test metadata
+  error_handler.set_current_test_metadata(nil)
+
+  if success then
+    -- Function completed without error, but an error was expected
+    error(error_handler.test_expected_error("Async function was expected to throw an error but it completed successfully", {
+      source_file = caller_info.source,
+      source_line = caller_info.currentline,
+      timeout_ms = timeout_ms,
+      test_context = true,
+    }))
+  end
+
+  -- parallel_async threw an error, check if it was a timeout or the expected error
+  local err_string = tostring(err_raw)
+  if err_string:match("Timeout of %d+ms exceeded") or err_string:match("timeout") then -- Check for timeout indicators
+    error(error_handler.test_expected_error(
+      "Async function timed out after " .. timeout_ms .. "ms while expecting an error",
+      {
+        source_file = caller_info.source,
+        source_line = caller_info.currentline,
+        timeout_ms = timeout_ms,
+        original_error = err_raw, -- Include the raw timeout error
+        test_context = true,
+      }
+    ))
+  end
+
+  -- It wasn't a timeout, so process the captured error (similar to expect_error)
+  local err_norm
+  if type(err_raw) == "table" and err_raw.category and err_raw.message then
+    -- Already a proper error object - normalize category
+    err_norm = err_raw
+    if err_norm.category ~= error_handler.CATEGORY.TEST_EXPECTED then
+      err_norm = error_handler.test_expected_error(
+        err_norm.message,
+        {
+          original_category = err_norm.category,
+          original_severity = err_norm.severity,
+          original_context = err_norm.context,
+          source_file = caller_info.source,
+          source_line = caller_info.currentline,
+        },
+        err_norm -- Preserve original as cause
+      )
+    end
+  elseif type(err_raw) == "string" then
+    err_norm = error_handler.test_expected_error(err_raw, {
+      source_file = caller_info.source,
+      source_line = caller_info.currentline,
+      raw_error = err_raw,
+    })
+  else
+    err_norm = error_handler.test_expected_error(
+      "Error of type " .. type(err_raw) .. ": " .. tostring(err_raw),
+      {
+        source_file = caller_info.source,
+        source_line = caller_info.currentline,
+        error_type = type(err_raw),
+        error_value = tostring(err_raw),
+      },
+      err_raw -- Include original value as cause if possible
+    )
+  end
+
+  -- Check if the error message matches the expected pattern
+  if message_pattern and err_norm.message and not err_norm.message:match(message_pattern) then
+    error(error_handler.test_expected_error("Async error message does not match expected pattern", {
+      expected_pattern = message_pattern,
+      actual_message = err_norm.message,
+      source_file = caller_info.source,
+      source_line = caller_info.currentline, -- Corrected source line reference
+      test_context = true,
+    }))
+  end
+
+  return err_norm
 end
 
 return helper

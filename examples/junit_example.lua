@@ -16,13 +16,21 @@
 --
 
 -- Import required modules
-local error_handler = require("lib.tools.error_handler")
 local reporting = require("lib.reporting")
 local fs = require("lib.tools.filesystem")
 local central_config = require("lib.core.central_config")
-local firmo = require("firmo") -- Needed for describe/it/expect
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
-local before, after = firmo.before, firmo.after
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
+---@type fun(callback: function) before Setup function that runs before each test
+local before = firmo.before
+---@type fun(callback: function) after Teardown function that runs after each test
+local after = firmo.after
 local logging = require("lib.tools.logging")
 local test_helper = require("lib.tools.test_helper")
 local temp_file = require("lib.tools.filesystem.temp_file") -- For cleanup
@@ -30,7 +38,8 @@ local temp_file = require("lib.tools.filesystem.temp_file") -- For cleanup
 -- Setup logger
 local logger = logging.get_logger("JUnitExample")
 
--- Create mock test results data (consistent with other examples)
+-- Mock test results data structure for demonstration.
+--- @type MockTestResults (See csv_example.lua for definition)
 local mock_test_results = {
   name = "JUnit Example Test Suite",
   timestamp = "2025-01-01T00:00:00Z", -- Static timestamp
@@ -158,21 +167,22 @@ local multi_suite_test_results = {
 
 -- Create tests to demonstrate the JUnit formatter
 --- Test suite demonstrating JUnit XML report generation and configuration.
+--- @within examples.junit_example
 describe("JUnit Formatter Example", function()
-  local temp_dir
+  local temp_dir -- Stores the temporary directory helper object
 
-  -- Setup: Create a temporary directory for reports before tests run
+  --- Setup hook: Create a temporary directory for reports.
   before(function()
     temp_dir = test_helper.create_temp_test_directory()
   end)
 
-  -- Teardown: Release reference (directory cleaned up by test_helper)
+  --- Teardown hook: Release reference. Directory cleaned automatically.
   after(function()
     temp_dir = nil
   end)
 
-  --- Test case for generating a basic JUnit XML report for test results.
-  it("generates basic JUnit XML test results", function()
+  --- Tests generating a basic JUnit XML report with default settings.
+  it("generates basic JUnit XML test results with defaults", function()
     -- Generate JUnit XML report
     logger.info("Generating basic JUnit XML test results report...")
     local junit_xml = reporting.format_results(mock_test_results, "junit")
@@ -194,6 +204,7 @@ describe("JUnit Formatter Example", function()
     local success, err = fs.write_file(file_path, junit_xml)
 
     -- Check if write was successful
+    expect(err).to.be_nil() -- Check for nil error string
     expect(success).to.be_truthy()
 
     logger.info("Basic JUnit XML report saved to: " .. file_path)
@@ -204,8 +215,7 @@ describe("JUnit Formatter Example", function()
     print(junit_xml:sub(1, 500) .. "...\n") -- Print preview
   end)
 
-  --- Test case demonstrating JUnit formatter configuration options
-  -- (timestamps, hostname, properties, pretty printing, etc.).
+  --- Tests configuring JUnit formatter options (timestamps, hostname, properties, etc.).
   it("demonstrates JUnit formatter configuration options", function()
     -- Configure JUnit formatter options via central_config
     central_config.set("reporting.formatters.junit", {
@@ -245,6 +255,7 @@ describe("JUnit Formatter Example", function()
     local success, err = fs.write_file(file_path, junit_xml)
 
     -- Check if write was successful
+    expect(err).to.be_nil() -- Check for nil error string
     expect(success).to.be_truthy()
 
     logger.info("Configured JUnit XML report saved to: " .. file_path)
@@ -254,8 +265,7 @@ describe("JUnit Formatter Example", function()
     print(junit_xml:sub(1, 700) .. "...\n")
   end)
 
-  --- Test case demonstrating the generation of a multi-suite JUnit report
-  -- by grouping test cases based on their `classname`.
+  --- Tests generating a multi-suite JUnit report using `group_by_classname`.
   it("demonstrates multi-suite JUnit XML reports", function()
     -- Configure JUnit formatter for multiple test suites
     central_config.set("reporting.formatters.junit", {
@@ -279,6 +289,7 @@ describe("JUnit Formatter Example", function()
     local success, err = fs.write_file(file_path, junit_xml)
 
     -- Check if write was successful
+    expect(err).to.be_nil() -- Check for nil error string
     expect(success).to.be_truthy()
 
     logger.info("Multi-suite JUnit XML report saved to: " .. file_path)
@@ -288,15 +299,15 @@ describe("JUnit Formatter Example", function()
     print(junit_xml:sub(1, 700) .. "...\n")
   end)
 
-  --- Test case providing example configurations for integrating JUnit XML reports
-  -- with common CI/CD platforms (GitHub Actions, Jenkins, GitLab CI).
-  it("demonstrates CI/CD integration with JUnit XML reports", function()
+  --- Informational test providing example CI/CD configurations for using JUnit reports.
+  it("discusses CI/CD integration with JUnit XML reports", function()
     -- Generate JUnit XML report for CI/CD examples
     local junit_xml = reporting.format_results(mock_test_results, "junit")
 
     -- Save to common CI/CD file location
     local file_path = fs.join_paths(temp_dir.path, "junit-results.xml")
     local success, err = fs.write_file(file_path, junit_xml)
+    expect(err).to.be_nil()
     expect(success).to.be_truthy()
 
     logger.info("CI/CD-ready JUnit XML report saved to: " .. file_path)

@@ -13,143 +13,172 @@
 -- Run this example directly: lua examples/module_reset_example.lua
 --
 
-local firmo = require("firmo") -- Keep for context, though not used directly here
-local error_handler = require("lib.tools.error_handler")
-local fs = require("lib.tools.filesystem") -- Keep for context if needed, though replaced
 local logging = require("lib.tools.logging")
 local temp_file = require("lib.tools.filesystem.temp_file")
 
 -- Setup logger
 local logger = logging.get_logger("ModuleResetExample")
 
-logger.info("firmo Module Reset Example")
-logger.info("----------------------------")
+print("--- Firmo Module Reset Example ---") -- Use print for direct execution clarity
+print("----------------------------------")
 
--- Check if the enhanced module_reset is available
+-- Check if the enhanced module_reset system is available
 local module_reset_available = false
-local reset_module_func -- Store the function if found
-local success, mr = pcall(require, "lib.core.module_reset")
-if success then
+local module_reset_module -- Store the loaded module if found
+local load_ok, loaded_module = pcall(require, "lib.core.module_reset")
+if load_ok then
   module_reset_available = true
-  reset_module_func = mr -- Assuming require returns the module table/functions
+  module_reset_module = loaded_module
+  print("Found Firmo's module_reset system (lib.core.module_reset).")
+else
+  print("Firmo's module_reset system (lib.core.module_reset) not found. Manual demo will proceed.")
 end
 
 --- Creates a temporary Lua module file with the given content.
--- @param name string Base name for the temp file.
--- @param content string Lua code content for the module.
--- @return string file_path The absolute path to the created temporary file.
+--- Registers the file with `temp_file` for automatic cleanup.
+--- @param name string Base name for the temp file (e.g., "module_a").
+--- @param content string Lua code content for the module.
+--- @return string|nil file_path The absolute path to the created temporary file, or `nil` on error.
+--- @within examples.module_reset_example
 local function create_test_module(name, content)
   local file_path, err = temp_file.create_with_content(content, name .. ".lua")
+  -- Use create_with_content which handles registration automatically
+  local file_path, err = temp_file.create_with_content(content, name .. ".lua")
   if not file_path then
-    error("Failed to create test module: " .. (err and err.message or "unknown error"))
+    print("ERROR: Failed to create test module '" .. name .. "': " .. tostring(err or "unknown error"))
+    return nil
   end
-  return file_path -- Return the absolute path
+  return file_path
 end
 
 -- Forward declaration for the module instance
-local module_a
+local module_a -- Will hold the loaded module instance
+local module_a_path -- Holds the path to the temporary module file
 
--- Create test module A
-local module_a_path = create_test_module(
-  "a",
-  [[
-  local module_a = {}
-  module_a.counter = 0
-  module_a.name = "Module A"
+-- Create test module A file content
+local module_a_content = [[
+-- Temporary module 'module_a' for reset demonstration
 
-  function module_a.increment()
-    module_a.counter = module_a.counter + 1
-    return module_a.counter
-  end
+local M = {}
+M.counter = 0 -- State variable
+M.name = "Module A"
 
-  print("Module A loaded with counter = " .. module_a.counter)
+function M.increment()
+  M.counter = M.counter + 1
+  return M.counter
+end
 
-  return module_a
+print("[Module A] Loaded/Re-loaded. Initial Counter:", M.counter)
+
+return M
 ]]
-)
 
--- Load module_a using dofile (since it's not in the standard require path)
+-- Create the temporary file
+module_a_path = create_test_module("module_a", module_a_content)
+if not module_a_path then
+  return
+end -- Exit if creation failed
+
+-- Load module_a for the first time using dofile (since it's not in a package path)
+-- dofile executes the file and returns its result
+print("\nLoading module_a for the first time...")
 module_a = dofile(module_a_path)
+if not module_a then
+  error("Failed to load module_a via dofile")
+end
 
---- Simulates running a test that interacts with `module_a`.
+--- Simulates running a test that interacts with the loaded `module_a`.
+--- @within examples.module_reset_example
 local function run_test_1()
-  logger.info("\nRunning Test 1:")
-  logger.info("  Initial counter value: " .. module_a.counter)
-  logger.info("  Incrementing counter")
+  print("\n--- Running Test 1 ---")
+  print("  Initial counter value:", module_a.counter)
+  print("  Incrementing counter...")
   module_a.increment()
-  logger.info("  Counter after test: " .. module_a.counter)
+  print("  Counter after Test 1:", module_a.counter)
 end
 
---- Simulates running a second test that interacts with `module_a`.
+--- Simulates running a second test that interacts with the loaded `module_a`.
+--- @within examples.module_reset_example
 local function run_test_2()
-  logger.info("\nRunning Test 2:")
-  logger.info("  Initial counter value: " .. module_a.counter)
-  logger.info("  Incrementing counter twice")
+  print("\n--- Running Test 2 ---")
+  print("  Initial counter value:", module_a.counter)
+  print("  Incrementing counter twice...")
   module_a.increment()
   module_a.increment()
-  logger.info("  Counter after test: " .. module_a.counter)
+  print("  Counter after Test 2:", module_a.counter)
 end
 
---- Simulates resetting `module_a` by clearing `package.loaded` and reloading via `dofile`.
--- @note This manual approach using `package.loaded` and `dofile` is for demonstration
---       purposes ONLY to illustrate the concept. Real tests should use Firmo's
---       built-in module reset capabilities provided by `lib.core.module_reset`
---       (if available) or test runner features, and avoid direct `package.loaded` manipulation.
--- @param module_path string The absolute path to the module file to reload.
--- @return table The reloaded module instance.
-local function reset_modules(module_path)
-  logger.info("\nResetting modules (manual demo)...")
+--- Simulates manually resetting `module_a` by clearing `package.loaded` and reloading via `dofile`.
+--- @warning **DEMONSTRATION ONLY!** This manual approach is fragile and incomplete.
+--- Real test environments should use the test runner's built-in isolation, which leverages
+--- `lib.core.module_reset` for reliable state clearing between test files.
+--- Do **NOT** replicate this manual `package.loaded` manipulation in production tests.
+--- @param module_path string The absolute path to the module file to reload.
+--- @return table|nil The reloaded module instance, or `nil` on error.
+--- @within examples.module_reset_example
+local function manual_reset_demonstration(module_path)
+  print("\nAttempting Manual Reset (DEMO ONLY)...")
 
-  -- Basic reset method - remove from package.loaded and reload via dofile
-  -- This requires knowing the *original* path used by require/dofile if it differs.
-  -- NOTE: This is simplified; real module reset needs to handle complex dependencies.
-  package.loaded[module_path] = nil -- Attempt to clear cache entry by path
+  -- Basic reset method - remove from package.loaded and reload via dofile.
+  -- NOTE: This only works reliably for simple, self-contained modules loaded via
+  -- an absolute path with `dofile`. It doesn't handle `require`, relative paths,
+  -- or complex dependencies correctly. Use Firmo's built-in reset instead.
+  package.loaded[module_path] = nil
   collectgarbage("collect")
 
   -- Reload module using dofile
-  logger.info("Reloading module from: " .. module_path)
-  return dofile(module_path)
+  print("Reloading module from:", module_path)
+  local ok, reloaded_module_or_err = pcall(dofile, module_path)
+  if not ok then
+    print("ERROR during manual reload:", reloaded_module_or_err)
+    return nil
+  end
+  return reloaded_module_or_err
 end
 
 -- Run test demo
-logger.info("\n== Demo: Running Tests Without Module Reset ==")
-logger.info("This demonstrates how state persists between tests when not using module reset.")
+print("\n== Demo: Running Tests WITHOUT Module Reset ==")
+print("Observe how the counter state persists across tests.")
 
-run_test_1() -- Should start with counter = 0
-run_test_2() -- Will start with counter = 1 from previous test
+run_test_1() -- Starts at 0, ends at 1
+run_test_2() -- Starts at 1, ends at 3
 
-logger.info("\n== Demo: Running Tests With Module Reset ==")
-logger.info("This demonstrates how module reset ensures each test starts with fresh state.")
+print("\n== Demo: Running Tests WITH Manual Module Reset (DEMO ONLY) ==")
+print("Observe how the counter is reset before each test.")
+print("**WARNING: This manual reset is for illustration only. Use Firmo's built-in reset.**")
 
 -- Manually reset the loaded module_a before running Test 1 again
-module_a = reset_modules(module_a_path)
-run_test_1() -- Should start with counter = 0
+module_a = manual_reset_demonstration(module_a_path)
+if not module_a then
+  return
+end -- Stop if reset failed
+run_test_1() -- Should start at 0, end at 1
 
-module_a = reset_modules(module_a_path) -- Reset again before Test 2
-run_test_2() -- Should also start with counter = 0 due to reset
+-- Manually reset again before Test 2
+module_a = manual_reset_demonstration(module_a_path)
+if not module_a then
+  return
+end -- Stop if reset failed
+run_test_2() -- Should also start at 0, end at 2
 
--- Information about the enhanced module reset system
-logger.info("\n== Enhanced Module Reset System ==")
+-- Information about the proper module reset system
+print("\n== Firmo's Built-in Module Reset System ==")
 if module_reset_available then
-  logger.info("The enhanced module reset system is available in firmo.")
-  logger.info("This provides automatic module reset between test files when using the test runner.")
-  logger.info("\nTo use it in your test runner:")
-  logger.info("1. Require the module: local module_reset = require('lib.core.module_reset')")
-  logger.info("2. Register with firmo: module_reset.register_with_firmo(firmo)")
-  logger.info("3. Configure options: module_reset.configure({ reset_modules = true })")
-  logger.info("\nThe standard test runner (`test.lua`) typically handles this automatically.")
-  -- Example using the function if available (optional demonstration)
-  -- if reset_module_func and reset_module_func.reset then
-  --   logger.info("Demonstrating enhanced reset (if available)...")
-  --   reset_module_func.reset({module_a_path}) -- Pass path or module name
-  --   logger.info("Enhanced reset complete.")
-  -- end
+  print("The built-in module reset system (`lib.core.module_reset`) IS available.")
+  print("It provides automatic module state reset between test *files* when using the test runner (`test.lua`).")
+  print("It handles complex dependencies and `require` correctly.")
+  print("\nUsage (typically handled by the runner automatically):")
+  print("1. `local module_reset = require('lib.core.module_reset')`")
+  print("2. `module_reset.register_with_firmo(firmo)`")
+  print("3. `module_reset.configure({ reset_modules = true })`")
+  print("4. The runner calls `firmo.reset()` between files, triggering `module_reset.reset_all()`.")
 else
-  logger.info("The enhanced module reset system ('lib.core.module_reset') was not found.")
-  logger.info("The demonstration above used a simplified manual method for module reset.")
+  print("The built-in module reset system (`lib.core.module_reset`) was NOT found.")
+  print("The demonstration above used a simplified *manual* method which should NOT be used in real tests.")
 end
 
--- Cleanup is handled by temp_file.cleanup_all()
+print("\n--- Module Reset Example Complete ---")
 
 -- Clean up all temporary files created by temp_file
 temp_file.cleanup_all()
+print("Temporary files cleaned up.")

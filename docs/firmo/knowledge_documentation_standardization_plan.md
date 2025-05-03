@@ -1,30 +1,27 @@
 # Knowledge Documentation Standardization Plan
 
-## Phase 1: Template Development
+## Phase 1: knowledge.md Template
 
-1. Analyze existing knowledge.md files to identify common patterns
-2. Develop standardized template with sections:
-   - Purpose
-   - Key Concepts
-   - Usage Examples
-   - Related Components
-3. Validate template against project architecture docs
-4. Document template format in docs/guides/knowledge_template.md
+1. This is the knowledge document template, read it and use it, docs/guides/knowledge_template.md
 
 ## Phase 2: Content Audit & Update
 
-1. Create inventory of all 61 knowledge.md files
-2. Categorize files into:
-   - Complete (matches new standard)
-   - Partial (needs updates)
-   - Empty (needs creation)
-3. For each file:
+1. Mark all files in the "List of files to review for updates" below as not completed.
+2. Ensure every file listed in "List of files to review for updates" actually exist in the firmo project,
+   if any files are in this list but don't exist on the filesystem, then remove that file from the list.
+3. Ensure the list in "List of files to review for updates" is complete, it should contain every knowledge.md
+   file in the examples direcotry. List every knowledge.md file in the firmo project and add any missing ones to
+   the "List of files to review for updates".
+4. Review every sub-directory in the firmo project, look for knowledge.md files in the sub-directory, if the
+   sub-directory doesn't have a knowledge.md file and you think it should have a knowledge.md file then create a
+   blank knowledge.md file in that sub-directory and add it to the list in "List of files to review for udpates".
+5. For each file:
 
    - Verify accuracy against current functionality
    - Apply new template structure
    - Ensure consistent formatting
 
-4. VERY IMPORTANT: After each file is updated, mark that file as completed in the list below.
+6. VERY IMPORTANT: After each file is updated, mark that file as completed in the list below.
 
 ## Phase 3: New Content Creation
 

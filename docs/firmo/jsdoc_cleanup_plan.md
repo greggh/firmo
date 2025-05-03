@@ -3,20 +3,22 @@
 ## Phase 1: Preparation
 
 1. Review project architecture docs (docs/firmo/architecture.md) to understand module relationships
-2. Establish standard JSDoc style guide based on:
-   - Existing well-documented files as examples
-   - Project memory rules regarding documentation
-3. Write this style guide to the file docs/firmo/jsdoc_standards.md
-   a. Include:
+2. Mark all files in the lists in Phase 5 and Phase 6 as not completed.
+3. Ensure every file listed in both lists for Phase 5 and Phase 6 actually exist, if any files are
+   in these lists but don't exist on the filesystem, then remove that file from the lists.
+4. Ensure the list in Phase 5 is complete, it should contain every lua file in the firmo project. List
+   every .lua file in the firmo project and add any missing ones to our list in Phase 5.
+5. Ensure the list in Phase 6 is complete, it should contain every markdown file (\*.md) in the firmo
+   project. List every .md file in the firmo project and add any missing ones to our list in Phase 6.
+6. Use our established JSDoc style guide: docs/firmo/jsdoc_standards.md
+   a. This includes:
 
    - JSDoc tags to use
    - Formatting rules (spacing, alignment)
    - Examples of good documentation
    - Rules for polymorphism documentation
 
-   b. Ensure it is comprehensive but concise
-
-   c. Relevant Context From Files
+   b. Relevant Context From Files
 
    - Example file patterns (firmo.lua, lib/core/init.lua, lib/assertion/init.lua) show:
    - Luau-style type annotations (---@type, ---@class)
@@ -26,7 +28,7 @@
 
 ## Phase 2: File Processing
 
-4. Create processing pipeline for the 130 files:
+4. Create processing pipeline for the files under Phase 5 in the section titled "List of files to review for updates":
    a. Categorize files by module/functionality area
    b. Do not assign priority to any files.
    c. Process in batches of 10 files
@@ -68,7 +70,7 @@
 
 7. Update project documentation:
    a. Refresh architecture.md if API changes were found
-   b. Update any documentation references to files that were modified in docs/api and docs/guides
+   b. After, do Phase 6 to update any documentation references to files that were modified in docs/api and docs/guides
 
 ## List of files to review for updates
 

@@ -9,7 +9,6 @@
 ---
 --- @author Firmo Team
 --- @test
-package.path = "../?.lua;" .. package.path
 local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 local error_handler = require("lib.tools.error_handler")

@@ -5,7 +5,7 @@
 1. **Review Existing Async Module**:
 
    - Examine `lib/async/init.lua` to understand current async implementation
-   - Analyze test patterns from synchronous functions in `test_definition.lua`
+   - Analyze test patterns from synchronous functions in `test_definition.lua` and `firmo.lua`
 
 2. **Implement New Async Functions**:
 
@@ -30,7 +30,7 @@
    - Error handling and reporting tests
 
 5. **Implement Test Helpers**:
-   - Create reusable test utilities for async assertions
+   - Create reusable test utilities for async assertions in the test_helper module
    - Set up dedicated test files for new functionality
 
 ## Phase 3: Documentation & Examples
@@ -39,7 +39,6 @@
 
    - Add API reference in `docs/api/async.md` for each new function
    - Update `docs/guides/async.md` with usage patterns and examples
-   - Include migration guidance for existing users
 
 7. **Create Examples**:
 
@@ -54,12 +53,7 @@
 
 ## Phase 4: Quality Assurance
 
-9. **Manual Verification**:
-
-   - Run all test commands from testing rules
-   - Check watch mode functionality
-
-10. **Code Review**:
-    - Verify single responsibility principle is maintained
-    - Check for proper polymorphism usage
-    - Ensure consistent data structures at boundaries
+9. **Code Review**:
+   - Verify single responsibility principle is maintained
+   - Check for proper polymorphism usage
+   - Ensure consistent data structures at boundaries

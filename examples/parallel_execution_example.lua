@@ -11,7 +11,6 @@
 --
 
 local firmo = require("firmo")
-local error_handler = require("lib.tools.error_handler")
 local logging = require("lib.tools.logging")
 local temp_file = require("lib.tools.filesystem.temp_file")
 local fs = require("lib.tools.filesystem") -- Needed for join_paths
@@ -24,8 +23,14 @@ local parallel_loaded, parallel = pcall(require, "lib.tools.parallel")
 if not parallel_loaded then
   logger.warn("Could not load parallel module. Parallel demo will not run.")
 else
-  -- NOTE: Verify API signature.
-  parallel.register_with_firmo(firmo)
+  -- Assuming registration happens via adding to firmo table or similar mechanism
+  -- Check if parallel is now available on the firmo object after require
+  if firmo.parallel and firmo.parallel.run_tests then
+    logger.info("Parallel module loaded and integrated with firmo.")
+  else
+    logger.warn("Parallel module loaded but not integrated correctly with firmo object.")
+    parallel_loaded = false -- Treat as not available if integration failed
+  end
 end
 
 logger.info("firmo Parallel Test Execution Example")
@@ -63,9 +68,12 @@ if arg[0]:match("parallel_execution_example%.lua$") then
   logger.info("----------------------------------------")
 
   --- Creates multiple temporary test files with simulated delays.
-  -- @param temp_dir_obj table The temp_file directory object.
-  -- @param count number The number of test files to create.
-  -- @return string[] files A list of absolute paths to the created test files.
+  --- Creates multiple temporary test files, each containing simple tests with simulated delays.
+  --- Registers created files with `temp_file` for cleanup.
+  --- @param temp_dir_obj table The temp_file directory helper object returned by `create_temp_test_directory`.
+  --- @param count number The number of test files to create.
+  --- @return string[] files A list of absolute paths to the created test files.
+  --- @within examples.parallel_execution_example
   local function create_test_files(temp_dir_obj, count)
     -- Create a few test files
     local files = {}
@@ -140,6 +148,10 @@ if arg[0]:match("parallel_execution_example%.lua$") then
 
     -- Run tests in parallel
     -- NOTE: Verify API signature.
+    -- Ensure the function exists before calling
+    if not firmo.parallel or not firmo.parallel.run_tests then
+      error("firmo.parallel.run_tests function not found after require.")
+    end
     local results = firmo.parallel.run_tests(files, {
       workers = 4, -- Use 4 worker processes
       show_worker_output = true, -- Show individual worker output for the demo

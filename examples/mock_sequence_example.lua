@@ -9,10 +9,15 @@
 -- Run embedded tests: lua test.lua examples/mock_sequence_example.lua
 --
 
+-- Extract the testing functions we need
 local firmo = require("firmo")
-local describe, it, expect = firmo.describe, firmo.it, firmo.expect
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
 local mock = firmo.mock
-local error_handler = require("lib.tools.error_handler")
 local logging = require("lib.tools.logging")
 
 -- Setup logger
@@ -21,6 +26,11 @@ local logger = logging.get_logger("MockSequenceExample")
 --- Test suite demonstrating mock call sequence tracking and verification.
 describe("Mock Sequence Tracking", function()
   -- Example service that will be mocked
+  --- @class MockService
+  --- @field getData fun(): string
+  --- @field processData fun(data: string): string
+  --- @field saveResult fun(result: string): boolean
+  --- @within examples.mock_sequence_example
   local service = {
     getData = function()
       return "real data"
@@ -33,9 +43,11 @@ describe("Mock Sequence Tracking", function()
     end,
   }
 
-  --- Describes potential issues with verifying call order using timestamps.
-  describe("1. Problems with timestamp-based tracking", function()
-    it("can fail due to execution speed/timing issues", function()
+  --- This section is **informational only** to explain the rationale behind sequence tracking.
+  --- @within examples.mock_sequence_example
+  describe("1. Problems with Timestamp-Based Tracking (Informational)", function()
+    --- Explains potential timing ambiguity.
+    it("can have timing ambiguity", function()
       -- In timestamp-based systems, if calls happen too quickly,
       -- they might get the same timestamp and ordering becomes ambiguous
 
@@ -49,111 +61,145 @@ describe("Mock Sequence Tracking", function()
       -- In a timestamp system, this verification might fail intermittently
       logger.info("With timestamps, verification could fail if calls have identical timestamps")
       logger.info("making it difficult to verify exact call order reliably")
-
-      it("can have flaky tests due to system load", function()
-        -- Under system load, execution timing becomes unpredictable
-        local mockService = mock(service)
-
-        -- Simulate unpredictable execution timing
-        -- Simulate unpredictable execution timing
-        mockService.getData()
-        -- Simulate potential delay; sequence tracking is independent of timing.
-        mockService.processData("test")
-
-        logger.info("Timestamp verification becomes unreliable when system load affects timing")
-      end)
+      logger.info("Verification based on timestamps can be unreliable if calls happen too close together.")
     end)
 
-    --- Describes how sequence-based tracking provides deterministic order.
-    describe("2. Sequence-based tracking solution", function()
+    --- Explains flakiness due to system load affecting timestamps.
+    it("can cause flaky tests due to system load", function()
+      -- Under system load, execution timing becomes unpredictable
       local mockService = mock(service)
 
-      -- No matter how quickly these execute, sequence is preserved
+      -- Simulate unpredictable execution timing
+      -- Simulate unpredictable execution timing
       mockService.getData()
+      -- Simulate potential delay; sequence tracking is independent of timing.
       mockService.processData("test")
-      mockService.saveResult("test result")
 
-      -- Verify calls happened in expected order
-      expect(mockService.getData).was_called()
-      expect(mockService.getData).was_called()
-      -- NOTE: Assumes .was_called_after() exists. Verify API.
-      expect(mockService.processData).was_called_after(mockService.getData)
-      -- NOTE: Assumes .was_called_after() exists. Verify API.
-      expect(mockService.saveResult).was_called_after(mockService.processData)
-
-      logger.info("Sequence-based tracking guarantees correct order verification regardless of timing")
+      logger.info("Timestamp verification becomes unreliable when system load affects timing")
     end)
-
-    local mockService = mock(service)
-
-    -- Even with delays, sequence numbers preserve order
-    mockService.getData()
-    -- Simulate potential delay; sequence tracking is independent of timing.
-    mockService.processData("test")
-
-    -- NOTE: Assumes .was_called_before() exists. Verify API.
-    expect(mockService.getData).was_called_before(mockService.processData)
-
-    logger.info("Sequence tracking works consistently even with delays between calls")
+    logger.info("Timestamp verification becomes unreliable when system load affects timing.")
   end)
 end)
 
---- Demonstrates specific sequence verification assertion methods.
-describe("3. Using sequence verification API", function()
-  local mockService = mock(service)
+--- Demonstrates the reliability of sequence tracking.
+--- @within examples.mock_sequence_example
+describe("2. Sequence-Based Tracking Solution", function()
+  --- Shows that sequence is preserved even with rapid calls.
+  it("preserves order regardless of execution speed", function()
+    local mockService = mock(service)
 
-  mockService.getData()
-  mockService.processData("test")
-  mockService.saveResult("test result")
+    -- No matter how quickly these execute, sequence numbers are assigned incrementally
+    local call1 = mockService.getData() -- Call 1, sequence 1
+    local call2 = mockService.processData("test") -- Call 2, sequence 2
+    local call3 = mockService.saveResult("test result") -- Call 3, sequence 3
 
-  -- Verify relative ordering
-  -- NOTE: Assumes .was_called_before() and .was_called_after() exist. Verify API.
-  expect(mockService.getData).was_called_before(mockService.processData)
-  expect(mockService.processData).was_called_before(mockService.saveResult)
-  expect(mockService.getData).was_called_before(mockService.saveResult)
+    -- Verify calls happened using .called property (basic check)
+    expect(mockService.getData.called).to.be_truthy()
+    expect(mockService.processData.called).to.be_truthy()
+    expect(mockService.saveResult.called).to.be_truthy()
 
-  -- Alternative syntax
-  expect(mockService.saveResult).was_called_after(mockService.processData)
-  expect(mockService.processData).was_called_after(mockService.getData)
+    -- **Firmo does not currently have built-in `was_called_before/after` assertions.**
+    -- To verify sequence, you would manually inspect the `.calls` array
+    -- which stores calls in the order they occurred.
+    expect(mockService.calls[1].method_name).to.equal("getData")
+    expect(mockService.calls[2].method_name).to.equal("processData")
+    expect(mockService.calls[3].method_name).to.equal("saveResult")
 
-  it("can verify call order with was_called_with", function()
+    logger.info("Sequence-based tracking guarantees correct order via the `.calls` array.")
+  end)
+
+  --- Shows sequence tracking works even with simulated delays.
+  it("works consistently with delays between calls", function()
+    local mockService = mock(service)
+
+    -- Even with delays, sequence numbers preserve order
+    mockService.getData() -- Sequence 1
+    -- Simulate delay (doesn't affect sequence number assignment)
+    mockService.processData("test") -- Sequence 2
+
+    -- Verify sequence using the `.calls` array
+    expect(mockService.calls[1].method_name).to.equal("getData")
+    expect(mockService.calls[2].method_name).to.equal("processData")
+
+    logger.info("Sequence tracking works consistently even with delays.")
+  end)
+end)
+
+--- Demonstrates manually verifying call sequences using the `.calls` array.
+--- @within examples.mock_sequence_example
+describe("3. Verifying Call Sequences Manually", function()
+  --- Tests verifying the exact order of calls.
+  it("can verify exact call order using the .calls array", function()
     local mockService = mock(service)
 
     mockService.getData()
-    mockService.processData("first")
-    mockService.processData("second")
+    mockService.processData("test")
+    mockService.saveResult("test result")
 
-    -- Can combine sequence with argument checking
-    -- NOTE: Assumes complex .before(function) chain or .calls_were_in_order() exist. Verify API.
-    expect(mockService.processData).was_called_with("first").before(function(call)
-      return call.args[1] == "second"
-    end)
+    -- Verify the order by checking the method names in the .calls array
+    expect(mockService.calls[1].method_name).to.equal("getData")
+    expect(mockService.calls[2].method_name).to.equal("processData")
+    expect(mockService.calls[3].method_name).to.equal("saveResult")
 
-    -- Or use the shorthand for checking multiple calls in order
-    -- NOTE: Assumes complex .before(function) chain or .calls_were_in_order    end)
+    -- Verify arguments along with order
+    expect(mockService.calls[2].args[1]).to.equal("test")
+    expect(mockService.calls[3].args[1]).to.equal("test result")
   end)
 
-  --- Demonstrates how sequence verification failures are reported.
-  describe("4. Sequence verification failures and debugging", function()
-    it("provides helpful error messages when sequence is wrong", function()
+  --- Tests verifying the order of specific calls among others.
+  it("can verify relative order of specific calls", function()
+    local mockService = mock(service)
+
+    mockService.getData() -- Call 1
+    mockService.processData("first") -- Call 2
+    mockService.getData() -- Call 3
+    mockService.processData("second") -- Call 4
+    mockService.saveResult("final") -- Call 5
+
+    -- Find the indices of specific calls
+    local firstProcessCallIndex
+    local secondProcessCallIndex
+    local saveCallIndex
+
+    for i, call in ipairs(mockService.calls) do
+      if call.method_name == "processData" and call.args[1] == "first" then
+        firstProcessCallIndex = i
+      elseif call.method_name == "processData" and call.args[1] == "second" then
+        secondProcessCallIndex = i
+      elseif call.method_name == "saveResult" then
+        saveCallIndex = i
+      end
+    end
+
+    -- Verify the relative order using indices
+    expect(firstProcessCallIndex).to.exist()
+    expect(secondProcessCallIndex).to.exist()
+    expect(saveCallIndex).to.exist()
+    expect(firstProcessCallIndex).to.be_less_than(secondProcessCallIndex)
+    expect(secondProcessCallIndex).to.be_less_than(saveCallIndex)
+  end)
+
+  --- This section is informational, as Firmo lacks built-in sequence assertions.
+  --- Failures in manual sequence checks (like the one above) would be standard
+  --- assertion failures (e.g., "Expected 'processData' to equal 'getData'").
+  --- @within examples.mock_sequence_example
+  describe("4. Sequence Verification Failures (Informational)", function()
+    --- Explains how manual sequence check failures appear.
+    it("failures in manual checks report standard assertion errors", function()
       local mockService = mock(service)
 
       -- Intentionally call in wrong order
-      mockService.processData("test")
-      mockService.getData()
+      mockService.processData("test") -- Call 1
+      mockService.getData() -- Call 2
 
-      -- This should fail with helpful message about call order
-      local success, error_message = pcall(function()
-        -- NOTE: Assumes .was_called_before() exists. Verify API.
-        expect(mockService.getData).was_called_before(mockService.processData)
+      -- This assertion will fail because calls[1].method_name is 'processData'
+      local success, err = pcall(function()
+        expect(mockService.calls[1].method_name).to.equal("getData")
       end)
 
-      logger.info("Sequence verification failure example:")
-      print(error_message or "Error message not captured") -- Keep print to show failure output
-
-      -- The error shows the actual sequence numbers and call order
+      expect(success).to.be_falsy()
+      expect(err).to.match("Expected 'processData' to equal 'getData'")
+      logger.info("Manual sequence check failed as expected: " .. err)
     end)
-
-    -- Removed debugging test case that relied on internal properties
   end)
 end)

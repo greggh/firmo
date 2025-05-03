@@ -1,22 +1,28 @@
-#!/usr/bin/env lua
---- custom_formatters_example.lua
---
--- This example demonstrates how to create and register custom report formatters
--- within Firmo for both test results and code coverage. It defines a simple
--- Markdown formatter as an illustration.
---
--- It shows:
--- - Defining functions that accept standardized data structures (coverage_data, results_data).
--- - Formatting that data into a custom string format (Markdown).
--- - Registering the formatters using `reporting.register_coverage_formatter` and `reporting.register_results_formatter`.
--- - Saving the generated report using `temp_file` for management.
---
--- Run this example directly: lua examples/custom_formatters_example.lua
---
+--- Example demonstrating custom report formatter creation and registration in Firmo.
+---
+--- This example shows how to define custom functions to format both test results
+--- and code coverage data into a non-standard format (in this case, Markdown).
+---
+--- It covers:
+--- - Defining formatter functions that accept standardized data structures (`coverage_data`, `results_data`).
+--- - Implementing the logic to transform these data structures into a custom string output (Markdown).
+--- - Registering the custom formatters with Firmo's reporting system using `reporting.register_coverage_formatter()` and `reporting.register_results_formatter()`.
+--- - Verifying the registration using `reporting.get_available_formatters()`.
+--- - Generating a report using the newly registered custom formatter (`reporting.format_results()`).
+--- - Saving the custom report to a file managed by the `temp_file` module.
+--- - Discussing how custom formatters might be loaded dynamically using `--load-formatters`.
+---
+--- @module examples.custom_formatters_example
+--- @see lib.reporting
+--- @see lib.tools.filesystem.temp_file
+--- @usage
+--- Run this example directly to see the custom formatter registration and output:
+--- ```bash
+--- lua examples/custom_formatters_example.lua
+--- ```
+--- The generated Markdown report will be saved to a temporary file (path logged to console).
 
 -- Load firmo and required modules
-local firmo = require("firmo")
-local error_handler = require("lib.tools.error_handler")
 local reporting = require("lib.reporting")
 local fs = require("lib.tools.filesystem")
 local temp_file = require("lib.tools.filesystem.temp_file")
@@ -26,7 +32,12 @@ local logging = require("lib.tools.logging")
 local logger = logging.get_logger("CustomFormatterExample")
 
 --- Example module structure containing custom formatter functions.
--- This structure could be defined in a separate Lua file and required.
+-- In a real project, this could be a separate Lua file loaded via `--load-formatters`.
+--- @class CustomFormattersModule
+--- @field coverage table Table containing custom coverage formatters.
+--- @field quality table Table containing custom quality formatters.
+--- @field results table Table containing custom test results formatters.
+--- @within examples.custom_formatters_example
 local custom_formatters = {}
 
 --- Table containing custom coverage formatters.
@@ -37,10 +48,11 @@ custom_formatters.quality = {}
 custom_formatters.results = {}
 
 --- Custom coverage formatter function that generates a Markdown report.
--- @param coverage_data table The standardized coverage data structure provided by Firmo.
--- @return string markdown The formatted Markdown report string.
+--- Assumes `coverage_data` follows the structure defined in `MockCoverageData` (see `csv_example.lua` for JSDoc).
+--- @param coverage_data table The standardized coverage data structure.
+--- @return string markdown The formatted Markdown report string.
 custom_formatters.coverage.markdown = function(coverage_data)
-  local markdown = "# Coverage Report\n\n"
+  local markdown = "# Coverage Report (Custom Markdown)\n\n"
   markdown = markdown .. "## Summary\n\n"
 
   -- Get data from the coverage report
@@ -115,8 +127,9 @@ custom_formatters.coverage.markdown = function(coverage_data)
 end -- Correctly close the function body here
 
 --- Custom test results formatter function that generates a Markdown report.
--- @param results_data table The standardized test results data structure provided by Firmo.
--- @return string markdown The formatted Markdown report string.
+--- Assumes `results_data` follows the structure defined in `MockTestResults` (see `csv_example.lua` for JSDoc).
+--- @param results_data table The standardized test results data structure.
+--- @return string markdown The formatted Markdown report string.
 custom_formatters.results.markdown = function(results_data)
   -- Create timestamp and summary info
   local timestamp = results_data.timestamp or os.date("!%Y-%m-%dT%H:%M:%S")
@@ -125,6 +138,7 @@ custom_formatters.results.markdown = function(results_data)
   local errors = results_data.errors or 0
   local skipped = results_data.skipped or 0
   local success_rate = tests > 0 and ((tests - failures - errors) / tests * 100) or 0
+  local markdown = "# Test Results Report (Custom Markdown)\n\n"
 
   -- Add summary data
   markdown = markdown .. "## Summary\n\n"
@@ -181,21 +195,29 @@ custom_formatters.results.markdown = function(results_data)
   return markdown
 end
 
--- Register our custom formatters
-logger.info("Registering custom formatters...")
-reporting.register_coverage_formatter("markdown", custom_formatters.coverage.markdown)
-reporting.register_results_formatter("markdown", custom_formatters.results.markdown)
+-- Register our custom formatters using the reporting module API
+logger.info("Registering custom 'markdown' formatters...")
+local cov_success = reporting.register_coverage_formatter("markdown", custom_formatters.coverage.markdown)
+local res_success = reporting.register_results_formatter("markdown", custom_formatters.results.markdown)
 
--- Show available formatters
+if not cov_success or not res_success then
+  logger.error("Failed to register one or both custom formatters.")
+  return -- Exit if registration fails
+end
+
+-- Verify registration by getting available formatters
 local available = reporting.get_available_formatters()
-logger.info("\nAvailable formatters:")
-logger.info("  Coverage: " .. table.concat(available.coverage, ", "))
-logger.info("  Quality: " .. table.concat(available.quality, ", "))
-logger.info("  Results: " .. table.concat(available.results, ", "))
+logger.info("\nAvailable formatters after registration:")
+-- Helper to safely concatenate formatter lists
+local function format_list(list)
+  return list and #list > 0 and table.concat(list, ", ") or "None"
+end
+logger.info("  Coverage: " .. format_list(available.coverage))
+logger.info("  Quality: " .. format_list(available.quality))
+logger.info("  Results: " .. format_list(available.results))
 
--- Removed unnecessary describe/it block that ran tests
-
--- Generate some mock test data
+-- Create some mock test data to format
+--- @type MockTestResults (See csv_example.lua for definition)
 local results_data = {
   name = "Custom Formatter Example",
   timestamp = "2025-01-01T00:00:00Z", -- Static timestamp
@@ -223,25 +245,29 @@ local results_data = {
   },
 }
 
--- Create a temporary directory
+-- Create a temporary directory using the helper for automatic cleanup
 local temp_dir, err = temp_file.create_temp_directory("custom_formatter_")
 if not temp_dir then
-  logger.error("Failed to create temp dir: " .. tostring(err))
-  return
+  logger.error("Failed to create temp directory: " .. tostring(err))
+  return -- Exit if temp dir fails
 end
 
--- Generate and save a markdown report using the custom formatter
-local markdown_report = reporting.format_results(results_data, "markdown")
+-- Generate a report using the custom "markdown" formatter for test results
+local markdown_report, format_err = reporting.format_results(results_data, "markdown")
 
-local report_path = fs.join_paths(temp_dir.path, "custom-report.md")
-local success, write_err = temp_dir:create_file("custom-report.md", markdown_report)
-if not success then
-  logger.error("Failed to write custom report: " .. tostring(write_err))
-end
-
--- Show output path
-if success then
-  logger.info("\nGenerated custom markdown report: " .. report_path)
+if not markdown_report then
+  logger.error("Failed to format results using custom markdown formatter", { error = format_err })
+else
+  -- Save the generated report to a file in the temporary directory
+  local report_path = fs.join_paths(temp_dir, "custom-test-report.md") -- Use temp_dir directly
+  local success, write_err = fs.write_file(report_path, markdown_report)
+  if not success then
+    logger.error("Failed to write custom markdown report", { error = write_err })
+  end
+  -- Show output path
+  if success then
+    logger.info("\nGenerated custom markdown report: " .. report_path)
+  end
 end
 
 logger.info("\nUsage with command line (hypothetical):")

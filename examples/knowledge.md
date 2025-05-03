@@ -19,7 +19,7 @@ The `examples/` directory contains practical demonstrations of various Firmo fea
 
 ## Usage Examples / Patterns
 
-*(Note: These snippets assume necessary modules like `firmo`, `test_helper`, `mocking` are required and functions like `expect`, `describe`, `it`, `before`, `after`, `it_async` are available in the scope, typically via `local firmo = require("firmo")` etc.)*
+_(Note: These snippets assume necessary modules like `firmo`, `test_helper`, `mocking` are required and functions like `expect`, `describe`, `it`, `before`, `after`, `it_async` are available in the scope, typically via `local firmo = require("firmo")` etc.)_
 
 ### Basic Test Example
 
@@ -28,8 +28,18 @@ The `examples/` directory contains practical demonstrations of various Firmo fea
   Basic test structure with setup, teardown, and assertions.
   See: examples/basic_example.lua
 ]]
-local firmo = require('firmo')
-local describe, it, expect, before, after = firmo.describe, firmo.it, firmo.expect, firmo.before, firmo.after
+-- Extract the testing functions we need
+local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
+---@type fun(callback: function) before Setup function that runs before each test
+local before = firmo.before
+---@type fun(callback: function) after Teardown function that runs after each test
+local after = firmo.after
 local test_helper = require("lib.tools.test_helper") -- For error capture
 
 describe('Calculator', function()
@@ -212,6 +222,6 @@ lua test.lua examples/
 
 ## Related Components / Modules
 
--   **Examples Directory:** [`examples/`](./) - Contains the full source code for these patterns.
--   **Getting Started Guide:** [`docs/guides/getting-started.md`](../guides/getting-started.md) - Introduces basic Firmo usage.
--   **API Reference & Guides:** Refer to the specific API/Guide documents for detailed information on functions used in the examples (e.g., Assertions, Mocking, Async). See [`docs/firmo/knowledge.md`](../firmo/knowledge.md) for an index.
+- **Examples Directory:** [`examples/`](./) - Contains the full source code for these patterns.
+- **Getting Started Guide:** [`docs/guides/getting-started.md`](../guides/getting-started.md) - Introduces basic Firmo usage.
+- **API Reference & Guides:** Refer to the specific API/Guide documents for detailed information on functions used in the examples (e.g., Assertions, Mocking, Async). See [`docs/firmo/knowledge.md`](../firmo/knowledge.md) for an index.

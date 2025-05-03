@@ -302,6 +302,181 @@ firmo.it_async("performs async operation", function()
 end, 2000) -- 2 second timeout
 ```
 
+### firmo.fit_async(description, options_or_fn, fn?, timeout_ms?)
+
+Defines a focused asynchronous test case using `firmo.fit`. Only focused tests run if any exist. This function is a convenience wrapper around `async_module.it_async` that sets the `focused` option to true.
+
+**Parameters:**
+
+- `description` (string): The description of the test case.
+- `options_or_fn` (table|function): Either an options table (e.g., `{ expect_error = true }`) or the async test function itself.
+- `fn` (function, optional): The async test function, if `options_or_fn` was an options table.
+- `timeout_ms` (number, optional): Optional timeout in milliseconds for this specific test case.
+
+**Returns:** None
+
+**Throws:**
+
+- Error if arguments are invalid or if the underlying `it_async` call fails.
+
+**Example:**
+
+```lua
+-- Focus on this specific async test
+firmo.fit_async("processes data quickly", function()
+  firmo.await(10)
+  expect(get_data_status()).to.equal("processed")
+end)
+
+-- This test will be skipped if focus mode is active
+firmo.it_async("handles regular operations", function()
+  -- ...
+end)
+```
+
+### firmo.xit_async(description, options_or_fn, fn?, timeout_ms?)
+
+Defines a skipped asynchronous test case using `firmo.xit`. It will not be run. This function is a convenience wrapper around `async_module.it_async` that sets the `excluded` option to true.
+
+**Parameters:**
+
+- `description` (string): The description of the test case.
+- `options_or_fn` (table|function): Either an options table (e.g., `{ expect_error = true }`) or the async test function itself.
+- `fn` (function, optional): The async test function, if `options_or_fn` was an options table.
+- `timeout_ms` (number, optional): Optional timeout (ignored as test is skipped, but kept for signature consistency).
+
+**Returns:** None
+
+**Throws:**
+
+- Error if arguments are invalid.
+
+**Example:**
+
+```lua
+-- Skip this async test temporarily
+firmo.xit_async("integrates with external service", function()
+  -- This code will not run
+  firmo.await(1000)
+  expect(service_status()).to.equal("ready")
+end)
+
+-- Other async tests will run normally
+firmo.it_async("performs basic operations", function()
+  firmo.await(10)
+  expect(true).to.be_truthy()
+end)
+```
+
+### firmo.describe_async(name, fn, options?)
+
+Defines an asynchronous test group (suite) using `firmo.describe`. Tests inside can use async features (`it_async`, `await`, etc.). It delegates the group definition (including nesting, hooks, and filtering logic) to `firmo.describe`.
+
+**Parameters:**
+
+- `name` (string): Name of the test group.
+- `fn` (function): Function containing the test group's definitions (e.g., `it_async` calls, nested `describe_async`).
+- `options` (table, optional): Optional table containing flags:
+  - `focused` (boolean): If true, marks this group as focused (via `firmo.fdescribe`).
+  - `excluded` (boolean): If true, marks this group to be skipped (via `firmo.xdescribe`).
+
+**Returns:** None
+
+**Throws:**
+
+- Error if `firmo.describe` is not available or if the underlying `describe` call fails.
+
+**Example:**
+
+```lua
+firmo.describe_async("Async Database Operations", function()
+  firmo.before(function() -- Setup can be sync or async
+     -- db_connect()
+  end)
+
+  firmo.it_async("should fetch user data", function()
+    local data = nil
+    -- db.fetch_user_async(1, function(res) data = res end)
+    firmo.await(10) -- Simulate fetch
+    data = { id = 1 }
+    firmo.wait_until(function() return data ~= nil end)
+    expect(data.id).to.equal(1)
+  end)
+
+  firmo.after(function()
+    -- db_disconnect()
+  end)
+end)
+```
+
+### firmo.fdescribe_async(name, fn)
+
+Defines a focused asynchronous test group using `firmo.fdescribe`. When focus mode is active, only focused suites and focused tests will be run. This is a convenience wrapper around `describe_async` that sets the `focused` option to true.
+
+**Parameters:**
+
+- `name` (string): Name of the test group.
+- `fn` (function): Function containing the test group's definitions.
+
+**Returns:** None
+
+**Throws:**
+
+- Error if the underlying `describe_async` call fails.
+
+**Example:**
+
+```lua
+-- Focus on this group of async tests
+firmo.fdescribe_async("Critical Async Feature", function()
+  firmo.it_async("must complete successfully", function()
+    -- ... async test logic ...
+    firmo.await(10)
+    expect(true).to.be_truthy()
+  end)
+end)
+
+-- This group will be skipped if focus mode is active
+firmo.describe_async("Non-critical Features", function()
+  -- ... other tests ...
+end)
+```
+
+### firmo.xdescribe_async(name, fn)
+
+Defines a skipped asynchronous test group using `firmo.xdescribe`. All tests and hooks defined within this group will be skipped during test execution. This is a convenience wrapper around `describe_async` that sets the `excluded` option to true.
+
+**Parameters:**
+
+- `name` (string): Name of the test group.
+- `fn` (function): Function containing the test group's definitions (these will be skipped).
+
+**Returns:** None
+
+**Throws:**
+
+- Error if the underlying `describe_async` call fails.
+
+**Example:**
+
+```lua
+-- Skip this entire group of async tests
+firmo.xdescribe_async("Legacy Async Code", function()
+  firmo.it_async("uses old patterns", function()
+    -- This test will not run
+  end)
+end)
+
+-- Other groups run normally
+firmo.describe_async("Current Async Features", function()
+  firmo.it_async("works as expected", function()
+    -- This test runs
+    firmo.await(5)
+    expect(true).to.be_truthy()
+  end)
+end)
+```
+
 ## Advanced Functions
 
 ## Error Handling
