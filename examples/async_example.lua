@@ -7,6 +7,10 @@
 --- - Handling test timeouts (conceptually, as direct promise testing is removed).
 ---
 --- @module examples.async_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see lib.async
 --- @see firmo.it_async
 --- @see firmo.await

@@ -1,7 +1,5 @@
---- error_handling_example.lua
---
--- This file provides a comprehensive demonstration of Firmo's standardized
--- error handling system (`lib.tools.error_handler`). It covers:
+--- This file provides a comprehensive demonstration of Firmo's standardized
+--- error handling system (`lib.tools.error_handler`). It covers:
 -- - Standard error categories and severities.
 -- - Creating basic and specialized errors (`validation_error`, `io_error`, etc.).
 -- - The `nil, error` return pattern for propagating errors.
@@ -12,6 +10,14 @@
 --   and `{ expect_error = true }`.
 -- - Best practices for error handling.
 --
+-- @module examples.error_handling_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see lib.tools.error_handler
+-- @see lib.tools.test_helper
+-- @usage
 -- Run embedded tests: lua test.lua examples/error_handling_example.lua
 --
 
@@ -21,6 +27,7 @@ local test_helper = require("lib.tools.test_helper")
 local fs = require("lib.tools.filesystem")
 local logging = require("lib.tools.logging")
 local temp_file = require("lib.tools.filesystem.temp_file") -- Needed for cleanup_all
+local json = require("lib.tools.json") -- Need json for stringifying context
 
 -- Set up logging
 local logger = logging.get_logger("ErrorHandlingExample")
@@ -61,7 +68,7 @@ local function create_basic_error()
   -- Create a general error
   local err = error_handler.create(
     "Something went wrong",
-    error_handler.CATEGORY.GENERAL,
+    error_handler.CATEGORY.RUNTIME, -- Use RUNTIME instead of GENERAL if GENERAL doesn't exist
     error_handler.SEVERITY.ERROR,
     { source = "create_basic_error" }
   )
@@ -96,9 +103,9 @@ local runtime_error = error_handler.runtime_error(
   { function_name = "process_data", module = "data_processor" }
 )
 
--- Format error (for invalid format or parsing issues)
-local format_error =
-  error_handler.format_error("Invalid JSON format", { content_sample = "{invalid json", expected_format = "JSON" })
+-- Format/Parse error (for invalid format or parsing issues)
+local parse_error =
+  error_handler.parse_error("Invalid JSON format", { content_sample = "{invalid json", expected_format = "JSON" })
 
 -- Display specialized errors
 -- logger.info("\nSpecialized Errors:")
@@ -120,10 +127,23 @@ print("- Category:", runtime_error.category)
 print("- Function:", runtime_error.context.function_name)
 print("- Module:", runtime_error.context.module)
 
--- logger.info("\nFormat Error:")
-print("- Message:", format_error.message)
-print("- Category:", format_error.category)
-print("- Expected Format:", format_error.context.expected_format)
+-- logger.info("\nParse Error:")
+print("- Message:", parse_error.message)
+print("- Category:", parse_error.category)
+print("- Expected Format:", parse_error.context.expected_format)
+
+-- Helper function to count entries in a table
+local function count_table_entries(tbl)
+  if type(tbl) ~= "table" then
+    return 0
+  end
+  
+  local count = 0
+  for _ in pairs(tbl) do
+    count = count + 1
+  end
+  return count
+end
 
 -- PART 2: Error Propagation Patterns
 -- logger.info("\nPART 2: Error Propagation Patterns\n")
@@ -182,13 +202,17 @@ for _, config_path in ipairs(configs) do
     print(
       string.format(
         "SUCCESS: '%s' -> %s config with %d settings",
-        config_path,
+        tostring(config_path), -- Ensure path is string
         result.config_type,
-        #next(result.settings) and result.settings or 0
+        count_table_entries(result.settings)
       )
     )
   else
     print(string.format("ERROR: '%s' -> %s: %s", tostring(config_path), err.category, err.message))
+    -- Print context if available
+    if err.context then
+      print("  Context:", json.encode(err.context)) -- Use json.encode for context table
+    end
   end
 end
 
@@ -206,7 +230,7 @@ function parse_json(content)
   -- Simulating parsing failures for invalid JSON
   if not content or not content:match("{") then
     return nil,
-      error_handler.format_error("Invalid JSON format", { content_sample = content and content:sub(1, 20) or "nil" })
+      error_handler.parse_error("Invalid JSON format", { content_sample = content and content:sub(1, 20) or "nil" })
   end
 
   -- Success case (simulated)
@@ -267,12 +291,13 @@ function initialize_with_config(config_path)
     return nil,
       error_handler.create(
         "Failed to initialize: " .. load_err.message,
-        error_handler.CATEGORY.INITIALIZATION,
+        error_handler.CATEGORY.RUNTIME, -- Use existing category like RUNTIME or create INITIALIZATION if needed
         error_handler.SEVERITY.ERROR,
         {
           original_error = load_err,
           config_path = config_path,
-        }
+        },
+        load_err -- Pass original error as cause
       )
   end
 
@@ -515,7 +540,7 @@ describe("User Validation", function()
       return validate_user({ age = 30 })
     end)()
 
-    expect(result).to.equal(nil)
+    expect(result).to.be_nil() -- Use to.be_nil()
     expect(err).to.exist()
     expect(err.category).to.equal(error_handler.CATEGORY.VALIDATION)
     expect(err.message).to.match("name property")
@@ -527,7 +552,7 @@ describe("User Validation", function()
       return validate_user({ name = "John", age = -10 })
     end)()
 
-    expect(result).to.equal(nil)
+    expect(result).to.be_nil() -- Use to.be_nil()
     expect(err).to.exist()
     expect(err.category).to.equal(error_handler.CATEGORY.VALIDATION)
     expect(err.message).to.match("valid age")
@@ -539,11 +564,11 @@ describe("User Validation", function()
       return validate_user({ name = "John" })
     end)()
 
-    expect(result).to.equal(nil)
+    expect(result).to.be_nil() -- Use to.be_nil()
     expect(err).to.exist()
     expect(err.category).to.equal(error_handler.CATEGORY.VALIDATION)
     expect(err.message).to.match("valid age")
-    expect(err.context.provided_value).to.equal(nil)
+    expect(err.context.provided_value).to.be_nil() -- Use to.be_nil()
   end)
 
   --- Uses the more concise `test_helper.expect_error` to check for specific error messages.
@@ -607,5 +632,4 @@ print("    Good: Logging with proper level and structured data")
 -- Cleanup
 -- logger.info("\nError handling example completed successfully.")
 
--- Ensure all temp resources are cleaned up
-temp_file.cleanup_all()
+-- Ensure all temp resources are cleaned up (handled automatically by temp_file registration)

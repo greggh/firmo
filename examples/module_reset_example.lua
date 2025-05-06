@@ -1,7 +1,5 @@
---- module_reset_example.lua
---
--- This procedural example script demonstrates the problem of persistent module state
--- between simulated test runs and introduces Firmo's module reset feature as the
+--- This procedural example script demonstrates the problem of persistent module state
+--- between simulated test runs and introduces Firmo's module reset feature as the
 -- solution for ensuring test isolation.
 --
 -- It shows:
@@ -10,11 +8,19 @@
 -- - A *manual* reset implementation using `package.loaded` and `dofile` (for demo only).
 -- - How to check for and potentially use Firmo's built-in `module_reset` functionality.
 --
+-- @module examples.module_reset_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see lib.core.module_reset
+-- @usage
 -- Run this example directly: lua examples/module_reset_example.lua
 --
 
 local logging = require("lib.tools.logging")
 local temp_file = require("lib.tools.filesystem.temp_file")
+local fs = require("lib.tools.filesystem") -- Added missing require
 
 -- Setup logger
 local logger = logging.get_logger("ModuleResetExample")
@@ -41,8 +47,6 @@ end
 --- @return string|nil file_path The absolute path to the created temporary file, or `nil` on error.
 --- @within examples.module_reset_example
 local function create_test_module(name, content)
-  local file_path, err = temp_file.create_with_content(content, name .. ".lua")
-  -- Use create_with_content which handles registration automatically
   local file_path, err = temp_file.create_with_content(content, name .. ".lua")
   if not file_path then
     print("ERROR: Failed to create test module '" .. name .. "': " .. tostring(err or "unknown error"))
@@ -179,6 +183,5 @@ end
 
 print("\n--- Module Reset Example Complete ---")
 
--- Clean up all temporary files created by temp_file
-temp_file.cleanup_all()
-print("Temporary files cleaned up.")
+-- Cleanup is handled automatically by temp_file registration
+print("Temporary files will be cleaned up automatically.")

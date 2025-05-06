@@ -6,6 +6,10 @@
 --- including asynchronous ones.
 ---
 --- @module examples.async_watch_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see firmo.it_async
 --- @see firmo.await
 --- @see firmo.wait_until
@@ -87,7 +91,6 @@ it_async("handles errors in async tests (no error case)", function()
 end)
 
 -- Test timeout handling (uncomment the `it_async` block below to see a timeout error)
---- @class ExamplesAsyncWatchExample
 --[[
   it_async("demonstrates timeout behavior", function()
     local condition_never_true = function() return false end

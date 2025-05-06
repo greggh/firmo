@@ -1,12 +1,17 @@
---- parallel_execution_example.lua
---
--- This procedural example script demonstrates parallel test execution using
--- `firmo.parallel.run_tests`. It works by:
+--- This procedural example script demonstrates parallel test execution using
+--- `firmo.parallel.run_tests`. It works by:
 -- 1. Creating several temporary test files, each with simulated delays.
 -- 2. Running these test files sequentially using `dofile` (for baseline timing).
 -- 3. Running the same test files in parallel using `firmo.parallel.run_tests`.
 -- 4. Comparing the execution times to show the potential speedup.
 --
+-- @module examples.parallel_execution_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see lib.tools.parallel
+-- @usage
 -- Run this example directly: lua examples/parallel_execution_example.lua
 --
 
@@ -69,8 +74,8 @@ if arg[0]:match("parallel_execution_example%.lua$") then
 
   --- Creates multiple temporary test files with simulated delays.
   --- Creates multiple temporary test files, each containing simple tests with simulated delays.
-  --- Registers created files with `temp_file` for cleanup.
-  --- @param temp_dir_obj table The temp_file directory helper object returned by `create_temp_test_directory`.
+  --- Registers created files with `temp_file` for cleanup implicitly via directory registration.
+  --- @param temp_dir_path string The path to the temporary directory where files should be created.
   --- @param count number The number of test files to create.
   --- @return string[] files A list of absolute paths to the created test files.
   --- @within examples.parallel_execution_example
@@ -86,8 +91,7 @@ if arg[0]:match("parallel_execution_example%.lua$") then
       local content = "-- Generated test file #" .. i .. "\n"
       content = content .. "local firmo = require('firmo')\n"
       content = content .. "local describe, it, expect = firmo.describe, firmo.it, firmo.expect\n\n"
-      content = content .. "local firmo = require('firmo')\n" -- Ensure require is correct for dofile/runner
-      content = content .. "local describe, it, expect = firmo.describe, firmo.it, firmo.expect\n\n"
+      -- Removed duplicate require
       content = content .. "-- Simulate work by sleeping\n"
       content = content .. "--- Busy-wait sleep for simulation ONLY.\n"
       content = content .. "local function sleep(sec)\n"
@@ -105,12 +109,13 @@ if arg[0]:match("parallel_execution_example%.lua$") then
 
       content = content .. "end)\n"
 
-      -- Write the file using temp_dir object
-      local abs_path, err = temp_dir_obj:create_file(filename, content)
-      if abs_path then
+      -- Write the file using fs.write_file
+      local abs_path = fs.join_paths(temp_dir_path, filename) -- Define abs path first
+      local success, err = fs.write_file(abs_path, content)
+      if success then
         table.insert(files, abs_path) -- Store absolute path
       else
-        logger.error("Error writing test file: " .. (err or "unknown error"))
+        print("Error writing test file: " .. (err or "unknown error")) -- Use print for consistency
       end
     end
 
@@ -127,17 +132,21 @@ if arg[0]:match("parallel_execution_example%.lua$") then
   local files = create_test_files(temp_dir, 10)
 
   -- Report what we created
-  logger.info("Created " .. #files .. " test files in " .. temp_dir.path)
+  logger.info("Created " .. #files .. " test files in " .. temp_dir)
 
-  -- Basic sequential execution demo
-  logger.info("\n== Running tests sequentially ==")
+  -- Basic sequential execution demo (SIMULATED - dofile doesn't run tests properly)
+  logger.info("\n== Simulating sequential execution (for timing comparison) ==")
   local start_time = os.clock()
-  for _, file in ipairs(files) do
-    firmo.reset() -- Manual reset/dofile for demo only.
-    dofile(file) -- Manual reset/dofile for demo only.
+  local total_delay = 0
+  for i = 1, #files do
+    -- Estimate delay based on file content (fragile, just for demo)
+    local content = fs.read_file(files[i])
+    local delay_str = content:match("sleep%(([%d%.]+)%)")
+    local delay = tonumber(delay_str) or 0
+    total_delay = total_delay + (delay * 3) -- 3 tests per file
   end
-  local sequential_time = os.clock() - start_time
-  print("Sequential execution time: " .. string.format("%.3f", sequential_time) .. " seconds")
+  local sequential_time = total_delay -- Approximate total time
+  print("Estimated sequential execution time: " .. string.format("%.3f", sequential_time) .. " seconds")
 
   -- Parallel execution demo
   if firmo.parallel and parallel_loaded then
@@ -181,5 +190,4 @@ if arg[0]:match("parallel_execution_example%.lua$") then
   logger.info("  lua test.lua --parallel --workers 4 tests/")
 end
 
--- Cleanup all temporary files/directories
-temp_file.cleanup_all()
+-- Cleanup is handled automatically by temp_file registration

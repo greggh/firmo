@@ -420,7 +420,8 @@ local paths = {
     "be_greater_than",
     "be_less_than",
     "be_between",
-    "be_approximately",
+    "be_near", -- Added
+    "be_approximately", -- Alias for be_near
     "throw",
     "satisfy",
     "implement_interface",
@@ -439,15 +440,18 @@ local paths = {
     "decrease",
     "deep_equal",
     "match_regex",
+    "match_with_options", -- Added
     "be_date",
     "be_iso_date",
     "be_before",
     "be_after",
     "be_same_day_as",
+    "be_between_dates", -- Added
     "complete",
     "complete_within",
     "resolve_with",
     "reject",
+    "be_nil",
   },
   to_not = {
     "have",
@@ -463,7 +467,8 @@ local paths = {
     "be_greater_than",
     "be_less_than",
     "be_between",
-    "be_approximately",
+    "be_near", -- Added
+    "be_approximately", -- Alias for be_near
     "throw",
     "satisfy",
     "implement_interface",
@@ -482,13 +487,16 @@ local paths = {
     "decrease",
     "deep_equal",
     "match_regex",
+    "match_with_options", -- Added
     "be_date",
     "be_iso_date",
     "be_before",
     "be_after",
     "be_same_day_as",
+    "be_between_dates", -- Added
     "complete",
     "complete_within",
+    "be_nil",
     chain = function(a)
       -- Set negation state to true
       -- This explicitly sets the negation state rather than toggling it
@@ -658,6 +666,18 @@ local paths = {
     end,
   },
 
+  --- Tests if value `v` is exactly `nil`.
+  ---@field test fun(v: any): boolean, string, string
+  be_nil = {
+    ---@param v any The value to check.
+    ---@return boolean success True if `v == nil`.
+    ---@return string success_message Message for success.
+    ---@return string failure_message Message for failure.
+    test = function(v)
+      return v == nil, "expected " .. tostring(v) .. " to be nil", "expected " .. tostring(v) .. " to not be nil"
+    end,
+  },
+
   --- Tests if a value is of a specific Lua base type using `type()`.
   ---@field test fun(v: any, expected_type: string): boolean, string, string
   type = {
@@ -762,6 +782,10 @@ local paths = {
   --- Tests if a string `v` contains a match for the Lua pattern `p`.
   ---@field test fun(v: any, p: string): boolean, string, string
   match = {
+    "fully", -- marker for match.fully chain
+    "any_of", -- marker for match.any_of chain
+    "all_of", -- marker for match.all_of chain
+
     ---@param v any The value to check (will be converted to string).
     ---@param p string The Lua pattern.
     ---@return boolean success True if `tostring(v)` contains a match for `p`.
@@ -830,6 +854,8 @@ local paths = {
     "value",
     "subset",
     "exactly",
+    "deep_key", -- Added
+    "exact_keys", -- Added
     test = function(v, x)
       -- Simple implementation first
       if type(v) == "string" then
@@ -1344,7 +1370,174 @@ paths.match_regex = {
   end,
 }
 
---- Tests if string `v` can be parsed as a valid date by the `lib.tools.date` module.
+--- Tests if a string fully matches a pattern (from start to end)
+---@field test fun(v: string, pattern: string): boolean, string, string
+paths.fully = {
+  ---@param v string The string to test
+  ---@param pattern string The Lua pattern to match against
+  ---@return boolean success True if the entire string matches the pattern
+  ---@return string success_message Message for success
+  ---@return string failure_message Message for failure
+  test = function(v, pattern)
+    if type(v) ~= "string" then
+      error("Expected a string to match fully, got " .. type(v))
+    end
+
+    if type(pattern) ~= "string" then
+      error("Expected a string pattern, got " .. type(pattern))
+    end
+
+    -- For full matching, we need to anchor the pattern with ^ and $
+    local anchored_pattern = "^" .. pattern .. "$"
+    local result = string.match(v, anchored_pattern) ~= nil
+
+    return result,
+      'expected "' .. v .. '" to fully match pattern "' .. pattern .. '"',
+      'expected "' .. v .. '" to not fully match pattern "' .. pattern .. '"'
+  end,
+}
+
+--- Tests if a string matches any pattern in an array of patterns
+---@field test fun(v: string, patterns: table): boolean, string, string
+paths.any_of = {
+  ---@param v string The string to test
+  ---@param patterns table An array of Lua patterns to match against
+  ---@return boolean success True if the string matches any pattern in the array
+  ---@return string success_message Message for success
+  ---@return string failure_message Message for failure
+  test = function(v, patterns)
+    if type(v) ~= "string" then
+      error("Expected a string to match against patterns, got " .. type(v))
+    end
+
+    if type(patterns) ~= "table" then
+      error("Expected an array of patterns, got " .. type(patterns))
+    end
+
+    if #patterns == 0 then
+      error("Pattern array cannot be empty")
+    end
+
+    -- Check if the string matches any of the patterns
+    for _, pattern in ipairs(patterns) do
+      if type(pattern) ~= "string" then
+        error("Expected string pattern in array, got " .. type(pattern))
+      end
+
+      if string.find(v, pattern) then
+        return true,
+          'expected "' .. v .. '" to match any of the patterns: ' .. stringify(patterns),
+          'expected "' .. v .. '" to not match any of the patterns: ' .. stringify(patterns)
+      end
+    end
+
+    return false,
+      'expected "' .. v .. '" to match any of the patterns: ' .. stringify(patterns),
+      'expected "' .. v .. '" to not match any of the patterns: ' .. stringify(patterns)
+  end,
+}
+
+--- Tests if a string matches all patterns in an array of patterns
+---@field test fun(v: string, patterns: table): boolean, string, string
+paths.all_of = {
+  ---@param v string The string to test
+  ---@param patterns table An array of Lua patterns to match against
+  ---@return boolean success True if the string matches all patterns in the array
+  ---@return string success_message Message for success
+  ---@return string failure_message Message for failure
+  test = function(v, patterns)
+    if type(v) ~= "string" then
+      error("Expected a string to match against patterns, got " .. type(v))
+    end
+
+    if type(patterns) ~= "table" then
+      error("Expected an array of patterns, got " .. type(patterns))
+    end
+
+    if #patterns == 0 then
+      error("Pattern array cannot be empty")
+    end
+
+    -- Check if the string matches all of the patterns
+    for _, pattern in ipairs(patterns) do
+      if type(pattern) ~= "string" then
+        error("Expected string pattern in array, got " .. type(pattern))
+      end
+
+      if not string.find(v, pattern) then
+        return false,
+          'expected "' .. v .. '" to match all of the patterns: ' .. stringify(patterns),
+          'expected "' .. v .. '" to not match all of the patterns: ' .. stringify(patterns)
+      end
+    end
+
+    return true,
+      'expected "' .. v .. '" to match all of the patterns: ' .. stringify(patterns),
+      'expected "' .. v .. '" to not match all of the patterns: ' .. stringify(patterns)
+  end,
+}
+
+--- Tests if string `v` matches Lua pattern `pattern`, with custom options
+---@field test fun(v: string, pattern: string, options: table): boolean, string, string
+paths.match_with_options = {
+  ---@param v string The string to test
+  ---@param pattern string The Lua pattern to match against
+  ---@param options table Options for matching (full: boolean, ignore_case: boolean)
+  ---@return boolean success True if the string matches according to the options
+  ---@return string success_message Message for success
+  ---@return string failure_message Message for failure
+  test = function(v, pattern, options)
+    if type(v) ~= "string" then
+      error("Expected a string to match, got " .. type(v))
+    end
+
+    if type(pattern) ~= "string" then
+      error("Expected a string pattern, got " .. type(pattern))
+    end
+
+    if options ~= nil and type(options) ~= "table" then
+      error("Expected options to be a table, got " .. type(options))
+    end
+
+    options = options or {}
+    local full = options.full or false
+    local case_insensitive = options.case_insensitive or false
+
+    -- Apply case insensitivity if requested
+    local compare_v = v
+    local compare_pattern = pattern
+
+    if case_insensitive then
+      compare_v = string.lower(compare_v)
+      compare_pattern = string.lower(compare_pattern)
+    end
+
+    -- For full matching, we need to anchor the pattern
+    if full then
+      compare_pattern = "^" .. compare_pattern .. "$"
+    end
+
+    -- Create user-friendly options string for error messages
+    local options_str = ""
+    if next(options) then
+      local opts = {}
+      if options.full then
+        table.insert(opts, "full")
+      end
+      if options.case_insensitive then
+        table.insert(opts, "case_insensitive")
+      end
+      options_str = " (with options: " .. table.concat(opts, ", ") .. ")"
+    end
+
+    local result = string.find(compare_v, compare_pattern) ~= nil
+
+    return result,
+      'expected "' .. v .. '" to match pattern "' .. pattern .. '"' .. options_str,
+      'expected "' .. v .. '" to not match pattern "' .. pattern .. '"' .. options_str
+  end,
+}
+
 ---@field test fun(v: string): boolean, string, string
 paths.be_date = {
   ---@param v string The string to test.
@@ -1531,6 +1724,59 @@ paths.be_same_day_as = {
       and date1:getday() == date2:getday(),
       'expected "' .. v .. '" to be the same day as "' .. expected_date .. '"',
       'expected "' .. v .. '" to not be the same day as "' .. expected_date .. '"'
+  end,
+}
+
+--- Tests if date string `v` is between two other date strings, `start_date` and `end_date`. Parses all dates using `lib.tools.date`.
+---@field test fun(v: string, start_date: string, end_date: string, inclusive?: boolean): boolean, string, string
+paths.be_between_dates = {
+  ---@param v string The date string to check.
+  ---@param start_date string The start date string.
+  ---@param end_date string The end date string.
+  ---@param inclusive boolean Whether the comparison should be inclusive (>=, <=) instead of exclusive (>, <). Default is true.
+  ---@return boolean success True if `v` is chronologically between `start_date` and `end_date`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure (including parsing errors).
+  test = function(v, start_date, end_date, inclusive)
+    if type(v) ~= "string" or type(start_date) ~= "string" or type(end_date) ~= "string" then
+      return false,
+        "expected date strings for comparison, got " .. type(v) .. ", " .. type(start_date) .. ", " .. type(end_date),
+        "expected invalid date strings"
+    end
+
+    -- Default to inclusive comparisons
+    if inclusive == nil then
+      inclusive = true
+    end
+
+    local success1, date_v = pcall(function()
+      return get_date()(v)
+    end)
+    local success2, date_start = pcall(function()
+      return get_date()(start_date)
+    end)
+    local success3, date_end = pcall(function()
+      return get_date()(end_date)
+    end)
+
+    if not (success1 and success2 and success3) then
+      return false,
+        'expected "' .. v .. '", "' .. start_date .. '", and "' .. end_date .. '" to be valid dates for comparison',
+        'expected at least one invalid date among "' .. v .. '", "' .. start_date .. '", and "' .. end_date .. '"'
+    end
+
+    local result
+    if inclusive then
+      result = date_v >= date_start and date_v <= date_end
+    else
+      result = date_v > date_start and date_v < date_end
+    end
+
+    local inclusive_str = inclusive and " (inclusive)" or " (exclusive)"
+
+    return result,
+      'expected "' .. v .. '" to be between "' .. start_date .. '" and "' .. end_date .. '"' .. inclusive_str,
+      'expected "' .. v .. '" to not be between "' .. start_date .. '" and "' .. end_date .. '"' .. inclusive_str
   end,
 }
 
@@ -1890,6 +2136,149 @@ paths.key = {
   end,
 }
 
+--- Helper function to get a deeply nested value from a table.
+---@param tbl table The table to traverse.
+---@param key_path string|table The path to the value. Can be a dot-separated string ("a.b.c") or a table of keys ({ "a", "b", "c" }).
+---@return any|nil value The value found at the path, or nil if the path is invalid or the value doesn't exist.
+---@return boolean exists True if the full path was valid and the value exists (even if nil), false otherwise.
+---@private
+local function _get_deep_value(tbl, key_path)
+  if type(tbl) ~= "table" then
+    return nil, false
+  end
+
+  local path_parts = {}
+  if type(key_path) == "string" then
+    for part in string.gmatch(key_path, "[^.]+") do
+      table.insert(path_parts, part)
+    end
+  elseif type(key_path) == "table" then
+    path_parts = key_path
+  else
+    return nil, false -- Invalid path type
+  end
+
+  if #path_parts == 0 then
+    return nil, false -- Empty path
+  end
+
+  local current_value = tbl
+  for i, part in ipairs(path_parts) do
+    if type(current_value) ~= "table" then
+      return nil, false -- Invalid path, encountered non-table intermediate value
+    end
+    -- Check if the key exists before accessing
+    if current_value[part] == nil and i < #path_parts then
+      -- Intermediate key doesn't exist
+      return nil, false
+    end
+    current_value = current_value[part]
+    if current_value == nil and i < #path_parts then
+      return nil, false -- Path doesn't exist fully
+    end
+  end
+
+  -- If we reached here, the path was valid. Check if the final key exists.
+  local final_part = path_parts[#path_parts]
+  local parent_value = tbl
+  for i = 1, #path_parts - 1 do
+    parent_value = parent_value[path_parts[i]]
+  end
+
+  local key_exists = false
+  if type(parent_value) == "table" then
+    for k, _ in pairs(parent_value) do
+      if k == final_part then
+        key_exists = true
+        break
+      end
+    end
+  end
+
+  return current_value, key_exists -- Return the final value and whether the key existed
+end
+
+--- Tests if a table `v` has a deeply nested key specified by `key_path`.
+---@field test fun(v: table, key_path: string|table): boolean, string, string
+paths.deep_key = {
+  ---@param v table The table to check.
+  ---@param key_path string|table The path to the key (e.g., "a.b.c" or {"a", "b", "c"}).
+  ---@return boolean success True if the deep key exists.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` is not a table or `key_path` is invalid.
+  test = function(v, key_path)
+    if type(v) ~= "table" then
+      error("expected a table for deep key check, got " .. type(v))
+    end
+    local _, exists = _get_deep_value(v, key_path)
+    local path_str = type(key_path) == "string" and key_path or table.concat(key_path, ".")
+
+    return exists,
+      "expected " .. stringify(v) .. ' to have deep key "' .. path_str .. '"',
+      "expected " .. stringify(v) .. ' to not have deep key "' .. path_str .. '"'
+  end,
+}
+
+--- Tests if a table `v` contains *exactly* the keys listed in `expected_keys` and no others.
+---@field test fun(v: table, expected_keys: table): boolean, string, string
+paths.exact_keys = {
+  ---@param v table The table to check.
+  ---@param expected_keys table An array-like table listing the keys expected to be present exclusively.
+  ---@return boolean success True if `v` contains exactly the keys in `expected_keys`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure, detailing missing or extra keys.
+  ---@throws string If `v` or `expected_keys` are not tables.
+  test = function(v, expected_keys)
+    if type(v) ~= "table" then
+      error("expected a table for exact keys check, got " .. type(v))
+    end
+    if type(expected_keys) ~= "table" then
+      error("expected keys must be a table, got " .. type(expected_keys))
+    end
+
+    local actual_keys = {}
+    local actual_key_count = 0
+    for k, _ in pairs(v) do
+      actual_keys[k] = true
+      actual_key_count = actual_key_count + 1
+    end
+
+    local expected_key_map = {}
+    local expected_key_count = 0
+    for _, k in ipairs(expected_keys) do
+      expected_key_map[k] = true
+      expected_key_count = expected_key_count + 1
+    end
+
+    local missing_keys = {}
+    for k, _ in pairs(expected_key_map) do
+      if not actual_keys[k] then
+        table.insert(missing_keys, stringify(k))
+      end
+    end
+
+    local extra_keys = {}
+    for k, _ in pairs(actual_keys) do
+      if not expected_key_map[k] then
+        table.insert(extra_keys, stringify(k))
+      end
+    end
+
+    local success = #missing_keys == 0 and #extra_keys == 0
+
+    local failure_msg = "expected table to have exact keys " .. stringify(expected_keys) .. ", but:"
+    if #missing_keys > 0 then
+      failure_msg = failure_msg .. "\n  Missing keys: " .. table.concat(missing_keys, ", ")
+    end
+    if #extra_keys > 0 then
+      failure_msg = failure_msg .. "\n  Extra keys: " .. table.concat(extra_keys, ", ")
+    end
+
+    return success, "expected table to have exact keys " .. stringify(expected_keys), failure_msg
+  end,
+}
+
 --- Tests if number `v` is strictly greater than number `x`.
 ---@field test fun(v: number, x: number): boolean, string, string
 paths.be_greater_than = {
@@ -2118,6 +2507,46 @@ paths.throw = {
   end,
 }
 
+--- Tests if number `v` is close to `expected` within a given `tolerance`. Uses `M.eq` for comparison.
+---@field test fun(v: number, expected: number, tolerance?: number): boolean, string, string
+paths.be_near = {
+  ---@param v number The actual number.
+  ---@param expected number The expected number.
+  ---@param tolerance? number The maximum allowed difference (default 0.0001).
+  ---@return boolean success True if `abs(v - expected) <= tolerance`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v`, `expected`, or `tolerance` are not numbers.
+  test = function(v, expected, tolerance)
+    if type(v) ~= "number" then
+      error("expected actual value to be a number, got " .. type(v))
+    end
+    if type(expected) ~= "number" then
+      error("expected target value to be a number, got " .. type(expected))
+    end
+    tolerance = tolerance or 0.0001 -- Default tolerance
+    if type(tolerance) ~= "number" or tolerance < 0 then
+      error("tolerance must be a non-negative number")
+    end
+
+    local is_near = M.eq(v, expected, tolerance)
+
+    return is_near,
+      "expected " .. tostring(v) .. " to be near " .. tostring(expected) .. " (within " .. tostring(tolerance) .. ")",
+      "expected "
+        .. tostring(v)
+        .. " to not be near "
+        .. tostring(expected)
+        .. " (within "
+        .. tostring(tolerance)
+        .. ")"
+  end,
+}
+
+--- Alias for `be_near`.
+---@field test fun(v: number, expected: number, tolerance?: number): boolean, string, string
+paths.be_approximately = paths.be_near
+
 --- Alias for `throw`. Tests if function `v` throws an error.
 ---@field test fun(v: function): boolean, string, string
 paths.error = {
@@ -2248,6 +2677,8 @@ paths.error_type = {
 ---@field have_property fun(self: ExpectChain, property_name: any, expected_value?: any): ExpectChain Asserts table has property (and optionally checks value).
 ---@field have_keys fun(self: ExpectChain, keys: table): ExpectChain Asserts table has all keys listed in the `keys` table.
 ---@field have_key fun(self: ExpectChain, key: any): ExpectChain Asserts table has the specified key.
+---@field deep_key fun(self: ExpectChain, key_path: string|table): ExpectChain Asserts table has a deep key specified by path.
+---@field have_exact_keys fun(self: ExpectChain, keys: table): ExpectChain Asserts table has exactly the specified keys and no others.
 ---@field match_schema fun(self: ExpectChain, schema: table): ExpectChain Asserts table matches schema definition.
 ---@field change fun(self: ExpectChain, value_fn: function, change_fn?: fun(before: any, after: any): boolean): ExpectChain Asserts executing the (function) value changes the result of `value_fn`.
 ---@field increase fun(self: ExpectChain, value_fn: function): ExpectChain Asserts executing the (function) value increases the numeric result of `value_fn`.
@@ -2258,6 +2689,8 @@ paths.error_type = {
 ---@field be_before fun(self: ExpectChain, date_str: string): ExpectChain Asserts date string is before another date string.
 ---@field be_after fun(self: ExpectChain, date_str: string): ExpectChain Asserts date string is after another date string.
 ---@field be_same_day_as fun(self: ExpectChain, date_str: string): ExpectChain Asserts date string represents the same calendar day as another.
+---@field be_near fun(self: ExpectChain, expected: number, tolerance?: number): ExpectChain Asserts number is near expected value within tolerance.
+---@field be_approximately fun(self: ExpectChain, expected: number, tolerance?: number): ExpectChain Alias for `be_near`.
 ---@field complete fun(self: ExpectChain, timeout?: number): ExpectChain Asserts async function completes within timeout.
 ---@field complete_within fun(self: ExpectChain, timeout: number): ExpectChain Asserts async function completes within specific timeout.
 ---@field resolve_with fun(self: ExpectChain, expected_value: any, timeout?: number): ExpectChain Asserts async function completes successfully with expected value.

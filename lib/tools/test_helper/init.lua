@@ -48,9 +48,23 @@
 --- @copyright 2023-2025
 --- @version 1.0.0
 
+--- Returns the name of the current test from debug information
+---@return string name The name of the test based on the debug info, or "unknown" if not available
+local function get_test_name()
+  local info = debug.getinfo(3, "n")
+  return info.name or "unknown"
+end
+
+--- Returns the location (file:line) of the current test from debug information
+---@return string location The source location of the test in "file:line" format
+local function get_test_location()
+  local info = debug.getinfo(3, "Sl")
+  return info.source .. ":" .. info.currentline
+end
+
 -- Lazy-load dependencies to avoid circular dependencies
 ---@diagnostic disable-next-line: unused-local
-local _error_handler, _fs, _async
+local _error_handler, _fs, _async, _logging -- Add _logging
 
 -- Local helper for safe requires without dependency on error_handler
 local function try_require(module_name)
@@ -89,6 +103,32 @@ local function get_async()
   return _async
 end
 
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
+local function get_logging()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  return _logging
+end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  local logging = get_logging()
+  if logging then
+    return logging.get_logger("TestHelper")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg, ctx) print("[ERROR] TestHelper: " .. msg, ctx) end,
+    warn = function(msg, ctx) print("[WARN] TestHelper: " .. msg, ctx) end,
+    info = function(msg, ctx) print("[INFO] TestHelper: " .. msg, ctx) end,
+    debug = function(msg, ctx) print("[DEBUG] TestHelper: " .. msg, ctx) end,
+    trace = function(msg, ctx) print("[TRACE] TestHelper: " .. msg, ctx) end,
+  }
+end
+
 local temp_file = try_require("lib.tools.filesystem.temp_file")
 
 local helper = {}
@@ -103,38 +143,52 @@ local unpack_table = table.unpack or unpack
 ---@param fn function The function to wrap.
 ---@return function wrapper A new function that, when called, executes `fn` and returns `result, nil` on success or `nil, error_object` on failure.
 ---@throws table Re-throws errors from `pcall` if error processing itself fails critically.
-function helper.with_error_capture(fn)
+function helper.with_error_capture(fn, options)
+  options = options or {}
   return function()
     -- Set up test to expect errors
+    local test_name = get_test_name()
+    local test_location = get_test_location()
+    local caller_info = debug.getinfo(2, "Sl")
     get_error_handler().set_current_test_metadata({
-      name = debug.getinfo(2, "n").name or "unknown",
+      name = test_name,
       expect_error = true,
-      caller_info = debug.getinfo(2, "Sl"),
+      caller_info = caller_info,
       function_info = debug.getinfo(fn, "Sl"),
     })
 
-    -- Use protected call
-    local success, results = pcall(fn)
+    -- Use protected call and capture all results
+    local pcall_results = { pcall(fn) }
+    local success = table.remove(pcall_results, 1) -- Extract success status
+    local actual_results = pcall_results -- Remaining items are actual results
 
     -- Clear test metadata
     get_error_handler().set_current_test_metadata(nil)
 
-    if results == nil then
-      -- If the function didn't return anything, treat it as an error
-      results = { nil, { message = "Function did not return any value" } }
+    if #actual_results == 0 and not success then
+      -- If pcall failed and returned nothing else, create a generic error message
+      -- Note: pcall typically returns an error message/object as the second item on failure.
+      -- This handles edge cases where it might not.
+      actual_results = { "pcall failed without returning an error value" }
+    elseif #actual_results == 0 and success then
+      -- If the function succeeded but returned nothing, treat it as success (no error)
+      -- If an error was *expected*, this path leads to failure later.
+      -- We no longer automatically create an error "Function did not return any value" here.
+      -- Let the subsequent logic handle it based on whether an error was expected.
+      -- If success is true, we eventually hit the final return unpack_table(actual_results).
     end
 
     -- Handle functions that return (nil, error_object) successfully
     if
       success
-      and #results >= 1
-      and results[1] == nil
-      and #results >= 2
-      and type(results[2]) == "table"
-      and get_error_handler().is_error(results[2])
+      and #actual_results >= 1 -- Check length first
+      and actual_results[1] == nil
+      and #actual_results >= 2 -- Check length again
+      and type(actual_results[2]) == "table"
+      and get_error_handler().is_error(actual_results[2])
     then
       -- Treat this as a captured error
-      local captured_err = results[2]
+      local captured_err = actual_results[2]
       -- Process it similarly to the 'if not success' block
       -- For simplicity, just wrap it as TEST_EXPECTED
       local error_context = {
@@ -143,17 +197,18 @@ function helper.with_error_capture(fn)
         in_test_context = true,
         returned_error = true, -- Indicate it was returned, not thrown
       }
+      -- Wrap the returned error object as the cause of a TEST_EXPECTED error
       return nil,
         get_error_handler().test_expected_error(
-          captured_err.message,
+          "Expected error returned by function", -- Generic message
           error_context,
-          captured_err -- Preserve original error as cause
+          captured_err -- Use the original returned error as the cause
         )
     end
 
     if not success then
       -- Captured an expected error (thrown) - process it
-      local thrown_err = results[1] -- Get the actual error value
+      local thrown_err = actual_results[1] -- Get the actual error value from pcall results
 
       -- Create base context with source information
       local error_context = {
@@ -181,7 +236,7 @@ function helper.with_error_capture(fn)
                 original_category = thrown_err.category,
                 original_severity = thrown_err.severity,
                 original_context = thrown_err.context,
-                assertion_type = result.context and result.context.action,
+                assertion_type = thrown_err.context and thrown_err.context.action, -- Use thrown_err
                 test_error = true,
               },
               thrown_err -- Preserve original error as cause
@@ -242,7 +297,9 @@ function helper.with_error_capture(fn)
                 original_category = thrown_err.category,
                 original_severity = thrown_err.severity,
                 original_context = thrown_err.context,
-                result, -- Preserve original error as cause
+                -- The original 'result' here seems incorrect, likely meant 'thrown_err'
+                -- If the intention was additional context, it's unclear what 'result' referred to.
+                -- Assuming it was a mistake and removing it for now, as 'thrown_err' is passed as cause.
               },
               thrown_err -- Preserve original error as cause
             )
@@ -293,8 +350,8 @@ function helper.with_error_capture(fn)
         )
     end
 
-    -- Return original results if successful and no error object was returned
-    return unpack_table(results)
+    -- Return original results if successful and no error object was returned/processed
+    return unpack_table(actual_results)
   end
 end
 
@@ -305,11 +362,15 @@ end
 ---@param message_pattern? string Optional Lua pattern to match against the error message.
 ---@return table error The captured error object if the function threw an error as expected and the message matched (if provided).
 ---@throws table If the function `fn` does not throw, or if `message_pattern` is provided and the error message does not match.
-function helper.expect_error(fn, message_pattern)
+function helper.expect_error(fn, message_pattern, options)
+  options = options or {}
   -- Set up test expectation context
+  -- Extract useful data for building test result context:
+  local test_name = get_test_name()
+  local test_location = get_test_location()
   local caller_info = debug.getinfo(2, "Sl")
   get_error_handler().set_current_test_metadata({
-    name = debug.getinfo(2, "n").name or "unknown",
+    name = test_name,
     expect_error = true,
     caller_info = caller_info,
     function_info = debug.getinfo(fn, "Sl"),
@@ -329,7 +390,7 @@ function helper.expect_error(fn, message_pattern)
       returned_value = result,
       source_file = caller_info.source,
       source_line = caller_info.currentline,
-      test_context = true,
+      "test_context = true"
     }))
   end
 
@@ -399,6 +460,7 @@ end
 ---@field unique_filename fun(prefix?: string, extension?: string): string Generates a unique filename in the test directory
 ---@field create_numbered_files fun(basename: string, content_pattern: string, count: number): string[] Creates multiple numbered files
 ---@field write_file fun(filename: string, content: string): boolean, string? Writes a file and registers it for cleanup
+---@field path_for fun(file_name: string): string|nil Retrieves the full path for a file created via this object by its relative name.
 
 --- Creates a temporary directory using `temp_file.create_temp_directory` and returns an object
 --- with helper methods for interacting with that directory (creating files/subdirs, checking existence, etc.).
@@ -416,13 +478,17 @@ function helper.create_temp_test_directory()
   return {
     -- Full path to the temporary directory
     path = dir_path,
+    -- Internal mapping of relative names to full paths
+    _created_files = {},
 
     ---@param file_name string Relative path of the file to create
     ---@param content string Content to write to the file
     ---@return string file_path Full path to the created file
-    -- Helper to create a file in this directory
-    create_file = function(file_name, content)
-      local file_path = dir_path .. "/" .. file_name
+    create_file = function(self, file_name, content) -- Restored self
+      local original_file_name = file_name -- Preserve original args
+      local original_content = content
+      local file_path = dir_path .. "/" .. original_file_name -- Define path using original name
+      -- Removed original_file_path variable
 
       -- Ensure parent directories exist
       local dir_name = file_path:match("(.+)/[^/]+$")
@@ -436,13 +502,20 @@ function helper.create_temp_test_directory()
       end
 
       -- Write the file
-      local success, write_err = get_fs().write_file(file_path, content)
+      -- Write the file
+      -- get_logger().info("Values PRE-fs.write_file", { path=file_path, content=original_content, type=type(original_content) }) -- REMOVED THIS LINE
+      get_logger().trace("Attempting write_file in test_helper", { file_path_value = file_path })
+      local success, write_err = get_fs().write_file(file_path, original_content) -- Use correct file_path and original_content
       if not success then
+        get_logger().trace("write_file failed, logging path before error creation", { file_path_value = file_path })
+        -- Use correct file_path in error message
         error(get_error_handler().io_error("Failed to create test file: " .. file_path, { error = write_err }))
       end
 
       -- Register the file with temp_file tracking system
+      get_logger().trace("Registering temp file in test_helper", { file_path = file_path })
       temp_file.register_file(file_path)
+      self._created_files[file_name] = file_path -- Store the mapping
 
       return file_path
     end,
@@ -450,7 +523,7 @@ function helper.create_temp_test_directory()
     ---@param subdir_name string Relative path of the subdirectory to create
     ---@return string subdir_path Full path to the created subdirectory
     -- Helper to create a subdirectory
-    create_subdirectory = function(subdir_name)
+    create_subdirectory = function(self, subdir_name) -- Restored self
       local subdir_path = dir_path .. "/" .. subdir_name
       local success, err = get_fs().create_directory(subdir_path)
       if not success then
@@ -466,7 +539,7 @@ function helper.create_temp_test_directory()
     ---@param file_name string Name of the file relative to the test directory
     ---@return boolean exists Whether the file exists
     -- Helper to check if a file exists in this directory
-    file_exists = function(file_name)
+    file_exists = function(self, file_name) -- Restored self
       return get_fs().file_exists(dir_path .. "/" .. file_name)
     end,
 
@@ -474,7 +547,7 @@ function helper.create_temp_test_directory()
     ---@return string|nil content Content of the file, or nil if file couldn't be read
     ---@return string? error Error message if reading failed
     -- Helper to read a file from this directory
-    read_file = function(file_name)
+    read_file = function(self, file_name) -- Restored self
       return get_fs().read_file(dir_path .. "/" .. file_name)
     end,
 
@@ -482,7 +555,7 @@ function helper.create_temp_test_directory()
     ---@param extension? string File extension without dot (default: "tmp")
     ---@return string filename A unique filename (not a full path)
     -- Helper to generate a unique filename in the test directory
-    unique_filename = function(prefix, extension)
+    unique_filename = function(self, prefix, extension) -- Restored self
       prefix = prefix or "temp"
       extension = extension or "tmp"
 
@@ -496,7 +569,7 @@ function helper.create_temp_test_directory()
     ---@param count number Number of files to create
     ---@return string[] List of created file paths
     -- Helper to create a series of numbered files
-    create_numbered_files = function(basename, content_pattern, count)
+    create_numbered_files = function(self, basename, content_pattern, count) -- Restored self
       local files = {}
       for i = 1, count do
         local filename = string.format("%s_%03d.txt", basename, i)
@@ -507,6 +580,7 @@ function helper.create_temp_test_directory()
           error(get_error_handler().io_error("Failed to create numbered test file: " .. path, { error = err }))
         end
         temp_file.register_file(path)
+        self._created_files[filename] = path -- Store the mapping
         table.insert(files, path)
       end
       return files
@@ -517,13 +591,21 @@ function helper.create_temp_test_directory()
     ---@return boolean success Whether the file was successfully written
     ---@return string? error Error message if writing failed
     -- Helper to write a file that automatically registers it
-    write_file = function(filename, content)
+    write_file = function(self, filename, content) -- Restored self
       local file_path = dir_path .. "/" .. filename
       local success, err = get_fs().write_file(file_path, content)
       if success then
         temp_file.register_file(file_path)
+        self._created_files[filename] = file_path -- Store the mapping
       end
       return success, err
+    end,
+
+    ---@param file_name string The relative name of the file previously created.
+    ---@return string|nil path The absolute path to the file, or nil if not found.
+    -- Retrieves the absolute path for a file created via this object's methods.
+    path_for = function(self, file_name) -- Restored self
+      return self._created_files[file_name]
     end,
   }
 end
@@ -540,8 +622,10 @@ function helper.with_temp_test_directory(files_map, callback)
 
   -- Create all the specified files
   local created_files = {}
+  get_logger().debug("Iterating files_map in with_temp_test_directory", { files_map_content = files_map }) -- Reverted to debug
   for file_name, content in pairs(files_map) do
-    local file_path = test_dir.create_file(file_name, content)
+    get_logger().debug("Processing entry from files_map", { key_file_name = file_name, value_content = content, type_key = type(file_name), type_value = type(content) }) -- Reverted to debug
+    local file_path = test_dir:create_file(file_name, content) -- Use colon notation for method call
     table.insert(created_files, file_path)
   end
 
@@ -608,7 +692,8 @@ end
 ---   expect(err).to.exist()
 ---   expect(err.message).to.match("Operation failed")
 --- end)
-function helper.expect_async_error(async_fn, timeout_ms, message_pattern)
+function helper.expect_async_error(async_fn, timeout_ms, message_pattern, options)
+  options = options or {}
   -- Validate arguments
   if type(async_fn) ~= "function" then
     error(get_error_handler().validation_error("First argument to expect_async_error must be a function"))
@@ -629,47 +714,46 @@ function helper.expect_async_error(async_fn, timeout_ms, message_pattern)
 
   -- Set up test expectation context
   local caller_info = debug.getinfo(2, "Sl")
+  local test_name = get_test_name()
+  local test_location = get_test_location()
   error_handler.set_current_test_metadata({
-    name = debug.getinfo(2, "n").name or "unknown",
-    expect_error = true,
-    caller_info = caller_info,
-    function_info = debug.getinfo(async_fn, "Sl"),
+      name = test_name,
+      expect_error = true,
+      caller_info = caller_info,
+      function_info = debug.getinfo(async_fn, "Sl"),
     explicit_expect_error = true,
     async_expected_error = true, -- Custom flag
   })
 
-  -- Wrap the user's function and get the executor
-  local executor = async_module.async(async_fn)()
+  -- Use the async function directly (it's already an async function)
+  local executor = async_fn -- async_fn is already an async function
 
-  -- Run using parallel_async for timeout handling
-  local success, err_raw = pcall(async_module.parallel_async, { executor }, timeout_ms)
+  -- Run using parallel_async for timeout handling and execute the function
+  local success, err_raw = pcall(async_module.parallel_async, { executor() }, timeout_ms)
 
-  -- Always clear the test metadata
+  -- Always clear the test metadata after the call completes
   error_handler.set_current_test_metadata(nil)
 
   if success then
     -- Function completed without error, but an error was expected
-    error(error_handler.test_expected_error("Async function was expected to throw an error but it completed successfully", {
-      source_file = caller_info.source,
-      source_line = caller_info.currentline,
-      timeout_ms = timeout_ms,
-      test_context = true,
-    }))
+    error("Async function was expected to throw an error but it completed successfully")
   end
 
   -- parallel_async threw an error, check if it was a timeout or the expected error
   local err_string = tostring(err_raw)
   if err_string:match("Timeout of %d+ms exceeded") or err_string:match("timeout") then -- Check for timeout indicators
-    error(error_handler.test_expected_error(
-      "Async function timed out after " .. timeout_ms .. "ms while expecting an error",
-      {
-        source_file = caller_info.source,
-        source_line = caller_info.currentline,
-        timeout_ms = timeout_ms,
-        original_error = err_raw, -- Include the raw timeout error
-        test_context = true,
-      }
-    ))
+    error(
+      error_handler.test_expected_error(
+        "Async function timed out after " .. timeout_ms .. "ms while expecting an error",
+        {
+          source_file = caller_info.source,
+          source_line = caller_info.currentline,
+          timeout_ms = timeout_ms,
+          original_error = err_raw,
+          test_context = true,
+        }
+      )
+    )
   end
 
   -- It wasn't a timeout, so process the captured error (similar to expect_error)
@@ -686,6 +770,7 @@ function helper.expect_async_error(async_fn, timeout_ms, message_pattern)
           original_context = err_norm.context,
           source_file = caller_info.source,
           source_line = caller_info.currentline,
+          validation_type = err_norm.context and err_norm.context.action,
         },
         err_norm -- Preserve original as cause
       )
@@ -710,6 +795,7 @@ function helper.expect_async_error(async_fn, timeout_ms, message_pattern)
   end
 
   -- Check if the error message matches the expected pattern
+  -- Removed diagnostic log
   if message_pattern and err_norm.message and not err_norm.message:match(message_pattern) then
     error(error_handler.test_expected_error("Async error message does not match expected pattern", {
       expected_pattern = message_pattern,

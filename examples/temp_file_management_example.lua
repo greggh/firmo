@@ -1,10 +1,3 @@
--- Comprehensive Temporary File Management Example
---
--- This example demonstrates the complete functionality of the temp_file module
--- including automatic tracking and cleanup of temporary files and directories.
-
--- Load firmo
-package.path = "../?.lua;../lib/?.lua;" .. package.path
 --- Comprehensive example demonstrating the Firmo temporary file management module.
 ---
 --- This example showcases the features of `lib.tools.filesystem.temp_file`:
@@ -16,6 +9,10 @@ package.path = "../?.lua;../lib/?.lua;" .. package.path
 --- - Explicitly cleaning up all tracked resources using `cleanup_all()`.
 ---
 --- @module examples.temp_file_management_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see lib.tools.filesystem.temp_file
 --- @see lib.tools.filesystem
 --- @usage
@@ -150,7 +147,7 @@ print("Creating resources without automatic cleanup (will use cleanup_all later)
 -- Note: create_temp_directory *still registers* it for cleanup_all by default
 local manual_dir, manual_dir_err = temp_file.create_temp_directory("manual_")
 if not manual_dir then
-  error("Failed to create manual dir: " .. manual_dir_err)
+  error("Failed to create manual dir: " .. tostring(manual_dir_err))
 end
 print("Manually managed directory created at: " .. manual_dir)
 
@@ -161,10 +158,10 @@ local ok1, err1 = fs.write_file(manual_file1, "Data 1")
 local ok2, err2 = fs.write_file(manual_file2, "Log entry")
 
 if not ok1 then
-  print("ERROR writing manual_file1: " .. err1)
+  print("ERROR writing manual_file1: " .. tostring(err1))
 end
 if not ok2 then
-  print("ERROR writing manual_file2: " .. err2)
+  print("ERROR writing manual_file2: " .. tostring(err2))
 end
 
 -- Normally, create_temp_directory registers the directory.

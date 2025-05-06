@@ -1,7 +1,5 @@
---- html_coverage_example.lua
---
--- This example provides a sample module (`Calculator`) and associated tests
--- specifically designed to demonstrate how different code execution states are
+--- This example provides a sample module (`Calculator`) and associated tests
+--- specifically designed to demonstrate how different code execution states are
 -- visualized in Firmo's HTML coverage reports.
 --
 -- Running this file with `lua test.lua --coverage --format=html ...` will generate
@@ -12,19 +10,16 @@
 --
 -- This helps users understand the nuances of coverage reporting beyond simple line execution.
 --
+-- @module examples.html_coverage_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see lib.coverage
+-- @see lib.reporting.formatters.html
+-- @usage
 -- Run embedded tests: lua test.lua --coverage --format=html examples/html_coverage_example.lua
 --
-
---[[
-  html_coverage_example.lua
-
-  Example that demonstrates HTML coverage reports with execution vs. coverage distinction.
-  This example is designed to clearly show the difference between:
-
-  1. Code that is executed and validated by tests (covered)
-  2. Code that is executed but not validated (executed-not-covered)
-  3. Code that is never executed (uncovered)
-]]
 
 -- Extract the testing functions we need
 local firmo = require("firmo")
@@ -35,6 +30,8 @@ local it = firmo.it
 ---@type fun(value: any) expect Assertion generator function
 local expect = firmo.expect
 
+-- local error_handler = require("lib.tools.error_handler") -- Not used
+-- local test_helper = require("lib.tools.test_helper") -- Not used
 local logging = require("lib.tools.logging")
 
 -- Setup logger

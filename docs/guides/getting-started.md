@@ -338,8 +338,8 @@ db_mock:restore()
 Now that you understand the basics of Firmo, you can:
 
 
-1. Explore the [API Reference](../api/README.md) for detailed documentation
-2. Look at the [Examples](../../examples) directory for more complex examples
-3. Check out [Advanced Topics](../guides/advanced-topics.md) for advanced features
+1. Explore the [API Reference](../api/README.md) for detailed documentation.
+2. Browse the [Examples Index](examples.md) for practical usage scenarios.
+3. Check out [Advanced Topics](../guides/advanced-topics.md) for advanced features.
 
 Happy testing!

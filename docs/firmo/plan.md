@@ -10,6 +10,18 @@ It also documents plans for many updates to other files in the firmo project.
 
 After work is done on a plan, please mark it as complete in the list at the bottom of this file.
 
+## Planning Documents Practice
+
+This document exemplifies the project's practice of creating dedicated plan documents within the `docs/firmo/` directory for significant refactoring efforts, large feature implementations, or complex bug fixes. These documents serve to:
+
+*   Outline clear goals and scope.
+*   Detail the chosen approach and alternatives considered.
+*   Record key decisions and rationale.
+*   Track progress and status.
+*   Facilitate knowledge sharing and collaboration.
+
+Maintaining such plans helps ensure structured development and provides valuable historical context for major changes.
+
 ## Documentation Updates by Area
 
 ### 1. JSDoc Updates
@@ -32,7 +44,7 @@ This sub-plan is documented in the docs/firmo/claude_document_update_plan.md
 
 ~~This file has many duplicate function definitions and we don't know which are the good ones.~~
 ~~Can you review this file and remove the duplicate functions based on which one is correct.~~
-35.1|Reviewed `lib/mocking/stub.lua`. No duplicate top-level function definitions were found. Methods like `.returns()` are defined dynamically within constructor functions (`stub.new`, `stub.on`), which is not harmful duplication. The unimplemented `stub.sequence` is noted. No code removal needed.
+Reviewed `lib/mocking/stub.lua`. No duplicate top-level function definitions were found. Methods like `.returns()` are defined dynamically within constructor functions (`stub.new`, `stub.on`), which is not harmful duplication. The unimplemented `stub.sequence` is noted. No code removal needed.
 
 ### 6. Unused files update
 
@@ -81,13 +93,13 @@ This sub-plan is documented in the docs/firmo/add_more_async_functions_plan.md
 
 ### 11. Review pcall and xpcall usage in the codebase
 
-This sub-plan is documented in the docs/firmo/pcall_update_plan.md
+This sub-plan is documented in the docs/firmo/pcall_update_plan_initial_review.md
 
 ## Progress
 
 - [x] JSDoc Updates
 - [x] Knowledge Files Updates
-- [ ] Example Files Updates
+- [x] Example Files Updates <!-- User: Please verify if 'Example Files Updates' are truly complete. -->
 - [x] CLAUDE.md file Updates
 - [x] lib/mocking/stub.lua file updates
 - [x] Unused file update
@@ -95,4 +107,4 @@ This sub-plan is documented in the docs/firmo/pcall_update_plan.md
 - [x] version_bump.lua and version_check.lua updates
 - [x] Duplicate JSON modules
 - [x] add fit_async, xit_async, describe_async, fdescribe_async, xdescribe_async
-- [ ] Review pcall and xpcall usage in the codebase
+- [x] Review pcall and xpcall usage in the codebase

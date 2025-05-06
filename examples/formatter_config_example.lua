@@ -1,13 +1,18 @@
---- formatter_config_example.lua
---
--- This example demonstrates how to configure various report formatters
--- (HTML, JSON, Summary, CSV) using Firmo's `central_config` system.
+--- This example demonstrates how to configure various report formatters
+--- (HTML, JSON, Summary, CSV) using Firmo's `central_config` system.
 --
 -- It shows:
 -- - Setting configuration options for specific formatters using `central_config.set`.
 -- - Retrieving formatter configuration using `central_config.get`.
 -- - Verifying that configuration changes are applied.
 --
+-- @module examples.formatter_config_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see lib.core.central_config
+-- @usage
 -- Run embedded tests: lua test.lua examples/formatter_config_example.lua
 --
 
@@ -44,7 +49,7 @@ central_config.set("reporting.formatters.html", {
 logger.info("HTML formatter configuration:")
 local html_config = central_config.get("reporting.formatters.html") or {}
 if next(html_config) == nil then
-  logger.warn("HTML config not found")
+  logger.warn("HTML config not found or empty")
 else
   for k, v in pairs(html_config) do
     print(string.format("  %s = %s", k, tostring(v)))
@@ -61,8 +66,8 @@ central_config.set("reporting.formatters.json", {
 -- Get JSON formatter configuration
 logger.info("JSON formatter configuration:")
 local json_config = central_config.get("reporting.formatters.json") or {}
-if next(json_config) == nil then
-  logger.warn("JSON config not found")
+if not json_config or next(json_config) == nil then
+  logger.warn("JSON config not found or empty")
 else
   for k, v in pairs(json_config) do
     print(string.format("  %s = %s", k, tostring(v)))
@@ -86,7 +91,7 @@ central_config.set("reporting.formatters.csv", {
 logger.info("\n4. Verifying configuration using central_config:")
 local formatter_config = central_config.get("reporting.formatters") or {}
 logger.info("All formatter configurations from central_config:")
-if next(formatter_config) == nil then
+if not formatter_config or next(formatter_config) == nil then
   logger.warn("No formatter configurations found in central_config")
 else
   for formatter, config in pairs(formatter_config) do

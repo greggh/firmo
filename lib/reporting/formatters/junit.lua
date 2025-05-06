@@ -324,12 +324,7 @@ function JUnitFormatter:build_junit_xml(data, options)
   table.insert(lines, '             skipped="' .. skipped_count .. '"')
   table.insert(lines, '             time="' .. total_time .. '"')
   table.insert(lines, '             timestamp="' .. options.timestamp .. '"')
-  table.insert(
-    lines,
-    '             hostname="'
-      .. (options.hostname or xml_escape(io.popen("hostname"):read("*a"):gsub("\n", "")))
-      .. '">'
-  )
+  table.insert(lines, '             hostname="' .. (options.hostname or os.getenv("HOSTNAME") or "unknown") .. '">')
 
   -- Add any system properties
   table.insert(lines, "    <properties>")

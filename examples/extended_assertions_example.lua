@@ -1,7 +1,5 @@
---- extended_assertions_example.lua
---
--- This example demonstrates various extended assertions provided by Firmo
--- beyond the basic equality and type checks. It covers assertions for:
+--- This example demonstrates various extended assertions provided by Firmo
+--- beyond the basic equality and type checks. It covers assertions for:
 -- - Collections (length, emptiness).
 -- - Numeric properties (positive, negative, integer).
 -- - String casing (uppercase, lowercase).
@@ -9,6 +7,13 @@
 -- - Function behavior (change detection, increase/decrease).
 -- - Deep equality comparison for nested tables.
 --
+-- @module examples.extended_assertions_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see firmo
+-- @usage
 -- Run embedded tests: lua test.lua examples/extended_assertions_example.lua
 --
 

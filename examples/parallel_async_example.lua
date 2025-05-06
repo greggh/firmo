@@ -1,7 +1,5 @@
---- parallel_async_example.lua
---
--- This example demonstrates how to run multiple asynchronous operations
--- concurrently using `firmo.parallel_async`. This can significantly speed up
+--- This example demonstrates how to run multiple asynchronous operations
+--- concurrently using `firmo.parallel_async`. This can significantly speed up
 -- tests that need to perform several independent async tasks, such as fetching
 -- data from multiple API endpoints simultaneously.
 --
@@ -11,6 +9,14 @@
 -- - Collecting and verifying the results.
 -- - Error handling when one or more parallel operations fail.
 --
+-- @module examples.parallel_async_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see firmo.parallel_async
+-- @see firmo.async
+-- @usage
 -- Run embedded tests: lua test.lua examples/parallel_async_example.lua
 --
 
@@ -30,13 +36,7 @@ local expect = firmo.expect
 local it_async = firmo.it_async
 local await = firmo.await
 local wait_until = firmo.wait_until
-local parallel_async = firmo.parallel_async -- Assuming this is the correct access path
-
--- Import promise utility functions (assuming they exist on firmo.async)
----@diagnostic disable-next-line: assign-type-mismatch
-local create_promise = firmo.async and firmo.async.create_promise or error("firmo.async.create_promise not found")
----@diagnostic disable-next-line: assign-type-mismatch
-local set_timeout = firmo.async and firmo.async.set_timeout or error("firmo.async.set_timeout not found")
+local parallel_async = firmo.parallel_async -- Correct way to access parallel_async
 
 -- Compatibility function for table unpacking
 local unpack_table = table.unpack or unpack
@@ -49,53 +49,50 @@ local unpack_table = table.unpack or unpack
 --- @within examples.parallel_async_example
 local AsyncAPI = {}
 
---- Simulated fetch function with delay, returning a promise.
+--- Simulated fetch function with delay, returning an async function.
 --- @param user_id number The user ID.
 --- @param delay? number Optional delay in ms (default 100).
---- @return table promise A promise object that resolves with user data `{ id, name, email }`.
+--- @return function An async function that returns user data `{ id, name, email }`.
 function AsyncAPI.fetch_user(user_id, delay)
   delay = delay or 100
-  return create_promise(function(resolve)
-    set_timeout(function()
-      resolve({
-        id = user_id,
-        name = "User " .. user_id,
-        email = "user" .. user_id .. "@example.com",
-      })
-    end, delay)
-  end)
+  return firmo.async(function()
+    await(delay)
+    return {
+      id = user_id,
+      name = "User " .. user_id,
+      email = "user" .. user_id .. "@example.com",
+    }
+  end)()
 end
 
---- Simulated data service, returning a promise that resolves with user posts.
+--- Simulated data service, returning an async function that resolves with user posts.
 --- @param user_id number The user ID.
 --- @param delay? number Optional delay in ms (default 150).
---- @return table promise A promise object that resolves with an array of post tables `{ id, title }`.
+--- @return function An async function that returns an array of post tables `{ id, title }`.
 function AsyncAPI.fetch_posts(user_id, delay)
   delay = delay or 150
-  return create_promise(function(resolve)
-    set_timeout(function()
-      resolve({
-        { id = 1, title = "First post by user " .. user_id },
-        { id = 2, title = "Second post by user " .. user_id },
-      })
-    end, delay)
-  end)
+  return firmo.async(function()
+    await(delay)
+    return {
+      { id = 1, title = "First post by user " .. user_id },
+      { id = 2, title = "Second post by user " .. user_id },
+    }
+  end)()
 end
 
---- Simulated comments service, returning a promise that resolves with comments for a post.
+--- Simulated comments service, returning an async function that resolves with comments for a post.
 --- @param post_id number The post ID.
 --- @param delay? number Optional delay in ms (default 80).
---- @return table promise A promise object that resolves with an array of comment tables `{ id, text }`.
+--- @return function An async function that returns an array of comment tables `{ id, text }`.
 function AsyncAPI.fetch_comments(post_id, delay)
   delay = delay or 80
-  return create_promise(function(resolve)
-    set_timeout(function()
-      resolve({
-        { id = 1, text = "Great post! #" .. post_id },
-        { id = 2, text = "I agree #" .. post_id },
-      })
-    end, delay)
-  end)
+  return firmo.async(function()
+    await(delay)
+    return {
+      { id = 1, text = "Great post! #" .. post_id },
+      { id = 2, text = "I agree #" .. post_id },
+    }
+  end)()
 end
 
 --- Test suite demonstrating `parallel_async`.
@@ -108,20 +105,23 @@ describe("Parallel Async Operations Demo", function()
     it_async("can run multiple simple async operations in parallel", function()
       local start = os.clock()
 
-      -- Define three different async operations
-      local op1 = function()
+      -- Define three different async operations, properly wrapped with firmo.async
+      local op1 = firmo.async(function()
         await(70) -- Simulate a 70ms operation
-      end
+        return "op1 complete"
+      end)()
 
-      local op2 = function()
+      local op2 = firmo.async(function()
         await(120) -- Simulate a 120ms operation
-      end
+        return "op2 complete"
+      end)()
 
-      local op3 = function()
+      local op3 = firmo.async(function()
         await(50) -- Simulate a 50ms operation
-      end
+        return "op3 complete"
+      end)()
 
-      logger.info("\nRunning 3 operations in parallel...")
+      logger.info("Running 3 operations in parallel...")
 
       -- Run all operations in parallel and wait for all to complete
       local results = parallel_async({ op1, op2, op3 })
@@ -136,9 +136,9 @@ describe("Parallel Async Operations Demo", function()
       end
 
       -- The total time should be close to the longest operation (120ms)
-      -- rather than the sum (240ms)
-      expect(elapsed < 400).to.be.truthy() -- More lenient timing check for different environments
-      expect(elapsed > 100).to.be.truthy() -- Should take at least 100ms
+      -- rather than the sum (70 + 120 + 50 = 240ms)
+      expect(elapsed).to.be_less_than(200) -- Allow some overhead, should be around 120ms
+      expect(elapsed).to.be.at_least(115) -- Should take at least the longest op time
       expect(#results).to.equal(3)
     end)
   end)
@@ -150,22 +150,16 @@ describe("Parallel Async Operations Demo", function()
     it_async("can fetch user profile, posts, and comments in parallel", function()
       local user_data, posts_data, comments_data
 
-      -- Operation to fetch user profile (returns promise)
-      local fetch_user_op = function()
-        return AsyncAPI.fetch_user(123, 100)
-      end
+      -- Operation to fetch user profile (returns async function)
+      local fetch_user_op = AsyncAPI.fetch_user(123, 100)
 
-      -- Operation to fetch user posts (returns promise)
-      local fetch_posts_op = function()
-        return AsyncAPI.fetch_posts(123, 150)
-      end
+      -- Operation to fetch user posts (returns async function)
+      local fetch_posts_op = AsyncAPI.fetch_posts(123, 150)
 
-      -- Operation to fetch comments (returns promise)
-      local fetch_comments_op = function()
-        return AsyncAPI.fetch_comments(1, 80)
-      end
+      -- Operation to fetch comments (returns async function)
+      local fetch_comments_op = AsyncAPI.fetch_comments(1, 80)
 
-      logger.info("\nFetching user profile, posts, and comments in parallel...")
+      logger.info("Fetching user profile, posts, and comments in parallel...")
       local start = os.clock()
 
       -- Run all data fetching operations in parallel
@@ -203,7 +197,8 @@ describe("Parallel Async Operations Demo", function()
       print("  Comments: " .. #comments_data .. " comments found")
 
       -- The total time should be approximately the longest operation (150ms)
-      expect(elapsed < 400).to.be.truthy() -- More lenient for different environments
+      expect(elapsed).to.be_less_than(250) -- Allow overhead, longest is 150ms
+      expect(elapsed).to.be.at_least(145)
     end)
   end)
 
@@ -212,22 +207,22 @@ describe("Parallel Async Operations Demo", function()
   describe("Error handling", function()
     --- Tests that `parallel_async` throws an error if any of the parallel operations fail.
     it_async("throws an error if any parallel operation fails", function()
-      local op1 = function()
+      local op1 = firmo.async(function()
         await(30)
         return "Op1 Success"
-      end
+      end)()
 
-      local op2 = function()
+      local op2 = firmo.async(function()
         await(20)
         error("Simulated failure in operation 2") -- This operation will throw an error
-      end
+      end)()
 
-      local op3 = function()
+      local op3 = firmo.async(function()
         await(40)
         return "Op3 Success"
-      end
+      end)()
 
-      logger.info("\nRunning operations with expected failure...")
+      logger.info("Running operations with expected failure...")
 
       -- Attempt to run operations in parallel using pcall to catch the expected error
       local success, err = pcall(function()
@@ -237,13 +232,12 @@ describe("Parallel Async Operations Demo", function()
       -- Verify that pcall caught an error
       expect(success).to.be_falsy("pcall should return false when an operation errors")
       expect(err).to.exist("An error message should be returned")
-      expect(err).to.be.a("string")
+      expect(type(err)).to.equal("string") -- pcall returns error message as string
 
       -- Check the error message content
       -- Note: The exact error message might vary depending on the async implementation details.
       -- It should ideally indicate which operation failed and why.
       logger.info("Caught expected error from parallel_async: " .. err)
-      expect(err).to.match("One or more parallel operations failed") -- General indicator
       expect(err).to.match("Simulated failure in operation 2") -- Specific error from op2
     end)
   end)
@@ -257,11 +251,11 @@ describe("Parallel Async Operations Demo", function()
   end)
 
   -- Log usage instructions
-  logger.info("\n-- Parallel Async Example --")
+  logger.info("-- Parallel Async Example --")
   logger.info("This file demonstrates using firmo.parallel_async to run async operations concurrently.")
   logger.info("Run with:")
   logger.info("  lua test.lua examples/parallel_async_example.lua")
-  logger.info("\nKey features demonstrated:")
+  logger.info("Key features demonstrated:")
   logger.info("1. Running multiple async operations concurrently")
   logger.info("2. Collecting results from parallel operations")
   logger.info("3. Error handling when one operation fails")

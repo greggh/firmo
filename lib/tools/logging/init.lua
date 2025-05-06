@@ -824,13 +824,13 @@ local function log(level, module_name, message, params)
   end
 
   -- Check if this log should be shown (unless it's an expected error with debug override)
-  local has_debug_override = params and params._expected_debug_override
+  local has_debug_override = params and type(params) == "table" and params._expected_debug_override
   if not has_debug_override and not is_enabled(level, module_name) then
     return false
   end
 
   -- Remove internal flag from params if it exists
-  if params and params._expected_debug_override then
+  if params and type(params) == "table" and params._expected_debug_override then
     params._expected_debug_override = nil
   end
 

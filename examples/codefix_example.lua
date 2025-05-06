@@ -10,6 +10,10 @@
 --- - Uses `temp_file` module for automatic cleanup of the temporary directory and files.
 ---
 --- @module examples.codefix_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see lib.tools.codefix
 --- @see lib.core.central_config
 --- @see lib.tools.filesystem.temp_file
@@ -36,20 +40,24 @@ print("Demonstrates finding and fixing Lua code quality issues.")
 
 --- Creates a temporary directory and populates it with example Lua files
 -- containing various code quality issues (unused vars, whitespace, etc.).
--- Register  -- Create a temporary directory, automatically registered for cleanup
-local temp_dir_path, create_err = temp_file.create_temp_directory("codefix_example_")
-if not temp_dir_path then
-  print("ERROR: Failed to create temporary directory: " .. tostring(create_err or "unknown error")) -- Use print
-  return nil, nil
-end
-print("Created temporary example directory: " .. temp_dir_path) -- Use print
+-- @return string|nil temp_dir_path The path to the created temporary directory, or nil on error.
+-- @return table|nil files A list of relative file paths created, or nil on error.
+-- @within examples.codefix_example
+local function create_example_files()
+  -- Create a temporary directory, automatically registered for cleanup
+  local temp_dir_path, create_err = temp_file.create_temp_directory("codefix_example_")
+  if not temp_dir_path then
+    print("ERROR: Failed to create temporary directory: " .. tostring(create_err or "unknown error")) -- Use print
+    return nil, nil
+  end
+  print("Created temporary example directory: " .. temp_dir_path) -- Use print
 
--- Create multiple files with different quality issues
-local files = {}
+  -- Create multiple files with different quality issues
+  local files = {}
 
--- File 1: Unused variables and arguments
-local filename1 = "unused_vars.lua"
-local content1 = [[
+  -- File 1: Unused variables and arguments
+  local filename1 = "unused_vars.lua"
+  local content1 = [[
 -- Example file with unused variables and arguments
 
 local function test_function(param1, param2, param3)
@@ -69,19 +77,19 @@ return {
 }
 ]]
 
-local file_path1 = fs.join_paths(temp_dir_path, filename1)
-local success, err = fs.write_file(file_path1, content1)
-if success then
-  -- No need to register, create_temp_directory handles dir cleanup
-  table.insert(files, filename1)
-  print("Created example file: " .. filename1) -- Use print
-else
-  print("ERROR creating file '" .. filename1 .. "': " .. tostring(err or "unknown error")) -- Use print
-end
+  local file_path1 = fs.join_paths(temp_dir_path, filename1)
+  local success, err = fs.write_file(file_path1, content1)
+  if success then
+    -- No need to register, create_temp_directory handles dir cleanup
+    table.insert(files, filename1)
+    print("Created example file: " .. filename1) -- Use print
+  else
+    print("ERROR creating file '" .. filename1 .. "': " .. tostring(err or "unknown error")) -- Use print
+  end
 
--- File 2: Trailing whitespace and mixed indentation
-local filename2 = "whitespace.lua"
-local content2 = [=[
+  -- File 2: Trailing whitespace and mixed indentation
+  local filename2 = "whitespace.lua"
+  local content2 = [=[
 -- Example file with trailing whitespace issues
 
 local function get_multiline_text()
@@ -106,19 +114,19 @@ return {
 }
 ]=]
 
-local file_path2 = fs.join_paths(temp_dir_path, filename2)
-local success, err = fs.write_file(file_path2, content2)
-if success then
-  -- No need to register file
-  table.insert(files, filename2)
-  print("Created example file: " .. filename2) -- Use print
-else
-  print("ERROR creating file '" .. filename2 .. "': " .. tostring(err or "unknown error")) -- Use print
-end
+  local file_path2 = fs.join_paths(temp_dir_path, filename2)
+  local success, err = fs.write_file(file_path2, content2)
+  if success then
+    -- No need to register file
+    table.insert(files, filename2)
+    print("Created example file: " .. filename2) -- Use print
+  else
+    print("ERROR creating file '" .. filename2 .. "': " .. tostring(err or "unknown error")) -- Use print
+  end
 
--- File 3: String concatenation and potential formatting issues
-local filename3 = "string_concat.lua"
-local content3 = [[
+  -- File 3: String concatenation and potential formatting issues
+  local filename3 = "string_concat.lua"
+  local content3 = [[
 -- Example file with string concatenation issues
 
 local function build_message(name, age)
@@ -137,22 +145,23 @@ return {
 }
 ]]
 
-local file_path3 = fs.join_paths(temp_dir_path, filename3)
-local success, err = fs.write_file(file_path3, content3)
-if success then
-  -- No need to register file
-  table.insert(files, filename3)
-  print("Created example file: " .. filename3) -- Use print
-else
-  print("ERROR creating file '" .. filename3 .. "': " .. tostring(err or "unknown error")) -- Use print
-end
+  local file_path3 = fs.join_paths(temp_dir_path, filename3)
+  local success, err = fs.write_file(file_path3, content3)
+  if success then
+    -- No need to register file
+    table.insert(files, filename3)
+    print("Created example file: " .. filename3) -- Use print
+  else
+    print("ERROR creating file '" .. filename3 .. "': " .. tostring(err or "unknown error")) -- Use print
+  end
 
--- Only return if directory creation was successful
-if #files == 3 then -- Check if all files were intended to be created
-  return temp_dir_path, files
-else
-  return nil, nil -- Indicate failure
-end
+  -- Only return if directory creation was successful
+  if #files == 3 then -- Check if all files were intended to be created
+    return temp_dir_path, files
+  else
+    return nil, nil -- Indicate failure
+  end
+end -- Added missing end for create_example_files
 
 --- Runs various codefix operations (`run_cli("find", ...)`, `fix_lua_files()`) on the
 -- files within the temporary directory and displays the results and fixed content.
@@ -174,22 +183,11 @@ local function run_multi_file_codefix(temp_dir_path, relative_files)
   })
   central_config.set("codefix.stylua.enabled", true) -- Ensure stylua is enabled
 
-  -- 1. Demonstrate the find functionality via run_cli
-  print("\n1. Finding Lua files using run_cli('find', ...):") -- Use print
-  print(string.rep("-", 60))
-  -- The `find` command prints results directly to stdout when verbose is enabled.
-  local find_success = firmo.codefix.run_cli({ "find", temp_dir_path, "--include", "%.lua$" })
-  if not find_success then
-    print("ERROR: codefix 'find' command failed")
-  end
-
-  -- 2. Demonstrate directory-based fixing using fix_lua_files()
-  print("\n2. Running fix_lua_files() on directory with report generation:") -- Use print
+  -- 1. Demonstrate directory-based fixing using fix_lua_files()
+  print("\n1. Running fix_lua_files() on directory with report generation:") -- Use print
   print(string.rep("-", 60))
   local report_path = fs.join_paths(temp_dir_path, "codefix_report.json")
   local options = {
-    sort_by_mtime = true,
-    generate_report = true,
     sort_by_mtime = true, -- Example option
     generate_report = true,
     report_file = report_path,
@@ -204,8 +202,8 @@ local function run_multi_file_codefix(temp_dir_path, relative_files)
     print("\n❌ Directory check/fix failed or had errors via fix_lua_files().")
   end
 
-  -- 3. Display summary results from fix_lua_files() return value
-  print("\n3. Summary of fix_lua_files() results:") -- Use print
+  -- 2. Display summary results from fix_lua_files() return value
+  print("\n2. Summary of fix_lua_files() results:") -- Use print
   print(string.rep("-", 60))
   for _, result in ipairs(dir_results or {}) do
     local path = result.file
@@ -213,8 +211,8 @@ local function run_multi_file_codefix(temp_dir_path, relative_files)
       print("  - Fixed/Checked:", path)
     elseif result.error then
       print("  - Error:", path, "(", result.error, ")")
-    elseif result.error then
-      print(string.format("  - ❌ Error fixing %s: %s", path, tostring(result.error)))
+      -- Removed duplicate error check condition
+      -- print(string.format("  - ❌ Error fixing %s: %s", path, tostring(result.error)))
     elseif result.skipped then
       print(string.format("  - ⏩ Skipped %s: %s", path, result.reason or "No reason given"))
     else
@@ -226,7 +224,6 @@ local function run_multi_file_codefix(temp_dir_path, relative_files)
   print("\n--- Content of files AFTER codefix ---") -- Use print
   for _, rel_filename in ipairs(relative_files) do
     local abs_filename = fs.join_paths(temp_dir_path, rel_filename)
-    print("\nFile: " .. abs_filename)
     print("\n--- File: " .. rel_filename .. " ---")
     print(string.rep("-", 40))
     local content, read_err = fs.read_file(abs_filename)
@@ -238,9 +235,9 @@ local function run_multi_file_codefix(temp_dir_path, relative_files)
     print(string.rep("-", 40))
   end
 
-  -- 4. Display the generated JSON report file content
+  -- 3. Display the generated JSON report file content
   if options.generate_report and options.report_file and fs.file_exists(options.report_file) then
-    print("\n4. Content of Generated Report (" .. options.report_file .. "):") -- Use print
+    print("\n3. Content of Generated Report (" .. options.report_file .. "):") -- Use print
     print(string.rep("-", 60))
     local report_content, report_read_err = fs.read_file(options.report_file)
     if report_content then
@@ -264,7 +261,5 @@ end
 
 print("\n--- Codefix Example Complete ---") -- Use print
 
--- Cleanup is handled automatically by temp_file module if files/dirs were registered.
--- Explicitly calling cleanup_all() ensures cleanup even if run outside test runner.
-temp_file.cleanup_all()
-print("Temporary files and directories cleaned up.") -- Use print
+-- Cleanup is handled automatically by temp_file module as the directory was created via create_temp_directory.
+print("Temporary files and directories will be cleaned up automatically.") -- Use print

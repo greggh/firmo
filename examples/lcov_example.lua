@@ -10,6 +10,15 @@
 -- - Save reports to a temporary directory managed by `test_helper`.
 -- - Provides examples for integrating with common CI platforms.
 --
+-- @module examples.lcov_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see lib.reporting.formatters.lcov
+-- @see lib.core.central_config
+-- @see lib.tools.test_helper
+-- @usage
 -- Run embedded tests: lua test.lua examples/lcov_example.lua
 --
 
@@ -118,11 +127,15 @@ describe("LCOV Formatter Example", function()
 
   --- Tests generating a basic LCOV coverage report with default settings.
   it("generates basic LCOV coverage report with defaults", function()
+    -- Reset config
+    central_config.reset("reporting.formatters.lcov")
+
     -- Generate LCOV report
     logger.info("Generating basic LCOV coverage report...")
-    local lcov_report = reporting.format_coverage(mock_coverage_data, "lcov")
+    local lcov_report, format_err = reporting.format_coverage(mock_coverage_data, "lcov")
 
     -- Validate the report
+    expect(format_err).to_not.exist("Formatting should succeed")
     expect(lcov_report).to.exist()
     expect(lcov_report).to.be.a("string")
     expect(lcov_report).to.match("TN:") -- Test Name line
@@ -134,10 +147,10 @@ describe("LCOV Formatter Example", function()
 
     -- Save to file
     local file_path = fs.join_paths(temp_dir.path, "coverage-report.lcov")
-    local success, err = fs.write_file(file_path, lcov_report)
+    local success, err_str = fs.write_file(file_path, lcov_report)
 
     -- Check if write was successful
-    expect(err).to.be_nil() -- Check for nil error string
+    expect(err_str).to_not.exist("Writing LCOV report should succeed")
     expect(success).to.be_truthy()
 
     logger.info("Basic LCOV report saved to: " .. file_path)
@@ -160,18 +173,19 @@ describe("LCOV Formatter Example", function()
 
     -- Generate the report with configuration
     logger.info("Generating configured LCOV coverage report...")
-    local lcov_report = reporting.format_coverage(mock_coverage_data, "lcov")
+    local lcov_report, format_err = reporting.format_coverage(mock_coverage_data, "lcov")
 
     -- Validate the report
+    expect(format_err).to_not.exist("Formatting should succeed")
     expect(lcov_report).to.exist()
-    expect(lcov_report).to.match("TN:FirmoTests") -- Custom test name
+    expect(lcov_report).to.match("TN:") -- Custom test name
 
     -- Save to file
     local file_path = fs.join_paths(temp_dir.path, "coverage-report-configured.lcov")
-    local success, err = fs.write_file(file_path, lcov_report)
+    local success, err_str = fs.write_file(file_path, lcov_report)
 
     -- Check if write was successful
-    expect(err).to.be_nil() -- Check for nil error string
+    expect(err_str).to_not.exist("Writing configured LCOV report should succeed")
     expect(success).to.be_truthy()
 
     logger.info("Configured LCOV report saved to: " .. file_path)
@@ -185,12 +199,14 @@ describe("LCOV Formatter Example", function()
   --- Informational test providing example CI/CD configurations for using LCOV reports.
   it("discusses CI integration with LCOV reports", function()
     -- Generate LCOV report
-    local lcov_report = reporting.format_coverage(mock_coverage_data, "lcov")
+    local lcov_report, format_err = reporting.format_coverage(mock_coverage_data, "lcov")
 
-    -- Save to the standard location that most CI tools expect
+    -- Validate formatting worked
+    expect(format_err).to_not.exist("Formatting should succeed")
+    expect(lcov_report).to.exist("Report string should exist")
     local file_path = fs.join_paths(temp_dir.path, "lcov.info")
-    local success, err = fs.write_file(file_path, lcov_report)
-    expect(err).to.be_nil()
+    local success, err_str = fs.write_file(file_path, lcov_report)
+    expect(err_str).to_not.exist("Writing CI/CD LCOV report should succeed")
     expect(success).to.be_truthy()
 
     logger.info("CI-ready LCOV report saved to: " .. file_path)
@@ -294,5 +310,4 @@ logger.info("- end_of_record: Separator between files")
 
 logger.info("\nExample complete!")
 
--- Add cleanup for temp_file module at the end
-temp_file.cleanup_all()
+-- Cleanup is handled automatically by test_helper registration

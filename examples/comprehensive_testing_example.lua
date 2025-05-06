@@ -12,6 +12,10 @@
 --- - Applying JSDoc for documentation.
 ---
 --- @module examples.comprehensive_testing_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see firmo
 --- @see lib.tools.test_helper
 --- @see lib.tools.error_handler
@@ -68,14 +72,14 @@ FileProcessor.__index = FileProcessor -- Allow method calls using ':'
 --- Initializes configuration from `central_config` (if `file_processor` key exists) or uses defaults.
 --- @return FileProcessor processor The new FileProcessor instance.
 function FileProcessor:new()
-  local cfg = central_config.get() -- Corrected function call
+  local cfg = central_config.get()
   local default_exts = cfg.file_processor and cfg.file_processor.allowed_extensions or { "lua", "txt", "json" }
 
-  local self = setmetatable({}, FileProcessor) -- Set metatable for ':' syntax
+  local self = setmetatable({}, { __index = FileProcessor }) -- Corrected metatable setup
 
   -- Internal state
   self._files = {}
-  local _config = {
+  self._config = { -- Assign to self._config instead of local _config
     max_file_size = cfg.file_processor and cfg.file_processor.max_file_size or 1024 * 1024, -- 1MB default
     allowed_extensions = {}, -- Initialize empty, populate below
   }
@@ -192,10 +196,9 @@ function FileProcessor:add_file(file_path)
   -- Add file to internal tracking
   table.insert(self._files, {
     path = file_path,
-    path = file_path,
     size = size,
-    added_at = 0, -- Placeholder timestamp -- Added missing comma
-  }) -- Closing parenthesis for table.insert
+    added_at = os.time(), -- Placeholder timestamp
+  })
 
   return true
 end
@@ -287,8 +290,6 @@ describe("FileProcessor", function()
   local test_dir
   local test_files = {}
 
-  local test_files = {} -- Keep track of manually created files if needed (test_dir helper often sufficient)
-
   --- Setup function executed before each `it` block in this suite.
   -- Creates a fresh FileProcessor instance and a temporary test directory.
   before(function()
@@ -378,7 +379,7 @@ describe("FileProcessor", function()
 
       -- Create a large file that exceeds the limit
       local large_content = string.rep("x", processor._config.max_file_size + 100)
-      test_dir.create_file("large.txt", large_content)
+      test_dir:create_file("large.txt", large_content)
     end)
 
     --- Tests that a file with an allowed extension and valid size is added successfully.
@@ -480,8 +481,9 @@ describe("FileProcessor", function()
 
       expect(results).to_not.exist()
       expect(err).to.exist()
-      expect(err.category).to.equal(error_handler.CATEGORY.VALIDATION)
-      expect(err.message).to.match("No files have been added")
+      expect(err.cause.category).to.equal(error_handler.CATEGORY.VALIDATION) -- Check original error category
+      expect(err.message).to.equal("Expected error returned by function") -- Check wrapper message
+      expect(err.cause.message).to.match("No files have been added") -- Check original message in cause
     end)
   end)
 
@@ -497,8 +499,8 @@ describe("FileProcessor", function()
 
     --- Tests that `:reset()` clears the internal file queue.
     it("should clear the file list on reset", function()
-      -- Verify file was initially added
-      expect(#processor._files).to.equal(1)
+      -- Verify files were initially added (includes files from outer 'before' hooks)
+      expect(#processor._files).to.equal(3)
 
       -- Reset the processor
       local success = processor:reset()

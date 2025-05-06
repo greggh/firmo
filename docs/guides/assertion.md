@@ -187,7 +187,45 @@ assertion.expect("2022-12-31").to.be_before("2023-01-01")
 assertion.expect("2023-01-01T10:00:00Z").to.be_same_day_as("2023-01-01T15:30:00Z")
 ```
 
+### Advanced Pattern Matching
 
+For more complex pattern matching needs, the assertion module provides several enhanced matching methods:
+
+```lua
+-- Using match_with_options for case-insensitive matching
+expect("Hello World").to.match_with_options("hello", { case_insensitive = true })
+
+-- Match the entire string with match.fully
+expect("abc123").to.match.fully("%a+%d+") -- Matches
+expect("abc123def").to_not.match.fully("%a+%d+") -- Fails, needs to match entire string
+
+-- Match any of multiple patterns with match.any_of
+expect("123").to.match.any_of({ "%a+", "%d+", "%p+" })
+expect("abc123").to_not.match.any_of({ "%a+$", "%p+$" })
+
+-- Match all of multiple patterns with match.all_of
+expect("Password123!").to.match.all_of({ "%a", "%d", "%p" })
+expect("abc").to_not.match.all_of({ "%a", "%d" })
+```
+
+### Date Assertions
+
+Test date strings with specialized date assertions:
+
+```lua
+-- Basic date validation
+assertion.expect("2023-05-01").to.be_date()
+-- ISO date validation
+assertion.expect("2023-05-01T12:34:56Z").to.be_iso_date()
+-- Date comparison
+assertion.expect("2023-01-01").to.be_after("2022-12-31")
+assertion.expect("2022-12-31").to.be_before("2023-01-01")
+-- Check if dates represent the same calendar day
+assertion.expect("2023-01-01T10:00:00Z").to.be_same_day_as("2023-01-01T15:30:00Z")
+-- Check if a date is within a range
+assertion.expect("2023-05-15").to.be_between_dates("2023-05-01", "2023-05-31")
+assertion.expect("2023-05-01").to.be_between_dates("2023-05-01", "2023-05-31", true) -- Inclusive by default
+```
 
 ### Async Assertions
 

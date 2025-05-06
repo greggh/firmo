@@ -11,6 +11,10 @@
 --- - Testing for expected errors using `test_helper.with_error_capture` and the `expect_error` option.
 ---
 --- @module examples.basic_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see firmo
 --- @see lib.tools.test_helper
 --- @see lib.tools.error_handler
@@ -91,14 +95,14 @@ describe("Calculator", function()
     -- Use structured logging
     logger.info("Setting up test for calculator", { module = "calculator" })
   end)
-  -- Removed extra end)
 
   --- Teardown function that runs after each `it` block within this `describe` block.
   after(function()
     logger.info("Cleaning up test for calculator", { module = "calculator" })
-  end) -- Added missing end)
+  end)
 
   --- Groups tests related to basic arithmetic operations.
+  --- @summary Tests for addition, subtraction, and multiplication.
   --- @within examples.basic_example
   describe("Basic Operations", function()
     --- Tests for the addition functionality.

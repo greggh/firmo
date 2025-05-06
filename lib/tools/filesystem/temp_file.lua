@@ -129,6 +129,7 @@ end
 ---@param file_path string Path to the file to register.
 ---@return string registered_path The `file_path` passed in.
 function M.register_file(file_path)
+  get_logger().trace("Inside temp_file.register_file", { received_path = file_path })
   get_logger().debug("Registering file", { path = file_path })
 
   -- Create simple string context to avoid complex objects

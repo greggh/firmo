@@ -9,12 +9,24 @@
 --- @copyright 2023-2025
 --- @version 1.0.0
 
+
+-- Local helper for safe requires without dependency on error_handler
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
 ---@class CoverageFormatters The public API for the coverage formatter registry.
 ---@field _VERSION string Version of this module.
 ---@field html table HTML formatter module (`lib.reporting.formatters.html`).
 ---@field lcov table LCOV formatter module (`lib.reporting.formatters.lcov`).
 ---@field json table JSON formatter module (`lib.reporting.formatters.json`).
 ---@field cobertura table Cobertura formatter module (`lib.reporting.formatters.cobertura`).
+---@field junit table JUnit formatter module (`lib.reporting.formatters.junit`).
 ---@field get_formatter fun(format: string): table|nil Gets a specific formatter module by its name (e.g., "html", "lcov").
 ---@field get_available_formats fun(): string[] Gets a sorted list of available formatter names.
 local M = {}
@@ -27,6 +39,7 @@ M.html = try_require("lib.reporting.formatters.html")
 M.lcov = try_require("lib.reporting.formatters.lcov")
 M.json = try_require("lib.reporting.formatters.json")
 M.cobertura = try_require("lib.reporting.formatters.cobertura")
+M.junit = try_require("lib.reporting.formatters.junit")
 
 -- Formatter mapping (for name lookup)
 local formatters = {
@@ -34,6 +47,7 @@ local formatters = {
   lcov = M.lcov,
   json = M.json,
   cobertura = M.cobertura,
+  junit = M.junit,
 }
 
 --- Gets a formatter by name

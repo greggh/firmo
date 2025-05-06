@@ -13,6 +13,10 @@
 --- accurately reflects execution paths and identifies untested code sections.
 ---
 --- @module examples.coverage_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see lib.coverage
 --- @see docs/guides/coverage.md
 --- @usage

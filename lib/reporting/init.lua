@@ -197,7 +197,7 @@ local DEFAULT_CONFIG = {
     junit = {
       schema_version = "2.0",
       include_timestamps = true,
-      include_hostname = true,
+      include_hostname = false, -- Prevent errors if hostname command fails
       include_properties = true, -- Include properties in report
       format_stack_traces = true, -- Format stack traces for readability
       use_cdata = true, -- Use CDATA sections for message content
@@ -1540,6 +1540,7 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
     has_data = true,
     validate = options.validate ~= false, -- Default to validate=true
   })
+  get_logger().trace("Inside save_coverage_report, before validation", { format=format, file_path=file_path })
 
   -- CRITICAL FIX: Check for minimal valid data structure before proceeding
   if not coverage_data.files or not coverage_data.summary then
@@ -1650,6 +1651,7 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
     end
   end
 
+  get_logger().trace("Inside save_coverage_report, before format call", { format=format, file_path=file_path })
   -- Format the coverage data with error handling
   ---@diagnostic disable-next-line: unused-local
   local format_success, formatted, format_err = get_error_handler().try(function()
@@ -1971,6 +1973,7 @@ end
 ---@return table<string, {success: boolean, error?: table, path: string}> results A summary table mapping report format/type (e.g., "html", "lcov", "quality_json") to its save result (`{success, error?, path}`).
 ---@throws table If ensuring the base report directory exists fails critically.
 function M.auto_save_reports(coverage_data, quality_data, results_data, options)
+  get_logger().trace("Inside auto_save_reports", { has_coverage = coverage_data ~= nil, has_quality = quality_data ~= nil, has_results = results_data ~= nil })
   -- Handle both string (backward compatibility) and table options
   local config = {}
 
@@ -2184,6 +2187,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     })
   end
 
+  get_logger().trace("Processing coverage reports loop")
   -- Always save coverage reports in multiple formats if coverage data is provided
   if coverage_data then
     -- Prepare validation options
@@ -2250,13 +2254,16 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     })
 
     for _, format in ipairs(formats) do
+      get_logger().trace("Processing coverage format", { format = format })
       local path = process_template(config.coverage_path_template, format, "coverage")
+      get_logger().trace("Calculated coverage path", { format = format, path = path })
 
       get_logger().debug("Saving coverage report", {
         format = format,
         path = path,
       })
 
+      get_logger().trace("Calling save_coverage_report", { format = format, path = path })
       local ok, err = M.save_coverage_report(path, coverage_data, format, validation_options)
       results[format] = {
         success = ok,

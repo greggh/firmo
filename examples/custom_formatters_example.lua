@@ -13,6 +13,10 @@
 --- - Discussing how custom formatters might be loaded dynamically using `--load-formatters`.
 ---
 --- @module examples.custom_formatters_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see lib.reporting
 --- @see lib.tools.filesystem.temp_file
 --- @usage
@@ -55,7 +59,12 @@ custom_formatters.coverage.markdown = function(coverage_data)
   local markdown = "# Coverage Report (Custom Markdown)\n\n"
   markdown = markdown .. "## Summary\n\n"
 
-  -- Get data from the coverage report
+  -- Check for valid input
+  if not coverage_data then
+    return "# Coverage Report (Custom Markdown)\n\nError: No coverage data provided."
+  end
+
+  -- Get data from the coverage report, providing defaults
   local summary = coverage_data.summary
     or {
       total_files = 0,
@@ -97,7 +106,7 @@ custom_formatters.coverage.markdown = function(coverage_data)
   -- Add each file
   for file, stats in pairs(coverage_data.files or {}) do
     -- Calculate percentages
-    local line_pct = stats.total_lines > 0 and ((stats.covered_lines or 0) / stats.total_lines * 100) or 0
+    local line_pct = stats.executable_lines > 0 and ((stats.covered_lines or 0) / stats.executable_lines * 100) or 0
     local func_pct = stats.total_functions > 0 and ((stats.covered_functions or 0) / stats.total_functions * 100) or 0
 
     -- Add to table
@@ -107,7 +116,7 @@ custom_formatters.coverage.markdown = function(coverage_data)
       .. "` | "
       .. stats.covered_lines
       .. "/"
-      .. stats.total_lines
+      .. stats.executable_lines -- Use executable lines as denominator
       .. " ("
       .. string.format("%.2f%%", line_pct)
       .. ") | "
@@ -118,7 +127,6 @@ custom_formatters.coverage.markdown = function(coverage_data)
       .. string.format("%.2f%%", func_pct)
       .. ") |\n"
   end
-  -- Removed misplaced 'end' here
 
   -- Add timestamp
   markdown = markdown .. "\n\n*Report generated on 2025-01-01T00:00:00Z*" -- Static timestamp
@@ -261,9 +269,6 @@ else
   -- Save the generated report to a file in the temporary directory
   local report_path = fs.join_paths(temp_dir, "custom-test-report.md") -- Use temp_dir directly
   local success, write_err = fs.write_file(report_path, markdown_report)
-  if not success then
-    logger.error("Failed to write custom markdown report", { error = write_err })
-  end
   -- Show output path
   if success then
     logger.info("\nGenerated custom markdown report: " .. report_path)
@@ -273,8 +278,7 @@ end
 logger.info("\nUsage with command line (hypothetical):")
 logger.info("lua test.lua --load-formatters examples/custom_formatters_example.lua --format=markdown")
 
--- Clean up temporary files
-temp_file.cleanup_all()
+-- Cleanup is handled automatically by temp_file registration
 
 -- Return the module so we can be loaded as a formatter module (if needed)
 return custom_formatters

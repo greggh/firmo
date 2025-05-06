@@ -1,17 +1,24 @@
---- html_report_example.lua
---
--- This example demonstrates generating HTML format test result reports using
--- Firmo's reporting module, specifically focusing on the `auto_save_reports`
--- function and configuring HTML options via `central_config`.
+--- This example demonstrates generating JUnit XML format test result reports using
+--- Firmo's reporting module, specifically focusing on the `auto_save_reports`
+-- function and configuring JUnit options via `central_config`.
 --
 -- It shows:
--- - Generating an HTML report using `reporting.auto_save_reports`.
+-- - Generating a JUnit XML report using `reporting.auto_save_reports`.
 -- - Passing mock test result data to the function.
--- - Configuring HTML-specific options (theme, title) within the `auto_save_reports` call.
--- - Using `test_helper` to manage the temporary output directory.
---
--- Run embedded tests: lua test.lua examples/html_report_example.lua
---
+-- - Configuring JUnit-specific options within the `auto_save_reports` call.
+--- - Using `test_helper` to manage the temporary output directory.
+---
+--- @module examples.junit_report_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+--- @see lib.reporting
+--- @see lib.reporting.formatters.junit
+--- @see lib.tools.test_helper
+--- @usage
+--- Run embedded tests: lua test.lua examples/junit_report_example.lua
+---
 
 -- Extract the testing functions we need
 local firmo = require("firmo")
@@ -33,7 +40,7 @@ local logging = require("lib.tools.logging")
 local temp_file = require("lib.tools.filesystem.temp_file") -- For cleanup
 
 -- Setup logger
-local logger = logging.get_logger("HTMLReportExample")
+local logger = logging.get_logger("JUnitReportExample")
 
 -- Mock test results data structure for demonstration.
 --- @class MockTestResults
@@ -45,9 +52,20 @@ local logger = logging.get_logger("HTMLReportExample")
 --- @field skipped number Number of tests that were skipped.
 --- @field time number Total execution time in seconds.
 --- @field test_cases TestCaseData[] An array of individual test case results.
---- @within examples.html_report_example
+--- @within examples.junit_report_example
+
+--- @class TestCaseData
+--- @field name string Name of the test case.
+--- @field classname string Name of the test suite/class containing the test.
+--- @field time number Execution time for this test case in seconds.
+--- @field status "pass"|"fail"|"error"|"skipped"|"pending" The status of the test.
+--- @field failure? { message: string, type: string, details?: string } Failure details if status is "fail".
+--- @field error? { message: string, type: string, details?: string } Error details if status is "error".
+--- @field skip_message? string Reason for skipping if status is "skipped".
+--- @within examples.junit_report_example
+
 local test_results = {
-  name = "HTML Report Example",
+  name = "JUnit Report Example",
   timestamp = "2025-01-01T00:00:00Z", -- Static timestamp
   tests = 8,
   failures = 1,
@@ -125,9 +143,9 @@ local test_results = {
   },
 }
 
---- Test suite demonstrating HTML report generation for test results using `auto_save_reports`.
---- @within examples.html_report_example
-describe("HTML Report Generator", function()
+--- Test suite demonstrating JUnit XML report generation for test results using `auto_save_reports`.
+--- @within examples.junit_report_example
+describe("JUnit Report Generator", function()
   local temp_dir -- Stores the temporary directory helper object
 
   --- Setup hook: Create a temporary directory for the report.
@@ -140,38 +158,39 @@ describe("HTML Report Generator", function()
     temp_dir = nil
   end)
 
-  --- Tests generating an HTML report using `reporting.auto_save_reports` and custom configuration.
-  it("generates HTML report using auto_save_reports with custom config", function()
-    -- Configure HTML report options
+  --- Tests generating a JUnit XML report using `reporting.auto_save_reports` and custom configuration.
+  it("generates test results report using auto_save_reports with custom config", function()
+    -- Configure report options based on the documentation
     local config = {
       report_dir = temp_dir.path,
-      formats = { "html" }, -- Only generate HTML
-      results_path_template = "test-results-{format}", -- Custom filename pattern
-      html = {
-        theme = "dark",
-        title = "HTML Test Results",
-        syntax_highlighting = false, -- Example: disable syntax highlighting
+      formats = {
+        results = {
+          default = "junit"  -- Just set the default format for results
+        }
       },
+      formatters = {
+        junit = {  -- JUnit-specific config
+          include_timestamps = true,
+          include_properties = true
+        }
+      }
     }
 
-    -- Save HTML report using auto_save_reports
-    -- Pass nil for coverage/quality data, pass test_results data, pass config
-    logger.info("Generating HTML report using auto_save_reports...")
+    logger.info("Generating JUnit test results report using auto_save_reports...")
     local results = reporting.auto_save_reports(nil, nil, test_results, config)
 
-    -- Verify the HTML report was created successfully
-    expect(results.html).to.exist("HTML results entry should exist")
-    expect(results.html.success).to.be_truthy("HTML report saving should succeed")
-    expect(results.html.path).to.be.a("string", "HTML report path should be returned")
+    -- Verify the results
+    expect(results.junit).to.exist("JUnit results entry should exist")
+    expect(results.junit.success).to.be_truthy("JUnit report saving should succeed")
+    expect(results.junit.path).to.be.a("string", "JUnit report path should be returned")
 
-    if results.html.success then
-      logger.info("HTML report generation successful.")
-      logger.info("Report saved to: " .. results.html.path)
+    if results.junit.success then
+      logger.info("JUnit report generation successful.")
+      logger.info("Report saved to: " .. results.junit.path)
     else
-      logger.error("Failed to generate HTML report", { error = results.html.error })
+      logger.error("Failed to generate JUnit report", { error = results.junit.error })
     end
   end)
 end)
 
--- Add cleanup for temp_file module at the end
-temp_file.cleanup_all()
+-- Cleanup is handled automatically by test_helper registration

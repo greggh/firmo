@@ -1,7 +1,5 @@
---- json_example.lua
---
--- This file demonstrates two primary aspects related to JSON in Firmo:
---
+--- This file demonstrates two primary aspects related to JSON in Firmo:
+---
 -- 1.  **JSON Coverage Report Formatter:** It shows how to generate JSON format
 --     coverage reports using `reporting.format_coverage`, configure options like
 --     pretty printing via `central_config`, and save the output using `test_helper`
@@ -11,6 +9,14 @@
 --     JSON strings back into Lua tables (`json.decode`), including file I/O and
 --     error handling.
 --
+-- @module examples.json_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see lib.reporting.formatters.json
+-- @see lib.tools.json
+-- @usage
 -- Run embedded tests (Part 1): lua test.lua examples/json_example.lua
 -- Run procedural example (Part 2): lua examples/json_example.lua
 --
@@ -39,7 +45,44 @@ local json = require("lib.tools.json") -- Added for Part 2
 local logger = logging.get_logger("JSONExample")
 
 -- Create mock coverage data (consistent with other examples, using execution_count)
---- @type MockCoverageData (See csv_example.lua for full definition)
+--- Mock coverage data structure for demonstration.
+--- @class MockCoverageData
+--- @field files table<string, FileCoverageData> Coverage data per file.
+--- @field summary CoverageSummaryData Overall summary statistics.
+--- @within examples.json_example
+
+--- @class FileCoverageData
+--- @field lines table<number, { execution_count: number }> Line coverage data (keys are line numbers).
+--- @field functions table<string, FunctionCoverageData> Function coverage data.
+--- @field total_lines number Total lines in the file.
+--- @field executable_lines number Total executable lines.
+--- @field covered_lines number Total covered executable lines.
+--- @field total_functions number Total functions defined.
+--- @field covered_functions number Total covered functions.
+--- @field line_coverage_percent number Percentage of lines covered.
+--- @field function_coverage_percent number Percentage of functions covered.
+--- @field line_rate number Line coverage rate (0.0 to 1.0).
+--- @field filename string Path to the file.
+--- @within examples.json_example
+
+--- @class FunctionCoverageData
+--- @field name string Function name.
+--- @field execution_count number How many times the function was entered.
+--- @within examples.json_example
+
+--- @class CoverageSummaryData
+--- @field total_files number Total files processed.
+--- @field covered_files number Files with > 0% coverage.
+--- @field total_lines number Total lines across all files.
+--- @field executable_lines number Total executable lines.
+--- @field covered_lines number Total covered executable lines.
+--- @field total_functions number Total functions.
+--- @field covered_functions number Total covered functions.
+--- @field line_coverage_percent number Overall line coverage percentage.
+--- @field function_coverage_percent number Overall function coverage percentage.
+--- @field overall_percent number Overall coverage percentage.
+--- @within examples.json_example
+
 local mock_coverage_data = {
   files = {
     ["src/calculator.lua"] = {
@@ -104,43 +147,32 @@ local mock_coverage_data = {
 -- ============================================================
 -- PART 1: JSON Coverage Formatter Example (using Firmo tests)
 -- ============================================================
-
--- ============================================================
--- PART 1: JSON Coverage Formatter Example (using Firmo tests)
--- ============================================================
+local temp_dir = test_helper.create_temp_test_directory()
 
 --- Test suite demonstrating the JSON coverage report formatter.
 --- @within examples.json_example
 describe("JSON Coverage Formatter Example", function()
-  local temp_dir -- Stores the temporary directory helper object
-
-  --- Setup hook: Create a temporary directory for reports.
-  before(function()
-    temp_dir = test_helper.create_temp_test_directory()
-  end)
-
-  --- Teardown hook: Release reference. Directory cleaned automatically.
-  after(function()
-    temp_dir = nil
-  end)
-
   --- Tests generating a basic JSON coverage report with default settings.
   it("generates basic JSON coverage report with defaults", function()
+    -- Reset config to ensure defaults
+    central_config.reset("reporting.formatters.json")
+
     -- Generate JSON report
     logger.info("Generating basic JSON coverage report...")
-    local json_report = reporting.format_coverage(mock_coverage_data, "json")
+    local json_report, format_err = reporting.format_coverage(mock_coverage_data, "json")
 
     -- Validate the report
+    expect(format_err).to_not.exist("Formatting should succeed")
     expect(json_report).to.exist()
     expect(json_report).to.be.a("string")
     expect(json_report).to.match('"overall_percent":')
 
     -- Save to file
     local file_path = fs.join_paths(temp_dir.path, "coverage-report.json")
-    local success, err = fs.write_file(file_path, json_report)
+    local success, err_str = fs.write_file(file_path, json_report)
 
     -- Check if write was successful
-    expect(err).to.be_nil() -- Check for nil error string
+    expect(err_str).to_not.exist("Writing JSON report should succeed")
     expect(success).to.be_truthy()
 
     logger.info("Basic JSON report saved to: " .. file_path)
@@ -163,18 +195,19 @@ describe("JSON Coverage Formatter Example", function()
 
     -- Generate the report with configuration
     logger.info("Generating configured JSON coverage report...")
-    local json_report = reporting.format_coverage(mock_coverage_data, "json")
+    local json_report, format_err = reporting.format_coverage(mock_coverage_data, "json")
 
     -- Validate the report
+    expect(format_err).to_not.exist("Formatting should succeed")
     expect(json_report).to.exist()
     expect(json_report).to.match("\n  ") -- Should have indentation due to pretty=true
 
     -- Save to file
     local file_path = fs.join_paths(temp_dir.path, "coverage-report-pretty.json")
-    local success, err = fs.write_file(file_path, json_report)
+    local success, err_str = fs.write_file(file_path, json_report)
 
     -- Check if write was successful
-    expect(err).to.be_nil() -- Check for nil error string
+    expect(err_str).to_not.exist("Writing pretty JSON report should succeed")
     expect(success).to.be_truthy()
 
     logger.info("Pretty-printed JSON report saved to: " .. file_path)
@@ -186,15 +219,51 @@ describe("JSON Coverage Formatter Example", function()
   end)
 
   --- Informational test discussing potential use cases for the generated JSON data.
-  it("discusses parsing and using the JSON data", function()
-    -- Generate JSON report
-    local json_report = reporting.format_coverage(mock_coverage_data, "json")
+  it("discusses parsing and using the JSON data", { expect_error = true }, function()
+    -- First verify our mock data structure
+    expect(mock_coverage_data.files).to.exist("Mock data should have files")
+    expect(mock_coverage_data.summary).to.exist("Mock data should have summary")
+    
+    -- Format the data with verbose output
+    logger.info("Mock coverage data sample:", json.encode(mock_coverage_data, { pretty = true }))
 
-    -- Parse the JSON back to a Lua table (simulated)
-    -- In a real application, you would use a JSON parser like dkjson or lunajson
-    -- In a real application, you would use a JSON parser like dkjson or lunajson
-    logger.info("In a real application, you could parse the JSON back to a Lua table")
-    logger.info("and perform further analysis or display it in a custom UI.")
+    -- Generate JSON report with error handling
+    local json_report = reporting.format_coverage(mock_coverage_data, "json")
+    expect(json_report).to.exist()
+    
+    -- Capture and check that the decode succeeds
+    local result, err = test_helper.with_error_capture(function()
+      return json.decode(json_report)
+    end)()
+
+    -- Verify we got valid data back
+    expect(err).to_not.exist("JSON decode should succeed")
+    expect(result).to.be.a("table")
+    expect(result.files).to.exist("Decoded data should have files")
+    expect(result.summary).to.exist("Decoded data should have summary")
+    
+    -- If we got here, the test is passing - log some helpful info about the data
+    logger.info("Successfully decoded JSON report")
+    logger.info("Report contains data for " .. result.summary.total_files .. " files")
+    logger.info("Overall coverage: " .. result.summary.line_coverage_percent .. "%")
+    -- Show how to use the data in practical applications
+    logger.info("\nExample uses of JSON coverage data:")
+    logger.info("1. Generate custom reports or visualizations")
+    logger.info("2. Integrate with CI/CD pipelines")
+    logger.info("3. Store in databases for historical tracking")
+    logger.info("4. Calculate delta coverage between runs")
+    
+    -- Verify specific values from the JSON structure
+    expect(result.metadata.tool).to.equal("Firmo Coverage")
+    expect(result.metadata.format).to.equal("json")
+    
+    -- List the files found in the report
+    logger.info("\nFiles in coverage report:")
+    for file_path, file_data in pairs(result.files) do
+      logger.info("  - " .. file_path .. ": " .. file_data.line_coverage_percent .. "% covered")
+    end
+
+    logger.info("Successfully decoded the generated JSON report back into a Lua table.")
 
     -- Example of how you might use the JSON data
     logger.info("\nExample use cases for JSON coverage data:")
@@ -219,7 +288,10 @@ logger.info("This section demonstrates direct usage of the lib.tools.json module
 -- and decoding it back using `json.decode()`.
 --- @within examples.json_example
 print("\nExample 1: Basic Encoding/Decoding")
-logger.info("----------------------------------")
+
+--- Demonstrates basic encoding of a Lua table to a JSON string using `json.encode()`
+-- and decoding it back using `json.decode()`.
+--- @within examples.json_example
 
 local data = {
   name = "test",
@@ -228,11 +300,11 @@ local data = {
 }
 
 local json_str = json.encode(data)
-print("Original data:", logging.format_value(data))
+print("Original data:", json.encode(data, { pretty = true })) -- Use JSON encode for better display
 print("JSON string:", json_str)
 
-local decoded = json.decode(json_str)
-print("Decoded data:", logging.format_value(decoded))
+local decoded_ok, decoded = pcall(json.decode, json_str)
+print("Decoded data:", decoded_ok and json.encode(decoded, { pretty = true }) or "DECODE FAILED")
 
 --- Demonstrates encoding a Lua table to JSON, writing it to a file using `fs.write_file`,
 -- reading the file back using `fs.read_file`, and decoding the JSON string using `json.decode`.
@@ -265,21 +337,24 @@ local config = {
 -- Save to file
 -- Save to file using fs.write_file
 print("Saving configuration to file:", json_file_path)
-local write_ok, write_err = fs.write_file(json_file_path, json.encode(config))
+-- Encode with pretty printing for readability in the file
+local write_ok, write_err_str = fs.write_file(json_file_path, json.encode(config, { pretty = true }))
 if not write_ok then
-  error("Failed to write JSON file: " .. write_err)
+  error("Failed to write JSON file: " .. (write_err_str or "unknown error"))
 end
 
 -- Read from file using fs.read_file
 print("Reading configuration from file...")
-local content, read_err = fs.read_file(json_file_path)
+local content, read_err_str = fs.read_file(json_file_path)
 if not content then
-  error("Failed to read JSON file: " .. read_err)
+  error("Failed to read JSON file: " .. (read_err_str or "unknown error"))
 end
-local loaded_config = json.decode(content)
+local loaded_config, decode_err = json.decode(content)
+if not loaded_config then
+  error("Failed to decode JSON from file: " .. decode_err)
+end
 
-print("Loaded config:", logging.format_value(loaded_config))
-print("Loaded config:", logging.format_value(loaded_config))
+print("Loaded config:", json.encode(loaded_config, { pretty = true }))
 
 --- Demonstrates error handling for invalid encoding (e.g., functions) using `pcall`
 -- and invalid decoding (malformed JSON string) also using `pcall`.
@@ -294,10 +369,10 @@ print("Success:", tostring(encode_ok))
 print("Error:", encode_err) -- pcall returns the error message directly
 
 -- Try to decode invalid JSON
-local decode_ok, decode_err_or_result = pcall(json.decode, "{ invalid json ' ")
+local decode_ok, decode_err = pcall(json.decode, "{ invalid json ' ")
 print("\nTrying to decode invalid JSON:")
 print("Success:", tostring(decode_ok))
-print("Error:", decode_err_or_result) -- pcall returns the error message directly
+print("Error:", decode_err) -- Check the returned error message/object
 
 --- Demonstrates how the JSON module handles special Lua values like `NaN`, `Infinity`,
 -- escaped string characters, and differentiates between arrays and objects.
@@ -307,9 +382,10 @@ logger.info("---------------------")
 
 -- Special numbers
 logger.info("Encoding special numbers:")
-print("NaN:", json.encode(0 / 0))
-print("Infinity:", json.encode(math.huge))
-print("-Infinity:", json.encode(-math.huge))
+-- JSON standard represents these as null
+print("NaN:", json.encode(0 / 0)) -- Expected: null
+print("Infinity:", json.encode(math.huge)) -- Expected: null
+print("-Infinity:", json.encode(-math.huge)) -- Expected: null
 
 -- Escaped strings
 logger.info("\nEncoding escaped strings:")
@@ -357,8 +433,8 @@ logger.info("Valid user:")
 local json_user = json.encode(valid_user)
 print("JSON:", json_user)
 
-local decoded_user = json.decode(json_user)
-print("Valid?", validate_user(decoded_user))
+local decoded_user, decode_err_valid = json.decode(json_user)
+print("Valid?", decode_err_valid == nil and validate_user(decoded_user))
 
 -- Invalid user
 local invalid_user = {
@@ -370,11 +446,10 @@ logger.info("\nInvalid user:")
 json_user = json.encode(invalid_user)
 print("JSON:", json_user)
 
-decoded_user = json.decode(json_user)
-print("Valid?", validate_user(decoded_user))
+local decoded_invalid_user, decode_err_invalid = json.decode(json_user)
+print("Valid?", decode_err_invalid == nil and validate_user(decoded_invalid_user))
 
 logger.info("\nJSON module example completed successfully.")
+temp_dir = nil
 
--- Add cleanup for temp_file module at the end
-local temp_file = require("lib.tools.filesystem.temp_file")
-temp_file.cleanup_all()
+-- Cleanup is handled automatically by temp_file registration

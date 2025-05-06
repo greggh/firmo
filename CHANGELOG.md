@@ -137,6 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Corrected "Test Directory Structure" to reflect the actual layout.
   - Updated "Project Structure" with a detailed overview.
   - Rewrote "Coverage Module Architecture" to describe the current debug hook system, replacing the outdated instrumentation description.
+- Completed comprehensive review and update of all example files (`examples/*.lua`) based on `docs/firmo/examples_cleanup_plan.md`. Ensured consistency with current standards for JSDoc, central configuration, error handling, temporary file usage, assertions, and test execution. Removed deprecated patterns. Created a new `docs/guides/examples.md` index file listing all examples with brief descriptions.
 - Initiated a comprehensive refactoring of all example files (`examples/*.lua`, `examples/*.md`) based on the inventory in `docs/firmo/examples_inventory.md` to align with current project standards. Key updates include:
   - Adding missing JSDoc comments.
   - Standardizing configuration via `lib.core.central_config`.

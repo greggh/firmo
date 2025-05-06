@@ -464,7 +464,8 @@ For cross-version Lua compatibility:
 
 ### Testing Commands
 
-- Run All Tests: `lua test.lua tests/`
+**NOTE:** Never run all tests at once (`lua test.lua tests/`) unless specifically needed and understood; prefer targeted testing.
+
 - Run Specific Test: `lua test.lua tests/reporting_test.lua`
 - Run Tests by Pattern: `lua test.lua --pattern=coverage tests/`
 - Run Tests with Coverage: `lua test.lua --coverage tests/`
@@ -795,7 +796,7 @@ expect(function() may_fail(true) end).to_not.fail()
 expect(function() may_fail(false) end).to.fail_with("fail") -- Checks error message pattern
 expect(function() may_fail(false) end).to.throw()           -- Alias for fail
 expect(function() may_fail(false) end).to.throw_error_matching("fail") -- Alias for fail_with
--- expect(function() error({ code=1 }) end).to.throw_error_type("table") -- Check error type (may need adjustment)
+-- expect(function() error({ code=1 }) end).to.throw_error_type("table") -- TODO: Verify implementation or remove if not supported.
 
 local obj = { count = 0 }
 local function get_count() return obj.count end
@@ -831,9 +832,9 @@ end)
 ```lua
 expect(value).to.satisfy(function(v) return v > 10 end) -- Custom predicate
 expect(my_obj).to.implement_interface({ method1 = "function", property = "string" })
--- expect(value).to.be_type("callable") -- Checks if function or has __call metamethod
--- expect(value).to.be_type("comparable") -- Checks if < operator works
--- expect(value).to.be_type("iterable") -- Checks if pairs() works
+-- expect(value).to.be_type("callable") -- NOTE: These 'be_type' assertions are conceptual/planned and may not be fully implemented. Checks if function or has __call metamethod
+-- expect(value).to.be_type("comparable") -- NOTE: These 'be_type' assertions are conceptual/planned and may not be fully implemented. Checks if < operator works
+-- expect(value).to.be_type("iterable") -- NOTE: These 'be_type' assertions are conceptual/planned and may not be fully implemented. Checks if pairs() works
 ```
 
 For the most up-to-date details on parameters and behavior, refer to the JSDoc comments within `lib/assertion/init.lua`.
@@ -1034,10 +1035,14 @@ The coverage system leverages Lua's `debug.sethook` mechanism to track line exec
 5.  **Error Handling (`lib.tools.error_handler.lua`)**:
     *   **Error Reporting**: Used throughout the coverage module to create structured errors and handle exceptions gracefully (e.g., during file I/O).
 
-6.  **(Implicit) Assertion Integration**:
-    *   While not a separate component in the *coverage module itself*, the assertion module (`lib/assertion/init.lua`) *uses* the coverage module.
-    *   When an assertion passes (`expect(...).to...`), it calls `coverage.mark_line_covered(file_path, line_number)` (via a lazy-loaded `get_coverage()` call).
-    *   This mechanism allows distinguishing between lines that were merely executed and lines whose execution contributed to a passing assertion, enabling the three-state coverage reporting (Covered, Executed, Not Covered). The actual marking logic (`mark_line_covered`) might still be evolving or reside within the coverage module's internal handling of `state.data`. *[Self-correction: Based on the assertion code, it seems `mark_line_covered` IS called, but the implementation detail of how this translates to the final report's three states needs careful review in the reporting step, as the `state.data` in coverage only stores hit counts.]*
+6.  **Assertion Integration for Three-State Coverage**:
+    *   The core coverage mechanism (`debug_hook`) tracks all executed lines, recording a hit count (> 0) for each line in the coverage data (`state.data`).
+    *   To differentiate verified code, the assertion module (`lib/assertion/init.lua`), upon successful execution of an assertion (`expect(...).to...`), explicitly calls `coverage.mark_line_covered(file_path, line_number)`. This function flags the specific line within the coverage data as having been covered by a passing assertion.
+    *   The reporting system uses both pieces of information:
+        - **Covered (Green)**: Line has a hit count > 0 AND was explicitly marked by `coverage.mark_line_covered`.
+        - **Executed (Orange)**: Line has a hit count > 0 BUT was NOT explicitly marked by an assertion.
+        - **Not Covered (Red)**: Line has a hit count of 0 (or was never recorded).
+    *   This explicit marking by assertions is crucial for providing the distinction between merely executed code and code whose behavior was actively verified by a test.
 
 This architecture differs significantly from instrumentation-based systems by relying on runtime hooks rather than code transformation.
 

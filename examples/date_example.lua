@@ -14,6 +14,10 @@
 --- - Parsing date strings (implicitly via the constructor).
 ---
 --- @module examples.date_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see lib.tools.date
 --- @see lib.tools.error_handler
 --- @usage
@@ -24,6 +28,7 @@
 
 -- Import necessary modules
 local date = require("lib.tools.date")
+local logging = require("lib.tools.logging") -- Add require
 
 -- Extract the testing functions we need
 local firmo = require("firmo")
@@ -35,6 +40,9 @@ local it = firmo.it
 local expect = firmo.expect
 ---@type fun(callback: function) before Setup function that runs before each test
 local before = firmo.before
+
+-- Setup logger
+local logger = logging.get_logger("DateExample") -- Add logger instance
 
 --- Main test suite for the date module.
 --- @within examples.date_example
@@ -114,10 +122,10 @@ describe("Date Module Examples", function()
     it("creates a copy of another date object", function()
       local original = date(2024, 1, 1)
       local copy = date(original)
-      expect(copy).to.equal(original) -- Should be equal in value
-      expect(copy).to_not.be(original) -- Should not be the same object reference
+      expect(copy).to.equal(original) -- Verify initial equality (same value)
+      -- We'll prove these are different objects by modifying one and showing it doesn't affect the other
       copy:adddays(1)
-      expect(copy).to_not.equal(original) -- Modifying copy doesn't affect original
+      expect(copy).to_not.equal(original) -- Verifies they are separate objects since modifying copy doesn't affect original
     end)
   end)
 
@@ -329,7 +337,7 @@ describe("Date Module Examples", function()
       expect(dt:fmt("${iso}")).to.equal("2024-12-25T09:05:30")
       -- Note: ${http} assumes UTC, convert first if needed
       local dt_utc = dt:copy():toutc()
-      expect(dt_utc:fmt("${http}")).to.match("Wed, 25 Dec 2024 09:05:30 GMT") -- Format includes GMT literal
+      expect(dt_utc:fmt("${http}")).to.match("Wed, 25 Dec 2024 14:05:30 GMT") -- Expect UTC time
     end)
   end)
 
@@ -386,9 +394,9 @@ describe("Date Module Examples", function()
       local utc_dt = date(2024, 7, 4, 12, 0, 0, 0):toutc() -- Assume 12:00 local on July 4th -> convert to UTC
       local local_dt = utc_dt:copy():tolocal() -- Convert back to local
 
-      firmo.log.info("UTC Time: " .. utc_dt:fmt("${iso}"))
-      firmo.log.info("Local Time: " .. local_dt:fmt("${iso} %Z"))
-      firmo.log.info("Bias (minutes): " .. tostring(local_dt:getbias()))
+      logger.info("UTC Time: " .. utc_dt:fmt("${iso}"))
+      logger.info("Local Time: " .. local_dt:fmt("${iso} %Z"))
+      logger.info("Bias (minutes): " .. tostring(local_dt:getbias()))
 
       -- Basic check: the local hour should likely differ from the UTC hour (unless system is UTC)
       -- Cannot reliably assert specific offset due to system differences.

@@ -1,15 +1,21 @@
---- json_output_example.lua
---
--- This file demonstrates tests with different outcomes (pass, fail, skip/pending).
--- It is intended to be run with the `--format=json` flag to showcase the
+--- This file demonstrates tests with different outcomes (pass, fail, skip/pending).
+--- It is intended to be run with the `--format=json` flag to showcase the
 -- JSON test results output format used by Firmo, which is particularly relevant
 -- for inter-process communication, such as aggregating results from parallel
 -- test runners.
 --
+-- @module examples.json_output_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see lib.reporting.formatters.json
+-- @usage
 -- Run with JSON output: lua test.lua --format=json examples/json_output_example.lua
 --
 
 local logging = require("lib.tools.logging")
+local test_helper = require("lib.tools.test_helper")
 
 -- Setup logger
 local logger = logging.get_logger("JSONOutputExample")
@@ -29,24 +35,38 @@ local expect = firmo.expect
 --- @within examples.json_output_example
 describe("JSON Output Example", function()
   --- A simple passing test.
+  --- @tags json demo pass
   it("should pass this test", function()
+    firmo.tags("json", "demo", "pass")
     expect(1 + 1).to.equal(2)
   end)
 
   --- Another simple passing test.
+  --- @tags json demo pass
   it("should pass this test too", function()
+    firmo.tags("json", "demo", "pass")
     expect(true).to.be(true)
   end)
 
   --- Example of a skipped test using `firmo.pending`.
   -- @pending This test is intentionally skipped using firmo.pending.
+  --- @tags json demo skip
   it("should skip this test using firmo.pending", function()
+    firmo.tags("json", "demo", "skip")
     firmo.pending("Skipping for the example")
   end)
 
   --- A test designed to fail to show the 'failure' structure in JSON output.
-  it("should fail this test for demonstration", function()
-    expect(1).to.equal(2) -- This assertion will fail
+  --- @tags json demo fail
+  it("should fail this test for demonstration", { expect_error = true }, function()
+    firmo.tags("json", "demo", "fail")
+    local result, err = test_helper.with_error_capture(function()
+      expect(1).to.equal(2) -- This assertion will fail
+    end)()
+    
+    expect(result).to_not.exist()
+    expect(err).to.exist()
+    expect(err.message).to.match("expected 1 to equal 2")
   end)
 end)
 

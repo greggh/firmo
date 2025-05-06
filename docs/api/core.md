@@ -7,7 +7,6 @@ This module acts as a central point for accessing several core utility submodule
 The `lib.core` module aggregates functionality from:
 
 - `lib.core.type_checking`: Utilities for advanced type validation.
-- `lib.core.fix_expect`: Utility to repair the `expect` assertion system (used internally).
 - `lib.core.version`: Version information for the Firmo framework.
 
 If a submodule fails to load (e.g., due to missing dependencies or errors during loading), its corresponding fields in the returned `core` table will be `nil`.
@@ -44,11 +43,6 @@ The `core` table returned by `require("lib.core")` contains the following fields
 - **Type:** `table` | `nil`
 - **Description:** The loaded `lib.core.type_checking` module, providing functions like `is_exact_type`, `is_instance_of`, `implements`, etc. Will be `nil` if the submodule failed to load.
 - **See:** `docs/api/type_checking.md` (Note: This file might not exist yet or might need creation/update)
-
-### `core.fix_expect`
-
-- **Type:** `boolean` | `nil`
-- **Description:** The result (success status) returned when the `lib.core.fix_expect` module was loaded and executed during the `lib.core` initialization. Will be `nil` if the submodule failed to load. Primarily used internally.
 
 ### `core.version`
 

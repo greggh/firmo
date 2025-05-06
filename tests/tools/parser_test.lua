@@ -71,6 +71,51 @@ test(5, 10)
       expect(err2).to.exist()
       expect(err2.message).to.match("malformed AST")
     end)
+    
+    --- Tests AST validation with both success and error cases
+    --- Verifies that the parser's validate function correctly validates ASTs
+    --- and properly handles the errorinfo parameter
+    it("should validate AST structure", { expect_error = true }, function()
+      -- Get a valid AST
+      local source_code = "local x = 1"
+      local ast = parser.parse(source_code, "test_validation")
+      expect(ast).to.exist()
+      
+      -- Create proper errorinfo with required fields
+      local errorinfo = {
+        subject = source_code,
+        filename = "test_validation"
+      }
+      
+      -- Test successful validation
+      local validator = require("lib.tools.parser.validator")
+      local is_valid, err_msg = validator.validate(ast, errorinfo)
+      expect(is_valid).to.exist()
+      expect(err_msg).to.be(nil)
+      
+      -- Test with missing errorinfo
+      local err = test_helper.with_error_capture(function()
+        return validator.validate(ast, nil)
+      end)
+      expect(err).to.exist()
+      expect(err.message).to.match("validator requires errorinfo table")
+      
+      -- Test with incomplete errorinfo
+      local incomplete_info = { subject = source_code }
+      local err2 = test_helper.with_error_capture(function()
+        return validator.validate(ast, incomplete_info)
+      end)
+      expect(err2).to.exist()
+      expect(err2.message).to.match("errorinfo.filename must be a string")
+      
+      -- Test with invalid AST
+      local invalid_ast = { tag = "Chunk" } -- Missing position information
+      local err3 = test_helper.with_error_capture(function()
+        return validator.validate(invalid_ast, errorinfo)
+      end)
+      expect(err3).to.exist()
+      expect(err3.message).to.match("has invalid pos field")
+    end)
 
     it("should detect executable lines", { expect_error = true }, function()
       -- Test valid case first

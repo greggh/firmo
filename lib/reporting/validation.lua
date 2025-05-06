@@ -586,7 +586,7 @@ function M.validate_coverage_data(coverage_data)
     file_count = file_count,
   })
 
-  local config = get_config() or DEFAULT_CONFIG
+  local config = central_config.get() or DEFAULT_CONFIG
 
   -- Ensure we have valid config values
   local validate_reports = config.validate_reports

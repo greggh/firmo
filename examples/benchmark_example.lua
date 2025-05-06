@@ -1,9 +1,9 @@
 --- Comprehensive example demonstrating the Firmo benchmark module.
 ---
 --- This example showcases various features of the `lib.tools.benchmark` module:
---- - Basic benchmarking of a single function using `benchmark.run()`.
+--- - Basic benchmarking of a single function using `benchmark.measure()`.
 --- - Benchmarking functions with arguments.
---- - Comparing the performance of multiple implementations using `benchmark.compare()`.
+--- - Comparing the performance of multiple implementations by running individual benchmarks.
 --- - Configuring benchmark runs (iterations, warmup iterations, name).
 --- - Example concepts for measuring memory usage during benchmarks (not a built-in feature).
 --- - Example concepts for performing statistical analysis on benchmark results (percentiles, outliers - not built-in features).
@@ -11,6 +11,10 @@
 --- - Demonstrates best practices like warming up the JIT compiler.
 ---
 --- @module examples.benchmark_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see lib.tools.benchmark
 --- @usage
 --- Run this example directly to see benchmark output printed to the console:
@@ -109,7 +113,6 @@ print(string.format("%-15s %-15s %-15s %-15s", "Input Size", "Avg Time (ms)", "M
 print(
   string.format("%-15s %-15s %-15s %-15s", "---------------", "---------------", "---------------", "---------------")
 )
--- Line 105 correctly wrapped in print(), no stray characters following.
 for n = 5, 25, 5 do
   local result = factorial_results[n]
   if result and result.time_stats then
@@ -747,8 +750,6 @@ describe("String Utils Performance", function()
     expect(result.time_stats.mean * 1000).to.be_less_than(10, "Join operation too slow")
 
     -- Output performance info
-
-    -- Output performance info
     logger.info("\nJoin Performance:")
     print("\nJoin Performance:") -- Keep print for results
     print("Average time (join): " .. (result.time_stats.mean * 1000) .. " ms")
@@ -757,25 +758,21 @@ describe("String Utils Performance", function()
   --- Tests the performance of the `string_utils.split` function.
   it("splits a long string efficiently", function()
     -- Create test data (a long comma-separated string)
-    local joined = function()
-      (function()
-        local arr = {}
-        for i = 1, 1000 do
-          arr[i] = "item" .. i
-        end
-        return arr
-      end)()
-
-      -- Benchmark split using measure
-      local result = benchmark.measure(
-        string_utils.split, -- Function
-        { joined, "," }, -- Arguments table
-        { iterations = 100, label = "String Split" } -- Options
-      )
-
-      -- Assert performance requirements using correct stats path
-      expect(result.time_stats.mean * 1000).to.be_less_than(20, "Split operation too slow")
-      print("Average time (split): " .. (result.time_stats.mean * 1000) .. " ms")
+    local items = {}
+    for i = 1, 1000 do
+      items[i] = "item" .. i
     end
+    local joined_string = table.concat(items, ",") -- Generate the actual string
+
+    -- Benchmark split using measure
+    local result = benchmark.measure(
+      string_utils.split, -- Function
+      { joined_string, "," }, -- Arguments table: pass the generated string
+      { iterations = 100, label = "String Split" } -- Options
+    )
+
+    -- Assert performance requirements using correct stats path
+    expect(result.time_stats.mean * 1000).to.be_less_than(20, "Split operation too slow")
+    print("Average time (split): " .. (result.time_stats.mean * 1000) .. " ms")
   end)
 end)

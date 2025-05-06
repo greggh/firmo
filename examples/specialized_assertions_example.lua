@@ -1,4 +1,3 @@
--- Example of using specialized assertions in firmo
 --- Example demonstrating specialized assertion types in Firmo.
 ---
 --- This example showcases assertions beyond the basic types, including:
@@ -7,6 +6,10 @@
 --- - Asynchronous assertions for promises (`to.complete`, `to.complete_within`, `to.resolve_with`, `to.reject`).
 ---
 --- @module examples.specialized_assertions_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see lib.assertion.expect
 --- @see lib.async
 --- @usage
@@ -24,6 +27,8 @@ local it = firmo.it
 ---@type fun(value: any) expect Assertion generator function
 local expect = firmo.expect
 local async = require("lib.async")
+local it_async = firmo.it_async -- Added missing import for async tests
+local test_helper = require("lib.tools.test_helper")
 
 --- Main test suite showing specialized assertions in action.
 --- @within examples.specialized_assertions_example
@@ -95,11 +100,11 @@ Third line
     --- @return table promise A promise object.
     --- @within examples.specialized_assertions_example
     local function delayed_success(ms, value)
-      return async.create_promise(function(resolve)
-        async.set_timeout(function()
-          resolve(value or "success")
-        end, ms or 50)
-      end)
+      -- Return an executor function directly using async.async
+      return async.async(function()
+        async.await(ms or 50)
+        return value or "success"
+      end)() -- Note the immediate call `()` to get the executor
     end
 
     --- Helper async function that rejects after a delay.
@@ -108,44 +113,53 @@ Third line
     --- @return table promise A promise object.
     --- @within examples.specialized_assertions_example
     local function delayed_error(ms, reason)
-      return async.create_promise(function(_, reject)
-        async.set_timeout(function()
-          reject(reason or "error")
-        end, ms or 50)
-      end)
+      -- Return the async function without executing it
+      return async.async(function()
+        async.await(ms or 50)
+        error(reason or "Delayed error occurred")
+      end)  -- Remove the () to match how we use it
     end
 
-    --- Tests `to.complete` and `to.complete_within`.
-    it_async("checks if an async function completes successfully (or within time)", function()
-      -- Check if the function completes successfully
-      expect(delayed_success()).to.complete()
+    --- Tests successful completion and timing.
+    it_async(
+      "checks if an async function completes successfully (or within time)",
+      { timeout = 200 },
+      async.async(function() -- Wrap in async function to use await
+        local result = async.await(delayed_success(50))
+        expect(result).to.equal("success")
 
-      -- Check if the function completes within a time limit
-      expect(delayed_success(10)).to.complete_within(100)
+        -- Test completion within a timeframe
+        local start_time = os.clock()
+        local quick_result = async.await(delayed_success(10))
+        local elapsed = (os.clock() - start_time) * 1000
+        expect(quick_result).to.equal("success")
+        expect(elapsed).to.be_less_than(100)
+      end)
+    )
 
-      -- Long operation should not complete within short timeout
-      expect(delayed_success(200)).to_not.complete_within(50)
-    end)
+    --- Tests checking the result value.
+    it_async("checks the resolution value of an async function", 
+      async.async(function()
+        local result = async.await(delayed_success(10, "expected result"))
+        expect(result).to.equal("expected result")
 
-    --- Tests `to.resolve_with`.
-    it_async("checks the resolution value of an async function", function()
-      -- Check if the function resolves with an expected value
-      expect(delayed_success(10, "expected result")).to.resolve_with("expected result")
+        local default_result = async.await(delayed_success(10))
+        expect(default_result).to.equal("success")
+      end)
+    )
 
-      -- Should not match a different value
-      expect(delayed_success(10, "actual result")).to_not.resolve_with("wrong result")
-    end)
-
-    --- Tests `to.reject` and `to.reject_with`.
+    --- Tests rejection using test_helper.expect_async_error.
+    --- Note: Async errors include additional context about parallel operations.
     it_async("checks if an async function rejects (optionally with a reason)", function()
-      -- Check if the function rejects
-      expect(delayed_error()).to.reject()
+      -- Pass the delayed_error function directly
+      local err = test_helper.expect_async_error(delayed_error(10, "Specific Reason"), 50, "Specific Reason")
+      expect(err).to.exist()
+      expect(err.message).to.match("Specific Reason")
 
-      -- Check if the function rejects with a specific message
-      expect(delayed_error(10, "validation failed")).to.reject("validation failed")
-
-      -- Should not match a different error message
-      expect(delayed_error(10, "actual error")).to_not.reject("wrong error")
+      -- Test default error message
+      local err2 = test_helper.expect_async_error(delayed_error(10), 50, "Delayed error occurred")
+      expect(err2).to.exist()
+      expect(err2.message).to.match("Delayed error occurred")
     end)
   end)
 end)

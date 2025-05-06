@@ -224,6 +224,7 @@ Asserts that a value is exactly `nil`.
 expect(nil).to.be_nil()
 expect(false).to_not.be_nil()
 ```
+
 ### .match(pattern)
 
 
@@ -263,6 +264,72 @@ expect("hello world").to.match_regex("hello")
 expect("HELLO").to.match_regex("hello", { case_insensitive = true })
 ```
 
+
+### .match_with_options(pattern, options)
+
+Asserts that a string matches the given Lua pattern with custom matching options.
+**Parameters:**
+
+- `pattern` (string): Lua pattern to match against the string
+- `options` (table): Configuration options
+  - `case_insensitive` (boolean): If true, performs case-insensitive matching
+  - `full` (boolean): If true, matches the entire string (anchors pattern with ^ and $)
+  - `multi_line` (boolean): If true, allows ^ and $ to match start/end of lines
+
+**Example:**
+
+```lua
+expect("Hello World").to.match_with_options("hello", { case_insensitive = true })
+expect("TESTING").to.match_with_options("test", { case_insensitive = true })
+expect("abc123def").to.match_with_options("abc%d+", { full = false }) // partial match
+```
+
+
+### .match.fully(pattern)
+
+Asserts that a string fully matches the given Lua pattern (entire string must match, not just a substring).
+**Parameters:**
+
+- `pattern` (string): Lua pattern to match against the string
+
+**Example:**
+
+```lua
+expect("abc123").to.match.fully("%a+%d+") // matches
+expect("abc123def").to_not.match.fully("%a+%d+") // doesn't match entire string
+```
+
+
+### .match.any_of(patterns)
+
+Asserts that a string matches at least one of the provided Lua patterns.
+**Parameters:**
+
+- `patterns` (table): Array of Lua patterns to match against the string
+
+**Example:**
+
+```lua
+expect("abc").to.match.any_of({ "%a+", "%d+", "%p+" })
+expect("123").to.match.any_of({ "%a+", "%d+", "%p+" })
+expect("!!!").to.match.any_of({ "%a+", "%d+", "%p+" })
+```
+
+
+### .match.all_of(patterns)
+
+Asserts that a string matches all of the provided Lua patterns.
+**Parameters:**
+
+- `patterns` (table): Array of Lua patterns to match against the string
+
+**Example:**
+
+```lua
+expect("abc123").to.match.all_of({ "%a", "%d" })
+expect("Password123!").to.match.all_of({ "%a", "%d", "%p" })
+expect("abc").to_not.match.all_of({ "%a", "%d" })
+```
 
 
 ### .contain(value)
@@ -470,6 +537,25 @@ expect(1).to.be_between(1, 10)
 expect(10).to.be_between(1, 10)
 expect(11).to_not.be_between(1, 10)
 ```
+
+
+### .be_near(expected, [tolerance]) / .be_approximately(expected, [tolerance])
+
+Asserts that a number is close to the expected value within a given tolerance.
+**Parameters:**
+
+- `expected` (number): The target value to compare against.
+- `tolerance` (number, optional): The maximum allowed difference (default: 0.0001).
+
+**Example:**
+
+```lua
+expect(0.1 + 0.2).to.be_near(0.3) -- Uses default tolerance
+expect(3.14159).to.be_near(3.14, 0.01)
+expect(10.5).to.be_approximately(10, 1) -- Alias works the same
+```
+
+
 ### .be_between(min, max)
 
 
@@ -518,9 +604,11 @@ Asserts that a number is approximately equal to the target value within the spec
 **Example:**
 
 ```lua
-expect(0.1 + 0.2).to.be_approximately(0.3) -- Uses default delta
+expect(0.1 + 0.2).to.be_approximately(0.3) -- Uses default tolerance
 expect(3.14159).to.be_approximately(3.14, 0.01)
 ```
+
+
 ### .be.positive()
 
 
@@ -616,6 +704,42 @@ Asserts that a string ends with the specified suffix.
 expect("hello world").to.end_with("world")
 expect("testing").to_not.end_with("fest")
 ```
+
+
+### .have.deep_key(key_path)
+
+Asserts that a table contains a deeply nested key specified by a path.
+**Parameters:**
+
+- `key_path` (string|table): The path to the key, either as a dot-separated string (e.g., "a.b.c") or a table of keys (e.g., `{"a", "b", "c"}`).
+
+**Example:**
+
+```lua
+local data = { user = { profile = { name = "Alice" } } }
+expect(data).to.have.deep_key("user.profile.name")
+expect(data).to.have.deep_key({"user", "profile", "name"})
+expect(data).to_not.have.deep_key("user.profile.email")
+```
+
+
+### .have.exact_keys(keys_table)
+
+Asserts that a table contains *exactly* the keys specified in the array and no others.
+**Parameters:**
+
+- `keys_table` (table): An array-like table containing the exact set of keys expected.
+
+**Example:**
+
+```lua
+expect({ a = 1, b = 2 }).to.have.exact_keys({ "a", "b" })
+expect({ b = 2, a = 1 }).to.have.exact_keys({ "a", "b" }) -- Order doesn't matter
+expect({ a = 1, b = 2, c = 3 }).to_not.have.exact_keys({ "a", "b" }) -- Fails due to extra key 'c'
+expect({ a = 1 }).to_not.have.exact_keys({ "a", "b" }) -- Fails due to missing key 'b'
+```
+
+
 ### .change(value_fn, [change_fn])
 
 
@@ -790,6 +914,39 @@ Asserts that a date string represents the same calendar day as another date.
 expect("2022-01-01T10:30:00Z").to.be_same_day_as("2022-01-01T15:45:00Z")
 ```
 
+
+### .be_same_day_as(other_date)
+
+Asserts that a date string represents the same calendar day as another date.
+**Parameters:**
+
+- `other_date` (string): The date to compare against
+
+**Example:**
+
+```lua
+expect("2022-01-01T10:30:00Z").to.be_same_day_as("2022-01-01T15:45:00Z")
+expect("May 1, 2023").to.be_same_day_as("2023-05-01")
+```
+
+
+### .be_between_dates(start_date, end_date, inclusive)
+
+Asserts that a date string represents a date that falls between two other dates.
+**Parameters:**
+
+- `start_date` (string): The start date of the range
+- `end_date` (string): The end date of the range
+- `inclusive` (boolean, optional): Whether the range includes the start and end dates (default: true)
+
+**Example:**
+
+```lua
+expect("2023-05-15").to.be_between_dates("2023-05-01", "2023-05-31")
+expect("2023-05-01").to.be_between_dates("2023-05-01", "2023-05-31") // inclusive by default
+expect("2023-06-01").to_not.be_between_dates("2023-05-01", "2023-05-31")
+expect("2023-05-01").to_not.be_between_dates("2023-05-01", "2023-05-31", false) // exclusive
+```
 
 
 ## Async Assertions

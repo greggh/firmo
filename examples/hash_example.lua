@@ -1,12 +1,18 @@
---- hash_example.lua
---
--- This example demonstrates the `lib.tools.hash` module, which provides
--- utilities for generating hash digests for strings and files. It showcases:
+--- This example demonstrates the `lib.tools.hash` module, which provides
+--- utilities for generating hash digests for strings and files. It showcases:
 -- - Hashing strings using `hash.hash_string()`.
 -- - Hashing file contents using `hash.hash_file()`.
 -- - Using hashes for simple change detection.
 -- - Using hashes as keys in a basic caching system simulation.
 --
+-- @module examples.hash_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see lib.tools.hash
+-- @see lib.tools.test_helper
+-- @usage
 -- Run this example directly: lua examples/hash_example.lua
 --
 
@@ -34,7 +40,8 @@ logger.info("\nExample 2: File Hashing")
 logger.info("----------------------")
 
 -- Create a test file
-local file_content = [[
+local file_content = "This is a test file with content." -- Use single line
+--[[
 This is a test file
 with multiple lines
 of content.
@@ -42,7 +49,8 @@ of content.
 test_dir.create_file("test.txt", file_content)
 
 -- Hash the file
-local file_hash = hash.hash_file(test_dir.path .. "/test.txt")
+local file_path_for_hash = test_dir.path_for("test.txt") or (test_dir.path .. "/test.txt")
+local file_hash = hash.hash_file(file_path_for_hash)
 print("File content:", file_content:gsub("\n", "\\n"))
 print("File hash:", file_hash)
 

@@ -1,388 +1,249 @@
---- junit_example.lua
---
--- This example demonstrates generating JUnit XML format test result reports
--- using Firmo's reporting module. JUnit is a widely supported format for
--- integrating test results into CI/CD systems.
---
--- It shows how to:
--- - Generate JUnit XML reports using `reporting.format_results`.
--- - Configure JUnit-specific options (timestamps, hostname, properties, etc.)
---   via `central_config`.
--- - Generate multi-suite reports using the `group_by_classname` option.
--- - Save reports to a temporary directory managed by `test_helper`.
--- - Provides examples for integrating with Jenkins, GitHub Actions, and GitLab CI.
---
--- Run embedded tests: lua test.lua examples/junit_example.lua
---
+--- JUnit Coverage Formatter Example
+---
+--- This example demonstrates how to use the JUnit coverage formatter to generate
+--- XML coverage reports compatible with CI systems. It shows how to:
+---   1. Load and use the JUnit formatter via the coverage_formatters module
+---   2. Prepare sample coverage data matching the expected input structure
+---   3. Format the data with various formatter options
+---   4. Write the output to a file
+---   5. Parse and validate the generated XML
+---
+--- The example includes both passing and failing coverage cases to show how
+--- JUnit test cases are generated for coverage metrics.
+---
+--- @module examples.junit_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+--- @see lib.reporting.formatters.junit
+--- @usage
+--- Run this example: lua test.lua examples/junit_example.lua
 
--- Import required modules
-local reporting = require("lib.reporting")
-local fs = require("lib.tools.filesystem")
-local central_config = require("lib.core.central_config")
--- Extract the testing functions we need
+-- Extract required testing functions
 local firmo = require("firmo")
----@type fun(description: string, callback: function) describe Test suite container function
-local describe = firmo.describe
----@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
-local it = firmo.it
----@type fun(value: any) expect Assertion generator function
-local expect = firmo.expect
----@type fun(callback: function) before Setup function that runs before each test
-local before = firmo.before
----@type fun(callback: function) after Teardown function that runs after each test
-local after = firmo.after
-local logging = require("lib.tools.logging")
-local test_helper = require("lib.tools.test_helper")
-local temp_file = require("lib.tools.filesystem.temp_file") -- For cleanup
+local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 
--- Setup logger
+-- Import necessary modules
+local test_helper = require("lib.tools.test_helper")
+local logging = require("lib.tools.logging")
+local coverage_formatters = require("lib.reporting.formatters.coverage_formatters")
+local temp_file = require("lib.tools.filesystem.temp_file")
+
+-- Set up logger
 local logger = logging.get_logger("JUnitExample")
 
--- Mock test results data structure for demonstration.
---- @type MockTestResults (See csv_example.lua for definition)
-local mock_test_results = {
-  name = "JUnit Example Test Suite",
-  timestamp = "2025-01-01T00:00:00Z", -- Static timestamp
-  tests = 8,
-  failures = 1,
-  errors = 1,
-  skipped = 1,
-  time = 0.35, -- Execution time in seconds
-  test_cases = {
-    {
-      name = "validates positive numbers correctly",
-      classname = "NumberValidator",
-      time = 0.001,
-      status = "pass",
-    },
-    {
-      name = "validates negative numbers correctly",
-      classname = "NumberValidator",
-      time = 0.003,
-      status = "pass",
-    },
-    {
-      name = "validates zero correctly",
-      classname = "NumberValidator",
-      time = 0.001,
-      status = "pass",
-    },
-    {
-      name = "rejects non-numeric inputs",
-      classname = "NumberValidator",
-      time = 0.002,
-      status = "pass",
-    },
-    {
-      name = "handles boundary values correctly",
-      classname = "NumberValidator",
-      time = 0.015,
-      status = "fail",
-      failure = {
-        message = "Expected validation to pass for MAX_INT but it failed",
-        type = "AssertionError",
-        details = "test/number_validator_test.lua:42: Expected isValid(9223372036854775807) to be true, got false",
+-- Simple Calculator module to use for coverage example
+local Calculator = {}
+
+-- This function will have "good" coverage
+function Calculator.add(a, b)
+  if type(a) ~= "number" or type(b) ~= "number" then
+    return nil, "Both arguments must be numbers"
+  end
+  return a + b
+end
+
+-- This function will have "poor" coverage
+function Calculator.subtract(a, b)
+  if type(a) ~= "number" or type(b) ~= "number" then
+    return nil, "Both arguments must be numbers"
+  end
+  return a - b
+end
+
+describe("JUnit Coverage Formatter Example", function()
+  it("demonstrates how to use the JUnit coverage formatter", function()
+    -- Get the JUnit formatter from the coverage_formatters registry
+    local junit_formatter = coverage_formatters.get_formatter("junit")
+    expect(junit_formatter).to.exist()
+    logger.info("Successfully loaded JUnit formatter")
+
+    -- Create sample coverage data that matches the expected structure
+    -- This mimics what the coverage module would produce
+    local sample_coverage_data = {
+      summary = {
+        coverage_percent = 75.5,  -- Overall coverage percentage
+        total_files = 2,          -- Total number of files
+        total_lines = 100,        -- Total lines across all files
+        covered_lines = 75,       -- Total covered lines across all files
+        executed_lines = 80       -- Total executed lines across all files
       },
-    },
-    {
-      name = "throws appropriate error for invalid format",
-      classname = "NumberValidator",
-      time = 0.005,
-      status = "error",
-      error = {
-        message = "Runtime error in test",
-        type = "Error",
-        details = "test/number_validator_test.lua:53: attempt to call nil value (method 'formatError')",
-      },
-    },
-    {
-      name = "validates scientific notation",
-      classname = "NumberValidator",
-      time = 0.000,
-      status = "skipped",
-      skip_message = "Scientific notation validation not implemented yet",
-    },
-    {
-      name = "validates decimal precision correctly",
-      classname = "NumberValidator",
-      time = 0.002,
-      status = "pass",
-    },
-  },
-}
-
--- Create multiple test suites to demonstrate grouping
-local multi_suite_test_results = {
-  name = "Multi-Suite Example",
-  timestamp = "2025-01-01T00:00:00Z", -- Static timestamp
-  tests = 6,
-  failures = 1,
-  errors = 0,
-  skipped = 0,
-  time = 0.25,
-  test_cases = {
-    {
-      name = "can create new user accounts",
-      classname = "UserService",
-      time = 0.042,
-      status = "pass",
-    },
-    {
-      name = "can authenticate users with valid credentials",
-      classname = "UserService",
-      time = 0.038,
-      status = "pass",
-    },
-    {
-      name = "rejects invalid login attempts",
-      classname = "UserService",
-      time = 0.015,
-      status = "pass",
-    },
-    {
-      name = "creates new orders correctly",
-      classname = "OrderService",
-      time = 0.055,
-      status = "pass",
-    },
-    {
-      name = "calculates order totals correctly",
-      classname = "OrderService",
-      time = 0.022,
-      status = "fail",
-      failure = {
-        message = "Order total calculation failed for multi-currency orders",
-        type = "AssertionError",
-        details = "test/order_service_test.lua:128: Expected 125.50, got 120.75",
-      },
-    },
-    {
-      name = "processes refunds correctly",
-      classname = "OrderService",
-      time = 0.078,
-      status = "pass",
-    },
-  },
-}
-
--- Create tests to demonstrate the JUnit formatter
---- Test suite demonstrating JUnit XML report generation and configuration.
---- @within examples.junit_example
-describe("JUnit Formatter Example", function()
-  local temp_dir -- Stores the temporary directory helper object
-
-  --- Setup hook: Create a temporary directory for reports.
-  before(function()
-    temp_dir = test_helper.create_temp_test_directory()
-  end)
-
-  --- Teardown hook: Release reference. Directory cleaned automatically.
-  after(function()
-    temp_dir = nil
-  end)
-
-  --- Tests generating a basic JUnit XML report with default settings.
-  it("generates basic JUnit XML test results with defaults", function()
-    -- Generate JUnit XML report
-    logger.info("Generating basic JUnit XML test results report...")
-    local junit_xml = reporting.format_results(mock_test_results, "junit")
-
-    -- Validate the report
-    expect(junit_xml).to.exist()
-    expect(junit_xml).to.be.a("string")
-    expect(junit_xml).to.match("<testsuite") -- Should have testsuite element
-    expect(junit_xml).to.match("<testcase") -- Should have testcase elements
-    expect(junit_xml).to.match("failures=") -- Should have failure count
-    expect(junit_xml).to.match("errors=") -- Should have error count
-    expect(junit_xml).to.match("skipped=") -- Should have skipped count
-    expect(junit_xml).to.match("<failure") -- Should have failure element
-    expect(junit_xml).to.match("<error") -- Should have error element
-    expect(junit_xml).to.match("<skipped") -- Should have skipped element
-
-    -- Save to file
-    local file_path = fs.join_paths(temp_dir.path, "test-results.xml")
-    local success, err = fs.write_file(file_path, junit_xml)
-
-    -- Check if write was successful
-    expect(err).to.be_nil() -- Check for nil error string
-    expect(success).to.be_truthy()
-
-    logger.info("Basic JUnit XML report saved to: " .. file_path)
-    logger.info("Report size: " .. #junit_xml .. " bytes")
-
-    -- Preview the JUnit XML output
-    logger.info("\nJUnit XML Preview:")
-    print(junit_xml:sub(1, 500) .. "...\n") -- Print preview
-  end)
-
-  --- Tests configuring JUnit formatter options (timestamps, hostname, properties, etc.).
-  it("demonstrates JUnit formatter configuration options", function()
-    -- Configure JUnit formatter options via central_config
-    central_config.set("reporting.formatters.junit", {
-      include_timestamp = true, -- Include timestamp attribute
-      include_hostname = true, -- Include hostname attribute
-      include_properties = true, -- Include properties element
-      include_system_out = true, -- Include system-out element
-      include_system_err = true, -- Include system-err element
-      normalize_classnames = true, -- Normalize class names to standard format
-      pretty_print = true, -- Format XML with indentation for readability
-    })
-
-    -- Temporarily add properties for this test case
-    mock_test_results.properties = {
-      { "name", "value" },
-      { "lua_version", _VERSION },
-      { "os", package.config:sub(1, 1) == "/" and "unix" or "windows" },
-      { "test_mode", "example" },
-      { "timestamp", "2025-01-01T00:00:00Z" }, -- Static timestamp
-    }
-
-    -- Generate the report with configuration
-    logger.info("Generating configured JUnit XML test results report...")
-    local junit_xml = reporting.format_results(mock_test_results, "junit")
-    -- Remove temporary properties
-    mock_test_results.properties = nil
-
-    -- Validate the report
-    expect(junit_xml).to.exist()
-    expect(junit_xml).to.match("<properties>") -- Should have properties element
-    expect(junit_xml).to.match("<property name=") -- Should have property elements
-    expect(junit_xml).to.match("hostname=") -- Should have hostname attribute
-    expect(junit_xml).to.match("<system%-out>") -- Should have system-out element
-
-    -- Save to file
-    local file_path = fs.join_paths(temp_dir.path, "test-results-configured.xml")
-    local success, err = fs.write_file(file_path, junit_xml)
-
-    -- Check if write was successful
-    expect(err).to.be_nil() -- Check for nil error string
-    expect(success).to.be_truthy()
-
-    logger.info("Configured JUnit XML report saved to: " .. file_path)
-
-    -- Preview the JUnit XML output with configuration
-    logger.info("\nConfigured JUnit XML Preview:")
-    print(junit_xml:sub(1, 700) .. "...\n")
-  end)
-
-  --- Tests generating a multi-suite JUnit report using `group_by_classname`.
-  it("demonstrates multi-suite JUnit XML reports", function()
-    -- Configure JUnit formatter for multiple test suites
-    central_config.set("reporting.formatters.junit", {
-      group_by_classname = true, -- Group tests by classname into separate suites
-      include_timestamp = true, -- Include timestamp attribute
-      pretty_print = true, -- Format XML with indentation for readability
-    })
-
-    -- Generate multi-suite JUnit XML report
-    logger.info("Generating multi-suite JUnit XML report...")
-    local junit_xml = reporting.format_results(multi_suite_test_results, "junit")
-
-    -- Validate the report has multiple test suites
-    expect(junit_xml).to.exist()
-    expect(junit_xml).to.match("<testsuites>") -- Should have testsuites root element
-    expect(junit_xml).to.match('name="UserService"') -- Should have UserService suite
-    expect(junit_xml).to.match('name="OrderService"') -- Should have OrderService suite
-
-    -- Save to file
-    local file_path = fs.join_paths(temp_dir.path, "multi-suite-results.xml")
-    local success, err = fs.write_file(file_path, junit_xml)
-
-    -- Check if write was successful
-    expect(err).to.be_nil() -- Check for nil error string
-    expect(success).to.be_truthy()
-
-    logger.info("Multi-suite JUnit XML report saved to: " .. file_path)
-
-    -- Preview the multi-suite XML output
-    logger.info("\nMulti-suite JUnit XML Preview:")
-    print(junit_xml:sub(1, 700) .. "...\n")
-  end)
-
-  --- Informational test providing example CI/CD configurations for using JUnit reports.
-  it("discusses CI/CD integration with JUnit XML reports", function()
-    -- Generate JUnit XML report for CI/CD examples
-    local junit_xml = reporting.format_results(mock_test_results, "junit")
-
-    -- Save to common CI/CD file location
-    local file_path = fs.join_paths(temp_dir.path, "junit-results.xml")
-    local success, err = fs.write_file(file_path, junit_xml)
-    expect(err).to.be_nil()
-    expect(success).to.be_truthy()
-
-    logger.info("CI/CD-ready JUnit XML report saved to: " .. file_path)
-
-    -- Example CI/CD configurations for using JUnit XML reports
-    local ci_examples = {
-      github_actions = [[
-# GitHub Actions workflow example for JUnit reports
-name: Test
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup Lua
-        uses: leafo/gh-actions-lua@v9
-      - name: Run Tests
-        run: lua test.lua --format=junit tests/
-      - name: Publish Test Report
-        uses: mikepenz/action-junit-report@v3
-        if: always() # Always run even if tests fail
-        with:
-          report_paths: 'test-reports/junit/*.xml'
-          fail_on_failure: true
-]],
-
-      jenkins = [[
-// Jenkinsfile example for JUnit reports
-pipeline {
-  agent any
-  stages {
-    stage('Test') {
-      steps {
-        sh 'lua test.lua --format=junit tests/'
-      }
-      post {
-        always {
-          junit 'test-reports/junit/*.xml'
+      files = {
+        ["calculator.lua"] = {
+          name = "calculator.lua",
+          path = "calculator.lua",
+          summary = {
+            coverage_percent = 90.0,      -- This file has good coverage
+            total_lines = 50,
+            covered_lines = 45,
+            executed_lines = 48,
+            not_covered_lines = 5
+          },
+          -- Example line details
+          lines = {
+            [1] = { covered = true, executed = true, execution_count = 10 },
+            [2] = { covered = true, executed = true, execution_count = 10 },
+            [45] = { covered = false, executed = false, execution_count = 0 },
+            [46] = { covered = false, executed = false, execution_count = 0 }
+          }
+        },
+        ["utilities.lua"] = {
+          name = "utilities.lua",
+          path = "utilities.lua",
+          summary = {
+            coverage_percent = 60.0,      -- This file has poor coverage
+            total_lines = 50,
+            covered_lines = 30,
+            executed_lines = 32,
+            not_covered_lines = 20
+          },
+          -- Example line details
+          lines = {
+            [10] = { covered = false, executed = false, execution_count = 0 },
+            [11] = { covered = false, executed = false, execution_count = 0 },
+            [12] = { covered = false, executed = false, execution_count = 0 },
+            [20] = { covered = true, executed = true, execution_count = 5 }
+          }
         }
       }
     }
-  }
-}
-]],
 
-      gitlab_ci = [[
-# GitLab CI configuration example for JUnit reports
-test:
-  stage: test
-  script:
-    - lua test.lua --format=junit tests/
-  artifacts:
-    reports:
-      junit: test-reports/junit/*.xml
-]],
+    -- Example 1: Basic JUnit coverage report
+    logger.info("Example 1: Basic JUnit coverage report")
+    local basic_options = {
+      threshold = 70,              -- Overall coverage threshold
+      file_threshold = 80,         -- Per-file coverage threshold
+      suite_name = "Coverage Demo" -- Name for the testsuite
     }
-
-    -- Print example CI/CD configurations
-    logger.info("\nExample CI/CD configurations for JUnit XML integration:")
-
-    logger.info("\n=== GitHub Actions ===")
-    print(ci_examples.github_actions)
-
-    logger.info("\n=== Jenkins ===")
-    print(ci_examples.jenkins)
-
-    logger.info("\n=== GitLab CI ===")
-    print(ci_examples.gitlab_ci)
+    
+    local xml_content = junit_formatter:format(sample_coverage_data, basic_options)
+    expect(xml_content).to.exist()
+    
+    -- Write the XML to a file
+    local temp_path = temp_file.create_with_content(xml_content, "xml")
+    logger.info("Wrote basic JUnit coverage report to: " .. temp_path)
+    
+    -- Basic validation of the XML content
+    expect(xml_content).to.match("<?xml version")
+    expect(xml_content).to.match("<testsuites>")
+    expect(xml_content).to.match("</testsuites>")
+    expect(xml_content).to.match("Coverage Demo")  -- Our suite name
+    expect(xml_content).to.match("75.50")          -- Overall coverage
+    expect(xml_content).to.match("90.00")          -- calculator.lua coverage
+    expect(xml_content).to.match("60.00")          -- utilities.lua coverage
+    
+    -- Check that we have a passing and failing test case
+    expect(xml_content).to.match("calculator.lua")
+    expect(xml_content).to.match("utilities.lua")
+    
+    -- Example 2: Report with failing threshold
+    logger.info("Example 2: JUnit report with failing threshold")
+    local strict_options = {
+      threshold = 80,              -- Set threshold higher than our 75.5% overall
+      file_threshold = 70,         -- Per-file threshold
+      suite_name = "Strict Coverage",
+      include_uncovered_lines = true  -- Include details of uncovered lines
+    }
+    
+    local strict_xml = junit_formatter:format(sample_coverage_data, strict_options)
+    expect(strict_xml).to.exist()
+    
+    -- Write to a temp file
+    local strict_path = temp_file.create_with_content(strict_xml, "xml")
+    logger.info("Wrote strict JUnit coverage report to: " .. strict_path)
+    
+    -- Validate that we have failure elements
+    expect(strict_xml).to.match("<failure message=")
+    expect(strict_xml).to.match("Overall coverage below threshold")
+    expect(strict_xml).to.match("Coverage: 75.50%% %(threshold: 80%%%)") -- Note escaped % signs
+    
+    -- The utilities.lua file should also fail its threshold
+    expect(strict_xml).to.match("utilities.lua.*Coverage below threshold")
+    
+    -- Should include uncovered lines details
+    expect(strict_xml).to.match("Uncovered lines:")
+    
+    -- Example 3: Show how to get all available coverage formatters
+    logger.info("Example 3: List all available coverage formatters")
+    local available_formats = coverage_formatters.get_available_formats()
+    expect(available_formats).to.be.a("table")
+    expect(#available_formats).to.be.greater_than(0)
+    
+    logger.info("Available coverage formatters:")
+    for _, format in ipairs(available_formats) do
+      logger.info("  - " .. format)
+    end
+    
+    -- Example 4: Demonstrate custom properties
+    logger.info("Example 4: JUnit report with custom properties")
+    local custom_options = {
+      threshold = 75,
+      suite_name = "Custom Properties Demo",
+      properties = {
+        environment = "test",
+        git_commit = "abcdef123456",
+        build_id = "12345"
+      }
+    }
+    
+    local custom_xml = junit_formatter:format(sample_coverage_data, custom_options)
+    expect(custom_xml).to.exist()
+    
+    -- Check that the custom properties were included
+    expect(custom_xml).to.match('property name="environment" value="test"')
+    expect(custom_xml).to.match('property name="git_commit" value="abcdef123456"')
+    expect(custom_xml).to.match('property name="build_id" value="12345"')
+    
+    -- Write to a file
+    local custom_path = temp_file.create_with_content(custom_xml, "xml")
+    logger.info("Wrote custom JUnit coverage report to: " .. custom_path)
+    
+    -- CI integration examples
+    logger.info("\nCI/CD Integration Examples:")
+    logger.info("GitHub Actions:\n```yaml")
+    logger.info("- name: Run Tests with Coverage")
+    logger.info("  run: lua test.lua --coverage --format=junit tests/")
+    logger.info("- name: Publish Coverage Report")
+    logger.info("  uses: mikepenz/action-junit-report@v3")
+    logger.info("  if: always() # Always run")
+    logger.info("  with:")
+    logger.info("    report_paths: junit-coverage-results.xml")
+    logger.info("```\n")
+    
+    logger.info("GitLab CI:\n```yaml")
+    logger.info("coverage:")
+    logger.info("  stage: test")
+    logger.info("  script:")
+    logger.info("    - lua test.lua --coverage --format=junit tests/")
+    logger.info("  artifacts:")
+    logger.info("    reports:")
+    logger.info("      junit: junit-coverage-results.xml")
+    logger.info("```\n")
+    
+    logger.info("Jenkins:\n```groovy")
+    logger.info("pipeline {")
+    logger.info("  agent any")
+    logger.info("  stages {")
+    logger.info("    stage('Test with Coverage') {")
+    logger.info("      steps {")
+    logger.info("        sh 'lua test.lua --coverage --format=junit tests/'")
+    logger.info("      }")
+    logger.info("      post {")
+    logger.info("        always {")
+    logger.info("          junit 'junit-coverage-results.xml'")
+    logger.info("        }")
+    logger.info("      }")
+    logger.info("    }")
+    logger.info("  }")
+    logger.info("}")
+    logger.info("```")
   end)
-
-  -- Removed XML validation test case
 end)
 
--- Add cleanup for temp_file module at the end
-temp_file.cleanup_all()
+-- Run this example using:
+-- lua test.lua examples/junit_example.lua
+
+-- Example complete! To learn more about JUnit coverage reports, see: lib/reporting/formatters/junit.lua
+
+-- Cleanup is handled automatically by test_helper registration

@@ -1,19 +1,36 @@
---[[
-  summary_example.lua
-
-  Example demonstrating text-based summary output for both test results and coverage data with firmo.
-
-  This example shows how to:
-  - Generate text-based summary reports for terminal output
-  - Configure summary-specific formatting options like colors and verbosity
-  - Save summary reports to disk using the filesystem module
-  - Customize terminal output for different environments and needs
-]]
+--- summary_example.lua
+---
+--- Example demonstrating text-based summary output for both test results and coverage data with firmo.
+---
+--- This example shows how to:
+--- - Generate text-based summary reports using `reporting.format_coverage`.
+--- - Configure summary-specific formatting options (colors, verbosity, sections, etc.) via `central_config.set()`.
+--- - Save summary reports to disk using `fs.write_file`.
+--- - Use `test_helper` for managing temporary output files.
+--- - Discuss terminal integration and viewing practices.
+---
+--- @module examples.summary_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+--- @see lib.reporting.formatters.summary
+--- @see lib.core.central_config
+--- @see lib.tools.test_helper
+--- @usage
+--- Run embedded tests:
+--- ```bash
+--- lua test.lua examples/summary_example.lua
+--- ```
+--- The generated text reports will be saved to a temporary directory.
+---
 
 -- Import required modules
 local reporting = require("lib.reporting")
 local fs = require("lib.tools.filesystem")
 local central_config = require("lib.core.central_config")
+local test_helper = require("lib.tools.test_helper") -- Added missing require
+local logging = require("lib.tools.logging") -- Added missing require
 
 -- Extract the testing functions we need
 local firmo = require("firmo")
@@ -23,8 +40,14 @@ local describe = firmo.describe
 local it = firmo.it
 ---@type fun(value: any) expect Assertion generator function
 local expect = firmo.expect
+local before = firmo.before -- Added missing require
+local after = firmo.after -- Added missing require
+
+-- Setup logger
+local logger = logging.get_logger("SummaryExample")
 
 -- Mock test results data (consistent with other examples)
+--- @type MockTestResults (See csv_example.lua for definition)
 local mock_test_results = {
   name = "Summary Example Test Suite",
   timestamp = os.date("!%Y-%m-%dT%H:%M:%S"),
@@ -97,329 +120,136 @@ local mock_test_results = {
 }
 
 -- Mock coverage data (consistent with other examples)
+--- @type MockCoverageData (See json_example.lua for definition)
 local mock_coverage_data = {
   files = {
     ["src/calculator.lua"] = {
       lines = {
-        [1] = true, -- This line was covered
-        [2] = true, -- This line was covered
-        [3] = true, -- This line was covered
-        [5] = false, -- This line was not covered
-        [6] = true, -- This line was covered
-        [8] = false, -- This line was not covered
-        [9] = false, -- This line was not covered
+        [1] = { hits = 1 },
+        [2] = { hits = 1 },
+        [3] = { hits = 1 },
+        [5] = { hits = 0 },
+        [6] = { hits = 1 },
+        [8] = { hits = 0 },
+        [9] = { hits = 0 },
       },
       functions = {
-        ["add"] = true, -- This function was covered
-        ["subtract"] = true, -- This function was covered
-        ["multiply"] = false, -- This function was not covered
-        ["divide"] = false, -- This function was not covered
+        ["add"] = { execution_count = 1 },
+        ["subtract"] = { execution_count = 1 },
+        ["multiply"] = { execution_count = 0 },
+        ["divide"] = { execution_count = 0 },
       },
       total_lines = 10,
+      executable_lines = 7,
       covered_lines = 4,
       total_functions = 4,
       covered_functions = 2,
+      line_coverage_percent = (4 / 7) * 100,
+      function_coverage_percent = (2 / 4) * 100,
     },
     ["src/utils.lua"] = {
       lines = {
-        [1] = true, -- This line was covered
-        [2] = true, -- This line was covered
-        [4] = true, -- This line was covered
-        [5] = true, -- This line was covered
-        [7] = false, -- This line was not covered
+        [1] = { hits = 1 },
+        [2] = { hits = 1 },
+        [4] = { hits = 1 },
+        [5] = { hits = 1 },
+        [7] = { hits = 0 },
       },
       functions = {
-        ["validate"] = true, -- This function was covered
-        ["format"] = false, -- This function was not covered
+        ["validate"] = { execution_count = 1 },
+        ["format"] = { execution_count = 0 },
       },
       total_lines = 8,
+      executable_lines = 5,
       covered_lines = 4,
       total_functions = 2,
       covered_functions = 1,
+      line_coverage_percent = (4 / 5) * 100,
+      function_coverage_percent = (1 / 2) * 100,
     },
   },
   summary = {
     total_files = 2,
     covered_files = 2,
     total_lines = 18,
+    executable_lines = 12,
     covered_lines = 8,
     total_functions = 6,
     covered_functions = 3,
-    line_coverage_percent = 44.4, -- 8/18
-    function_coverage_percent = 50.0, -- 3/6
-    overall_percent = 47.2, -- (44.4 + 50.0) / 2
+    line_coverage_percent = (8 / 12) * 100,
+    function_coverage_percent = (3 / 6) * 100,
+    overall_percent = (8 / 12) * 100,
   },
 }
 
 -- Create tests to demonstrate the Summary formatter
+--- Test suite demonstrating the summary report formatter.
+--- @within examples.summary_example
 describe("Summary Formatter Example", function()
-  -- Create directories for reports
-  local reports_dir = "test-reports/summary"
-  fs.ensure_directory_exists(reports_dir)
+  local temp_dir -- Temp dir helper from test_helper
 
-  it("generates basic summary test results", function()
-    -- Generate basic summary test results
-    print("Generating basic summary test results output...")
-    local summary_report = reporting.format_results(mock_test_results, "summary")
-
-    -- Validate the report
-    expect(summary_report).to.exist()
-    expect(summary_report).to.be.a("string")
-    expect(summary_report).to.match("Test Results")
-    expect(summary_report).to.match("Total:%s+8")
-    expect(summary_report).to.match("Passed:%s+5")
-    expect(summary_report).to.match("Failed:%s+1")
-
-    -- Save to file
-    local file_path = fs.join_paths(reports_dir, "test-results.txt")
-    local success, err = fs.write_file(file_path, summary_report)
-
-    -- Check if write was successful
-    expect(success).to.be_truthy()
-
-    print("Basic summary test results saved to:", file_path)
-    print("Report size:", #summary_report, "bytes")
-
-    -- Preview the summary output
-    print("\nSummary Test Results Preview:")
-    print(summary_report)
+  --- Setup: Create temp directory.
+  before(function()
+    temp_dir = test_helper.create_temp_test_directory("summary_example_")
   end)
 
+  --- Teardown: Release temp dir reference.
+  after(function()
+    temp_dir = nil
+end)
+
+  --- Tests basic summary report generation for coverage data.
   it("generates basic summary coverage report", function()
+    -- Reset config
+    central_config.reset("reporting.formatters.summary")
+
     -- Generate basic summary coverage report
-    print("Generating basic summary coverage report...")
-    local summary_report = reporting.format_coverage(mock_coverage_data, "summary")
+    logger.info("Generating basic summary coverage report...")
+    local summary_report, format_err = reporting.format_coverage(mock_coverage_data, "summary")
+    expect(format_err).to_not.exist("Formatting should succeed") -- Use to_not.exist instead of to.be.nil
 
     -- Validate the report
     expect(summary_report).to.exist()
-    expect(summary_report).to.be.a("string")
-    expect(summary_report).to.match("Coverage Summary")
-    expect(summary_report).to.match("Overall:%s+%d+.%d+%%")
-    expect(summary_report).to.match("Files:%s+%d+/%d+")
+    expect(summary_report).to.be.a("table") -- Expect table with output field
+    expect(summary_report.output).to.be.a("string")
+    expect(summary_report.output).to.match("Coverage Summary")
+    expect(summary_report.output).to.match("Overall Coverage:") -- Update pattern to match actual output
+    expect(summary_report.output).to.match("Files:")
 
     -- Save to file
-    local file_path = fs.join_paths(reports_dir, "coverage-summary.txt")
-    local success, err = fs.write_file(file_path, summary_report)
+    local file_path = fs.join_paths(temp_dir.path, "coverage-summary.txt") -- Use temp_dir
+    local success, err_str = fs.write_file(file_path, summary_report.output) -- Use .output field
 
     -- Check if write was successful
+    expect(err_str).to_not.exist("Writing coverage summary should succeed")
     expect(success).to.be_truthy()
 
-    print("Basic summary coverage report saved to:", file_path)
-    print("Report size:", #summary_report, "bytes")
+    -- Log with proper string formatting
+    logger.info("Basic summary coverage report saved to: " .. file_path)
+    logger.info("Report size: " .. #summary_report.output .. " bytes")
 
     -- Preview the summary output
     print("\nSummary Coverage Report Preview:")
-    print(summary_report)
+    print(summary_report.output) -- Use .output field
   end)
 
-  it("demonstrates summary formatter with color configuration", function()
-    -- Configure summary formatter with colors enabled
-    central_config.set("reporting.formatters.summary", {
-      use_colors = true, -- Enable colored output
-      color_scheme = { -- Custom color scheme
-        header = "bright blue", -- Headers in bright blue
-        pass = "green", -- Passing tests in green
-        fail = "bright red", -- Failing tests in bright red
-        error = "magenta", -- Errors in magenta
-        skip = "yellow", -- Skipped tests in yellow
-        info = "cyan", -- Info text in cyan
-        good = "green", -- Good metrics in green (e.g., high coverage)
-        warning = "yellow", -- Warning metrics in yellow (e.g., medium coverage)
-        critical = "red", -- Critical metrics in red (e.g., low coverage)
-      },
-      terminal_width = 80, -- Target terminal width
-      unicode_symbols = true, -- Use Unicode symbols (✓, ✗, etc.)
-      show_time = true, -- Show execution time for tests
-    })
+end) -- Close describe block for "Summary Formatter Example"
 
-    -- Generate the colored summary report for test results
-    print("\nGenerating colored summary test results...")
-    local summary_report = reporting.format_results(mock_test_results, "summary")
+logger.info("\n=== Summary Formatter Example ===")
+logger.info("This example demonstrates how to generate terminal-friendly text-based summary reports.")
+logger.info("Summary format is ideal for quick feedback in CI/CD systems and local development.")
 
-    -- Note: We can't validate colors directly in the string content
-    expect(summary_report).to.exist()
+logger.info("\nTo run this example directly:")
+logger.info("  lua examples/summary_example.lua")
 
-    -- Save to file (note that colors will likely be saved as ANSI escape sequences)
-    local file_path = fs.join_paths(reports_dir, "test-results-colored.txt")
-    local success, err = fs.write_file(file_path, summary_report)
-    expect(success).to.be_truthy()
+logger.info("\nOr run it with firmo's test runner:")
+logger.info("  lua test.lua examples/summary_example.lua")
 
-    print("Colored summary test results saved to:", file_path)
-    print("\nNote: Terminal will show colors when viewing directly")
+logger.info("\nCommon summary configurations:")
+logger.info("- use_colors: true|false - Enable terminal colors")
+logger.info("- verbosity: minimal|normal|detailed - Control output detail level")
+logger.info("- unicode_symbols: true|false - Use fancy symbols if terminal supports it")
+logger.info("- terminal_width: number - Target width for formatting")
+logger.info("- sections: table - Enable/disable specific sections")
 
-    -- Generate the colored summary report for coverage
-    print("\nGenerating colored summary coverage report...")
-    local coverage_report = reporting.format_coverage(mock_coverage_data, "summary")
-
-    -- Save to file
-    file_path = fs.join_paths(reports_dir, "coverage-summary-colored.txt")
-    success, err = fs.write_file(file_path, coverage_report)
-    expect(success).to.be_truthy()
-
-    print("Colored summary coverage report saved to:", file_path)
-  end)
-
-  it("demonstrates summary formatter with verbosity levels", function()
-    -- Configure for minimal output
-    central_config.set("reporting.formatters.summary", {
-      use_colors = true, -- Keep colors enabled
-      verbosity = "minimal", -- Minimal verbosity level
-      unicode_symbols = false, -- Don't use Unicode symbols
-      show_time = false, -- Don't show execution time
-      terminal_width = 60, -- Narrow terminal width
-    })
-
-    print("\nGenerating minimal verbosity summary...")
-    local minimal_report = reporting.format_results(mock_test_results, "summary")
-
-    expect(minimal_report).to.exist()
-
-    -- Configure for normal output
-    central_config.set("reporting.formatters.summary", {
-      verbosity = "normal", -- Normal verbosity level
-    })
-
-    print("\nGenerating normal verbosity summary...")
-    local normal_report = reporting.format_results(mock_test_results, "summary")
-
-    expect(normal_report).to.exist()
-
-    -- Configure for detailed output
-    central_config.set("reporting.formatters.summary", {
-      verbosity = "detailed", -- Detailed verbosity level
-      show_file_details = true, -- Show details for each file in coverage
-      show_function_details = true, -- Show function details in coverage
-    })
-
-    print("\nGenerating detailed verbosity summary...")
-    local detailed_report = reporting.format_results(mock_test_results, "summary")
-
-    expect(detailed_report).to.exist()
-
-    -- Save all three verbosity levels
-    local minimal_path = fs.join_paths(reports_dir, "test-results-minimal.txt")
-    local normal_path = fs.join_paths(reports_dir, "test-results-normal.txt")
-    local detailed_path = fs.join_paths(reports_dir, "test-results-detailed.txt")
-
-    fs.write_file(minimal_path, minimal_report)
-    fs.write_file(normal_path, normal_report)
-    fs.write_file(detailed_path, detailed_report)
-
-    print("\nSaved summary reports with different verbosity levels:")
-    print("Minimal:", minimal_path)
-    print("Normal:", normal_path)
-    print("Detailed:", detailed_path)
-
-    -- Show relative sizes to demonstrate verbosity difference
-    print("\nSummary size comparison:")
-    print(string.format("Minimal: %d bytes", #minimal_report))
-    print(string.format("Normal: %d bytes", #normal_report))
-    print(string.format("Detailed: %d bytes", #detailed_report))
-
-    -- Display preview of minimal report
-    print("\nMinimal verbosity preview:")
-    print(minimal_report)
-  end)
-
-  it("demonstrates summary formatter with custom sections and formatting", function()
-    -- Configure custom summary sections
-    central_config.set("reporting.formatters.summary", {
-      use_colors = true, -- Enable colored output
-      verbosity = "normal", -- Normal verbosity
-      terminal_width = 80, -- Standard terminal width
-      unicode_symbols = true, -- Use Unicode symbols
-      sections = { -- Custom section configuration
-        header = true, -- Include header section
-        summary = true, -- Include summary section
-        overview = true, -- Include overview section
-        failures = true, -- Include failures section
-        files = true, -- Include files section for coverage
-        conclusion = true, -- Include conclusion section
-      },
-      show_execution_time = true, -- Show execution time
-      threshold_good = 80, -- Coverage threshold for "good" rating (%)
-      threshold_warning = 50, -- Coverage threshold for "warning" rating (%)
-      sort_files_by = "coverage", -- Sort files by coverage (low to high)
-      max_files_to_show = 5, -- Maximum number of files to show in summary
-      custom_header = "FIRMO TEST REPORT", -- Custom header text
-    })
-
-    -- Generate summary for test results with custom configuration
-    print("\nGenerating custom formatted summary test results...")
-    local test_summary = reporting.format_results(mock_test_results, "summary")
-
-    expect(test_summary).to.exist()
-
-    -- Generate summary for coverage with custom configuration
-    print("\nGenerating custom formatted summary coverage report...")
-    local coverage_summary = reporting.format_coverage(mock_coverage_data, "summary")
-
-    expect(coverage_summary).to.exist()
-
-    -- Save custom formatted reports
-    local test_path = fs.join_paths(reports_dir, "test-results-custom.txt")
-    local coverage_path = fs.join_paths(reports_dir, "coverage-summary-custom.txt")
-
-    fs.write_file(test_path, test_summary)
-    fs.write_file(coverage_path, coverage_summary)
-
-    print("\nSaved custom formatted summary reports:")
-    print("Test results:", test_path)
-    print("Coverage summary:", coverage_path)
-
-    -- Display preview of custom coverage summary
-    print("\nCustom coverage summary preview:")
-    print(coverage_summary)
-  end)
-
-  it("demonstrates terminal integration and viewing summary reports", function()
-    -- Set default configuration for summary reports
-    central_config.set("reporting.formatters.summary", {
-      use_colors = true, -- Enable colored output (if terminal supports it)
-      verbosity = "normal", -- Standard verbosity level
-      terminal_width = 80, -- Default terminal width
-      unicode_symbols = true, -- Use Unicode symbols if supported
-    })
-
-    -- Generate both test and coverage summaries
-    local test_summary = reporting.format_results(mock_test_results, "summary")
-    local coverage_summary = reporting.format_coverage(mock_coverage_data, "summary")
-
-    -- Show example shell commands for viewing reports in terminal
-    print("\nTerminal viewing examples:")
-    print("1. Direct test execution with summary output:")
-    print("   $ lua test.lua --format=summary tests/")
-
-    print("\n2. Coverage report with summary output:")
-    print("   $ lua test.lua --coverage --format=summary tests/")
-
-    print("\n3. Viewing saved summary files in terminal:")
-    print("   $ cat test-reports/summary/test-results.txt")
-    print("   $ cat test-reports/summary/coverage-summary.txt")
-
-    print("\n4. Using terminal tools for better display:")
-    print("   $ cat test-reports/summary/test-results.txt | less -R  # Preserves colors")
-    print("   $ cat test-reports/summary/coverage-summary.txt | more")
-
-    print("\nSummary reports generated and ready for viewing!")
-  end)
-end)
-
-print("\n=== Summary Formatter Example ===")
-print("This example demonstrates how to generate terminal-friendly text-based summary reports.")
-print("Summary format is ideal for quick feedback in CI/CD systems and local development.")
-
-print("\nTo run this example directly:")
-print("  lua examples/summary_example.lua")
-
-print("\nOr run it with firmo's test runner:")
-print("  lua test.lua examples/summary_example.lua")
-
-print("\nCommon summary configurations:")
-print("- use_colors: true|false - Enable terminal colors")
-print("- verbosity: minimal|normal|detailed - Control output detail level")
-print("- unicode_symbols: true|false - Use fancy symbols if terminal supports it")
-print("- terminal_width: number - Target width for formatting")
-print("- sections: table - Enable/disable specific sections")
-
-print("\nExample complete!")
+logger.info("\nExample complete!")

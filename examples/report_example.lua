@@ -9,18 +9,21 @@
 --- - Registering and using a custom report formatter.
 --- - Using `reporting.auto_save_reports` for streamlined multi-format report generation.
 ---
---- **Important Note on Coverage:**
---- Similar to other reporting examples, this file intentionally bypasses the standard Firmo
---- test runner's coverage handling (violating Rule ySVa5TBNltJZQjpbZzXWfP / HgnQwB8GQ5BqLAH8MkKpay)
---- by directly calling `coverage.start()`, `coverage.stop()`, and `coverage.get_data()`
---- within the test file. **This is strictly for demonstration purposes** to show how the
---- reporting module consumes coverage data. In a real project, coverage should **always** be
---- managed by the test runner (`lua test.lua --coverage ...`).
+--- **Important Note:**
+--- This example uses **mock processed coverage data** passed directly to the reporting
+--- functions. It does **not** perform actual test execution or coverage collection.
+--- Its purpose is solely to demonstrate generating reports in various formats using
+--- `reporting.format_coverage` and `reporting.auto_save_reports` with mock data.
+--- In a real project, coverage data is collected via `lua test.lua --coverage ...`
+--- and reports are generated based on the configuration.
 ---
 --- @module examples.report_example
 --- @see lib.reporting
---- @see lib.coverage
 --- @see lib.core.central_config
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @usage
 --- Run embedded tests (coverage is handled internally for demo):
 --- ```bash
@@ -31,17 +34,85 @@
 --- lua test.lua --coverage examples/report_example.lua
 --- ```
 
+-- Extract the testing functions we need
 local firmo = require("firmo")
+---@type fun(description: string, callback: function) describe Test suite container function
+local describe = firmo.describe
+---@type fun(description: string, options: table|function, callback: function?) it Test case function with optional parameters
+local it = firmo.it
+---@type fun(value: any) expect Assertion generator function
+local expect = firmo.expect
+---@type fun(callback: function) before Setup function that runs before each test
+local before = firmo.before
+---@type fun(callback: function) after Teardown function that runs after each test
+local after = firmo.after
 
 -- Import helper modules
 local fs = require("lib.tools.filesystem")
 local test_helper = require("lib.tools.test_helper")
 local error_handler = require("lib.tools.error_handler")
+local logging = require("lib.tools.logging") -- Added missing require
 
 -- Load required modules
 local reporting = require("lib.reporting")
-local coverage = require("lib.coverage")
+-- local coverage = require("lib.coverage") -- Removed: Using mock data
 local central_config = require("lib.core.central_config")
+
+-- Setup logger
+local logger = logging.get_logger("ReportExample")
+
+-- Mock processed coverage data structure for demonstration purposes.
+local mock_processed_data = {
+  files = {
+    ["examples/report_example.lua"] = { -- Use this file conceptually
+      filename = "examples/report_example.lua",
+      lines = { -- line_num (string) = { hits=count }
+        ["69"] = { hits = 1 }, -- calc.add
+        ["77"] = { hits = 1 }, -- calc.subtract
+        ["85"] = { hits = 1 }, -- calc.multiply
+        ["94"] = { hits = 1 }, -- calc.divide (if branch)
+        ["97"] = { hits = 1 }, -- calc.divide (return)
+        ["105"] = { hits = 0 }, -- calc.power (not called)
+      },
+      functions = { -- func_name = { name, start_line, execution_count }
+        ["add"] = { name = "add", start_line = 68, execution_count = 1 },
+        ["subtract"] = { name = "subtract", start_line = 76, execution_count = 1 },
+        ["multiply"] = { name = "multiply", start_line = 84, execution_count = 1 },
+        ["divide"] = { name = "divide", start_line = 93, execution_count = 1 },
+        ["power"] = { name = "power", start_line = 104, execution_count = 0 },
+      },
+      branches = { -- line_num (string) = { { hits=count }, { hits=count } }
+        ["94"] = { { hits = 1 }, { hits = 0 } }, -- divide by zero check (false path hit)
+      },
+      executable_lines = 6,
+      covered_lines = 5,
+      line_rate = 5 / 6,
+      line_coverage_percent = (5 / 6) * 100,
+      total_lines = 442, -- Approx file total
+      total_functions = 5,
+      covered_functions = 4,
+      function_coverage_percent = (4 / 5) * 100,
+      total_branches = 1,
+      covered_branches = 1, -- The 'false' path of the 'if b==0' was hit
+      branch_coverage_percent = 100.0,
+    },
+  },
+  summary = {
+    executable_lines = 6,
+    covered_lines = 5,
+    line_coverage_percent = (5 / 6) * 100,
+    total_lines = 442,
+    total_functions = 5,
+    covered_functions = 4,
+    function_coverage_percent = (4 / 5) * 100,
+    total_branches = 1,
+    covered_branches = 1,
+    branch_coverage_percent = 100.0,
+    total_files = 1,
+    covered_files = 1,
+    overall_percent = (5 / 6) * 100,
+  },
+}
 
 -- Some sample code to test coverage
 --- Simple calculator module for testing.
@@ -114,13 +185,15 @@ describe("Report Example - Calculator", function()
         end
       end)
 
-      if not success and firmo.log then
-        firmo.log.warn("Failed to remove test file: " .. tostring(err), {
+      if not success then -- Check if firmo.log exists before calling
+        logger.warn("Failed to remove test file: " .. tostring(err), {
           file_path = file_path,
         })
       end
     end
     test_files = {}
+    temp_dir = nil -- Release reference
+    -- temp_file module handles actual directory cleanup
   end)
 
   --- Tests for basic arithmetic operations.
@@ -190,7 +263,8 @@ describe("Reporting Module Examples", function()
 
   -- Create a temp directory before tests
   before(function()
-    temp_dir = test_helper.create_temp_test_directory()
+    temp_dir = test_helper.create_temp_test_directory("report_example_") -- Add prefix
+    logger.info("Created temporary directory: " .. temp_dir.path)
   end)
 
   -- Clean up files after tests
@@ -204,19 +278,10 @@ describe("Reporting Module Examples", function()
   end)
 
   -- Example demonstrating all 8 formatters
-  --- Generates coverage data and creates reports using all 8 built-in formatters.
+  --- Generates coverage reports using mock data and all 8 built-in formatters.
   it("demonstrates all 8 supported formatters", function()
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
-    coverage.start()
-
-    -- Run some code to generate coverage data
-    calculator.add(5, 10)
-    calculator.subtract(20, 5)
-    calculator.multiply(3, 4)
-
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
-    coverage.stop()
-    local coverage_data = coverage.get_data()
+    -- Use mock data instead of generating live coverage
+    local coverage_data = mock_processed_data
 
     -- The 8 supported formatters
     local formatters = {
@@ -232,8 +297,9 @@ describe("Reporting Module Examples", function()
 
     -- Generate and verify reports for each formatter
     for _, format in ipairs(formatters) do
-      -- Generate the report
-      local report = reporting.format_coverage(coverage_data, format)
+      -- Generate the report using mock data
+      local report, format_err = reporting.format_coverage(mock_processed_data, format)
+      expect(format_err).to.be_nil("Formatting " .. format .. " should succeed")
       expect(report).to.exist()
 
       -- Save to file
@@ -243,7 +309,8 @@ describe("Reporting Module Examples", function()
       end
 
       local report_path = fs.join_paths(temp_dir.path, "coverage-" .. format .. "." .. file_ext)
-      local success, err = reporting.write_file(report_path, report)
+      -- Note: reporting.write_file might not exist, use fs.write_file
+      local success, err_str = fs.write_file(report_path, report)
 
       -- Record for cleanup
       if success then
@@ -253,8 +320,8 @@ describe("Reporting Module Examples", function()
           size = #report,
         })
       else
-        firmo.log.warn("Failed to write " .. format .. " report", {
-          error = tostring(err.message),
+        logger.warn("Failed to write " .. format .. " report", {
+          error = tostring(err_str), -- Use the error string
         })
       end
     end
@@ -289,20 +356,16 @@ describe("Reporting Module Examples", function()
       },
     })
 
-    -- Test coverage with configured formatters
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
-    coverage.start()
-    calculator.divide(10, 2)
-    calculator.multiply(4, 4)
-    coverage.stop()
+    -- Use mock coverage data
+    local data = mock_processed_data
 
-    -- Get coverage data
-    local data = coverage.get_data()
-
-    -- Generate configured reports
-    local html_report = reporting.format_coverage(data, "html")
-    local json_report = reporting.format_coverage(data, "json")
-    local csv_report = reporting.format_coverage(data, "csv")
+    -- Generate configured reports using mock data
+    local html_report, html_err = reporting.format_coverage(mock_processed_data, "html")
+    local json_report, json_err = reporting.format_coverage(mock_processed_data, "json")
+    local csv_report, csv_err = reporting.format_coverage(mock_processed_data, "csv")
+    expect(html_err).to.be_nil()
+    expect(json_err).to.be_nil()
+    expect(csv_err).to.be_nil()
 
     -- Verify configuration was applied
     expect(html_report).to.match('theme="dark"')
@@ -366,14 +429,10 @@ describe("Reporting Module Examples", function()
     local available = reporting.get_available_formatters()
     expect(available.coverage).to.contain("simple")
 
-    -- Generate coverage data and use the formatter
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
-    coverage.start()
-    calculator.add(1, 1)
-    coverage.stop()
-
-    local data = coverage.get_data()
-    local simple_report = reporting.format_coverage(data, "simple")
+    -- Use mock coverage data and the formatter
+    local data = mock_processed_data
+    local simple_report, format_err = reporting.format_coverage(mock_processed_data, "simple")
+    expect(format_err).to.be_nil()
 
     -- Verify the output
     expect(simple_report).to.match("Coverage Summary:")
@@ -384,20 +443,8 @@ describe("Reporting Module Examples", function()
   --- Demonstrates using `reporting.auto_save_reports` with advanced configuration,
   -- including custom filename templates and multiple formats.
   it("demonstrates advanced report configuration and auto-saving", function()
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
-    coverage.start()
-
-    -- Add some test coverage
-    calculator.add(5, 5)
-    calculator.subtract(10, 3)
-    calculator.multiply(2, 6)
-    calculator.divide(10, 2)
-
-    -- NOTE: Bypassing standard runner coverage for demonstration (Rule ySVa5TBNltJZQjpbZzXWfP)
-    coverage.stop()
-
-    -- Get the coverage data
-    local data = coverage.get_data()
+    -- Use mock coverage data
+    local data = mock_processed_data
 
     -- Example of advanced configuration with templates
     local config = {
@@ -412,11 +459,11 @@ describe("Reporting Module Examples", function()
       validation_report_path = fs.join_paths(temp_dir.path, "validation-report.json"),
     }
 
-    -- Auto-save all reports
-    local results = reporting.auto_save_reports(data, nil, nil, config)
+    -- Auto-save all reports (pass nil for results, data for coverage, nil for quality)
+    local results = reporting.auto_save_reports(nil, data, nil, config)
 
     -- Verify results
-    expect(results.html.success).to.be_truthy()
+    expect(results.html.success).to.be_truthy("HTML auto-save failed")
     expect(results.json.success).to.be_truthy()
     expect(results.lcov.success).to.be_truthy()
     expect(results.cobertura.success).to.be_truthy()

@@ -351,17 +351,18 @@ function M.describe(name, fn, options)
   befores[level] = befores[level] or {}
   afters[level] = afters[level] or {}
 
-  if not should_skip_block then
-    -- Execute the test group function to register its tests
-    local success, err = get_error_handler().try(fn)
-    if not success then
-      -- Handle errors in describe blocks
-      get_logger().error("Error in describe block: " .. get_error_handler().format_error(err), {
-        block_name = name,
-        level = level,
-      })
-      errors = errors + 1
-    end
+  -- Always execute the function 'fn' to discover nested tests, even if skipped.
+  -- The 'it' function will handle skipping based on the 'excluded' flag on the block.
+  local success, err = get_error_handler().try(fn)
+  if not success then
+    -- Handle errors during describe block definition
+    get_logger().error("Error during describe block definition: " .. get_error_handler().format_error(err), {
+      block_name = name,
+      level = level,
+    })
+    errors = errors + 1
+    -- Record this suite itself as failing due to definition error? Might be complex.
+    -- For now, just log the error. The runner should still report failures.
   end
 
   -- Restore previous state
@@ -464,12 +465,28 @@ end
 ---   expect(operation_completed).to.be_truthy()
 --- end)
 function M.it(name, options_or_fn, fn)
-  -- Determine if first argument is options or function
+  -- Determine arguments based on signature
   local options = {}
-  if type(options_or_fn) == "table" then
+  local test_fn -- Use a different name for the function variable
+
+  if type(options_or_fn) == "function" then
+    -- Signature: it(desc, func)
+    options = {}
+    test_fn = options_or_fn
+  elseif type(options_or_fn) == "table" then
+    -- Signature: it(desc, options, func_arg)
     options = options_or_fn
-  else
-    fn = options_or_fn
+    test_fn = fn -- Use the third argument parameter named 'fn'
+    if type(test_fn) ~= "function" then
+      error("Invalid arguments to it(): Expected function as third argument when second is options table.", 2)
+    end
+  else -- options_or_fn is nil or some other type
+    -- Signature: it(desc, nil, func_arg)
+    options = {}
+    test_fn = fn -- Use the third argument parameter named 'fn'
+    if type(test_fn) ~= "function" then
+      error("Invalid arguments to it(): Expected function as second or third argument.", 2)
+    end
   end
 
   -- Apply defaults to options
@@ -493,7 +510,12 @@ function M.it(name, options_or_fn, fn)
   -- Determine if test should be skipped based on focus mode
   local should_skip = false
 
-  -- Skip if exclude flag is set
+  -- Skip if parent describe block was excluded
+  if current_describe_block and current_describe_block.excluded then
+    should_skip = true
+  end
+
+  -- Skip if exclude flag is set directly on the test
   if options.excluded then
     should_skip = true
   end
@@ -590,7 +612,8 @@ function M.it(name, options_or_fn, fn)
     end -- Correctly close the level loop
 
     -- Run the test
-    fn()
+    assert(type(test_fn) == "function", "INTERNAL ERROR: test_fn is nil before pcall in test runner!") -- Add assertion
+    test_fn() -- Use the correctly assigned test function variable
 
     -- Run after hooks in reverse order
     for i = level, 1, -1 do

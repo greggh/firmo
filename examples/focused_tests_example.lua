@@ -1,12 +1,17 @@
---- focused_tests_example.lua
---
--- This example demonstrates Firmo's focus (`fit`, `fdescribe`) and exclude
--- (`xit`, `xdescribe`) features, which allow developers to selectively run
+--- This example demonstrates Firmo's focus (`fit`, `fdescribe`) and exclude
+--- (`xit`, `xdescribe`) features, which allow developers to selectively run
 -- or skip specific tests or test suites.
 --
 -- It also includes a test designed to fail with a table comparison to show
 -- the enhanced diff output provided by Firmo's assertion library.
 --
+-- @module examples.focused_tests_example
+-- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
+-- @see firmo
+-- @usage
 -- Run embedded tests: lua test.lua examples/focused_tests_example.lua
 --
 

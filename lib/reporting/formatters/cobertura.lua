@@ -331,6 +331,7 @@ end
 ---@return string xml_content The generated Cobertura XML content as a string. Returns a minimal empty XML if input data is invalid.
 ---@throws table If validation fails (via `error_handler.assert`).
 function M.format_coverage(coverage_data)
+  get_logger().trace("Starting format_coverage")
   -- Parameter validation
   get_error_handler().assert(
     type(coverage_data) == "table",
@@ -343,6 +344,7 @@ function M.format_coverage(coverage_data)
     logger.warn("Coverage data does not contain summary data, returning empty Cobertura content")
     return '<?xml version="1.0" encoding="UTF-8"?>\n<coverage></coverage>'
   end
+  get_logger().trace("Checked summary data")
 
   -- Generate timestamp
   local timestamp = os.date("%Y-%m-%dT%H:%M:%S")
@@ -378,8 +380,10 @@ function M.format_coverage(coverage_data)
     return a.path < b.path
   end)
 
+  get_logger().trace("Starting file loop")
   -- Process each file
   for _, file in ipairs(files) do
+    get_logger().trace("Processing file", { path = file.path })
     local file_data = file.data
     local path = file.path
 
@@ -416,6 +420,7 @@ function M.format_coverage(coverage_data)
       return a.data.start_line < b.data.start_line
     end)
 
+    get_logger().trace("Starting function loop for file", { path = path })
     -- Process each function
     for _, func in ipairs(functions) do
       local func_data = func.data
@@ -471,6 +476,7 @@ function M.format_coverage(coverage_data)
       return a.line_num < b.line_num
     end)
 
+    get_logger().trace("Starting line loop for file", { path = path })
     -- Process each line
     for _, line_info in ipairs(sorted_lines) do
       local line_num = line_info.line_num
@@ -493,6 +499,7 @@ function M.format_coverage(coverage_data)
   xml = xml .. "  </packages>\n"
   xml = xml .. "</coverage>\n"
 
+  get_logger().trace("Finished format_coverage successfully")
   return xml
 end
 

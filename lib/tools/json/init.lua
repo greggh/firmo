@@ -173,7 +173,8 @@ function encode_value(val)
   elseif val_type == "table" then
     return encode_table(val)
   else
-    return nil, error_handler.validation_error("Cannot encode value of type " .. val_type, { provided_type = val_type })
+    return nil,
+      get_error_handler().validation_error("Cannot encode value of type " .. val_type, { provided_type = val_type })
   end
 end
 
@@ -188,7 +189,7 @@ function M.encode(value)
 
   if not success then
     get_logger().error("Failed to encode JSON", {
-      error = error_handler.format_error(result),
+      error = get_error_handler().format_error(result),
     })
     return nil, result
   end
@@ -387,7 +388,7 @@ function M.decode(json)
     return nil, get_error_handler().validation_error("Expected string", { provided_type = type(json) })
   end
 
-  local success, pos, result = error_handler.try(function()
+  local success, pos, result = get_error_handler().try(function()
     local pos, result = decode_value(json, 1)
     if not pos then
       return nil, get_error_handler().validation_error("Invalid JSON", { json = json })

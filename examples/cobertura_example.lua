@@ -13,6 +13,10 @@
 --- and Firmo would handle data collection and formatting automatically based on config.
 ---
 --- @module examples.cobertura_example
+--- @author Firmo Team
+--- @license MIT
+--- @copyright 2023-2025
+--- @version 1.0.0
 --- @see lib.reporting
 --- @see lib.reporting.formatters.cobertura
 --- @see lib.tools.filesystem.temp_file
@@ -36,9 +40,18 @@ local logger = logging.get_logger("CoberturaExample")
 --- @class MockCoverageData
 --- @field files table<string, FileCoverageData> Coverage data per file.
 --- @field summary CoverageSummaryData Overall summary statistics.
+--- @field lines table<number, { executable: boolean, execution_count: number }> Line coverage data.
+--- @field functions table<string, FunctionCoverageData> Function coverage data.
+--- @field total_lines number Total lines in the file.
+--- @field executable_lines number Total executable lines in the file.
+--- @field covered_lines number Number of executable lines covered (execution_count > 0).
+--- @field total_functions number Total functions defined in the file.
+--- @field covered_functions number Number of functions covered (execution_count > 0).
+--- @field line_coverage_percent number Percentage of executable lines covered.
+--- @field function_coverage_percent number Percentage of functions covered.
+--- @field branch_coverage_percent number Percentage of branches covered (optional).
 --- @within examples.cobertura_example
 local mock_coverage_data = {
-  --- @class FileCoverageData
   files = {
     ["src/calculator.lua"] = {
       lines = {
@@ -47,24 +60,29 @@ local mock_coverage_data = {
         [3] = { executable = true, execution_count = 1 },
         [5] = { executable = true, execution_count = 0 }, -- false becomes count 0
         [6] = { executable = true, execution_count = 1 },
-        [8] = { executable = true, execution_count = 0 }, -- false becomes count 0
-        [9] = { executable = true, execution_count = 0 }, -- false becomes count 0
+        [8] = { executable = true, execution_count = 0 },
+        [9] = { executable = true, execution_count = 0 },
       },
+      --- @class FunctionCoverageData
+      --- @field name string Function name.
+      --- @field start_line number Starting line number.
+      --- @field end_line number Ending line number.
+      --- @field execution_count number How many times the function was entered.
       functions = {
-        ["add"] = { name = "add", start_line = 5, end_line = 10, executed = true, execution_count = 1 },
-        ["subtract"] = { name = "subtract", start_line = 11, end_line = 15, executed = true, execution_count = 1 },
-        ["multiply"] = { name = "multiply", start_line = 16, end_line = 20, executed = false, execution_count = 0 },
-        ["divide"] = { name = "divide", start_line = 21, end_line = 25, executed = false, execution_count = 0 },
+        ["add"] = { name = "add", start_line = 5, end_line = 10, execution_count = 1 },
+        ["subtract"] = { name = "subtract", start_line = 11, end_line = 15, execution_count = 1 },
+        ["multiply"] = { name = "multiply", start_line = 16, end_line = 20, execution_count = 0 },
+        ["divide"] = { name = "divide", start_line = 21, end_line = 25, execution_count = 0 },
       },
-      total_lines = 10,
-      covered_lines = 4,
-      executable_lines = 8, -- Added estimated field
+      total_lines = 25, -- Estimated based on function end lines
+      executable_lines = 7, -- Number of entries in lines table
+      covered_lines = 4, -- Number with execution_count > 0
       total_functions = 4,
-      covered_functions = 2,
-      line_coverage_percent = 40.0, -- Added field
-      function_coverage_percent = 50.0, -- Added field
-      branch_coverage_percent = 100.0, -- Added field
-    }, -- <<< Comma
+      covered_functions = 2, -- Number with execution_count > 0
+      line_coverage_percent = (4 / 7) * 100, -- Recalculated
+      function_coverage_percent = (2 / 4) * 100, -- Recalculated
+      branch_coverage_percent = 100.0, -- Placeholder
+    },
     ["src/utils.lua"] = {
       lines = {
         [1] = { executable = true, execution_count = 1 },
@@ -77,42 +95,41 @@ local mock_coverage_data = {
         ["validate"] = { name = "validate", start_line = 3, end_line = 8, executed = true, execution_count = 1 },
         ["format"] = { name = "format", start_line = 9, end_line = 12, executed = false, execution_count = 0 },
       },
-      total_lines = 8,
-      covered_lines = 4,
-      executable_lines = 6, -- Added estimated field
+      total_lines = 12, -- Estimated based on function end lines
+      executable_lines = 5, -- Number of entries in lines table
+      covered_lines = 4, -- Number with execution_count > 0
       total_functions = 2,
-      covered_functions = 1,
-      line_coverage_percent = 50.0, -- Added field
-      function_coverage_percent = 50.0, -- Added field
-      branch_coverage_percent = 100.0, -- Added field
-    }, -- <<< Comma
-  }, -- <<< Comma
-  summary = {
-    total_files = 2, -- Added missing field
-    covered_files = 2,
-    total_lines = 18,
-    executable_lines = 14, -- Added missing field (sum of per-file executable lines)
-    covered_lines = 8, -- Corrected based on file data
-    total_functions = 6,
-    covered_functions = 3, -- Corrected based on file data
-    line_coverage_percent = 44.4, -- 8/18
-    function_coverage_percent = 50.0, -- 3/6
-    overall_percent = 47.2, -- (44.4 + 50.0) / 2
-    --- @class CoverageSummaryData
-    summary = {
-      total_files = 2, -- Added missing field
-      covered_files = 2,
-      total_lines = 18,
-      executable_lines = 14, -- Added missing field (sum of per-file executable lines)
-      covered_lines = 8, -- Corrected based on file data
-      total_functions = 6,
-      covered_functions = 3, -- Corrected based on file data
-      line_coverage_percent = 44.4, -- 8/18
-      function_coverage_percent = 50.0, -- 3/6
-      overall_percent = 47.2, -- Example overall metric
+      covered_functions = 1, -- Number with execution_count > 0
+      line_coverage_percent = (4 / 5) * 100, -- Recalculated
+      function_coverage_percent = (1 / 2) * 100, -- Recalculated
+      branch_coverage_percent = 100.0, -- Placeholder
     },
   },
+  --- @class CoverageSummaryData
+  --- @field total_files number Total number of files processed.
+  --- @field covered_files number Number of files with > 0% coverage.
+  --- @field total_lines number Total lines across all files.
+  --- @field executable_lines number Total executable lines across all files.
+  --- @field covered_lines number Total covered executable lines.
+  --- @field total_functions number Total functions across all files.
+  --- @field covered_functions number Total covered functions.
+  --- @field line_coverage_percent number Overall line coverage percentage.
+  --- @field function_coverage_percent number Overall function coverage percentage.
+  --- @field overall_percent number Overall coverage percentage (often based on lines).
+  summary = {
+    total_files = 2,
+    covered_files = 2,
+    total_lines = 37, -- 25 + 12
+    executable_lines = 12, -- 7 + 5
+    covered_lines = 8, -- 4 + 4
+    total_functions = 6, -- 4 + 2
+    covered_functions = 3, -- 2 + 1
+    line_coverage_percent = (8 / 12) * 100, -- Recalculated: ~66.7%
+    function_coverage_percent = (3 / 6) * 100, -- Recalculated: 50.0%
+    overall_percent = (8 / 12) * 100, -- Typically based on lines
+  },
 }
+
 -- Create a temporary directory for the report using the temp_file helper.
 -- This ensures the directory is automatically cleaned up later.
 local temp_dir_path, err = temp_file.create_temp_directory("cobertura_example_")
@@ -162,5 +179,4 @@ print("- Azure DevOps with the Publish Code Coverage task")
 
 logger.info("\nExample complete!")
 
--- Cleanup temporary directory
-temp_file.cleanup_all()
+-- Cleanup temporary directory (handled by temp_file registration or test runner)
