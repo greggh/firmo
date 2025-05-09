@@ -15,6 +15,10 @@
 ---@field track_assertion fun(self: QualityModule, type_name: string, test_name?: string): QualityModule Tracks an assertion usage for the current test. Returns self.
 ---@field start_test fun(self: QualityModule, test_name: string, context_opts?: {has_describe?: boolean, has_it?: boolean, nesting_level?: number, has_before_after?: boolean}): QualityModule Starts analysis for a specific test. Returns self.
 ---@field end_test fun(self: QualityModule): QualityModule Ends analysis for the current test and evaluates its quality. Returns self.
+---@field track_spy_created fun(self: QualityModule, spy_identifier: string|number): QualityModule Tracks the creation of a spy.
+---@field track_spy_restored fun(self: QualityModule, spy_identifier: string|number): QualityModule Tracks the restoration of a spy.
+---@field start_describe fun(self: QualityModule, describe_name: string): QualityModule Marks the start of a describe block for quality tracking, fetching file_path internally.
+---@field end_describe fun(self: QualityModule): QualityModule Marks the end of the current describe block and checks for emptiness.
 ---@field analyze_file fun(self: QualityModule, file_path: string): table Performs static analysis on a file for structural properties; dynamic tracking is used for assertions. Returns analysis results.
 ---@field get_report_data fun(self: QualityModule): {report_type: "quality", level: number, level_name: string, tests: table<string, table>, summary: {tests_analyzed: number, tests_passing_quality: number, quality_percent: number, assertions_total: number, assertions_per_test_avg: number, assertion_types_found: table<string, number>, issues: table<{test: string, issue: string}>[]}} Gets structured data for reporting.
 ---@field report fun(self: QualityModule, format?: string): string|table Generates a quality report. @throws table If reporting module fails.
@@ -380,6 +384,8 @@ M.levels = {
 -- Data structures for tracking tests and their quality metrics
 local current_test = nil
 local test_data = {}
+local active_spies = {} -- Tracks spies created within the current_test scope { [spy_identifier] = true }
+local describe_context_stack = {} -- Stack to hold info about active describe blocks: { name, file_path, it_blocks_found }
 
 -- Quality statistics
 M.stats = {
@@ -545,6 +551,8 @@ function M.reset()
   -- Reset test data
   test_data = {}
   current_test = nil
+  active_spies = {}
+  describe_context_stack = {}
 
   -- Reset file cache
   file_cache = {}
@@ -824,7 +832,6 @@ function M.track_assertion(action_name, test_name_override)
   if category then
     test_data[current_test].assertion_types[category] = (test_data[current_test].assertion_types[category] or 0) + 1
   else
-    -- Removed [QUALITY_DEBUG] print statement
     get_logger().warn("Unknown assertion action for quality categorization. Mapping to 'other'.", {
       action_in_log = action_name,
       test = current_test,
@@ -863,61 +870,79 @@ function M.start_test(test_name, context_opts)
   get_logger().debug("Starting test analysis", { test_name = test_name })
   current_test = test_name
 
-  -- Initialize test data
+  -- Increment direct_it_blocks_found for the current describe context if any
+  if #describe_context_stack > 0 then
+    local current_describe_ctx = describe_context_stack[#describe_context_stack]
+    current_describe_ctx.direct_it_blocks_found = current_describe_ctx.direct_it_blocks_found + 1
+  end
+
   if not test_data[current_test] then
     get_logger().trace("Initializing new test data structure", { test = test_name })
 
     local has_proper_name = (test_name and test_name ~= "" and test_name ~= "unnamed_test")
+
     local current_file_for_test = central_config and central_config.get("runtime.current_test_file") or nil
+
+    if
+      current_file_for_test
+      and current_file_for_test ~= ""
+      and current_file_for_test ~= "unknown_file"
+      and current_file_for_test ~= "unknown_file_from_describe_fallback"
+    then
+      for _, d_ctx in ipairs(describe_context_stack) do
+        if d_ctx.file_path == "unknown_file_from_describe_fallback" or d_ctx.file_path == "unknown_file" then
+          get_logger().trace("Retroactively updating file_path for describe context", {
+            describe_name = d_ctx.name,
+            old_path = d_ctx.file_path,
+            new_path = current_file_for_test,
+          })
+          d_ctx.file_path = current_file_for_test
+        end
+      end
+    end
 
     test_data[current_test] = {
       name = test_name,
-      file_path = current_file_for_test, -- Store file_path
+      file_path = current_file_for_test,
       assertion_count = 0,
       assertion_types = {},
       has_describe = context_opts.has_describe or false,
       has_it = context_opts.has_it or false,
-      has_proper_name = has_proper_name, -- This is already based on test_name analysis below
+      has_proper_name = has_proper_name,
       has_before_after = context_opts.has_before_after or false,
       nesting_level = context_opts.nesting_level or 1,
-      has_mock_verification = false, -- These will be set by pattern matching or future analysis
+      has_mock_verification = false,
       has_performance_tests = false,
       has_security_tests = false,
+      unrestored_spies_found = false,
       patterns_found = {},
       issues = {},
       quality_level = 0,
     }
+    active_spies = {}
 
-    -- Check for specific patterns in the test name
     if test_name then
-      -- Check for proper naming conventions
       if test_name:match("should") or test_name:match("when") then
         test_data[current_test].has_proper_name = true
         get_logger().trace("Test has proper naming convention", { test = test_name })
       end
 
-      -- Explicitly populate patterns_found for "should" and "when" if present in name
-      if test_name and test_data[current_test] then -- Ensure current_test data exists
-        test_data[current_test].patterns_found = test_data[current_test].patterns_found or {} -- Ensure table exists
-        if test_name:match("should") then
-          test_data[current_test].patterns_found["should"] = true
-          get_logger().trace("Marked 'should' pattern as found due to test name.", { test = test_name })
-        end
-        if test_name:match("when") then
-          test_data[current_test].patterns_found["when"] = true
-          get_logger().trace("Marked 'when' pattern as found due to test name.", { test = test_name })
-        end
+      test_data[current_test].patterns_found = test_data[current_test].patterns_found or {}
+      if test_name:match("should") then
+        test_data[current_test].patterns_found["should"] = true
+        get_logger().trace("Marked 'should' pattern as found due to test name.", { test = test_name })
+      end
+      if test_name:match("when") then
+        test_data[current_test].patterns_found["when"] = true
+        get_logger().trace("Marked 'when' pattern as found due to test name.", { test = test_name })
       end
 
-      -- Check for different test types
       local found_patterns = {}
       for pat_type, patterns_list in pairs(patterns) do
         for _, pattern in ipairs(patterns_list) do
           if contains_pattern(test_name, pattern) then
             test_data[current_test].patterns_found[pat_type] = true
             table.insert(found_patterns, pat_type)
-
-            -- Mark special test types
             if pat_type == "performance" then
               test_data[current_test].has_performance_tests = true
             elseif pat_type == "security" then
@@ -926,7 +951,6 @@ function M.start_test(test_name, context_opts)
           end
         end
       end
-
       if #found_patterns > 0 then
         get_logger().trace("Found patterns in test name", {
           test = test_name,
@@ -935,7 +959,6 @@ function M.start_test(test_name, context_opts)
       end
     end
   end
-
   return M
 end
 
@@ -952,6 +975,26 @@ function M.end_test()
   end
 
   get_logger().debug("Ending test analysis", { test = current_test })
+
+  -- Check for unrestored spies before evaluation
+  if next(active_spies) ~= nil then
+    if test_data[current_test] then
+      test_data[current_test].unrestored_spies_found = true
+      local unrestored_ids = {}
+      for id, _ in pairs(active_spies) do
+        table.insert(unrestored_ids, tostring(id))
+      end
+      get_logger().warn("Unrestored spies detected at end of test", {
+        test = current_test,
+        unrestored_spy_identifiers = table.concat(unrestored_ids, ", "),
+      })
+    else
+      get_logger().error(
+        "Cannot mark unrestored spies: test_data not found for current_test",
+        { current_test_val = current_test }
+      )
+    end
+  end
 
   -- Evaluate test quality
   local evaluation = evaluate_test_quality(test_data[current_test])
@@ -1691,6 +1734,162 @@ function M.register_with_firmo(firmo_instance)
   table.insert(firmo_instance._reset_handlers, M.reset)
   get_logger().info("quality.reset registered with firmo instance.")
   return true
+end
+
+--- Tracks the creation of a spy.
+--- This function should be called by the spy module (e.g., `firmo.spy.on`) when a spy is created.
+---@param spy_identifier string|number A unique identifier for the spy (e.g., a name or object reference string).
+---@return QualityModule self The quality module instance (`M`) for chaining.
+function M.track_spy_created(spy_identifier)
+  if not M.config.enabled then
+    return M
+  end
+  if not current_test then
+    get_logger().warn(
+      "track_spy_created called outside of an active test scope. Spy creation will not be tracked for restoration.",
+      {
+        spy_identifier = spy_identifier,
+      }
+    )
+    return M
+  end
+  if not spy_identifier then
+    get_logger().warn("track_spy_created called with nil spy_identifier.")
+    return M
+  end
+
+  active_spies = active_spies or {} -- Ensure it's initialized, though start_test should do it
+  active_spies[spy_identifier] = true
+  get_logger().trace("Spy created and tracked", { test = current_test, spy_id = spy_identifier })
+  return M
+end
+
+--- Tracks the restoration of a spy.
+--- This function should be called by the spy module when a spy's `restore()` method is called.
+---@param spy_identifier string|number The unique identifier for the spy that was restored.
+---@return QualityModule self The quality module instance (`M`) for chaining.
+function M.track_spy_restored(spy_identifier)
+  if not M.config.enabled then
+    return M
+  end
+  if not spy_identifier then
+    get_logger().warn("track_spy_restored called with nil spy_identifier.")
+    return M
+  end
+
+  if active_spies and active_spies[spy_identifier] then
+    active_spies[spy_identifier] = nil
+    get_logger().trace("Spy restored and untracked", { test = current_test or "global", spy_id = spy_identifier })
+  else
+    get_logger().trace("Attempted to restore an untracked or already restored spy", {
+      test = current_test or "global",
+      spy_id = spy_identifier,
+    })
+  end
+  return M
+end
+
+--- Marks the start of a describe block for quality tracking.
+--- Retrieves the current file path from `central_config` and pushes a new
+--- context (name, file_path, it_blocks_found) onto the describe_context_stack.
+---@param describe_name string The name of the describe block.
+---@return QualityModule self The quality module instance (`M`) for chaining.
+function M.start_describe(describe_name)
+  if not M.config.enabled then
+    return M
+  end
+
+  if not describe_name or type(describe_name) ~= "string" or describe_name == "" then
+    get_logger().warn("M.start_describe called with invalid describe_name. Using 'unnamed_describe'.", {
+      provided_name = describe_name,
+      type = type(describe_name),
+    })
+    describe_name = "unnamed_describe"
+  end
+
+  local retrieved_file_path = (central_config and central_config.get("runtime.current_test_file"))
+  get_logger().debug('[QUALITY_DEBUG] M.start_describe: Value from central_config.get("runtime.current_test_file")', {
+    retrieved_path_debug = retrieved_file_path,
+    is_nil = retrieved_file_path == nil,
+    is_empty_string = retrieved_file_path == "",
+  })
+
+  local file_path = retrieved_file_path or "unknown_file_from_describe_fallback"
+  if not file_path or type(file_path) ~= "string" or file_path == "" then
+    get_logger().warn(
+      "M.start_describe could not determine file_path reliably from central_config or it was invalid. Using fallback.",
+      {
+        describe_name = describe_name,
+        retrieved_path_final_check = file_path,
+      }
+    )
+    file_path = "unknown_file_from_describe_fallback"
+  end
+
+  local context = {
+    name = describe_name,
+    file_path = file_path,
+    direct_it_blocks_found = 0, -- Changed from it_blocks_found
+    child_it_blocks_found = 0, -- New field
+  }
+  table.insert(describe_context_stack, context)
+  get_logger().trace(
+    "Started describe block tracking",
+    { name = describe_name, file = file_path, depth = #describe_context_stack }
+  )
+  return M
+end
+
+--- Marks the end of the current describe block for quality tracking.
+--- Pops the current context from the describe_context_stack and checks if it was empty.
+--- If empty, an issue is added to `M.stats.issues`.
+---@return QualityModule self The quality module instance (`M`) for chaining.
+function M.end_describe()
+  if not M.config.enabled then
+    return M
+  end
+
+  if #describe_context_stack == 0 then
+    get_logger().warn("M.end_describe called but describe_context_stack is empty. Mismatched start/end calls?")
+    return M
+  end
+
+  local ended_describe_info = table.remove(describe_context_stack)
+  local total_its_in_subtree = ended_describe_info.direct_it_blocks_found + ended_describe_info.child_it_blocks_found
+
+  get_logger().trace("Ended describe block tracking", {
+    name = ended_describe_info.name,
+    file = ended_describe_info.file_path,
+    direct_it_blocks = ended_describe_info.direct_it_blocks_found,
+    child_it_blocks = ended_describe_info.child_it_blocks_found,
+    total_subtree_its = total_its_in_subtree,
+    depth_after_pop = #describe_context_stack,
+  })
+
+  if total_its_in_subtree == 0 then
+    local issue_test_name = ended_describe_info.name .. " (in file " .. ended_describe_info.file_path .. ")"
+    table.insert(M.stats.issues, {
+      test = issue_test_name,
+      issue = "Describe block and its entire subtree are empty (contain no 'it' blocks)", -- Updated message
+    })
+    get_logger().warn("Empty describe block subtree detected", {
+      name = ended_describe_info.name,
+      file = ended_describe_info.file_path,
+    })
+  end
+
+  -- Propagate total 'it' count to parent context
+  if #describe_context_stack > 0 then
+    local parent_ctx = describe_context_stack[#describe_context_stack]
+    parent_ctx.child_it_blocks_found = parent_ctx.child_it_blocks_found + total_its_in_subtree
+    get_logger().trace("Propagated 'it' count to parent describe", {
+      parent_name = parent_ctx.name,
+      propagated_count = total_its_in_subtree,
+      new_child_it_count_for_parent = parent_ctx.child_it_blocks_found,
+    })
+  end
+
+  return M
 end
 
 -- Return the module

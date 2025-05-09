@@ -18,8 +18,8 @@
 
 ---@class spy_module
 ---@field _VERSION string Module version identifier.
----@field new fun(fn?: function): spy_object|nil, table? Creates a new standalone spy function, optionally wrapping `fn`. Returns `spy_object, nil` on success, or `nil, error_object` on failure. @throws table If spy creation fails critically.
----@field on fun(obj: table, method_name: string): spy_object|nil, table? Creates a spy on an object's method. Returns `spy_object, nil` on success, or `nil, error_object` on failure. @throws table If validation or spy creation fails critically.
+---@field new fun(fn?: function): spy_object|nil, table? Creates a new standalone spy function, optionally wrapping `fn`. Creation is tracked by `lib.quality` if enabled. Returns `spy_object, nil` on success, or `nil, error_object` on failure. @throws table If spy creation fails critically.
+---@field on fun(obj: table, method_name: string): spy_object|nil, table? Creates a spy on an object's method. Creation is tracked by `lib.quality` if enabled. Returns `spy_object, nil` on success, or `nil, error_object` on failure. @throws table If validation or spy creation fails critically.
 ---@field assert fun(spy_obj: spy_object): spy_assert|nil, table? Creates an assertion helper object for the given spy. Returns `spy_assert, nil` on success, or `nil, error_object` on failure. @throws table If validation fails.
 ---@field is_spy fun(obj: any): boolean Checks if an object is a spy created by this module.
 ---@field get_all_spies fun(): table<number, spy_object> Returns a list of all spies created by this module.
@@ -53,7 +53,7 @@
 ---@field target table|nil For method spies (`spy.on`), the target object.
 ---@field name string|nil For method spies, the name of the spied method.
 ---@field original function|nil For method spies, the original method implementation.
----@field restore fun(self: spy_object): boolean|nil, table? For method spies, restores the original method. Returns `true`/`false`, or `nil` on error, plus optional error. @throws table If restoration fails critically.
+---@field restore fun(self: spy_object): boolean|nil, table? For method spies, restores the original method. Restoration is tracked by `lib.quality` if enabled. Returns `true`/`false`, or `nil` on error, plus optional error. @throws table If restoration fails critically.
 ---@field _is_firmo_spy boolean Internal flag identifying this as a spy object.
 ---@field _original_fn function|nil The original wrapped function (from `new` or `on`).
 ---@field _fake_fn function|nil The fake implementation function set by `and_call_fake`.
@@ -73,7 +73,7 @@
 
 -- Lazy-load dependencies to avoid circular dependencies
 ---@diagnostic disable-next-line: unused-local
-local _error_handler, _logging, _fs
+local _error_handler, _logging, _fs, _quality
 
 -- Local helper for safe requires without dependency on error_handler
 local function try_require(module_name)
@@ -128,6 +128,15 @@ local function get_logger()
       print("[TRACE] " .. msg)
     end,
   }
+end
+
+--- Get the quality module with lazy loading
+---@return table|nil The quality module or nil if not available
+local function get_quality()
+  if not _quality then
+    _quality = try_require("lib.quality")
+  end
+  return _quality
 end
 
 -- Compatibility function for table unpacking (works with both Lua 5.1 and 5.2+)
@@ -985,6 +994,12 @@ function spy.new(fn)
     -- Continue despite this warning - the spy should still work
   end
 
+  local qual_module = get_quality()
+  if qual_module and qual_module.track_spy_created then
+    local spy_id_str = tostring(spy_obj) -- Use table's string representation as a unique ID
+    qual_module.track_spy_created(spy_id_str)
+  end
+
   return spy_obj
 end
 
@@ -1255,6 +1270,12 @@ function spy.on(obj, method_name)
       return false
     end
 
+    local qual_module = get_quality()
+    if qual_module and qual_module.track_spy_restored then
+      local spy_id_str = tostring(self) -- 'self' here is the spy_object
+      qual_module.track_spy_restored(spy_id_str)
+    end
+
     return true
   end
 
@@ -1290,6 +1311,12 @@ function spy.on(obj, method_name)
   spy_object.target = obj
   spy_object.name = method_name
   spy_object.original = original_fn
+
+  local qual_module = get_quality()
+  if qual_module and qual_module.track_spy_created then
+    local spy_id_str = tostring(spy_object) -- spy_object is the final spy object being returned
+    qual_module.track_spy_created(spy_id_str)
+  end
 
   return spy_object
 end

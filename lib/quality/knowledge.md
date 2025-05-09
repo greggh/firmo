@@ -6,22 +6,29 @@ This document outlines key internal concepts, implementation patterns, and desig
 
 ## Key Concepts
 
--   **Quality Levels (1-5):** The module defines five levels of increasing test quality requirements, from Basic (level 1) to Complete (level 5).
--   **Level Checkers (`level_checkers.lua`):** This file contains functions (`check_level_1`, `check_level_2`, etc.) that implement the specific validation rules for each quality level. These checks analyze collected test data (assertion counts, coverage, etc.).
--   **Data Collection:** The `init.lua` module provides functions (`start_test`, `track_assertion`, `end_test`) called by the test runner (via `lib/core/test_definition.lua` hooks for `start_test`/`end_test`) and the assertion system (`lib/assertion/init.lua` for `track_assertion`) during test execution to gather metrics like assertion types used and test duration.
--   **File Analysis:** Functions like `analyze_file` process test files primarily for structural properties (describe/it blocks, hooks). Assertion counting and detailed type analysis are now handled dynamically via `M.track_assertion`. `check_file` and `validate_test_quality` use the collected dynamic data and structural info to evaluate against quality levels.
--   **Reporting Integration:** The `quality.report(format)` function generates report content (summary/markdown, json, html) by summarizing collected data and validation results. It integrates with `lib/reporting` for file saving.
-    The HTML formatter (`lib/reporting/formatters/html.lua`) for quality reports is particularly feature-rich, now including:
-    *   Interactive "fix-it" examples for common issues.
-    *   A light/dark theme toggle with preference persistence.
-    *   A responsive pie chart visualizing summary statistics.
-    *   Conceptual syntax highlighting for Lua code examples (note: current implementation is a JS placeholder; full library integration like Prism.js is a future enhancement).
--   **Configuration:** Uses `central_config` and `quality.configure` (internally `M.init`) to manage settings like `enabled`, target `level`, `strict` mode, and potential `custom_rules`.
--   **CLI for Quality Reports:** When using the test runner (`scripts/runner.lua`):
-    *   Enable quality analysis with `--quality`.
-    *   Specify the desired report format(s) using the global `--format=<format_name>` flag (e.g., `--format=html`, `--format=json`, `--format=md`). The quality module supports `html`, `json`, and `summary` (which produces Markdown `.md` files).
-    *   Specify the output directory with the global `--report-dir=<path_to_directory>` flag.
-    *   Note: Quality-specific CLI flags like `--quality-format` or `--quality-output` are *not* implemented; use the global flags. The runner handles passing these to the reporting system for quality reports.
+- **Quality Levels (1-5):** The module defines five levels of increasing test quality requirements, from Basic (level 1) to Complete (level 5).
+- **Level Checkers (`level_checkers.lua`):** This file contains functions (`check_level_1`, `check_level_2`, etc.) that implement the specific validation rules for each quality level. These checks analyze collected test data (assertion counts, coverage, etc.).
+- **Data Collection:** The `init.lua` module provides functions called by the test runner and assertion system to gather metrics.
+  - `M.start_test`, `M.end_test`: Called by `lib/core/test_definition.lua` around `it` blocks.
+  - `M.track_assertion`: Called by `lib/assertion/init.lua` for dynamic assertion tracking.
+  - `M.track_spy_created`, `M.track_spy_restored`: Called by `lib/mocking/spy.lua` to track spy lifecycles for restoration checks.
+  - `M.start_describe`, `M.end_describe`: Called by `lib/core/test_definition.lua` to track `describe` block structure and identify empty subtrees.
+- **File Analysis:** Functions like `analyze_file` process test files primarily for structural properties (describe/it blocks, hooks). Assertion counting and detailed type analysis are now handled dynamically via `M.track_assertion`. `check_file` and `validate_test_quality` use the collected dynamic data and structural info to evaluate against quality levels.
+- **Reporting Integration:** The `quality.report(format)` function generates report content (summary/markdown, json, html) by summarizing collected data and validation results. It integrates with `lib/reporting` for file saving.
+  The HTML formatter (`lib/reporting/formatters/html.lua`) for quality reports is particularly feature-rich, now including:
+  - Interactive "fix-it" examples for common issues.
+  - A light/dark theme toggle with preference persistence.
+  - A responsive pie chart visualizing summary statistics.
+  - Conceptual syntax highlighting for Lua code examples (note: current implementation is a JS placeholder; full library integration like Prism.js is a future enhancement).
+- **Configuration:** Uses `central_config` and `quality.configure` (internally `M.init`) to manage settings like `enabled`, target `level`, `strict` mode, and potential `custom_rules`.
+- **CLI for Quality Reports:** When using the test runner (`scripts/runner.lua`):
+  - Enable quality analysis with `--quality`.
+  - Specify the desired report format(s) using the global `--format=<format_name>` flag (e.g., `--format=html`, `--format=json`, `--format=md`). The quality module supports `html`, `json`, and `summary` (which produces Markdown `.md` files).
+  - Specify the output directory with the global `--report-dir=<path_to_directory>` flag.
+  - Note: Quality-specific CLI flags like `--quality-format` or `--quality-output` are _not_ implemented; use the global flags. The runner handles passing these to the reporting system for quality reports.
+- **Advanced Structural Checks:**
+  - _Mock/Spy Restoration_: For relevant quality levels (typically Level 3+), the system now checks if spies created via `firmo.spy.on()` are correctly restored using their `:restore()` method by the end of the test. This uses data from `M.track_spy_created` and `M.track_spy_restored`. An issue is logged for the test if unrestored spies are detected.
+  - _Empty Describe Block (Subtree)_: The system identifies `describe` blocks that are entirely empty, meaning neither the block itself nor any of its nested `describe` children contain any `it` test cases. Such empty describe trees are reported as a global issue, helping to maintain a clean test structure. This uses data from `M.start_describe`, `M.end_describe`, and `M.start_test`.
 
 ## Usage Examples / Patterns
 
@@ -168,10 +175,10 @@ end
 
 ## Related Components / Modules
 
--   **Source:** [`lib/quality/init.lua`](init.lua), [`lib/quality/level_checkers.lua`](level_checkers.lua)
--   **Usage Guide:** [`docs/guides/quality.md`](../../docs/guides/quality.md)
--   **API Reference:** [`docs/api/quality.md`](../../docs/api/quality.md)
--   **Reporting:** [`lib/reporting/init.lua`](../reporting/init.lua) - Used to format and save quality reports.
--   **Parser:** [`lib/tools/parser/init.lua`](../tools/parser/init.lua) - Potentially used by `analyze_file` for static checks.
--   **Test Definition:** [`lib/core/test_definition.lua`](../core/test_definition.lua) - Provides test structure and data used for quality checks.
--   **Configuration:** [`lib/core/central_config.lua`](../core/central_config.lua) - Provides configuration settings.
+- **Source:** [`lib/quality/init.lua`](init.lua), [`lib/quality/level_checkers.lua`](level_checkers.lua)
+- **Usage Guide:** [`docs/guides/quality.md`](../../docs/guides/quality.md)
+- **API Reference:** [`docs/api/quality.md`](../../docs/api/quality.md)
+- **Reporting:** [`lib/reporting/init.lua`](../reporting/init.lua) - Used to format and save quality reports.
+- **Parser:** [`lib/tools/parser/init.lua`](../tools/parser/init.lua) - Potentially used by `analyze_file` for static checks.
+- **Test Definition:** [`lib/core/test_definition.lua`](../core/test_definition.lua) - Provides test structure and data used for quality checks.
+- **Configuration:** [`lib/core/central_config.lua`](../core/central_config.lua) - Provides configuration settings.

@@ -474,63 +474,63 @@ This phase introduces more sophisticated quality checks focused on test hygiene 
 
 ### 1. Enhance Data Collection for Mock/Spy Tracking
 
-- [ ] **Goal**: Enable the quality module to track the lifecycle of spies to ensure they are properly restored.
-- [ ] **Tasks**:
-  - [ ] Task 1.1: Modify `lib/quality/init.lua`:
-    - [ ] Add internal data structures to track active spies (e.g., `M.active_spies`).
-    - [ ] Add `M.track_spy_created(spy_id)` and `M.track_spy_restored(spy_id)`.
-    - [ ] Update `M.start_test()` to reset active spy tracking for the current test.
-    - [ ] Update `M.end_test()` to check for unrestored spies and record this (e.g., in `test_info.unrestored_spies_found`).
-  - [ ] Task 1.2: Modify `lib/mocks/spy.lua` (or its equivalent, where `firmo.spy.on` is defined):
-    - [ ] Call `quality.track_spy_created()` upon spy creation.
-    - [ ] Call `quality.track_spy_restored()` when a spy's `restore()` method is invoked.
-    - [ ] Ensure these calls are conditional on the quality module being enabled.
-  - [ ] Task 1.3: Update `QualityTestInfo` definition (e.g., in `lib/quality/level_checkers.lua` JSDoc and relevant structures) to include `unrestored_spies_found: boolean`.
+- [x] **Goal**: Disable the quality module to track the lifecycle of spies to ensure they are properly restored.
+- [x] **Tasks**:
+  - [x] Task 1.1: Modify `lib/quality/init.lua`:
+    - [x] Add internal data structures to track active spies (e.g., `M.active_spies`).
+    - [x] Add `M.track_spy_created(spy_id)` and `M.track_spy_restored(spy_id)`.
+    - [x] Update `M.start_test()` to reset active spy tracking for the current test.
+    - [x] Update `M.end_test()` to check for unrestored spies and record this (e.g., in `test_info.unrestored_spies_found`).
+  - [x] Task 1.2: Modify `lib/mocks/spy.lua` (or its equivalent, where `firmo.spy.on` is defined):
+    - [x] Call `quality.track_spy_created()` upon spy creation.
+    - [x] Call `quality.track_spy_restored()` when a spy's `restore()` method is invoked.
+    - [x] Ensure these calls are conditional on the quality module being enabled.
+  - [x] Task 1.3: Update `QualityTestInfo` definition (e.g., in `lib/quality/level_checkers.lua` JSDoc and relevant structures) to include `unrestored_spies_found: boolean`.
 
 ### 2. Implement Mock Restoration Check in `level_checkers.lua`
 
-- [ ] **Goal**: Add a new quality check for mock/spy restoration and integrate it into relevant quality levels.
-- [ ] **Tasks**:
-  - [ ] Task 2.1: In `lib/quality/level_checkers.lua`, create `M.check_mock_restoration(test_info, requirements)` which checks `test_info.unrestored_spies_found`.
-  - [ ] Task 2.2: Update `QualityRequirements` definition (in `level_checkers.lua` JSDoc) to include `test_organization.require_mock_restoration?: boolean`.
-  - [ ] Task 2.3: Add `require_mock_restoration = true` to `test_organization` requirements for appropriate quality levels (e.g., Level 3+ or 4+).
-  - [ ] Task 2.4: Integrate the call to `M.check_mock_restoration` into `M.evaluate_test_against_requirements` (e.g., as part of organization checks).
+- [x] **Goal**: Add a new quality check for mock/spy restoration and integrate it into relevant quality levels.
+- [x] **Tasks**:
+  - [x] Task 2.1: In `lib/quality/level_checkers.lua`, create `M.check_mock_restoration(test_info, requirements)` which checks `test_info.unrestored_spies_found`.
+  - [x] Task 2.2: Update `QualityRequirements` definition (in `level_checkers.lua` JSDoc) to include `test_organization.require_mock_restoration?: boolean`.
+  - [x] Task 2.3: Add `require_mock_restoration = true` to `test_organization` requirements for appropriate quality levels (e.g., Level 3+ or 4+).
+  - [x] Task 2.4: Integrate the call to `M.check_mock_restoration` into `M.evaluate_test_against_requirements` (e.g., as part of organization checks).
 
 ### 3. Enhance Data Collection for `describe` Block Completeness
 
-- [ ] **Goal**: Enable the quality module to track `describe` blocks and identify if they are empty.
-- [ ] **Tasks**:
-  - [ ] Task 3.1: Modify `lib/quality/init.lua`:
-    - [ ] Add internal state to track current `describe` context (e.g., `M.current_describe_info = { name = "", it_blocks_found = 0, file_path = "" }`).
-    - [ ] Add `M.start_describe(describe_name, file_path)`.
-    - [ ] Add `M.end_describe(describe_name, file_path)` to check `it_blocks_found` and record an issue if zero.
-    - [ ] Update `M.start_test()` to increment `it_blocks_found` for the current describe context.
-  - [ ] Task 3.2: Modify `lib/core/test_definition.lua`:
-    - [ ] In `M.describe`, call `quality.start_describe(name, current_file_path)` and `quality.end_describe(name, current_file_path)`.
-    - [ ] Ensure calls are conditional on quality module enablement.
+- [x] **Goal**: Enable the quality module to track `describe` blocks and identify if they are empty.
+- [x] **Tasks**:
+  - [x] Task 3.1: Modify `lib/quality/init.lua`:
+    - [x] Add internal state to track current `describe` context (e.g., `M.current_describe_info = { name = "", it_blocks_found = 0, file_path = "" }`).
+    - [x] Add `M.start_describe(describe_name, file_path)`.
+    - [x] Add `M.end_describe(describe_name, file_path)` to check `it_blocks_found` and record an issue if zero.
+    - [x] Update `M.start_test()` to increment `it_blocks_found` for the current describe context.
+  - [x] Task 3.2: Modify `lib/core/test_definition.lua`:
+    - [x] In `M.describe`, call `quality.start_describe(name, current_file_path)` and `quality.end_describe(name, current_file_path)`.
+    - [x] Ensure calls are conditional on quality module enablement.
 
 ### 4. Implement Empty `describe` Block Check
 
-- [ ] **Goal**: Report empty `describe` blocks as a global quality issue.
-- [ ] **Tasks**:
-  - [ ] Task 4.1: Core logic in `quality.end_describe()` (from Task 3.1) to add an issue to `M.overall_issues` (e.g., `{ file = file_path, scope = describe_name, issue = "Describe block is empty" }`).
-  - [ ] Task 4.2: Ensure this new type of global issue is correctly displayed in all relevant report formats (HTML, Summary/Markdown, JSON).
+- [x] **Goal**: Report empty `describe` blocks as a global quality issue.
+- [x] **Tasks**:
+  - [x] Task 4.1: Core logic in `quality.end_describe()` (from Task 3.1) to add an issue to `M.overall_issues` (e.g., `{ file = file_path, scope = describe_name, issue = "Describe block is empty" }`).
+  - [x] Task 4.2: Ensure this new type of global issue is correctly displayed in all relevant report formats (HTML, Summary/Markdown, JSON).
 
 ### 5. Testing and Refinement
 
-- [ ] **Goal**: Verify the new checks function correctly and integrate smoothly.
-- [ ] **Tasks**:
-  - [ ] Task 5.1: Create/modify test files to specifically trigger unrestored spies and empty `describe` blocks.
-  - [ ] Task 5.2: Create/modify test files that correctly restore spies and have non-empty `describe` blocks.
-  - [ ] Task 5.3: Run tests with various quality levels; verify reports and quality assessments for the new checks.
-  - [ ] Task 5.4: Refine issue messages and checker logic as needed.
+- [x] **Goal**: Verify the new checks function correctly and integrate smoothly.
+- [x] **Tasks**:
+  - [x] Task 5.1: Create/modify test files to specifically trigger unrestored spies and empty `describe` blocks.
+  - [x] Task 5.2: Create/modify test files that correctly restore spies and have non-empty `describe` blocks.
+  - [x] Task 5.3: Run tests with various quality levels; verify reports and quality assessments for the new checks.
+  - [x] Task 5.4: Refine issue messages and checker logic as needed.
 
 ### 6. Documentation Update
 
-- [ ] **Goal**: Document the new quality checks and any related API/data structure changes.
-- [ ] **Tasks**:
-  - [ ] Task 6.1: Update JSDoc in `lib/quality/init.lua`, `lib/quality/level_checkers.lua`.
-  - [ ] Task 6.2: Update JSDoc in `lib/mocks/spy.lua`, `lib/core/test_definition.lua` for new hooks.
-  - [ ] Task 6.3: Update `docs/guides/quality.md` to explain the new checks.
-  - [ ] Task 6.4: Update `lib/quality/knowledge.md` with details on new data collection and checks.
-  - [ ] Task 6.5: Update this plan file (`docs/firmo/quality_module_integration_plan.md`) with progress for Phase VII.
+- [x] **Goal**: Document the new quality checks and any related API/data structure changes.
+- [x] **Tasks**:
+  - [x] Task 6.1: Update JSDoc in `lib/quality/init.lua`, `lib/quality/level_checkers.lua`.
+  - [x] Task 6.2: Update JSDoc in `lib/mocks/spy.lua`, `lib/core/test_definition.lua` for new hooks.
+  - [x] Task 6.3: Update `docs/guides/quality.md` to explain the new checks.
+  - [x] Task 6.4: Update `lib/quality/knowledge.md` with details on new data collection and checks.
+  - [x] Task 6.5: Update this plan file (`docs/firmo/quality_module_integration_plan.md`) with progress for Phase VII.

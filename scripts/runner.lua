@@ -170,6 +170,7 @@ function runner.run_file(file_path, firmo, options)
   firmo.passes = 0
   firmo.errors = 0
   firmo.skipped = 0
+  local central_config = try_require("lib.core.central_config")
 
   -- Since we're resetting each time, these are always zero
   local prev_passes = 0
@@ -302,9 +303,18 @@ function runner.run_file(file_path, firmo, options)
   -- Also set global context
   _G._current_temp_file_context = file_context
 
+  -- Inside runner.run_file, before setting runtime.current_test_file:
+  -- Set runtime.current_test_file for quality module after dofile
+  local original_current_test_file_val = nil
+  if options.quality and central_config then
+    original_current_test_file_val = central_config.get("runtime.current_test_file") -- Store old value
+    central_config.set("runtime.current_test_file", file_path)
+    get_logger().debug("Set runtime.current_test_file for quality module (before dofile)", { file = file_path })
+  end
+
   -- Execute the test file
   local start_time = os.clock()
-  local success, err = pcall(function()
+  local success_dofile, err_dofile = pcall(function()
     -- Verify file exists
     if not get_fs().file_exists(file_path) then
       error("Test file does not exist: " .. file_path)
@@ -321,21 +331,34 @@ function runner.run_file(file_path, firmo, options)
         .. package.path
     end
 
-    if options.quality and central_config then
-      central_config.set("runtime.current_test_file", file_path)
-      get_logger().debug("Set runtime.current_test_file for quality module", { file = file_path })
-    end
+    -- The runtime.current_test_file is already set above for the whole dofile scope
 
     dofile(file_path)
 
-    if options.quality and central_config then
-      central_config.set("runtime.current_test_file", nil)
-      get_logger().debug("Cleared runtime.current_test_file")
-    end
+    -- Clearing of runtime.current_test_file moved after pcall block
 
     package.path = save_path
   end)
   local elapsed_time = os.clock() - start_time
+  if not success_dofile then
+    local err_str = "[NONE]"
+    if err_dofile ~= nil then -- Check if err_dofile is not nil before tostring
+      err_str = tostring(err_dofile)
+    end
+    get_logger().error("[RUNNER_DOFILE_ERROR] Error during dofile execution of " .. file_path, {
+      error_obj_type = type(err_dofile), -- Log type
+      error_string = err_str, -- Log tostring
+    })
+  end
+
+  -- Restore/clear runtime.current_test_file after dofile
+  if options.quality and central_config then
+    central_config.set("runtime.current_test_file", original_current_test_file_val) -- Restore or clear
+    get_logger().debug(
+      "Restored/cleared runtime.current_test_file (after dofile)",
+      { previous_value_restored = original_current_test_file_val ~= nil }
+    )
+  end
 
   -- Restore original print function
   _G.print = original_print
@@ -392,8 +415,8 @@ function runner.run_file(file_path, firmo, options)
 
   -- Use structured test results collected via intercepted logger calls
   local results = {
-    success = success,
-    error = err,
+    success = success_dofile, -- Use the pcall success flag from dofile execution
+    error = err_dofile, -- Use err_dofile
     passes = pass_count,
     errors = fail_count,
     skipped = skip_count,
@@ -455,15 +478,24 @@ function runner.run_file(file_path, firmo, options)
     end
   end
 
-  if not success then
-    get_logger().error("Execution error", { error = err })
+  if not success_dofile then -- Use the pcall success flag from dofile execution
+    get_logger().error("Execution error during dofile", { error = err_dofile }) -- Use err_dofile
     table.insert(results.test_errors, {
-      message = tostring(err),
+      message = tostring(err_dofile), -- Use err_dofile
       file = file_path,
       traceback = debug.traceback(),
     })
+    -- This was results.success for the pcall of dofile.
+    -- The results.success field in the `results` table for run_file should reflect this.
+    results.success = success_dofile
+    results.error = err_dofile -- Store the actual dofile error
 
-    results.errors = results.errors + 1
+    -- If dofile itself failed, this counts as at least one error for the file.
+    -- If test_definition parsing still ran and reported errors, results.errors might already be >0.
+    -- Ensure results.errors reflects that the file execution had an issue if it didn't already.
+    if results.errors == 0 then
+      results.errors = results.errors + 1
+    end
   end
 
   -- Always show the completion status with test counts
@@ -1604,7 +1636,6 @@ function runner.main(args)
     get_logger().info("Detected file path", { path = path })
     local result = runner.run_file(path, firmo, options)
     test_success = result.success and result.errors == 0
-
     if not test_success then
       get_logger().error("Test failures detected in file", {
         path = path,

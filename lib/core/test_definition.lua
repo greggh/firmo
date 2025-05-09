@@ -271,6 +271,8 @@ end
 --- Describe blocks can be nested to create a tree-like structure of tests, with each
 --- level having its own setup (before) and teardown (after) hooks. The callback
 --- function contains test definitions and possibly nested describe blocks.
+--- If the `lib.quality` module is enabled, this function also notifies it about the
+--- start and end of the describe block for tracking purposes (e.g., detecting empty blocks).
 ---
 ---@param name string Name of the test group
 ---@param fn function Function containing the test group
@@ -314,6 +316,17 @@ function M.describe(name, fn, options)
   -- Update focus mode if this is a focused describe
   if focused and not excluded then
     focus_mode = true
+  end
+
+  -- Notify quality module about the start of the describe block
+  if quality_module and quality_module.config and quality_module.config.enabled then
+    -- Assuming quality_module.start_describe(describe_name) internally gets the file_path
+    -- The quality_module was loaded at the top of this file.
+    if quality_module.start_describe then -- Check if function exists
+      quality_module.start_describe(name)
+    else
+      get_logger().warn("quality_module.start_describe function not found, describe block tracking disabled for this call.")
+    end
   end
 
   -- Save previous tags and level
@@ -371,6 +384,15 @@ function M.describe(name, fn, options)
   level = previous_level
   current_tags = previous_tags
   current_describe_block = previous_describe_block
+
+  -- Notify quality module about the end of the describe block
+  if quality_module and quality_module.config and quality_module.config.enabled then
+    if quality_module.end_describe then -- Check if function exists
+      quality_module.end_describe()
+    else
+      get_logger().warn("quality_module.end_describe function not found, describe block tracking disabled for this call.")
+    end
+  end
 end
 
 --- Create a focused test group

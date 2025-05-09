@@ -62,19 +62,20 @@ The test runner (`scripts/runner.lua`) will use these settings to initialize `li
 
 Firmo's quality validation provides five progressive quality levels. The exact checks for each level are detailed in `lib/quality/level_checkers.lua`.
 
-| Level | Constant (`lib.quality`) | Name (in reports) | General Description (from `lib/quality/init.lua`) |
-|-------|--------------------------|-------------------|---------------------------------------------------|
-| 1     | `LEVEL_BASIC`            | Basic             | Basic tests with at least one assertion per test and proper structure |
-| 2     | `LEVEL_STRUCTURED`       | Standard          | Standard tests with multiple assertions, proper naming, and error handling |
-| 3     | `LEVEL_COMPREHENSIVE`    | Comprehensive     | Comprehensive tests with edge cases, type checking, and isolated setup |
-| 4     | `LEVEL_ADVANCED`         | Advanced          | Advanced tests with boundary conditions, mock verification, and context organization |
-| 5     | `LEVEL_COMPLETE`         | Complete          | Complete tests with 100% branch coverage, security validation, and performance testing |
+| Level | Constant (`lib.quality`) | Name (in reports) | General Description (from `lib/quality/init.lua`)                                                                                                           |
+| ----- | ------------------------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | `LEVEL_BASIC`            | Basic             | Basic tests with at least one assertion per test and proper structure                                                                                       |
+| 2     | `LEVEL_STRUCTURED`       | Standard          | Standard tests with multiple assertions, proper naming, and error handling                                                                                  |
+| 3     | `LEVEL_COMPREHENSIVE`    | Comprehensive     | Comprehensive tests with edge cases, type checking, isolated setup, and **mock/spy restoration**.                                                           |
+| 4     | `LEVEL_ADVANCED`         | Advanced          | Advanced tests with boundary conditions, mock verification (including **restoration**), and context organization.                                           |
+| 5     | `LEVEL_COMPLETE`         | Complete          | Complete tests with 100% branch coverage, security validation, performance testing, and **rigorous mock/spy lifecycle management (including restoration)**. |
 
 ### Configuring Quality Options
 
 Configuration is primarily handled by `.firmo-config.lua` or CLI arguments, which are then passed to `quality.init()` by the runner.
 
 **Example `.firmo-config.lua`:**
+
 ```lua
 return {
   -- ...
@@ -176,14 +177,18 @@ Quality reports provide information about:
 
 Review reports to identify areas for improving test comprehensiveness and structure.
 
+#### Empty Describe Blocks
+
+The quality system will also identify `describe` blocks that are entirely devoid of tests. A `describe` block is flagged if neither it nor any of its nested `describe` blocks contain any `it` test cases. This check helps in cleaning up unused structural elements from your test suite, ensuring that all defined `describe` contexts serve a purpose by ultimately organizing active tests. Such issues will be listed in the "Overall Issues" section of the reports.
+
 ### Interactive Fix Examples in HTML Report
 
 The HTML quality report provides an "Overall Issues" section listing all quality concerns identified in your tests. To make these reports more actionable, for many common issues, you'll find a **"Show Example"** button to the right of the issue description.
 
 Clicking this button will expand a panel directly below the issue. This panel includes:
 
--   **A Title**: A brief description of the fix or improvement.
--   **A Code Snippet**: A generic Lua code example illustrating how to address the specific quality issue or demonstrating a better practice.
+- **A Title**: A brief description of the fix or improvement.
+- **A Code Snippet**: A generic Lua code example illustrating how to address the specific quality issue or demonstrating a better practice.
 
 You can click the button again (which will now read "Hide Example") to collapse the panel. These examples are designed to provide quick, actionable guidance on improving your test quality directly within the report.
 
@@ -191,14 +196,14 @@ You can click the button again (which will now read "Hide Example") to collapse 
 
 Beyond the interactive fix examples, the HTML quality report interface includes several other features for better usability and visual clarity:
 
-*   **Light/Dark Theme Toggle**:
-    Located in the top-right corner of the report, you'll find a toggle switch (🌑/☀️) allowing you to switch between a dark theme (default) and a light theme. Your preference is automatically saved in your browser's `localStorage` and will be applied the next time you open a Firmo HTML quality report.
+- **Light/Dark Theme Toggle**:
+  Located in the top-right corner of the report, you'll find a toggle switch (🌑/☀️) allowing you to switch between a dark theme (default) and a light theme. Your preference is automatically saved in your browser's `localStorage` and will be applied the next time you open a Firmo HTML quality report.
 
-*   **Summary Pie Chart**:
-    The "Summary Statistics" section now includes a responsive pie chart. This chart visually represents the proportion of "Tests Meeting Configured Level" compared to those that do not. A legend below the chart provides details on the segments, including counts and percentages. On wider screens, the chart appears next to the text statistics; on smaller screens, it stacks below for optimal viewing.
+- **Summary Pie Chart**:
+  The "Summary Statistics" section now includes a responsive pie chart. This chart visually represents the proportion of "Tests Meeting Configured Level" compared to those that do not. A legend below the chart provides details on the segments, including counts and percentages. On wider screens, the chart appears next to the text statistics; on smaller screens, it stacks below for optimal viewing.
 
-*   **Syntax Highlighting for Examples**:
-    The Lua code snippets shown in the "Show Example" panels feature basic syntax highlighting. This makes the example code easier to read and understand by visually differentiating keywords, comments, strings, and other language elements. (Note: This is a conceptual implementation; a more robust third-party library may be integrated in the future).
+- **Syntax Highlighting for Examples**:
+  The Lua code snippets shown in the "Show Example" panels feature basic syntax highlighting. This makes the example code easier to read and understand by visually differentiating keywords, comments, strings, and other language elements. (Note: This is a conceptual implementation; a more robust third-party library may be integrated in the future).
 
 ## Advanced Quality Configuration
 
@@ -261,7 +266,7 @@ end
 -- Simulate test run for demonstration:
 quality.start_test("Demo Test 1")
 -- In real tests, quality.track_assertion("action_name") is called by expect()
-quality.track_assertion("equality") 
+quality.track_assertion("equality")
 quality.end_test()
 
 local overall_meets_target = quality.meets_level(quality.LEVEL_COMPREHENSIVE) -- Checks against configured level or provided level

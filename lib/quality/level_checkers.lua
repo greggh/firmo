@@ -80,6 +80,7 @@ local M = {}
 ---@field has_mock_verification boolean Whether mock/spy verification patterns were found (based on analysis in `lib.quality`).
 ---@field has_performance_tests boolean Whether performance testing patterns were found (based on analysis in `lib.quality`).
 ---@field has_security_tests boolean Whether security testing patterns were found (based on analysis in `lib.quality`).
+---@field unrestored_spies_found? boolean True if spies created during this test were not restored by the end of the test. (Defaults to false if not set)
 ---@field issues string[] List of quality issue description strings accumulated for this test during evaluation.
 ---@field quality_level number The highest quality level this specific test has successfully met.
 ---@field scores? table<number, number> A map where keys are level numbers (1-5) and values are scores (0-100) achieved at each evaluated level (optional).
@@ -88,7 +89,7 @@ local M = {}
 ---@field min_assertions_per_test? number Minimum required assertions per test.
 ---@field assertion_types_required? string[] Array of required assertion type categories.
 ---@field assertion_types_required_count? number Minimum number of distinct required assertion types needed.
----@field test_organization? {require_describe_block?: boolean, require_it_block?: boolean, max_assertions_per_test?: number, require_test_name?: boolean, require_before_after?: boolean, require_context_nesting?: boolean, require_mock_verification?: boolean, require_coverage_threshold?: number, require_performance_tests?: boolean, require_security_tests?: boolean} Table defining organizational requirements.
+---@field test_organization? {require_describe_block?: boolean, require_it_block?: boolean, max_assertions_per_test?: number, require_test_name?: boolean, require_before_after?: boolean, require_context_nesting?: boolean, require_mock_verification?: boolean, require_mock_restoration?: boolean, require_coverage_threshold?: number, require_performance_tests?: boolean, require_security_tests?: boolean} Table defining organizational requirements.
 ---@field required_patterns? string[] Array of required pattern categories.
 ---@field forbidden_patterns? string[] Array of forbidden pattern categories.
 
@@ -249,6 +250,17 @@ function M.check_organization(test_info, requirements)
     is_valid = false
   end
 
+  -- Check for mock restoration if required
+  if org.require_mock_restoration then
+    local mock_restore_valid, mock_restore_issue = M.check_mock_restoration(test_info, requirements) -- Pass full requirements
+    if not mock_restore_valid then
+      is_valid = false
+      if mock_restore_issue then
+        table.insert(issues, mock_restore_issue)
+      end
+    end
+  end
+
   return is_valid, issues
 end
 
@@ -338,6 +350,23 @@ function M.check_forbidden_patterns(test_info, requirements)
 
   if #found_forbidden > 0 then
     return false, string.format("Found forbidden patterns: %s", table.concat(found_forbidden, ", "))
+  end
+
+  return true
+end
+
+--- Checks if spies created during the test were properly restored.
+---@param test_info QualityTestInfo The test info object, expected to have `unrestored_spies_found`.
+---@param requirements QualityRequirements The requirements for the specified quality level, expected to have `test_organization.require_mock_restoration`.
+---@return boolean is_valid `true` if mock restoration requirements are met or not applicable, `false` otherwise.
+---@return string? issue An issue description string if unrestored spies were found and restoration is required, `nil` otherwise.
+function M.check_mock_restoration(test_info, requirements)
+  if not requirements.test_organization or not requirements.test_organization.require_mock_restoration then
+    return true -- Not required for this level
+  end
+
+  if test_info.unrestored_spies_found then
+    return false, "Unrestored spies detected. Ensure all spies are restored after use."
   end
 
   return true
@@ -472,13 +501,14 @@ function M.evaluate_level_5(test_info, coverage_data)
       max_assertions_per_test = 5,
       require_test_name = true,
       require_before_after = true,
-      require_context_nesting = true,
-      require_mock_verification = true,
-      require_coverage_threshold = 90, -- Match our new standard threshold
-      require_performance_tests = true,
-      require_security_tests = true,
-    },
-    required_patterns = { "should", "when", "boundary", "security", "performance" },
+        require_context_nesting = true,
+        require_mock_verification = true,
+        require_mock_restoration = true,
+        require_coverage_threshold = 90, -- Match our new standard threshold
+        require_performance_tests = true,
+        require_security_tests = true,
+      },
+      required_patterns = { "should", "when", "boundary", "security", "performance" },
     forbidden_patterns = { "SKIP", "TODO", "FIXME" },
   }
 
@@ -648,6 +678,7 @@ function M.get_level_requirements(level)
         require_test_name = true,
         require_before_after = true,
         require_context_nesting = true,
+        require_mock_restoration = true,
       },
       required_patterns = { "should", "when" },
       forbidden_patterns = { "SKIP", "TODO", "FIXME" },
@@ -673,6 +704,7 @@ function M.get_level_requirements(level)
         require_before_after = true,
         require_context_nesting = true,
         require_mock_verification = true,
+        require_mock_restoration = true,
       },
       required_patterns = { "should", "when", "boundary" },
       forbidden_patterns = { "SKIP", "TODO", "FIXME" },
@@ -700,7 +732,8 @@ function M.get_level_requirements(level)
         require_before_after = true,
         require_context_nesting = true,
         require_mock_verification = true,
-        require_coverage_threshold = 90,
+        require_mock_restoration = true,
+        require_coverage_threshold = 90, -- Match our new standard threshold
         require_performance_tests = true,
         require_security_tests = true,
       },
