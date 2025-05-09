@@ -29,7 +29,6 @@
 ---@field mock table fun(target: table, method_or_options?: string|table, impl_or_value?: any): table|nil, table|nil) Provides `mock.create(target, options)`, `mock.restore_all()`, `mock.with_mocks(fn)`. Can be called directly as `mocking.mock(target, method?, impl?)` or `mocking.mock(target, options?)`. Returns `mock_object|nil, error|nil`. @see lib.mocking.mock
 ---@field with_mocks fun(fn: function): any, table|nil Executes a function with automatic mock cleanup via `mock.with_mocks`. Returns `result|nil, error|nil`.
 ---@field register_cleanup_hook fun(after_test_fn?: function): function Registers a composite cleanup hook that runs the optional `after_test_fn` then `mock.restore_all()`. Returns the composite function. @throws table If validation fails.
----@field ensure_assertions fun(firmo_module: table): boolean, table|nil Ensures mocking-related assertions are available (compatibility check, usually returns true). Returns `success, error|nil`. @throws table If validation fails.
 ---@field reset_all fun(): boolean, table|nil Resets all spies, stubs, and mocks by calling `mock.restore_all()`. Returns `success, error|nil`. @throws table If reset fails critically.
 ---@field create_spy fun(fn?: function): table|nil, table|nil Creates a standalone spy function via `spy.new`. Returns `spy_object|nil, error|nil`. @throws table If creation fails.
 ---@field create_stub fun(return_value?: any): table|nil, table|nil Creates a standalone stub function via `stub.new`. Returns `stub_object|nil, error|nil`. @throws table If creation fails.
@@ -731,54 +730,6 @@ function mocking.register_cleanup_hook(after_test_fn)
       return nil
     end
   end
-end
-
---- Ensure that mocking-related assertions are available in firmo
---- This function ensures that assertions needed for mocking tests are registered
---- with the firmo assertion system. In newer versions, these assertions are built-in,
---- so this function primarily serves as a compatibility layer for older versions.
----
---- @param firmo_module table The firmo module instance to modify
---- @return boolean success Whether the assertions were successfully registered or already present
---- @return boolean success True if assertions are ensured (or check is skipped).
---- @return table|nil error Error object if validation fails (e.g., `firmo_module` is nil).
---- @throws table If validation fails critically.
----
---- @usage
---- -- In your test setup code
---- local firmo = require("firmo")
---- local mocking = require("lib.mocking")
----
---- -- Make sure mocking assertions are available
---- local success, err = mocking.ensure_assertions(firmo)
---- if not success then
----   print("Warning: Failed to register mocking assertions: " .. err.message)
---- end
-function mocking.ensure_assertions(firmo_module)
-  get_logger().debug("Ensuring mocking assertions are registered")
-
-  -- Input validation
-  if firmo_module == nil then
-    local err = get_error_handler().validation_error("Cannot register assertions on nil module", {
-      function_name = "mocking.ensure_assertions",
-      parameter_name = "firmo_module",
-      provided_value = "nil",
-    })
-    get_logger().error(err.message, err.context)
-    return false, err
-  end
-
-  -- In newer versions of firmo, assertions might be managed directly by the assertion module.
-  -- Just return success since the assertions should already be defined there or in lib/assertion.lua.
-
-  get_logger().info("Skipping assertion registration in newer firmo version", {
-    function_name = "mocking.ensure_assertions",
-    module = "mocking",
-    reason = "Built-in assertions likely already exist",
-  })
-
-  -- Return success without modifying paths since they may not exist or be needed in newer versions
-  return true
 end
 
 -- Add direct exports for submodule functions if not already exposed via metatables

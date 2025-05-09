@@ -1,11 +1,11 @@
 --- Firmo Quality Level Checkers
 ---
---- This module provides specialized validation functions (`evaluate_level_*`) for each
---- defined quality level (1-5). It evaluates test metadata (`QualityTestInfo`) against
---- specific requirements (`QualityRequirements`) for each level.
----
---- Implements the single responsibility principle by separating level-specific logic
---- from the main `lib.quality` module.
+--- This module contains the core evaluation logic for Firmo's test quality validation system.
+--- It defines specialized validation functions (`evaluate_level_*`, `check_*`) for each
+--- defined quality level (1-5) and their specific criteria.
+--- It evaluates test metadata (as `QualityTestInfo` objects) against defined requirements
+--- (`QualityRequirements`) for each level. This module is used by `lib.quality` to perform
+--- the actual quality assessments.
 ---
 --- @module lib.quality.level_checkers
 --- @author Firmo Team
@@ -67,22 +67,22 @@ end
 local M = {}
 
 ---@class QualityTestInfo Test metadata and metrics used for quality evaluation.
----@field name string Test name.
+---@field name string Test name (usually full path including describe blocks).
 ---@field file_path? string Path to the test file.
----@field assertion_count number Number of assertions tracked for the test.
----@field assertion_types table<string, number> Map of assertion types (e.g., "equality", "type_checking") to their counts.
----@field patterns_found table<string, boolean> Map of pattern categories (e.g., "should", "boundary") found in the test name or content.
----@field has_describe boolean Whether the test is within a `describe` block.
----@field has_it boolean Whether the test is within an `it` block.
----@field has_proper_name boolean Whether the test name follows conventions (e.g., includes "should").
----@field has_before_after boolean Whether `before` or `after` hooks are associated with the test context.
----@field nesting_level number Depth of `describe` nesting.
----@field has_mock_verification boolean Whether mock/spy verification patterns were found.
----@field has_performance_tests boolean Whether performance testing patterns were found.
----@field has_security_tests boolean Whether security testing patterns were found.
----@field issues string[] List of quality issues found during evaluation.
----@field quality_level number The highest quality level the test meets.
----@field scores? table<number, number> Scores achieved at each evaluated level (optional).
+---@field assertion_count number Number of assertions dynamically tracked or statically analyzed for the test.
+---@field assertion_types table<string, number> Map of assertion type categories (e.g., "equality", "type_checking") to their counts for this test. Populated by `lib.quality.track_assertion` or static analysis.
+---@field patterns_found table<string, boolean> Map of pattern categories (e.g., "should", "boundary") found in the test name or content. Populated by `lib.quality.track_assertion` or static analysis.
+---@field has_describe boolean Whether the test is considered to be within a `describe` block (typically passed as context or analyzed).
+---@field has_it boolean Whether the test is an `it` block (typically true if this structure is for an `it` block, passed as context or analyzed).
+---@field has_proper_name boolean Whether the test name follows conventions (e.g., includes "should", based on analysis in `lib.quality`).
+---@field has_before_after boolean Whether `before` or `after` hooks are associated with the test context (passed as context or analyzed).
+---@field nesting_level number Depth of `describe` nesting for this test (passed as context or analyzed).
+---@field has_mock_verification boolean Whether mock/spy verification patterns were found (based on analysis in `lib.quality`).
+---@field has_performance_tests boolean Whether performance testing patterns were found (based on analysis in `lib.quality`).
+---@field has_security_tests boolean Whether security testing patterns were found (based on analysis in `lib.quality`).
+---@field issues string[] List of quality issue description strings accumulated for this test during evaluation.
+---@field quality_level number The highest quality level this specific test has successfully met.
+---@field scores? table<number, number> A map where keys are level numbers (1-5) and values are scores (0-100) achieved at each evaluated level (optional).
 
 ---@class QualityRequirements Defines the criteria for a specific quality level.
 ---@field min_assertions_per_test? number Minimum required assertions per test.
@@ -253,11 +253,11 @@ function M.check_organization(test_info, requirements)
 end
 
 --- Check for coverage threshold requirements
----@param test_info QualityTestInfo The test info object (not used directly by this checker but passed for consistency).
----@param requirements QualityRequirements The requirements for the specified quality level (must contain `test_organization.require_coverage_threshold`).
----@param coverage_data? table Optional coverage summary table (e.g., from `coverage.summary_report()`) containing `overall_pct` or `summary.coverage_percent`.
----@return boolean is_valid `true` if coverage requirements are met or not applicable, `false` otherwise.
----@return string? issue An issue description string if requirements are not met, `nil` otherwise.
+---@param test_info QualityTestInfo The test info object.
+---@param requirements QualityRequirements The requirements for the specified quality level, expected to contain `test_organization.require_coverage_threshold`.
+---@param coverage_data? table Optional coverage data. Expected to be a table from `coverage.get_data().summary` (containing `coverage_percent`) or `coverage.summary_report()` (containing `overall_pct`).
+---@return boolean is_valid `true` if coverage requirements are met, not applicable (no threshold or no data), or if coverage data is malformed but check doesn't fail open. `false` if threshold explicitly not met.
+---@return string? issue An issue description string if threshold is not met, `nil` otherwise.
 function M.check_coverage(test_info, requirements, coverage_data)
   -- Skip if no coverage requirements or no coverage data
   if
@@ -291,17 +291,18 @@ end
 ---@return boolean is_valid `true` if all required patterns are found, `false` otherwise.
 ---@return string? issue An issue description string if requirements are not met, `nil` otherwise.
 function M.check_required_patterns(test_info, requirements)
-  local required_patterns = requirements.required_patterns or {}
-  if #required_patterns == 0 then
+  local current_patterns_found = test_info.patterns_found or {}
+  local required_pattern_categories = requirements.required_patterns or {}
+  if #required_pattern_categories == 0 then
     return true
   end
 
   local is_valid = true
   local missing_patterns = {}
 
-  for _, pattern in ipairs(required_patterns) do
-    if not test_info.patterns_found[pattern] then
-      table.insert(missing_patterns, pattern)
+  for _, pattern_category in ipairs(required_pattern_categories) do
+    if not current_patterns_found[pattern_category] then
+      table.insert(missing_patterns, pattern_category)
       is_valid = false
     end
   end
@@ -319,17 +320,18 @@ end
 ---@return boolean is_valid `true` if no forbidden patterns are found, `false` otherwise.
 ---@return string? issue An issue description string if forbidden patterns are found, `nil` otherwise.
 function M.check_forbidden_patterns(test_info, requirements)
-  local forbidden_patterns = requirements.forbidden_patterns or {}
-  if #forbidden_patterns == 0 then
+  local current_patterns_found = test_info.patterns_found or {}
+  local forbidden_pattern_categories = requirements.forbidden_patterns or {}
+  if #forbidden_pattern_categories == 0 then
     return true
   end
 
   local is_valid = true
   local found_forbidden = {}
 
-  for _, pattern in ipairs(forbidden_patterns) do
-    if test_info.patterns_found[pattern] then
-      table.insert(found_forbidden, pattern)
+  for _, pattern_category in ipairs(forbidden_pattern_categories) do
+    if current_patterns_found[pattern_category] then
+      table.insert(found_forbidden, pattern_category)
       is_valid = false
     end
   end
@@ -579,10 +581,11 @@ function M.evaluate_test_against_requirements(test_info, requirements, coverage_
   return result
 end
 
---- Get a level checker function for a specific level
----@param level number Quality level to get the checker for (1-5)
----@param level number Quality level (1-5).
----@return function|nil checker The corresponding `evaluate_level_X` function, or `nil` if the level is invalid.
+--- Get a level checker function for a specific quality level.
+--- Each returned function expects `(test_info: QualityTestInfo, coverage_data?: table)`
+--- and returns ` {passes: boolean, score: number, issues: string[], requirements_met: number, total_requirements: number}`.
+---@param level number Quality level number (1-5) for which to get the checker.
+---@return function|nil checker The corresponding `evaluate_level_X` function for the specified level, or `nil` if the level number is invalid.
 function M.get_level_checker(level)
   if level == 1 then
     return M.evaluate_level_1

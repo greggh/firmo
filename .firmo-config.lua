@@ -19,6 +19,14 @@ return {
     threshold = 90,
   },
 
+  -- Quality Module Configuration
+  quality = {
+    enabled = false, -- Quality validation is disabled by default
+    level = 3,       -- Default quality level to aim for if enabled (Comprehensive)
+    strict = false,  -- If true, tests might fail if they don't meet the quality level
+    -- custom_rules = {}, -- Placeholder for future custom rules if implemented beyond level definitions
+  },
+
   -- LuaCov debug hook options
   debug_hook = {
     track_lines = true, -- Track line execution

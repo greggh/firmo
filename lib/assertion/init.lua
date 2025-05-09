@@ -34,7 +34,7 @@ local unpack = table.unpack or _G.unpack
 
 -- Lazy-load dependencies to avoid circular dependencies
 ---@diagnostic disable-next-line: unused-local
-local _error_handler, _logging, _firmo, _coverage, _date
+local _error_handler, _logging, _firmo, _coverage, _date, _quality_module
 
 -- Local helper for safe requires without dependency on error_handler
 local function try_require(module_name)
@@ -107,6 +107,15 @@ local function get_coverage()
   return _coverage
 end
 
+--- Get the quality module with lazy loading
+---@return table|nil The quality module or nil if not available
+local function get_quality_module()
+  if not _quality_module then
+    _quality_module = try_require("lib.quality")
+  end
+  return _quality_module
+end
+
 -- Utility functions
 
 --- Checks if a table contains a specific value among its values.
@@ -150,9 +159,26 @@ local function stringify(t, depth, visited)
     return "'" .. tostring(t) .. "'"
   elseif type(t) == "number" or type(t) == "boolean" or type(t) == "nil" then
     return tostring(t)
-  elseif type(t) ~= "table" or (getmetatable(t) and getmetatable(t).__tostring) then
+  elseif type(t) ~= "table" then -- Handle other non-tables (functions, userdata)
     return tostring(t)
+  elseif getmetatable(t) and getmetatable(t).__tostring then -- Handle tables with __tostring
+    local success, result = pcall(tostring, t)
+    if success then
+      return result
+    else
+      -- Fallback if __tostring errors, try basic table representation
+      local result_str
+      if type(result) == "string" then
+        result_str = result
+      elseif type(result) == "table" and result.message and type(result.message) == "string" then
+        result_str = result.message -- Common for error objects
+      else
+        result_str = "unstringifiable error object"
+      end
+      return "table: (error in __tostring: " .. result_str .. ")"
+    end
   end
+  -- If it's a table without __tostring, it will proceed to detailed table formatting.
 
   -- Handle cyclic references
   if visited[t] then
@@ -621,7 +647,7 @@ local paths = {
     ---@return string success_message Message for success.
     ---@return string failure_message Message for failure.
     test = function(v)
-      return v ~= nil, "expected " .. tostring(v) .. " to exist", "expected " .. tostring(v) .. " to not exist"
+      return v ~= nil, "expected value to exist", "expected value to not exist"
     end,
   },
 
@@ -662,7 +688,9 @@ local paths = {
     ---@return string success_message Message for success.
     ---@return string failure_message Message for failure.
     test = function(v)
-      return v == nil, "expected " .. tostring(v) .. " to be nil", "expected " .. tostring(v) .. " to not be nil"
+      return v == nil,
+        "expected " .. stringify(v, 0, {}) .. " to be nil",
+        "expected " .. stringify(v, 0, {}) .. " to not be nil"
     end,
   },
 
@@ -674,7 +702,9 @@ local paths = {
     ---@return string success_message Message for success.
     ---@return string failure_message Message for failure.
     test = function(v)
-      return v == nil, "expected " .. tostring(v) .. " to be nil", "expected " .. tostring(v) .. " to not be nil"
+      return v == nil,
+        "expected " .. stringify(v, 0, {}) .. " to be nil",
+        "expected " .. stringify(v, 0, {}) .. " to not be nil"
     end,
   },
 
@@ -792,14 +822,22 @@ local paths = {
     ---@return string success_message Message for success.
     ---@return string failure_message Message for failure.
     test = function(v, p)
-      -- Ensure v is a string for matching
+      local v_str
       if type(v) ~= "string" then
-        v = tostring(v)
+        local s, r = pcall(tostring, v) -- Safely convert v to string
+        if not s then
+          v_str = "<unstringifiable_value>"
+        else
+          v_str = r
+        end
+      else
+        v_str = v
       end
-      local result = string.find(v, p) ~= nil
+      local result = string.find(v_str, p) ~= nil
+      local display_v = stringify(v, 0, {}) -- Use stringify for messages
       return result,
-        'expected "' .. v .. '" to match pattern "' .. p .. '"',
-        'expected "' .. v .. '" to not match pattern "' .. p .. '"'
+        'expected "' .. display_v .. '" to match pattern "' .. p .. '"',
+        'expected "' .. display_v .. '" to not match pattern "' .. p .. '"'
     end,
   },
 
@@ -2716,9 +2754,11 @@ paths.error_type = {
 ---@example expect(1 + 1).to.equal(2)
 ---@example expect(my_string).to_not.contain("error")
 function M.expect(v)
+  local logger = get_logger() -- Moved logger up for the trace
+  logger.trace("Enter M.expect in assertion.lua", { value_v_type = type(v) }) -- Reverted from print
+
   ---@diagnostic disable-next-line: unused-local
   local error_handler = get_error_handler()
-  local logger = get_logger()
 
   -- Track assertion count (for test quality metrics)
   M.assertion_count = (M.assertion_count or 0) + 1
@@ -2805,27 +2845,75 @@ function M.expect(v)
         return rawget(t, k)
       end,
       __call = function(t, ...)
+        local logger = get_logger() -- Ensure logger is available
+        logger.trace("[ASSERTION __CALL] Entered", { action = t.action, val_type = type(t.val), negate = t.negate })
         local path_entry = paths[t.action]
         if path_entry and type(path_entry) == "table" and path_entry.test then
           local success, err, nerr
 
           -- Use error_handler.try if available for structured error handling
           if get_error_handler() then
+            local args_for_log = { ... }
+            logger.trace("[ASSERTION __CALL] About to call test function", {
+              action = t.action,
+              val_is_table = type(t.val) == "table",
+              val_tostring = tostring(t.val),
+              arg_count = #args_for_log,
+              first_arg_type = #args_for_log > 0 and type(args_for_log[1]) or nil,
+            })
             local args = { ... }
-            local try_success, try_result = get_error_handler().try(function()
+            -- Temporarily use direct pcall to isolate error_handler.try
+            local try_success, try_result
+            local pcall_func = function()
               local res, e, ne = paths[t.action].test(t.val, unpack(args))
               return { res = res, err = e, nerr = ne }
-            end)
+            end
+            try_success, try_result = pcall(pcall_func)
+            logger.trace("[ASSERTION __CALL] pcall result for test function", {
+              action = t.action,
+              try_success = try_success,
+              try_result_type = type(try_result),
+              try_result_error_message = (try_success == false and type(try_result) == "table" and try_result.message)
+                or (try_success == false and type(try_result) == "string" and try_result or nil),
+              try_result_is_table_with_res = (
+                try_success == true
+                and type(try_result) == "table"
+                and try_result.res ~= nil
+              ),
+            })
+
+            if try_success and type(try_result) ~= "table" then
+              get_logger().error("Assertion test function did not return a table as expected via pcall", {
+                returned_type = type(try_result),
+              })
+              try_success = false
+              try_result = (type(try_result) == "string" or type(try_result) == "table") and try_result
+                or "Internal error in assertion test function"
+            end
 
             if try_success then
               success, err, nerr = try_result.res, try_result.err, try_result.nerr
-            else
-              -- Handle error in test function
-              get_logger().error("Error in assertion test function", {
+              logger.trace("INTERNAL_ASSERTION_RESULT", {
                 action = t.action,
-                error = get_error_handler().format_error(try_result),
+                val_type = type(t.val),
+                raw_test_success = success,
+                is_negated = rawget(t, "negate"),
               })
-              error(try_result.message or "Error in assertion test function", 2)
+            else
+              -- Handle error in test function (error came from pcall_func or paths[t.action].test)
+              local formatted_err = "Unknown error in assertion test function"
+              if get_error_handler() and type(try_result) == "table" then -- if try_result is an error object
+                formatted_err = get_error_handler().format_error(try_result)
+              elseif type(try_result) == "string" then
+                formatted_err = try_result
+              end
+              logger.error("INTERNAL ASSERTION TEST ERROR (pcall path)", {
+                action = t.action,
+                value_type_for_log = type(t.val),
+                negated = rawget(t, "negate"),
+                error_details = formatted_err,
+              })
+              error((type(try_result) == "table" and try_result.message) or formatted_err, 2)
             end
           else
             -- Fallback if error_handler is not available
@@ -2884,28 +2972,60 @@ function M.expect(v)
             })
 
             -- Mark the code involved in this assertion as covered
-            -- This is what creates the distinction between "executed" and "covered" in the coverage report
-            if get_coverage() and get_coverage().mark_line_covered then
-              -- Get the current stack frame to find where the assertion is happening
+            local coverage_mod = get_coverage()
+            if coverage_mod and coverage_mod.mark_line_covered then
               local info = debug.getinfo(3, "Sl") -- 3 is the caller of the assertion
-              local file_path = info.source:sub(2) -- Remove the '@' prefix
+              if info and info.source and info.currentline then
+                local file_path = info.source:sub(2) -- Remove the '@' prefix
+                local cov_success, cov_err = pcall(function()
+                  coverage_mod.mark_line_covered(file_path, info.currentline)
+                end)
+                if not cov_success then
+                  logger.warn(
+                    "Failed to mark line as covered for coverage module",
+                    { action = t.action, error = cov_err }
+                  )
+                end
+              end
+            end
 
-              -- Use the public API to mark the line as covered, which is safe and general
-              local success, err = pcall(function()
-                get_coverage().mark_line_covered(file_path, info.currentline) -- Use _coverage
+            -- Track assertion for quality module
+            local quality_mod = get_quality_module()
+            if quality_mod and quality_mod.config and quality_mod.config.enabled then
+              logger.trace("[ASSERTION __CALL] About to track_assertion with quality_mod", {
+                action = t.action,
+                val_type = type(t.val),
+              })
+              -- Use pcall for safety, as quality module might not be fully initialized or could error
+              local track_success, track_err = pcall(function()
+                local current_test_name_from_quality = "unavailable_ctx_in_pcall"
+                -- Attempt to get current test name from quality module itself if possible
+                if quality_mod.get_current_test_name then -- Check if function exists
+                  current_test_name_from_quality = quality_mod.get_current_test_name()
+                    or "nil_test_name_from_quality_mod"
+                end
+
+                -- Log extended info about the assertion being tracked
+                local val_type_for_log = type(t.val)
+                if val_type_for_log == "table" and get_error_handler() and get_error_handler().is_error(t.val) then
+                  val_type_for_log = "error_object" -- More specific type
+                end
+
+                get_logger().trace("Inside PCall: Calling quality_mod.track_assertion", { -- Changed from INFO to TRACE
+                  action = t.action,
+                  val_type_for_log = val_type_for_log, -- Use the refined val_type
+                  current_test_from_quality = current_test_name_from_quality, -- Log the current test context from quality's perspective
+                  is_negated = rawget(t, "negate") or false, -- Ensure negate is always boolean
+                })
+                quality_mod.track_assertion(t.action) -- Pass only action name
               end)
-
-              -- Disable logging to improve performance
-              -- if success then
-              --   logger.debug("Marked line as covered from assertion", {
-              --     file_path = file_path,
-              --     line_number = info.currentline
-              --   })
-              -- else
-              --   logger.debug("Failed to mark line as covered", {
-              --     file_path = file_path,
-              --     line_number = info.currentline,
-              --     error = tostring(err)
+              if not track_success then
+                -- Revert to warn for actual failures in tracking
+                logger.warn("Failed to track assertion for quality module", {
+                  action = t.action,
+                  error = track_err,
+                })
+              end
             end
           end
 

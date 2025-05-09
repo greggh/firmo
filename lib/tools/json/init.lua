@@ -385,25 +385,43 @@ end
 ---@throws table If input validation fails (e.g., `json` is not a string).
 function M.decode(json)
   if type(json) ~= "string" then
-    return nil, get_error_handler().validation_error("Expected string", { provided_type = type(json) })
+    return nil, get_error_handler().validation_error("Expected string for JSON decoding", { provided_type = type(json) })
   end
 
-  local success, pos, result = get_error_handler().try(function()
-    local pos, result = decode_value(json, 1)
-    if not pos then
-      return nil, get_error_handler().validation_error("Invalid JSON", { json = json })
-    end
-    return pos, result
-  end)
+  -- pcall will return:
+  -- 1. pcall_ok (boolean): true if decode_value completed without Lua error, false otherwise.
+  -- 2. If pcall_ok is true:
+  --    p_pos: The first return value from decode_value (next position or nil if parse error).
+  --    p_result_or_err_obj: The second return value from decode_value (decoded value or error object).
+  -- 3. If pcall_ok is false:
+  --    p_pos: The Lua error message/object from decode_value itself crashing.
+  local pcall_ok, p_pos, p_result_or_err_obj = pcall(decode_value, json, 1)
 
-  if not success then
-    get_logger().error("Failed to decode JSON", {
-      error = get_error_handler().format_error(pos),
-    })
-    return nil, pos
+  if not pcall_ok then
+      -- decode_value itself threw a Lua error (e.g., bug in decode_value, not a JSON parse error)
+      -- p_pos here is the error object/string from Lua.
+      get_logger().error("Internal error during decode_value pcall", {
+          error_raw = p_pos,
+          error_formatted = get_error_handler().format_error(p_pos)
+      })
+      return nil, get_error_handler().runtime_error("JSON decoding failed due to internal error", {raw_error = tostring(p_pos)}, p_pos)
   end
 
-  return result
+  -- At this point, pcall_ok is true. decode_value completed its execution.
+  -- We now check what decode_value returned.
+  -- If p_pos is nil, it means decode_value signaled a JSON parse error by returning (nil, error_object).
+  if not p_pos then
+      -- p_result_or_err_obj is the error_object from decode_value.
+      get_logger().warn("Failed to decode JSON (parse error)", {
+          error = get_error_handler().format_error(p_result_or_err_obj),
+          json_preview = json:sub(1, 50) .. (#json > 50 and "..." or "")
+      })
+      return nil, p_result_or_err_obj -- Correctly return (nil, error_object)
+  end
+
+  -- Successfully decoded.
+  -- p_pos is the new position (number), p_result_or_err_obj is the decoded Lua value.
+  return p_result_or_err_obj -- Return just the decoded value
 end
 
 return M

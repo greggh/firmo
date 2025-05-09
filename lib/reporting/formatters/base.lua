@@ -344,6 +344,38 @@ function Formatter:get_table_keys(tbl)
   return keys
 end
 
+--- Merges instance options with new options, giving precedence to new options.
+--- Also incorporates defaults from the formatter class's DEFAULT_CONFIG table.
+---@param self Formatter The formatter instance.
+---@param new_options table|nil The new options to merge into the instance's current options.
+---@return table merged_options The resulting merged options table.
+---@protected
+function Formatter:_merge_options(new_options)
+  local merged = {}
+
+  -- Get the class table (e.g., HTMLFormatter) which is the __index of the instance's metatable
+  local class_table = getmetatable(self) and getmetatable(self).__index
+  local class_default_config = (class_table and class_table.DEFAULT_CONFIG) or {} -- Specific to derived class
+
+  -- 1. Start with class-specific defaults
+  for k, v in pairs(class_default_config) do
+    merged[k] = v
+  end
+
+  -- 2. Overlay with instance's initial options (set by new() when instance was created)
+  -- self.options are the options passed to HTMLFormatter.new(options), for example.
+  for k, v in pairs(self.options or {}) do
+    merged[k] = v
+  end
+
+  -- 3. Finally, overlay with new_options passed to the current method call (e.g., format(data, new_options))
+  for k, v in pairs(new_options or {}) do
+    merged[k] = v
+  end
+
+  return merged
+end
+
 --- Creates a new formatter class that extends the base formatter
 ---@param name string The name for the new formatter class (e.g., "HtmlFormatter").
 ---@param extension string The default file extension for reports produced by this class (e.g., ".html").
@@ -356,8 +388,8 @@ function Formatter.extend(name, extension)
 
   -- Set up inheritance
   setmetatable(formatter_class, {
-    __index = Formatter,
-    __call = function(cls, ...)
+    __index = Formatter, -- Class methods fall back to Formatter base
+    __call = function(cls, ...) -- Allows ClassName() to call cls.new()
       return cls.new(...)
     end,
   })
@@ -369,9 +401,9 @@ function Formatter.extend(name, extension)
     }
 
     setmetatable(instance, {
-      __index = formatter_class,
-      __tostring = function(self)
-        return string.format("Formatter(%s)", name)
+      __index = formatter_class, -- Instance methods looked up on formatter_class first
+      __tostring = function(self_instance)
+        return string.format("Formatter(%s)", self_instance.name or name)
       end,
     })
 

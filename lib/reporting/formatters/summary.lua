@@ -111,9 +111,11 @@ end
 
 local central_config = try_require("lib.core.central_config")
 local Formatter = try_require("lib.reporting.formatters.base")
+local quality_module = try_require("lib.quality") -- For get_level_name
 
 -- Create Summary formatter class
-local SummaryFormatter = Formatter.extend("summary", "txt")
+local SummaryFormatter = Formatter.extend("summary", "md")
+SummaryFormatter.EXTENSION = "md" -- Explicitly ensure EXTENSION is set
 
 --- Summary Formatter version
 SummaryFormatter._VERSION = "1.0.0"
@@ -125,7 +127,53 @@ local DEFAULT_CONFIG = {
   colorize = true,
   min_coverage_warn = 70,
   min_coverage_ok = 80,
+  indent_size = 2, -- Default indent size for quality summary sections
+  precision = 1, -- Default decimal precision for percentages
+  max_issues = 20, -- Max overall issues to display before truncating
+  show_all_issues = false, -- Whether to show all issues regardless of max_issues
+  max_files = 25, -- Max per-test details to show before truncating (used for quality tests)
+  show_all_tests = false, -- Whether to show all per-test details
 }
+
+-- ANSI Color definitions used by this formatter
+local DEFAULT_COLORS = {
+  reset = "\27[0m",
+  bold = "\27[1m",
+  dim = "\27[2m",
+  red = "\27[31m",
+  green = "\27[32m",
+  yellow = "\27[33m",
+  blue = "\27[34m",
+  magenta = "\27[35m",
+  cyan = "\27[36m",
+  white = "\27[37m",
+  -- Semantic colors
+  header = "\27[1;36m", -- Bold Cyan
+  subheader = "\27[1m", -- Bold Default
+  stat_label = "", -- Default (no specific color)
+  stat_value = "\27[1m", -- Bold Default
+  good = "\27[32m", -- Green
+  warn = "\27[33m", -- Yellow
+  bad = "\27[31m", -- Red
+  issue = "\27[33m", -- Yellow for issue summary
+  issue_detail = "\27[2m", -- Dim for issue details
+}
+
+--- Returns a table of color codes or empty strings if color is disabled.
+---@param self SummaryFormatter
+---@param use_color boolean Whether to use colors.
+---@return table<string, string> Color codes.
+---@private
+function SummaryFormatter:_get_colors(use_color)
+  if not use_color then
+    local no_colors = {}
+    for k, _ in pairs(DEFAULT_COLORS) do
+      no_colors[k] = ""
+    end
+    return no_colors
+  end
+  return DEFAULT_COLORS
+end
 
 --- Retrieves the configuration for the summary formatter.
 --- Fetches from `central_config` ("reporting.formatters.summary") or uses `DEFAULT_CONFIG`.
@@ -261,14 +309,34 @@ function SummaryFormatter:format(data, options)
 
   -- Get configuration
   local config = self:get_config()
+  -- Merge passed options into config, giving precedence to options
+  if options and type(options) == "table" then
+    for k, v in pairs(options) do
+      config[k] = v
+    end
+  end
 
   -- Detect report type and format accordingly
-  if data.type == "quality" or data.quality_level or data.level_name then
-    -- This appears to be quality data
-    return self:format_quality(data, config, options)
+  if data and data.report_type == "quality" then
+    get_logger().debug("Formatting quality data as summary", { data_keys = self:get_table_keys(data) })
+    return self:_format_quality_summary(data, config)
+  elseif data and (data.report_type == "coverage" or (not data.report_type and data.files and data.summary)) then -- Assuming coverage
+    get_logger().debug("Formatting coverage data as summary", { data_keys = self:get_table_keys(data) })
+    local normalized_data = self:normalize_coverage_data(data)
+    if config.style == "detailed" then
+      return self:_format_detailed_summary(normalized_data, config)
+    elseif config.style == "hierarchical" then
+      return self:_format_hierarchical_summary(normalized_data, config)
+    else -- compact by default
+      return self:_format_compact_summary(normalized_data, config)
+    end
   else
-    -- Default to coverage report
-    return self:format_coverage(data, config, options)
+    local err_handler = get_error_handler()
+    return nil, err_handler.validation_error("Unsupported data structure for Summary formatter", {
+      formatter = self.name,
+      data_type = type(data),
+      report_type = data and data.report_type,
+    })
   end
 end
 
@@ -614,6 +682,115 @@ function SummaryFormatter:format_coverage(coverage_data, config, options)
   }
 end
 
+--- Formats quality data into a Markdown text summary.
+---@param self SummaryFormatter The formatter instance.
+---@param quality_data table The quality data structure.
+---@param options table Formatting options.
+---@return string summary_text The Markdown formatted summary.
+---@private
+function SummaryFormatter:_format_quality_summary(quality_data, options)
+  local lines = {}
+  -- local c = self:_get_colors(options.colorize) -- Colors not used for Markdown
+  -- local indent = string.rep(" ", options.indent_size or 2) -- Indentation handled by Markdown list syntax
+  local precision_str = "%." .. (options.precision or 1) .. "f"
+
+  table.insert(lines, "# Quality Report Summary")
+  if options.include_timestamp ~= false then
+    table.insert(lines, string.format("Generated: %s", os.date("%Y-%m-%d %H:%M:%S")))
+  end
+  table.insert(lines, "")
+
+  -- Overall Quality
+  local level_achieved_str = string.format("%s (%d)", quality_data.level_name or "N/A", quality_data.level or 0)
+  table.insert(lines, string.format("## Overall Quality Level Achieved: **%s**", level_achieved_str))
+  table.insert(lines, "")
+
+  -- Summary Statistics
+  table.insert(lines, "## Summary Statistics")
+  local summary = quality_data.summary or {}
+  table.insert(lines, string.format("- **Tests Analyzed:** %d", summary.tests_analyzed or 0))
+  table.insert(lines, string.format("- **Tests Meeting Configured Level:** %d", summary.tests_passing_quality or 0))
+  table.insert(lines, string.format("- **Quality Compliance:** " .. precision_str .. "%%", summary.quality_percent or 0))
+  table.insert(lines, string.format("- **Total Assertions:** %d", summary.assertions_total or 0))
+  table.insert(lines, string.format("- **Avg Assertions/Test:** " .. precision_str, summary.assertions_per_test_avg or 0))
+  table.insert(lines, "")
+
+  -- Assertion Types Found (if detailed)
+  if options.detailed and summary.assertion_types_found and next(summary.assertion_types_found) then
+    table.insert(lines, "## Assertion Types Found")
+    local types_sorted = {}
+    for type_name, count in pairs(summary.assertion_types_found) do
+      table.insert(types_sorted, { name = type_name, count = count })
+    end
+    table.sort(types_sorted, function(a,b) return a.name < b.name end)
+    for _, item in ipairs(types_sorted) do
+      table.insert(lines, string.format("- **%s:** %d", item.name, item.count))
+    end
+    table.insert(lines, "")
+  end
+
+  -- Overall Issues
+  if summary.issues and #summary.issues > 0 then
+    table.insert(lines, string.format("## Overall Issues Found (%d)", #summary.issues))
+    local max_issues_to_show = options.show_all_issues and #summary.issues or (options.max_issues or 20)
+    for i = 1, math.min(#summary.issues, max_issues_to_show) do
+      local issue_obj = summary.issues[i]
+      table.insert(lines, string.format("- **Test:** %s", issue_obj.test or "N/A"))
+      table.insert(lines, string.format("  - **Issue:** %s", issue_obj.issue or "Unknown"))
+    end
+    if #summary.issues > max_issues_to_show then
+       table.insert(lines, string.format("...and %d more issues.", #summary.issues - max_issues_to_show))
+    end
+    table.insert(lines, "")
+  else
+    table.insert(lines, "No overall quality issues found.")
+    table.insert(lines, "")
+  end
+
+  -- Per-Test Details (if detailed)
+  if options.detailed and quality_data.tests and next(quality_data.tests) then
+    table.insert(lines, "## Per-Test Quality Details")
+    local tests_sorted = {}
+    for test_name_key, test_info_val in pairs(quality_data.tests) do
+      table.insert(tests_sorted, { name = test_name_key, info = test_info_val })
+    end
+    table.sort(tests_sorted, function(a,b) return a.name < b.name end)
+
+    local max_tests_to_show = options.show_all_tests and #tests_sorted or (options.max_files or 25)
+    for i = 1, math.min(#tests_sorted, max_tests_to_show) do
+      local item = tests_sorted[i]
+      local test_name = item.name
+      local test_info = item.info
+      local achieved_level = test_info.quality_level or 0
+      local level_name_str = quality_module and quality_module.get_level_name(achieved_level) or tostring(achieved_level)
+
+      table.insert(lines, string.format("- **%s:** Level **%s** (%d)", test_name, level_name_str, achieved_level))
+      if test_info.issues and #test_info.issues > 0 then
+        for _, issue_text in ipairs(test_info.issues) do
+          table.insert(lines, string.format("  - %s", issue_text))
+        end
+      else
+        table.insert(lines, "  - No specific issues for this test at its achieved level.")
+      end
+    end
+    if #tests_sorted > max_tests_to_show then
+       table.insert(lines, string.format("...and %d more tests.", #tests_sorted - max_tests_to_show))
+    end
+    table.insert(lines, "")
+  end
+
+  -- Return a table with the output string and key metrics, similar to format_coverage
+  return {
+    output = table.concat(lines, "\n"),
+    level = quality_data.level or 0,
+    level_name = quality_data.level_name or "unknown",
+    tests_analyzed = summary.tests_analyzed or 0,
+    tests_passing = summary.tests_passing_quality or 0,
+    quality_pct = summary.quality_percent or 0,
+    issues_count = summary.issues and #summary.issues or 0,
+  }
+end
+
 --- Format quality data as a text summary
 ---@param self SummaryFormatter The formatter instance.
 ---@param quality_data QualityReportData The quality data to format (expects `level`, `level_name`, `summary`).
@@ -814,15 +991,16 @@ function SummaryFormatter.register(formatters)
 
   -- Ensure coverage and quality tables exist
   formatters.coverage = formatters.coverage or {}
-  formatters.quality = formatters.quality or {}
 
-  -- Register format functions
+  -- Register format functions for coverage
   formatters.coverage.summary = function(coverage_data, options)
     return formatter:format(coverage_data, options)
   end
 
-  formatters.quality.summary = function(quality_data, options)
-    return formatter:format(quality_data, options)
+  -- Register for quality reports
+  formatters.quality = formatters.quality or {}
+  formatters.quality.summary = function(quality_data, opts)
+    return formatter:format(quality_data, opts) -- Pass opts for quality options
   end
 
   return true

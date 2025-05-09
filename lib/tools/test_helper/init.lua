@@ -134,7 +134,7 @@ local temp_file = try_require("lib.tools.filesystem.temp_file")
 local helper = {}
 
 -- Compatibility function for table unpacking
-local unpack_table = table.unpack or unpack
+local unpack_table = table.unpack or _G.unpack -- More robust for Lua 5.1 if global 'unpack' is removed/nil
 
 --- Wraps a function to safely capture any errors it throws.
 --- Sets the error handler's test context to expect errors, runs the function via `pcall`,
@@ -143,215 +143,56 @@ local unpack_table = table.unpack or unpack
 ---@param fn function The function to wrap.
 ---@return function wrapper A new function that, when called, executes `fn` and returns `result, nil` on success or `nil, error_object` on failure.
 ---@throws table Re-throws errors from `pcall` if error processing itself fails critically.
-function helper.with_error_capture(fn, options)
-  options = options or {}
-  return function()
-    -- Set up test to expect errors
-    local test_name = get_test_name()
-    local test_location = get_test_location()
-    local caller_info = debug.getinfo(2, "Sl")
-    get_error_handler().set_current_test_metadata({
-      name = test_name,
-      expect_error = true,
-      caller_info = caller_info,
-      function_info = debug.getinfo(fn, "Sl"),
-    })
+function helper.with_error_capture(fn) -- Removed options, was unused by simplified logic
+  assert(type(fn) == "function", "Expected function for with_error_capture")
+  local eh = get_error_handler() -- Ensure error_handler is available
+  local logger_instance = get_logger() -- Get logger instance
 
-    -- Use protected call and capture all results
-    local pcall_results = { pcall(fn) }
-    local success = table.remove(pcall_results, 1) -- Extract success status
-    local actual_results = pcall_results -- Remaining items are actual results
+  return function(...)
+    -- No longer setting/clearing test_metadata here as it's complex and
+    -- should be managed by the test runner or expect_error itself if needed.
 
-    -- Clear test metadata
-    get_error_handler().set_current_test_metadata(nil)
+    local pcall_results = { pcall(fn, ...) }
+    local pcall_success = table.remove(pcall_results, 1) -- True if fn completed without Lua error
 
-    if #actual_results == 0 and not success then
-      -- If pcall failed and returned nothing else, create a generic error message
-      -- Note: pcall typically returns an error message/object as the second item on failure.
-      -- This handles edge cases where it might not.
-      actual_results = { "pcall failed without returning an error value" }
-    elseif #actual_results == 0 and success then
-      -- If the function succeeded but returned nothing, treat it as success (no error)
-      -- If an error was *expected*, this path leads to failure later.
-      -- We no longer automatically create an error "Function did not return any value" here.
-      -- Let the subsequent logic handle it based on whether an error was expected.
-      -- If success is true, we eventually hit the final return unpack_table(actual_results).
+    if not pcall_success then
+      -- Case 1: fn itself threw a Lua error.
+      -- pcall_results[1] is the error message/object from Lua.
+      local thrown_err_val = pcall_results[1]
+      logger_instance.debug("with_error_capture: fn threw an error", { error = thrown_err_val })
+      local err_obj = eh.test_expected_error( -- Use test_expected_error for consistency
+          (type(thrown_err_val) == "string" and thrown_err_val or "Function threw an error"),
+          { original_error_type = type(thrown_err_val), source = "pcall_direct_error" },
+          (type(thrown_err_val) == "table" and thrown_err_val or nil) -- cause
+      )
+      return nil, err_obj
     end
 
-    -- Handle functions that return (nil, error_object) successfully
-    if
-      success
-      and #actual_results >= 1 -- Check length first
-      and actual_results[1] == nil
-      and #actual_results >= 2 -- Check length again
-      and type(actual_results[2]) == "table"
-      and get_error_handler().is_error(actual_results[2])
-    then
-      -- Treat this as a captured error
-      local captured_err = actual_results[2]
-      -- Process it similarly to the 'if not success' block
-      -- For simplicity, just wrap it as TEST_EXPECTED
-      local error_context = {
-        source = debug.getinfo(2, "S").source,
-        error_capture_location = debug.getinfo(2, "S").source .. ":" .. debug.getinfo(2, "l").currentline,
-        in_test_context = true,
-        returned_error = true, -- Indicate it was returned, not thrown
-      }
-      -- Wrap the returned error object as the cause of a TEST_EXPECTED error
-      return nil,
-        get_error_handler().test_expected_error(
-          "Expected error returned by function", -- Generic message
-          error_context,
-          captured_err -- Use the original returned error as the cause
-        )
-    end
+    -- Case 2: fn completed, pcall_results contains its return values.
+    -- Example: json.decode failing returns (nil, "error_string")
+    -- So, pcall_results would be {nil, "error_string"}
+    local fn_first_return = pcall_results[1]
+    local fn_second_return = pcall_results[2] -- Might be nil if fn returned only one value
 
-    if not success then
-      -- Captured an expected error (thrown) - process it
-      local thrown_err = actual_results[1] -- Get the actual error value from pcall results
-
-      -- Create base context with source information
-      local error_context = {
-        source = debug.getinfo(2, "S").source,
-        error_capture_location = debug.getinfo(2, "S").source .. ":" .. debug.getinfo(2, "l").currentline,
-        in_test_context = true,
-      }
-
-      -- Enhanced error processing with more specific cases:
-
-      -- 1. Already a properly formatted error object
-      if type(thrown_err) == "table" and thrown_err.category and thrown_err.message then
-        -- 1a. Already has TEST_EXPECTED category - just return it
-        if thrown_err.category == get_error_handler().CATEGORY.TEST_EXPECTED then
-          return nil, thrown_err
-        end
-
-        -- 1b. Is a VALIDATION error from expect().to.exist() or similar
-        if thrown_err.category == get_error_handler().CATEGORY.VALIDATION then
-          -- Validation errors in test context should be treated as TEST_EXPECTED
-          return nil,
-            get_error_handler().test_expected_error( -- Use get_error_handler()
-              thrown_err.message,
-              {
-                original_category = thrown_err.category,
-                original_severity = thrown_err.severity,
-                original_context = thrown_err.context,
-                assertion_type = thrown_err.context and thrown_err.context.action, -- Use thrown_err
-                test_error = true,
-              },
-              thrown_err -- Preserve original error as cause
-            )
-        end
-
-        -- 1c. Has a nested cause that might be TEST_EXPECTED
-        if
-          type(thrown_err.cause) == "table"
-          and thrown_err.cause.category == get_error_handler().CATEGORY.TEST_EXPECTED
-        then -- Use get_error_handler()
-          return nil,
-            get_error_handler().test_expected_error(
-              thrown_err.message,
-              {
-                original_category = thrown_err.category,
-                original_severity = thrown_err.severity,
-                original_context = thrown_err.context,
-                from_cause = true,
-              },
-              thrown_err.cause -- Use the original TEST_EXPECTED cause
-            )
-        end
-
-        -- 1d. Has a context with an error that is TEST_EXPECTED
-        if
-          type(thrown_err.context) == "table"
-          and type(thrown_err.context.error) == "table"
-          and thrown_err.context.error.category == get_error_handler().CATEGORY.TEST_EXPECTED -- Use get_error_handler()
-        then
-          return nil,
-            get_error_handler().test_expected_error(
-              thrown_err.message,
-              {
-                original_category = thrown_err.category,
-                original_severity = thrown_err.severity,
-                original_context = thrown_err.context,
-              },
-              thrown_err.context.error -- Use the original TEST_EXPECTED error from context
-            )
-        end
-
-        -- 1e. Is an assertion error indicated by specific context properties
-        if
-          type(thrown_err.context) == "table"
-          and (
-            thrown_err.context.action
-            or thrown_err.context.assertion
-            or (thrown_err.context.negate ~= nil)
-            or thrown_err.context.expected
-          )
-        then
-          -- This is likely an assertion error
-          return nil,
-            get_error_handler().test_expected_error( -- Use get_error_handler()
-              thrown_err.message,
-              {
-                original_category = thrown_err.category,
-                original_severity = thrown_err.severity,
-                original_context = thrown_err.context,
-                -- The original 'result' here seems incorrect, likely meant 'thrown_err'
-                -- If the intention was additional context, it's unclear what 'result' referred to.
-                -- Assuming it was a mistake and removing it for now, as 'thrown_err' is passed as cause.
-              },
-              thrown_err -- Preserve original error as cause
-            )
-        end
-
-        -- 1f. Any other structured error - wrap it in TEST_EXPECTED
-        return nil,
-          get_error_handler().test_expected_error( -- Use get_error_handler()
-            thrown_err.message,
-            {
-              original_category = thrown_err.category,
-              original_severity = thrown_err.severity,
-              original_context = thrown_err.context,
-            },
-            thrown_err -- Preserve original error as cause
-          )
+    if fn_first_return == nil and fn_second_return ~= nil then
+      -- fn indicated an error by returning (nil, error_val).
+      -- Normalize fn_second_return into a standard error object.
+      logger_instance.debug("with_error_capture: fn returned (nil, error_val)", { error_val_type = type(fn_second_return) })
+      if eh.is_error(fn_second_return) then -- It's already a standard error object
+        return nil, fn_second_return
+      elseif type(fn_second_return) == "string" then -- It's an error string
+        return nil, eh.test_expected_error(fn_second_return, { source_fn_returned_string_error = true })
+      else
+        -- fn returned (nil, some_other_non_error_type_value).
+        -- This is treated as a successful return of (nil, other_val).
+        logger_instance.debug("with_error_capture: fn returned (nil, non_error_value), passing through.", { results_count = #pcall_results })
+        return unpack_table(pcall_results) -- Contains original (nil, other_val, ...)
       end
-
-      -- 2. String error (most common case)
-      if type(thrown_err) == "string" then
-        -- 2a. If the string has specific patterns indicating assertion errors
-        if
-          thrown_err:match("VALIDATION")
-          or thrown_err:match("expected")
-          or thrown_err:match("assertion")
-          or thrown_err:match("to%.")
-        then
-          -- This is likely an assertion error reported as string
-          error_context.assertion_error = true
-          error_context.captured_error = thrown_err
-          return nil, get_error_handler().test_expected_error(thrown_err, error_context) -- Use get_error_handler()
-        end
-
-        -- 2b. Regular string error
-        error_context.captured_error = thrown_err
-        return nil, get_error_handler().test_expected_error(thrown_err, error_context) -- Use get_error_handler()
-      end
-
-      -- 3. Any other type of error (fallback)
-      error_context.error_type = type(thrown_err)
-      error_context.error_value = tostring(thrown_err)
-
-      return nil,
-        get_error_handler().test_expected_error( -- Use get_error_handler()
-          "Error of type " .. type(thrown_err) .. ": " .. tostring(thrown_err),
-          error_context,
-          thrown_err -- Include original value as cause if possible
-        )
     end
 
-    -- Return original results if successful and no error object was returned/processed
-    return unpack_table(actual_results)
+    -- If fn succeeded and didn't return the (nil, error_indicator) pattern, pass through all its results.
+    logger_instance.debug("with_error_capture: fn succeeded, passing through results.", { results_count = #pcall_results })
+    return unpack_table(pcall_results)
   end
 end
 

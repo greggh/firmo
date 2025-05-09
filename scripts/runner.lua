@@ -56,6 +56,7 @@
 --- @field threshold? number Coverage/quality threshold (default 80).
 --- @field exclude_patterns? string[] Patterns to exclude (default {"fixtures/*"}).
 --- @field coverage_instance? table Instance of the coverage module if initialized.
+--- @field quality_instance? table Instance of the quality module if initialized.
 --- @field results_format? string Specific format for test results output (e.g., "json").
 --- @field interval? number Watch mode interval (default 1.0).
 
@@ -320,7 +321,17 @@ function runner.run_file(file_path, firmo, options)
         .. package.path
     end
 
+    if options.quality and central_config then
+      central_config.set("runtime.current_test_file", file_path)
+      get_logger().debug("Set runtime.current_test_file for quality module", { file = file_path })
+    end
+
     dofile(file_path)
+
+    if options.quality and central_config then
+      central_config.set("runtime.current_test_file", nil)
+      get_logger().debug("Cleared runtime.current_test_file")
+    end
 
     package.path = save_path
   end)
@@ -464,6 +475,71 @@ function runner.run_file(file_path, firmo, options)
     tests_passed = results.passes, -- Add for consistency with run_all
     tests_failed = results.errors, -- Add for consistency with run_all
   })
+
+  -- Save per-file quality report if quality is enabled
+  if options.quality and options.quality_instance then
+    local quality_module_instance = options.quality_instance
+    local reporting_module = try_require("lib.reporting") -- Ensure reporting module is available
+    local current_central_config = try_require("lib.core.central_config") -- For report_dir
+
+    if
+      quality_module_instance
+      and reporting_module
+      and quality_module_instance.get_report_data
+      and current_central_config
+    then
+      get_logger().info("Generating per-file quality report", { file = file_path })
+      local pcall_success_get_data, quality_data_content_or_error = pcall(function()
+        return quality_module_instance.get_report_data()
+      end)
+
+      if pcall_success_get_data then
+        local current_file_quality_data = quality_data_content_or_error
+        local report_dir_for_file_quality = options.report_dir -- CLI option has highest precedence
+          or current_central_config.get("reporting.report_dir")
+          or "./coverage-reports" -- Fallback default
+
+        local auto_save_opts_for_file_quality = {
+          report_dir = report_dir_for_file_quality,
+          current_test_file_path = file_path,
+        }
+        -- Add the formats from CLI options (options is the argument to runner.run_file)
+        if options and options.formats and #options.formats > 0 then
+          auto_save_opts_for_file_quality.quality_formats = options.formats
+          get_logger().debug(
+            "[RUN_FILE] Passing explicit quality_formats to auto_save_reports for per-file report",
+            { formats = options.formats }
+          )
+        else
+          -- If no specific format from CLI, default to summary for per-file to be safe
+          auto_save_opts_for_file_quality.quality_formats = { "summary" }
+          get_logger().debug("[RUN_FILE] Defaulting to 'summary' quality_format for per-file report", {})
+        end
+
+        local pcall_success_save, save_error = pcall(function()
+          reporting_module.auto_save_reports(nil, current_file_quality_data, nil, auto_save_opts_for_file_quality)
+        end)
+        if not pcall_success_save then
+          get_logger().error(
+            "Failed to save per-file quality report during auto_save_reports call",
+            { file = file_path, error = save_error }
+          )
+        end
+      else
+        get_logger().error(
+          "Failed to get quality data for per-file report",
+          { file = file_path, error = quality_data_content_or_error }
+        )
+      end
+    else
+      get_logger().warn("Could not save per-file quality report due to missing modules or functions.", {
+        quality_instance_ok = options.quality_instance ~= nil,
+        reporting_module_ok = reporting_module ~= nil,
+        get_report_data_ok = quality_module_instance and quality_module_instance.get_report_data ~= nil,
+        central_config_ok = current_central_config ~= nil,
+      })
+    end
+  end
 
   -- Output JSON results if requested
   if options.json_output or options.results_format == "json" then
@@ -1275,9 +1351,31 @@ end
 --- Parses arguments, loads firmo, initializes coverage/watch mode if requested,
 --- runs tests, generates reports, and sets the process exit code.
 ---@param args string[] Array of command-line arguments (typically `_G.arg`).
----@return boolean final_success True if tests passed and reports generated successfully, false otherwise.
+---@return boolean final_success True if tests passed, modules initialized, and reports generated successfully, false otherwise.
 ---@throws error If critical modules cannot be loaded.
 function runner.main(args)
+  -- Attempt to clear module cache for critical reporting modules
+  -- This is to ensure the latest changes are picked up.
+  if _G.package and _G.package.loaded then
+    if _G.package.loaded["lib.reporting.init"] then
+      get_logger().debug("[RUNNER_CACHE_BUST] Clearing package.loaded for lib.reporting.init")
+      _G.package.loaded["lib.reporting.init"] = nil
+    end
+    if _G.package.loaded["lib.reporting.formatters.init"] then
+      get_logger().debug("[RUNNER_CACHE_BUST] Clearing package.loaded for lib.reporting.formatters.init")
+      _G.package.loaded["lib.reporting.formatters.init"] = nil
+    end
+    -- Also clear the specific summary formatter module, as its EXTENSION is crucial
+    if _G.package.loaded["lib.reporting.formatters.summary"] then
+      get_logger().debug("[RUNNER_CACHE_BUST] Clearing package.loaded for lib.reporting.formatters.summary")
+      _G.package.loaded["lib.reporting.formatters.summary"] = nil
+    end
+    if _G.package.loaded["lib.tools.test_helper.init"] then
+      get_logger().debug("[RUNNER_CACHE_BUST] Clearing package.loaded for lib.tools.test_helper.init")
+      _G.package.loaded["lib.tools.test_helper.init"] = nil
+    end
+  end
+
   -- Print all args for debugging
   print("Runner.main called with arguments:")
   for i, arg in ipairs(args) do
@@ -1334,6 +1432,22 @@ function runner.main(args)
       get_logger().warn("Failed to load .firmo-config.lua", {
         error = get_error_handler().format_error(config_err),
       })
+    end
+  end
+
+  -- Configure formats from CLI options for reporting module
+  if options.formats and #options.formats > 0 then
+    if central_config then
+      if options.coverage then
+        central_config.set("reporting.formats_override.coverage", options.formats)
+        get_logger().debug("Overriding coverage report formats from CLI", { formats = options.formats })
+      end
+      if options.quality then
+        central_config.set("reporting.formats_override.quality", options.formats)
+        get_logger().debug("Overriding quality report formats from CLI", { formats = options.formats })
+      end
+    else
+      get_logger().warn("Central_config not available, cannot set CLI format overrides for reporting.")
     end
   end
 
@@ -1411,6 +1525,65 @@ function runner.main(args)
 
     -- Always store coverage in options so it can be passed to both run_file and run_all
     options.coverage_instance = coverage
+  end
+
+  -- Initialize quality module if running with --quality flag
+  local quality_init_success = true
+  local quality_module = nil
+
+  if options.quality then
+    get_logger().info("Quality analysis enabled via CLI option")
+    quality_module = try_require("lib.quality")
+
+    if quality_module then
+      local quality_config = {
+        enabled = true, -- Explicitly enable
+      }
+
+      if options.quality_level then
+        quality_config.level = options.quality_level
+        get_logger().debug("Setting quality level from CLI", { level = options.quality_level })
+      end
+
+      -- Pass coverage instance if available, quality module can decide to use it
+      if options.coverage_instance then
+        quality_config.coverage_data = options.coverage_instance
+        get_logger().debug("Passing coverage instance to quality module config")
+      end
+
+      -- Add other potential CLI-driven quality options here if needed in the future
+      -- e.g., if options.quality_strict then quality_config.strict = true end
+
+      local ok, err = pcall(function()
+        quality_module.init(quality_config) -- Initialize with CLI-derived options
+        -- init() will merge with central_config and its own defaults
+      end)
+
+      if not ok then
+        get_logger().error("Failed to initialize quality module", {
+          error = get_error_handler().format_error(err),
+        })
+        quality_init_success = false
+      else
+        get_logger().info("Quality module initialized successfully")
+        options.quality_instance = quality_module -- Store for later use (e.g., report generation)
+
+        -- Register quality_module.reset with firmo's reset mechanism
+        if quality_module.register_with_firmo then
+          local reg_ok, reg_err = pcall(quality_module.register_with_firmo, firmo)
+          if not reg_ok then
+            get_logger().warn("Failed to register quality module for reset with firmo", { error = reg_err })
+          else
+            get_logger().info("Quality module reset handler registered with firmo.")
+          end
+        else
+          get_logger().warn("quality_module.register_with_firmo not found. Per-file quality data might not be reset.")
+        end
+      end
+    else
+      get_logger().error("Failed to load quality module (lib.quality)")
+      quality_init_success = false
+    end
   end
 
   -- Check if path is a file or directory
@@ -1522,18 +1695,258 @@ function runner.main(args)
     })
   end
 
-  -- Log a clear error message if tests failed
-  if not test_success then
-    get_logger().error("TESTS FAILED! Returning non-zero exit code", {
-      reason = "Tests had failures or execution errors",
-      exit_code = 1,
-    })
+  -- Generate quality reports if enabled
+  local quality_report_success = true -- Initialize for quality reports
+
+  if options.quality and options.quality_instance and quality_init_success then
+    -- If the initial path was a single file, generate its quality report here.
+    -- If it was a directory, per-file reports were already generated by runner.run_file (via runner.run_all).
+    -- The quality data at this point (due to per-file resets) will reflect the *last file run* if path was a directory,
+    -- or the single file if path was a file.
+    if get_fs().file_exists(path) then
+      get_logger().info("Generating quality report for single file run: " .. path)
+      local quality_module_instance = options.quality_instance
+      local reporting_module = try_require("lib.reporting")
+
+      if quality_module_instance and reporting_module then
+        local pcall_success_get_data, pcall_result_or_error = pcall(function()
+          return quality_module_instance.get_report_data()
+        end)
+
+        local quality_data_content = nil
+        local get_data_error = nil
+
+        if pcall_success_get_data then
+          quality_data_content = pcall_result_or_error
+        else
+          get_data_error = pcall_result_or_error
+        end
+
+        if get_data_error == nil and quality_data_content ~= nil then
+          local report_dir_for_quality = options.report_dir
+            or (central_config and central_config.get("reporting.report_dir")) -- Use report_dir not output_dir
+            or "./coverage-reports"
+          get_fs().ensure_directory_exists(report_dir_for_quality)
+
+          local auto_save_opts_quality = {
+            report_dir = report_dir_for_quality,
+            current_test_file_path = path,
+          }
+          -- Add the formats from CLI options directly
+          if options.formats and #options.formats > 0 then
+            auto_save_opts_quality.quality_formats = options.formats -- Pass only the desired formats
+            get_logger().debug(
+              "Passing explicit quality_formats from runner.main to auto_save_reports",
+              { formats = options.formats }
+            )
+          end
+
+          -- Aggressive cache bust for reporting_module right before critical call
+          if _G.package and _G.package.loaded and _G.package.loaded["lib.reporting.init"] then
+            get_logger().debug(
+              "[RUNNER_CACHE_BUST_AGAIN] Clearing package.loaded for lib.reporting.init BEFORE quality auto_save"
+            )
+            _G.package.loaded["lib.reporting.init"] = nil
+          end
+          -- Re-assign reporting_module after cache clear to force re-require
+          reporting_module = try_require("lib.reporting")
+          if not reporting_module then
+            get_logger().error(
+              "[RUNNER_CACHE_BUST_AGAIN] FAILED to re-require lib.reporting after cache clear. Aborting quality report save."
+            )
+            quality_report_success = false -- Mark as failure
+          else
+            get_logger().debug("[RUNNER_CACHE_BUST_AGAIN] Successfully re-required lib.reporting.")
+          end
+
+          -- Aggressive cache bust for test_helper module
+          if _G.package and _G.package.loaded and _G.package.loaded["lib.tools.test_helper.init"] then
+            get_logger().debug(
+              "[RUNNER_CACHE_BUST_AGAIN] Clearing package.loaded for lib.tools.test_helper.init BEFORE quality auto_save"
+            )
+            _G.package.loaded["lib.tools.test_helper.init"] = nil
+          end
+          local re_required_test_helper = try_require("lib.tools.test_helper") -- Assuming module is 'lib.tools.test_helper'
+          if not re_required_test_helper then
+            get_logger().error(
+              "[RUNNER_CACHE_BUST_AGAIN] FAILED to re-require lib.tools.test_helper after cache clear."
+            )
+          else
+            get_logger().debug("[RUNNER_CACHE_BUST_AGAIN] Successfully re-required lib.tools.test_helper.")
+          end
+
+          local pcall_success_auto_save, result_or_error_from_pcall
+          if reporting_module then -- Check if re-require was successful
+            pcall_success_auto_save, result_or_error_from_pcall = pcall(function()
+              return reporting_module.auto_save_reports(nil, quality_data_content, nil, auto_save_opts_quality)
+            end)
+          else
+            pcall_success_auto_save = false
+            result_or_error_from_pcall =
+              "Reporting module was nil before auto_save_reports pcall (after cache bust attempt)."
+          end
+
+          local actual_report_summary_table = nil
+          local auto_save_operation_error = nil
+
+          if pcall_success_auto_save then
+            actual_report_summary_table = result_or_error_from_pcall
+            get_logger().debug(
+              "DIRECT CALL to auto_save_reports SUCCEEDED (via pcall).",
+              { result_type = type(actual_report_summary_table), result_value = actual_report_summary_table }
+            )
+          else
+            auto_save_operation_error = result_or_error_from_pcall
+            get_logger().error(
+              "DIRECT CALL to auto_save_reports FAILED (via pcall).",
+              { error_type = type(auto_save_operation_error), error_value = auto_save_operation_error }
+            )
+          end
+
+          if auto_save_operation_error == nil and actual_report_summary_table ~= nil then
+            -- Success path for auto_save_reports
+            get_logger().debug(
+              "auto_save_reports processing successful result.",
+              { results_table = actual_report_summary_table }
+            )
+            for report_type_key, type_results_val in pairs(actual_report_summary_table) do
+              if report_type_key == "quality" then
+                for format_name_key, res_obj_val in pairs(type_results_val) do
+                  if not res_obj_val.success then
+                    quality_report_success = false
+                    get_logger().error("Failed to save quality report (detail from auto_save_reports result)", {
+                      format = format_name_key,
+                      path = res_obj_val.path,
+                      error = res_obj_val.error and (res_obj_val.error.message or tostring(res_obj_val.error))
+                        or "Unknown",
+                    })
+                  else
+                    get_logger().info(
+                      "Quality report saved successfully",
+                      { format = format_name_key, path = res_obj_val.path }
+                    )
+                  end
+                end
+              end
+            end
+          else
+            -- Error path: auto_save_reports itself failed OR direct pcall failed
+            quality_report_success = false
+            local err_msg_tostring_as = tostring(auto_save_operation_error)
+            local err_msg_field_as = (type(auto_save_operation_error) == "table" and auto_save_operation_error.message)
+              or "N/A"
+            local err_cat_field_as = (type(auto_save_operation_error) == "table" and auto_save_operation_error.category)
+              or "N/A"
+            local err_formatted_by_handler_as = get_error_handler().format_error(auto_save_operation_error)
+            local err_serialized_as = ""
+            if type(auto_save_operation_error) == "table" then
+              local json_encode_fn = try_require("lib.tools.json")
+              if json_encode_fn and json_encode_fn.encode then
+                local json_success_serialize, json_str_serialize =
+                  pcall(json_encode_fn.encode, auto_save_operation_error)
+                if json_success_serialize then
+                  err_serialized_as = json_str_serialize
+                else
+                  err_serialized_as = "Could not serialize error table to JSON: " .. tostring(json_str_serialize)
+                end
+              else
+                err_serialized_as = "JSON encoder not available."
+              end
+            end
+            get_logger().error(
+              "Failed during quality auto_save_reports call (pcall caught error or direct call failed)",
+              {
+                error_type = type(auto_save_operation_error),
+                error_tostring = err_msg_tostring_as,
+                error_message_field = err_msg_field_as,
+                error_category_field = err_cat_field_as,
+                error_handler_formatted = err_formatted_by_handler_as,
+                error_json_if_table = err_serialized_as,
+              }
+            )
+          end
+        else
+          -- Error occurred during get_report_data
+          quality_report_success = false
+          local err_msg_tostring = tostring(get_data_error)
+          local err_msg_field = (type(get_data_error) == "table" and get_data_error.message) or "N/A"
+          local err_cat_field = (type(get_data_error) == "table" and get_data_error.category) or "N/A"
+          local err_formatted_by_handler = get_error_handler().format_error(get_data_error)
+          local err_serialized = ""
+          if type(get_data_error) == "table" then
+            local json_encode_fn = try_require("lib.tools.json")
+            if json_encode_fn and json_encode_fn.encode then
+              local json_success, json_str = pcall(json_encode_fn.encode, get_data_error)
+              if json_success then
+                err_serialized = json_str
+              else
+                err_serialized = "Could not serialize error table to JSON: " .. tostring(json_str)
+              end
+            else
+              err_serialized = "JSON encoder not available."
+            end
+          end
+
+          get_logger().error("Failed to get quality report data", {
+            error_type = type(get_data_error),
+            error_tostring = err_msg_tostring,
+            error_message_field = err_msg_field,
+            error_category_field = err_cat_field,
+            error_handler_formatted = err_formatted_by_handler,
+            error_json_if_table = err_serialized,
+          })
+        end
+      else
+        quality_report_success = false
+        if not quality_module_instance then
+          get_logger().error("Quality module instance not available for reporting.")
+        end
+        if not reporting_module then
+          get_logger().error("Reporting module not available for quality reports.")
+        end
+      end
+      get_logger().debug(
+        "[RUNNER_MAIN_DEBUG] Value of quality_report_success before final_success calc",
+        { qrs_value = quality_report_success }
+      )
+    elseif options.quality and (not options.quality_instance or not quality_init_success) then
+      get_logger().warn(
+        "Quality analysis was enabled but module was not initialized successfully; skipping report generation."
+      )
+      quality_report_success = false -- If quality was enabled but init failed, reporting is also a failure.
+    end -- This 'end' closes the 'if options.quality and options.quality_instance and quality_init_success then' block
+
+    -- Log a clear error message if tests failed
+    if not test_success then
+      get_logger().error("TESTS FAILED! Returning non-zero exit code", {
+        reason = "Tests had failures or execution errors",
+        exit_code = 1,
+      })
+    end
   end
 
   -- Return the combined success status
-  local final_success = test_success and coverage_init_success and report_success
+  get_logger().debug("[RUNNER_FINAL_CHECK] Values before final_success calculation:", {
+    test_success_val = test_success,
+    options_coverage = options.coverage,
+    coverage_init_success_val = coverage_init_success,
+    report_success_val_for_coverage = report_success,
+    options_quality = options.quality,
+    quality_init_success_val = quality_init_success,
+    quality_report_success_val = quality_report_success,
+  })
+
+  local final_success = test_success
+
+  if options.coverage then
+    final_success = (final_success == true) and (coverage_init_success == true) and (report_success == true)
+  end
+
+  if options.quality then
+    final_success = (final_success == true) and (quality_init_success == true) and (quality_report_success == true)
+  end
   return final_success
-end
+end -- Closes runner.main function
 
 -- If this script is being run directly, execute main function
 if arg and arg[0]:match("runner%.lua$") then

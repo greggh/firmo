@@ -22,8 +22,10 @@ The quality module is part of the firmo test framework and is available by defau
 
 
 ```lua
-local firmo = require("firmo")
 local quality = require("lib.quality")
+-- OR, if firmo main object is used to expose sub-modules:
+-- local firmo = require("firmo")
+-- local quality = firmo.quality -- Assuming firmo.lua would set this up
 ```
 
 
@@ -58,26 +60,30 @@ quality.LEVEL_COMPLETE      -- 5
 ### init(options)
 
 
-Initialize quality module with specified options.
 
+Initializes and configures the quality module. This is the primary method for setup and is typically called by the test runner based on CLI arguments or central configuration. It merges provided options with defaults and central configuration values.
 
 ```lua
 quality.init({
   enabled = true,                -- Enable quality validation
   level = 3,                     -- Required quality level (1-5)
-  strict = false,                -- Strict mode (fail on first issue)
-  coverage_data = coverage_data, -- Reference to coverage module data
+  strict = false,                -- Strict mode (test suite might fail if quality level isn't met)
+  coverage_data = coverage_module_instance, -- Optional: instance of the coverage module or its report data
+  debug = false,                 -- Enable debug logging for the quality module
+  verbose = false                -- Enable verbose (trace) logging for the quality module
 })
 ```
 
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| options.enabled | boolean | Whether quality validation is enabled |
-| options.level | number | Required quality level (1-5) |
-| options.strict | boolean | Strict mode (fail on first issue) |
-| options.coverage_data | table | Reference to coverage module data |
-**Returns:** The quality module for method chaining
+| options.enabled | boolean | Whether quality validation is enabled. Defaults to `false` or value from `central_config`. |
+| options.level | number | Required quality level (1-5). Defaults to `3` (Comprehensive) or value from `central_config`. |
+| options.strict | boolean | If true, tests might fail if they don't meet the quality level (behavior depends on runner integration). Defaults to `false` or value from `central_config`. |
+| options.coverage_data | table | Optional: Instance of the coverage module or its report data, used for coverage-related quality checks. |
+| options.debug | boolean | Enable debug level logging for the quality module. |
+| options.verbose | boolean | Enable verbose (trace) level logging for the quality module. |
+**Returns:** The quality module (`M`) for method chaining.
 **Example:**
 
 
@@ -89,8 +95,7 @@ quality.init({
 ```
 ### configure(options)
 
-Configures the quality module, merging provided options with defaults and central configuration.
-Updates logger settings based on debug/verbose flags.
+Alias for `quality.init(options)`. Configures the quality module by merging provided options with defaults and central configuration.
 
 ```lua
 quality.configure({
@@ -100,23 +105,9 @@ quality.configure({
 })
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| options.enabled | boolean | Enable/disable quality validation |
-| options.level | number | Set the required quality level (1-5) |
-| options.strict | boolean | Enable/disable strict mode |
-| options.custom_rules | table | Define custom quality rules |
-| options.coverage_data | table | Provide coverage data for validation |
-| options.debug | boolean | Enable debug logging for the module |
-| options.verbose | boolean | Enable verbose logging for the module |
-**Returns:** The quality module for method chaining
-**Example:**
+*Refer to `quality.init(options)` for parameters and details.*
 
-```lua
--- Enable quality level 3 and verbose logging
-quality.configure({ level = 3, verbose = true })
-```
-
+**Returns:** The quality module (`M`) for method chaining.
 
 ### reset()
 
@@ -242,19 +233,20 @@ end
 ### track_assertion(type_name, test_name)
 
 
-Track assertion usage in a specific test.
 
+Tracks an assertion dynamically. This function is called by the assertion system (`lib/assertion/init.lua`) when an assertion (e.g., `expect(...).to.equal(...)`) is executed. The quality module maps the `action_name` to a broader category (e.g., 'equality', 'truth') for analysis.
 
 ```lua
-quality.track_assertion("equality", "should properly validate user input")
+-- Typically called internally by the assertion library:
+-- quality.track_assertion("equal", "current_test_name_here")
 ```
 
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| type_name | string | Type of assertion being tracked |
-| test_name | string | Name of the test (optional, uses current test if not provided) |
-**Returns:** The quality module for method chaining
+| action_name | string | The specific assertion method used (e.g., "equal", "exist", "be_nil"). |
+| test_name_override | string | Optional. Name of the test; used if `current_test` is nil (should be rare with dynamic tracking). |
+**Returns:** The quality module (`M`) for method chaining.
 **Example:**
 
 
@@ -299,25 +291,25 @@ quality.end_test()
 ### analyze_file(file_path)
 
 
-Analyze test file statically for quality metrics.
 
+Performs static analysis on a test file primarily for its structural properties (describe/it blocks, hooks, nesting levels). Assertion metrics (count, types) are now determined dynamically via `track_assertion`.
+**Important:** This function calls `quality.start_test` and `quality.end_test` internally for each test (`it` block) it discovers via parsing. If used on a file that is also run via the normal test execution flow, tests might be processed twice by the quality module.
 
 ```lua
-local analysis = quality.analyze_file("tests/my_test.lua")
+local structural_analysis = quality.analyze_file("tests/my_test.lua")
 ```
 
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | file_path | string | Path to the test file to analyze |
-**Returns:** Analysis results table with metrics
+**Returns:** A table containing structural analysis results (e.g., `tests` found, `has_describe`, `nesting_level`).
 **Example:**
-
 
 ```lua
 local analysis = quality.analyze_file("tests/my_test.lua")
-print("Test file has " .. analysis.assertion_count .. " assertions")
-print("Quality level: " .. analysis.quality_level)
+print("File analysis found " .. #analysis.tests .. " tests.")
+print("Max nesting level: " .. analysis.nesting_level)
 ```
 
 
@@ -353,204 +345,127 @@ local json_data = quality.report("json")
 local html = quality.report("html")
 fs.write_file("quality-report.html", html)
 ```
-  format = "html",       -- Default format for reports (html, json, summary)
-  output = "./quality",  -- Default output location for reports
-  strict = false,        -- Strict mode - fail on first issue (default: false)
-  custom_rules = {       -- Custom quality rules
-    require_describe_block = true,
-    min_assertions_per_test = 2
-  }
-}
+-- Configuration for quality module itself (via `quality.init` or central_config `quality.*`):
+--   enabled = true
+--   level = 3
+--   strict = false
+-- Configuration for reporting of quality data (via central_config `reporting.*`):
+--   reporting.formats.quality.default = "html"
+--   reporting.templates.quality = "./custom_reports/quality-{test_file_slug}.{format}"
 ```
 
-
-
-## API Reference
-
-
-### `firmo.quality_options`
-
-
-Configuration table for quality options:
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable quality validation |
-| `level` | number | `1` | Quality level to enforce (1-5) |
-| `format` | string | `"summary"` | Default format for reports (html, json, summary) |
-| `output` | string | `nil` | Default output location for reports |
-| `strict` | boolean | `false` | Strict mode - fail on first issue |
-| `custom_rules` | table | `{}` | Custom quality rules |
-
-### `firmo.with_quality(options, fn)`
-
-
-Run a function with quality validation:
-
-
-```lua
-firmo.with_quality({
-  level = 3,
-  strict = true
-}, function()
-  -- Run tests here
-  firmo.run_discovered('./tests')
-end)
-```
-
-
-
-### `firmo.start_quality(options)`
-
-
-Start quality validation with the given options:
-
-
-```lua
-firmo.start_quality({
-  level = 4,
-  strict = false
-})
--- Run tests
-firmo.run_discovered('./tests')
--- Stop quality validation
-firmo.stop_quality()
-```
-
-
-
-### `firmo.stop_quality()`
-
-
-Stop quality validation and finalize data collection.
-
-### `firmo.get_quality_data()`
-
-
-Get the collected quality data as a structured table:
-
-
-```lua
-local quality_data = firmo.get_quality_data()
-```
-
-
-
-### `firmo.generate_quality_report(format, output_path)`
-
-
-Generate a quality report:
-
-
-```lua
--- Generate an HTML report
-firmo.generate_quality_report("html", "./quality-report.html")
--- Generate a JSON report
-firmo.generate_quality_report("json", "./quality-report.json")
--- Generate a summary report (returns text, doesn't write to file)
-local summary = firmo.generate_quality_report("summary")
-```
-
-
-Parameters:
-
-
-- `format` (string): Output format (html, json, summary)
-- `output_path` (string): Path to save the report (optional for summary format)
-
-
-### `firmo.quality_meets_level(level)`
-
-
-Check if tests meet the specified quality level:
-
-
-```lua
-if firmo.quality_meets_level(3) then
-  print("Quality is good!")
-else
-  print("Quality is below level 3!")
-end
-```
-
-
-Parameters:
-
-
-- `level` (number): Quality level threshold (1-5)
+Note: The section previously titled "API Reference" detailing `firmo.quality_options`, `firmo.start_quality()`, etc., has been removed as it described an API pattern not primarily used by the framework. The quality module is typically accessed via `local quality = require("lib.quality")`, and its API methods like `quality.init()`, `quality.get_report_data()`, `quality.report()` are documented above. Test runner integration handles most direct interactions.
 
 
 ## Custom Rules
 
 
-You can define custom quality rules through the `custom_rules` option:
-
+You can influence quality rules by configuring the quality `level` and using `strict` mode. The `custom_rules` field in the configuration is a conceptual placeholder; actual rule definitions and enforcement are managed by `lib/quality/level_checkers.lua`.
 
 ```lua
-firmo.quality_options.custom_rules = {
-  require_describe_block = true,       -- Tests must be in describe blocks
-  min_assertions_per_test = 2,         -- Minimum number of assertions per test
-  require_error_assertions = true,     -- Tests must include error assertions
-  require_mock_verification = true,    -- Mocks must be verified
-  max_test_name_length = 60,           -- Maximum test name length
-  require_setup_teardown = true,       -- Tests must use setup/teardown
-  naming_pattern = "^should_.*$",      -- Test name pattern requirement
-  max_nesting_level = 3                -- Maximum nesting level for describes
-}
-```
+-- Example configuration in .firmo-config.lua:
+-- return {
+--   quality = {
+--     enabled = true,
+--     level = 3, -- Or a specific level that uses custom checks from level_checkers.lua
+--     -- custom_rules = { -- This field is not directly processed by current logic
+--     --   require_describe_block = true, 
+--     --   min_assertions_per_test = 2
+--     -- }
+--   }
+-- }
 
+-- Or programmatically (typically done by runner):
+local quality = require("lib.quality")
+quality.init({
+  level = 3
+  -- custom_rules = { -- Note: Custom rule application depends on level_checkers.lua logic
+  --   min_assertions_per_test = 3 
+  -- }
+})
+```
+Note: The `custom_rules` field in the configuration is a placeholder concept. Actual rule enforcement and quality level definitions are primarily managed by the hardcoded structures and logic within `lib/quality/level_checkers.lua`. Customization typically involves modifying `level_checkers.lua` or contributing new checkers.
 
 
 ## Examples
 
 
+
 ### Basic Quality Validation
 
+Quality validation is typically enabled and configured via CLI arguments when using the `test.lua` runner.
 
+```bash
+# Run tests with quality validation at level 2
+lua test.lua --quality --quality-level=2 tests/
 
-```lua
-local firmo = require('firmo')
--- Enable quality validation
-firmo.quality_options.enabled = true
-firmo.quality_options.level = 2 -- Standard quality level
--- Run tests
-firmo.run_discovered('./tests')
--- Generate report
-firmo.generate_quality_report("html", "./quality-report.html")
+# Generate an HTML report
+lua test.lua --quality --quality-level=2 --format=html --report-dir=./reports tests/
 ```
 
+Programmatic example (simplified, as the runner handles most details):
+```lua
+local quality = require("lib.quality")
+local central_config = require("lib.core.central_config")
+local reporting = require("lib.reporting")
 
+-- Mimic runner enabling quality
+-- In a real scenario, this would be set by CLI parsing or .firmo-config.lua
+central_config.set("quality.enabled", true)
+central_config.set("quality.level", 2)
+quality.init() -- Initializes with settings from central_config
+
+-- During test execution (handled by test_definition.lua and assertion.lua):
+-- quality.start_test("Test / example test should pass")
+-- quality.track_assertion("equal") -- Called by expect(...).to.equal(...)
+-- quality.end_test()
+
+-- After all tests run:
+local report_data = quality.get_report_data()
+reporting.save_quality_report("./reports/quality-report.html", report_data, "html")
+```
 
 ### Custom Quality Configuration
 
-
+Configure quality module settings, typically through `.firmo-config.lua` or programmatically via `quality.init()`.
 
 ```lua
-local firmo = require('firmo')
--- Start quality validation with custom configuration
-firmo.start_quality({
+-- In .firmo-config.lua
+-- return {
+--   quality = {
+--     enabled = true,
+--     level = 4,
+--     strict = true,
+--     -- custom_rules = { min_assertions_per_test = 3 } -- See note on custom_rules
+--   }
+-- }
+
+-- Or programmatically:
+local quality = require("lib.quality")
+local central_config = require("lib.core.central_config")
+
+quality.init({
   level = 4,
   strict = true,
-  custom_rules = {
-    min_assertions_per_test = 3,
-    require_mock_verification = true,
-    require_error_assertions = true
-  }
+  -- custom_rules = { min_assertions_per_test = 3 } -- See note above about custom_rules implementation
 })
--- Run specific tests
-firmo.run_file("tests/api_tests.lua")
--- Stop quality validation
-firmo.stop_quality()
--- Check if quality meets level
-if firmo.quality_meets_level(4) then
+central_config.set("quality.enabled", true) -- Ensure it's active for test hooks
+
+-- Simulate a test run...
+-- (Test execution would call quality.start_test, quality.track_assertion, quality.end_test)
+
+-- After tests:
+if quality.meets_level(4) then -- quality.meets_level is available
   print("Meets quality level 4!")
 else
   print("Below quality level 4!")
 end
--- Generate reports in different formats
-firmo.generate_quality_report("html", "./quality/report.html")
-firmo.generate_quality_report("json", "./quality/report.json")
-```
 
+local report_data = quality.get_report_data()
+local reporting = require("lib.reporting")
+reporting.save_quality_report("./quality/report.html", report_data, "html")
+reporting.save_quality_report("./quality/report.json", report_data, "json")
+```
 
 
 ### Command Line Usage
@@ -558,29 +473,22 @@ firmo.generate_quality_report("json", "./quality/report.json")
 
 
 ```bash
+# Run tests with quality validation enabled (uses configured default level, e.g., from .firmo-config.lua)
+lua test.lua --quality tests/
 
-# Run tests with basic quality validation
+# Specify quality level to enforce
+lua test.lua --quality --quality-level=3 tests/
 
+# Enable strict mode (via .firmo-config.lua: quality.strict = true)
+# Note: --quality-strict CLI flag is not currently implemented.
+# lua test.lua --quality --quality-level=3 tests/ (and ensure strict=true in config)
 
-lua firmo.lua --quality tests/
-
-# Specify quality level
-
-
-lua firmo.lua --quality --quality-level 3 tests/
-
-# Enable strict mode
-
-
-lua firmo.lua --quality --quality-level 3 --quality-strict tests/
-
-# Set custom output file
-
-
-lua firmo.lua --quality --quality-format html --quality-output ./reports/quality.html tests/
+# Set report format and output directory
+lua test.lua --quality --format=html --report-dir=./reports tests/
+# Note: Specific output filenames within the report directory are typically auto-generated 
+# (e.g., quality-mytest.html). The exact naming can be influenced by 
+# `reporting.templates.quality` in `.firmo-config.lua`.
 
 # Run with both quality and coverage
-
-
-lua firmo.lua --quality --quality-level 3 --coverage tests/
+lua test.lua --quality --quality-level=3 --coverage tests/
 ```

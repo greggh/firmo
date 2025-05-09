@@ -374,15 +374,6 @@ if mocking_module then
   firmo.stub = mocking_module.stub
   firmo.mock = mocking_module.mock
   firmo.with_mocks = mocking_module.with_mocks
-
-  -- Add required assertion functions (be_truthy, be_falsy)
-  local success, err = mocking_module.ensure_assertions(firmo)
-  if not success then
-    logger.warn("Failed to register mocking assertions", {
-      error = get_error_handler().format_error(err),
-      module = "firmo-core",
-    })
-  end
 end
 
 --- Create a module that can be required

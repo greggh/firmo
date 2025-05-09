@@ -15,6 +15,7 @@
 ---@field _VERSION string Module version.
 ---@field built_in table A table listing the names of built-in formatters by category (`coverage`, `quality`, `results`).
 ---@field register_all fun(formatters: table): table|nil, table? Loads and registers all built-in formatters into the provided registry table. Returns the updated formatters table on success, or nil and an error table on failure.
+---@field get_formatter_extension fun(format_name: string): string|nil Returns the file extension for a given formatter name.
 
 -- Lazy-load dependencies to avoid circular dependencies
 ---@diagnostic disable-next-line: unused-local
@@ -438,6 +439,63 @@ function M.register_all(formatters)
 
   -- Even with some errors, return the formatters if at least one loaded
   return formatters
+end
+
+--- Returns the file extension for a given formatter name.
+--- Loads the formatter module and accesses its EXTENSION property.
+---@param format_name string The logical name of the formatter (e.g., "summary", "json").
+---@return string|nil The file extension (e.g., "md", "json") or nil if not found/defined.
+function M.get_formatter_extension(format_name)
+  local function get_table_keys(tbl)
+    if type(tbl) ~= "table" then return "not a table" end
+    local keys = {}
+    for k, _ in pairs(tbl) do
+      table.insert(keys, tostring(k))
+    end
+    return table.concat(keys, ", ")
+  end
+
+  if not format_name or type(format_name) ~= "string" then
+    get_logger().warn("Invalid format_name for get_formatter_extension", { provided = format_name })
+    return nil
+  end
+
+  -- Construct the path to the formatter module
+  -- This assumes formatters are in the same directory or accessible via 'lib.reporting.formatters.<name>'
+  local formatter_module_path = "lib.reporting.formatters." .. format_name
+  local success, formatter_module = pcall(require, formatter_module_path)
+
+  if not success then
+    -- Try a relative path as a fallback, though less ideal
+    formatter_module_path = "./" .. format_name -- Assuming they are co-located
+    success, formatter_module = pcall(require, formatter_module_path)
+  end
+
+  if success and formatter_module and type(formatter_module) == "table" then
+    -- A formatter module is expected to be a table (class instance)
+    -- that has an EXTENSION field (from Formatter.extend)
+    if formatter_module.EXTENSION and type(formatter_module.EXTENSION) == "string" then
+      get_logger().trace("Found extension for formatter", { format = format_name, extension = formatter_module.EXTENSION })
+      return formatter_module.EXTENSION
+    else
+      get_logger().trace("Formatter module loaded but no EXTENSION property found or not a string", {
+        format = format_name,
+        module_path = formatter_module_path,
+        has_extension_prop = formatter_module.EXTENSION ~= nil,
+        extension_prop_type = type(formatter_module.EXTENSION),
+        module_keys = get_table_keys(formatter_module) -- Log the keys
+      })
+      return nil -- Return nil if EXTENSION is not a string or not present
+    end
+  else
+    get_logger().warn("Failed to load formatter module or module not a table", {
+      format = format_name,
+      path_attempted = formatter_module_path,
+      load_error = not success and tostring(formatter_module) or nil, -- formatter_module contains error if pcall failed
+      module_type = success and type(formatter_module) or "N/A"
+    })
+    return nil
+  end
 end
 
 return M

@@ -223,7 +223,13 @@ end
 ---@return nil
 ---@private
 local function log(level, message, params)
-  get_logger()[level](message, params or {})
+  local logger_to_use
+  if _initializing or not _initialized then -- If central_config is currently initializing itself
+    logger_to_use = get_bootstrap_logger()
+  else
+    logger_to_use = get_logger() -- Use the full logger if central_config is done initializing
+  end
+  logger_to_use[level](message, params or {})
 end
 
 --- Recursively merges key-value pairs from `source` table into `target` table.
@@ -403,13 +409,16 @@ end
 function M.get(path, default)
   -- Parameter validation
   if path ~= nil and type(path) ~= "string" then
-    local err = get_error_handler().validation_error("Path must be a string or nil", {
-      parameter_name = "path",
-      provided_type = type(path),
-      operation = "get",
-    })
-    log("warn", err.message, err.context)
-    return nil, err
+    -- This is the point where 'path' is a table.
+    -- Directly return a simple error message and nil, to avoid recursion through logging/error_handler.
+    local err_msg = "INTERNAL_CENTRAL_CONFIG_ERROR: M.get() was called with a table as a path. Path type: "
+      .. type(path)
+      .. ", Path value: "
+      .. tostring(path)
+    -- Use bootstrap logger for this specific internal error to prevent recursion
+    get_bootstrap_logger().error(err_msg .. "\n" .. debug.traceback("", 2))
+    -- Return a very simple error table directly to avoid re-triggering complex error handling
+    return nil, { message = err_msg, category = "INTERNAL_ERROR", severity = "ERROR" }
   end
 
   -- Return all config if no path specified

@@ -75,13 +75,13 @@ describe("JSON Module", function()
     end)
 
     it("should handle invalid values gracefully", { expect_error = true }, function()
-      local result, err = test_helper.with_error_capture(function()
+      local actual_result, actual_err_obj = test_helper.with_error_capture(function()
         return json.encode(function() end)
       end)()
 
-      expect(result).to_not.exist()
-      expect(err).to.exist()
-      expect(err.message).to.match("Cannot encode value of type function")
+      expect(actual_result).to.be_nil()
+      expect(actual_err_obj).to.exist() -- Should now be an error object
+      expect(actual_err_obj.message).to.match("Cannot encode value of type function")
     end)
   end)
 
@@ -163,13 +163,12 @@ describe("JSON Module", function()
     end)
 
     it("should handle invalid JSON gracefully", { expect_error = true }, function()
-      local result, err = test_helper.with_error_capture(function()
-        return json.decode("invalid json")
+      local s, err = test_helper.with_error_capture(function()
+        json.decode("{invalid_json") -- This will error
       end)()
-
-      expect(result).to_not.exist()
+      expect(s).to.be_nil()
       expect(err).to.exist()
-      expect(err.message).to.match("Invalid JSON")
+      expect(err.message).to.match("Unexpected token")
     end)
 
     it("should handle invalid input type", { expect_error = true }, function()
@@ -177,9 +176,9 @@ describe("JSON Module", function()
         return json.decode(123)
       end)()
 
-      expect(result).to_not.exist()
+      expect(result).to.be_nil()
       expect(err).to.exist()
-      expect(err.message).to.match("Expected string")
+      expect(err.message).to.match("Expected string for JSON decoding")
     end)
   end)
 

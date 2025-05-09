@@ -1153,33 +1153,58 @@ function M.format_quality(quality_data, format)
 
   -- Use the appropriate formatter
   if formatters.quality[format] then
-    get_logger().trace("Using requested formatter", { format = format })
-    local result = formatters.quality[format](quality_data)
+    get_logger().trace("Using requested formatter for quality", { format = format })
+    local formatter_fn = formatters.quality[format]
+    local pcall_ok, pcall_res_or_err = pcall(formatter_fn, quality_data, options or {}) -- Pass options
+    local final_content = nil
+    local final_full_result = nil -- For formatters that return {output=..., metrics=...}
 
-    -- Handle both old-style string returns and new-style structured returns
-    if type(result) == "table" and result.output then
-      -- For formatters that return a table with both display output and structured data
-      return result
+    if pcall_ok then
+      get_logger().debug(
+        "Formatter pcall successful",
+        { format = format, type = "quality", result_type_from_pcall = type(pcall_res_or_err) }
+      )
+      if type(pcall_res_or_err) == "table" and pcall_res_or_err.output ~= nil then -- Allow empty string for output
+        final_content = pcall_res_or_err.output
+        final_full_result = pcall_res_or_err
+        get_logger().debug("Formatter returned table with .output field.", { format = format, type = "quality" })
+      elseif type(pcall_res_or_err) == "string" then
+        final_content = pcall_res_or_err
+        get_logger().debug("Formatter returned string.", { format = format, type = "quality" })
+      else
+        local err_msg = "Formatter for "
+          .. format
+          .. " (quality) returned unexpected result type: "
+          .. type(pcall_res_or_err)
+        get_logger().error(err_msg, {
+          format = format,
+          type = "quality",
+          returned_type = type(pcall_res_or_err),
+          expected_type = "string OR table with .output field",
+        })
+        local err_obj = get_error_handler().new(err_msg, {
+          returned_type = type(pcall_res_or_err),
+          formatter_name = format,
+          report_type = "quality",
+        }, "FORMAT_ERROR")
+        return nil, err_obj
+      end
+      return final_content, final_full_result
     else
-      -- For backward compatibility with formatters that return strings directly
-      return result
+      local err_msg = "Formatter function for " .. format .. " (quality) failed during pcall"
+      get_logger().error(err_msg, {
+        format = format,
+        type = "quality",
+        error_raw = tostring(pcall_res_or_err),
+        error_formatted = get_error_handler().format_error(pcall_res_or_err),
+      })
+      return nil, pcall_res_or_err
     end
   else
-    local default_format = get_default_format("quality")
-    get_logger().warn("Requested formatter not available, falling back to default", {
-      requested_format = format,
-      default_format = default_format,
-    })
-    -- Default to summary formatter explicitly
-    get_logger().debug("Using summary formatter as fallback for invalid format")
-    local result = formatters.quality.summary(quality_data)
-
-    -- Handle both old-style string returns and new-style structured returns
-    if type(result) == "table" and result.output then
-      return result
-    else
-      return result
-    end
+    local err_msg = "Requested formatter not available for quality reports"
+    get_logger().warn(err_msg, { requested_format = format })
+    local err_obj = get_error_handler().new(err_msg, { requested_format = format }, "NOT_FOUND")
+    return nil, err_obj
   end
 end
 
@@ -1540,7 +1565,7 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
     has_data = true,
     validate = options.validate ~= false, -- Default to validate=true
   })
-  get_logger().trace("Inside save_coverage_report, before validation", { format=format, file_path=file_path })
+  get_logger().trace("Inside save_coverage_report, before validation", { format = format, file_path = file_path })
 
   -- CRITICAL FIX: Check for minimal valid data structure before proceeding
   if not coverage_data.files or not coverage_data.summary then
@@ -1651,7 +1676,7 @@ function M.save_coverage_report(file_path, coverage_data, format, options)
     end
   end
 
-  get_logger().trace("Inside save_coverage_report, before format call", { format=format, file_path=file_path })
+  get_logger().trace("Inside save_coverage_report, before format call", { format = format, file_path = file_path })
   -- Format the coverage data with error handling
   ---@diagnostic disable-next-line: unused-local
   local format_success, formatted, format_err = get_error_handler().try(function()
@@ -1973,108 +1998,353 @@ end
 ---@return table<string, {success: boolean, error?: table, path: string}> results A summary table mapping report format/type (e.g., "html", "lcov", "quality_json") to its save result (`{success, error?, path}`).
 ---@throws table If ensuring the base report directory exists fails critically.
 function M.auto_save_reports(coverage_data, quality_data, results_data, options)
-  get_logger().trace("Inside auto_save_reports", { has_coverage = coverage_data ~= nil, has_quality = quality_data ~= nil, has_results = results_data ~= nil })
+  get_logger().trace(
+    "Inside auto_save_reports",
+    { has_coverage = coverage_data ~= nil, has_quality = quality_data ~= nil, has_results = results_data ~= nil }
+  )
   -- Handle both string (backward compatibility) and table options
-  local config = {}
+  local config = {} -- Start with an empty new table for local config
 
   if type(options) == "string" then
-    config.report_dir = options
+    config.report_dir = options -- Handle string option for backward compatibility
   elseif type(options) == "table" then
-    config = options
+    -- Deep copy relevant fields from options to config to avoid modifying the original options table
+    for k, v in pairs(options) do
+      -- Be selective or perform a proper deep copy if nested tables are expected in options
+      -- For now, assume options contains mostly flat values or tables we want to reference (like quality_formats)
+      if k == "quality_formats" and type(v) == "table" then
+        config[k] = {} -- Create new table for quality_formats
+        for i_qk, v_qk in ipairs(v) do
+          config[k][i_qk] = v_qk
+        end
+      elseif
+        k == "report_dir"
+        or k == "report_suffix"
+        or k == "timestamp_format"
+        or k == "coverage_path_template"
+        or k == "quality_path_template"
+        or k == "results_path_template"
+        or k == "verbose"
+        or k == "validate"
+        or k == "strict_validation"
+        or k == "validation_report"
+        or k == "validation_report_path"
+        or k == "current_test_file_path"
+      then
+        config[k] = v
+      else
+        -- For other keys, if deep copy is needed and value is a table, implement it
+        -- For now, shallow copy for unrecognized keys (or decide to ignore them)
+        config[k] = v -- This might still carry over references if v is a table not handled above
+      end
+    end
+    local num_options_keys = 0
+    if options then
+      for _ in pairs(options) do
+        num_options_keys = num_options_keys + 1
+      end
+    end
+    get_logger().debug("Copied table options to local config", { num_options_keys = options and num_options_keys or 0 })
   end
 
   -- Check central_config for defaults
-  -- central_config is loaded at top level and guaranteed to exist
+  local central_config_merge_success = true
+  local central_config_merge_error = nil
   if central_config then
-    local reporting_config = central_config.get("reporting")
+    central_config_merge_success, central_config_merge_error = pcall(function()
+      local reporting_main_config_from_central = central_config.get("reporting")
 
-    if reporting_config then
-      -- Use central config as base if available, but allow options to override
-      if not config.report_dir and reporting_config.report_dir then
-        config.report_dir = reporting_config.report_dir
-      end
-
-      if not config.report_suffix and reporting_config.report_suffix then
-        config.report_suffix = reporting_config.report_suffix
-      end
-
-      if not config.timestamp_format and reporting_config.timestamp_format then
-        config.timestamp_format = reporting_config.timestamp_format
-      end
-
-      -- Check for path templates in the formats section
-      if reporting_config.formats then
+      if reporting_main_config_from_central and type(reporting_main_config_from_central) == "table" then
         if
-          not config.coverage_path_template
-          and reporting_config.formats.coverage
-          and reporting_config.formats.coverage.path_template
+          not config.report_dir
+          and reporting_main_config_from_central.report_dir
+          and type(reporting_main_config_from_central.report_dir) == "string"
         then
-          config.coverage_path_template = reporting_config.formats.coverage.path_template
+          config.report_dir = reporting_main_config_from_central.report_dir
+        end
+        if
+          not config.report_suffix
+          and reporting_main_config_from_central.report_suffix
+          and type(reporting_main_config_from_central.report_suffix) == "string"
+        then
+          config.report_suffix = reporting_main_config_from_central.report_suffix
+        end
+        if
+          not config.timestamp_format
+          and reporting_main_config_from_central.timestamp_format
+          and type(reporting_main_config_from_central.timestamp_format) == "string"
+        then
+          config.timestamp_format = reporting_main_config_from_central.timestamp_format
         end
 
         if
-          not config.quality_path_template
-          and reporting_config.formats.quality
-          and reporting_config.formats.quality.path_template
+          reporting_main_config_from_central.formats and type(reporting_main_config_from_central.formats) == "table"
         then
-          config.quality_path_template = reporting_config.formats.quality.path_template
+          if
+            not config.coverage_path_template
+            and reporting_main_config_from_central.formats.coverage
+            and type(reporting_main_config_from_central.formats.coverage) == "table"
+            and reporting_main_config_from_central.formats.coverage.path_template
+            and type(reporting_main_config_from_central.formats.coverage.path_template) == "string"
+          then
+            config.coverage_path_template = reporting_main_config_from_central.formats.coverage.path_template
+          end
+          if
+            not config.quality_path_template
+            and reporting_main_config_from_central.formats.quality
+            and type(reporting_main_config_from_central.formats.quality) == "table"
+            and reporting_main_config_from_central.formats.quality.path_template
+            and type(reporting_main_config_from_central.formats.quality.path_template) == "string"
+          then
+            config.quality_path_template = reporting_main_config_from_central.formats.quality.path_template
+          end
+          if
+            not config.results_path_template
+            and reporting_main_config_from_central.formats.results
+            and type(reporting_main_config_from_central.formats.results) == "table"
+            and reporting_main_config_from_central.formats.results.path_template
+            and type(reporting_main_config_from_central.formats.results.path_template) == "string"
+          then
+            config.results_path_template = reporting_main_config_from_central.formats.results.path_template
+          end
         end
-
-        if
-          not config.results_path_template
-          and reporting_config.formats.results
-          and reporting_config.formats.results.path_template
-        then
-          config.results_path_template = reporting_config.formats.results.path_template
-        end
+        get_logger().debug("Merged 'config' with values from central_config 'reporting' section.")
+      else
+        get_logger().debug(
+          "No 'reporting' section found in central_config or it's not a table. Using existing 'config' values or later defaults."
+        )
       end
+    end)
 
-      get_logger().debug("Using centralized configuration for reports", {
-        using_central_report_dir = config.report_dir == reporting_config.report_dir,
-        using_central_suffix = config.report_suffix == reporting_config.report_suffix,
-        using_central_timestamp = config.timestamp_format == reporting_config.timestamp_format,
-        using_coverage_template = config.coverage_path_template ~= nil,
-        using_quality_template = config.quality_path_template ~= nil,
-        using_results_template = config.results_path_template ~= nil,
+    if not central_config_merge_success then
+      get_logger().error(
+        "Error during central_config merge in auto_save_reports",
+        { error = tostring(central_config_merge_error) }
+      )
+      -- Continue with potentially incomplete config, defaults will apply later
+    else
+      get_logger().debug("Successfully merged with centralized configuration (or no merge needed).", {
+        final_report_dir = config.report_dir,
+        final_report_suffix = config.report_suffix,
+        -- Add other relevant config values here for logging
       })
     end
   end
+  -- The print("[DEBUG_AUTO_SAVE] AFTER central_config merge pcall block.") was here and is now removed.
 
-  -- Set defaults for missing values (after checking central_config)
+  -- Set defaults for any values still missing after options and central_config merge
   config.report_dir = config.report_dir or DEFAULT_CONFIG.report_dir
   config.report_suffix = config.report_suffix or DEFAULT_CONFIG.report_suffix
   config.timestamp_format = config.timestamp_format or DEFAULT_CONFIG.timestamp_format
-  config.verbose = config.verbose or false
+  config.verbose = config.verbose or false -- Note: options.verbose might not be passed as often.
+  -- Default path templates if not set by options or central_config
+  config.coverage_path_template = config.coverage_path_template -- No change if nil, process_template handles nil
+  config.quality_path_template = config.quality_path_template
+  config.results_path_template = config.results_path_template
 
   local base_dir = config.report_dir
+  get_logger().debug("[AUTO_SAVE_REPORTS] base_dir determined", {
+    base_dir_type = type(base_dir),
+    base_dir_value = base_dir,
+  })
   local results = {}
 
   -- Helper function for path templates
-  local function process_template(template, format, type)
-    -- If no template provided, use default filename pattern
-    if not template then
-      return base_dir .. "/" .. type .. "-report" .. config.report_suffix .. "." .. format
+  local function process_template(template, format, report_type_arg, file_context_for_slug, current_config_arg) -- Added current_config_arg
+    local logger_pt = get_logger() -- Ensure logger is available for this function too
+
+    local logger_pt = get_logger() -- Ensure logger is available for this function too
+
+    -- Aggressive cache bust for formatter_registry's source module
+    if _G.package and _G.package.loaded and _G.package.loaded["lib.reporting.formatters.init"] then
+      logger_pt.trace("[PROCESS_TEMPLATE_CACHE_BUST] Clearing package.loaded for lib.reporting.formatters.init")
+      _G.package.loaded["lib.reporting.formatters.init"] = nil
+    end
+    -- Attempt to re-require it immediately. The module-level 'formatter_registry' variable will be used later.
+    -- This is just to ensure the next require (done by the module-level variable assignment) is fresh.
+    local fresh_formatters_init_check = try_require("lib.reporting.formatters.init")
+    if fresh_formatters_init_check then
+      logger_pt.trace(
+        "[PROCESS_TEMPLATE_CACHE_BUST] Successfully re-required lib.reporting.formatters.init for freshness check."
+      )
+      -- We don't assign it here, the module-level 'formatter_registry' will do its own require.
+    else
+      logger_pt.warn( -- Changed to warn as it's not a fatal error for this cache bust attempt
+        "[PROCESS_TEMPLATE_CACHE_BUST] FAILED to re-require lib.reporting.formatters.init for freshness check."
+      )
     end
 
-    -- Get current timestamp
-    local timestamp = os.date(config.timestamp_format)
+    local logger = get_logger() -- Ensure logger is available
+
+    -- Log to inspect formatter_registry
+    if formatter_registry then
+      local fr_type = type(formatter_registry)
+      local has_gfe_func = formatter_registry.get_formatter_extension ~= nil
+        and type(formatter_registry.get_formatter_extension) == "function"
+      logger.debug("Inspecting formatter_registry in process_template", {
+        registry_type = fr_type,
+        has_get_formatter_extension = has_gfe_func,
+      })
+      if fr_type == "table" and not has_gfe_func then
+        local keys = {}
+        for k, _ in pairs(formatter_registry) do
+          table.insert(keys, tostring(k))
+        end
+        logger.debug("Keys in formatter_registry:", { keys = table.concat(keys, ", ") })
+      end
+    else
+      logger.warn("formatter_registry is nil in process_template")
+    end
+
+    -- Attempt to re-require formatter_registry to get the freshest version
+    -- This is a diagnostic step for potential caching issues.
+    -- NOTE: The 'formatter_registry' variable used below is the one loaded at the module level (line 129).
+    -- The 'fresh_formatters_init_check' above was to clear cache before *that* module-level require happens.
+    -- If 'formatter_registry' (module level) is still stale, we might try to use 'fresh_formatters_init_check' if it has the function.
+
+    local actual_file_extension = format -- Default to the format name itself (format is the second argument to process_template)
+    local used_fresh_check = false
+
+    if formatter_registry and formatter_registry.get_formatter_extension then
+      local specific_ext = formatter_registry.get_formatter_extension(format)
+      if specific_ext then
+        actual_file_extension = specific_ext
+      else
+        logger.debug(
+          "No specific extension on module-level formatter_registry. Will check fresh_formatters_init_check.",
+          { format = format }
+        )
+        if fresh_formatters_init_check and fresh_formatters_init_check.get_formatter_extension then
+          specific_ext = fresh_formatters_init_check.get_formatter_extension(format)
+          if specific_ext then
+            actual_file_extension = specific_ext
+            used_fresh_check = true
+            logger.info(
+              "Used fresh_formatters_init_check for extension.",
+              { format = format, extension = actual_file_extension }
+            )
+          end
+        else
+          logger.warn(
+            "fresh_formatters_init_check also lacks get_formatter_extension.",
+            { format = format, fresh_check_is_table = type(fresh_formatters_init_check) == "table" }
+          )
+        end
+      end
+    else
+      logger.warn(
+        "Module-level formatter_registry is nil or has no get_formatter_extension. Checking fresh_formatters_init_check.",
+        { format = format }
+      )
+      if fresh_formatters_init_check and fresh_formatters_init_check.get_formatter_extension then
+        local specific_ext = fresh_formatters_init_check.get_formatter_extension(format)
+        if specific_ext then
+          actual_file_extension = specific_ext
+          logger.info( -- Keep as INFO if we had to use a fallback fresh check successfully
+            "Used fresh_formatters_init_check for extension (main registry was faulty).",
+            { format = format, extension = actual_file_extension }
+          )
+        else
+          logger.warn(
+            "No specific extension found on fresh_formatters_init_check (main registry faulty).",
+            { format = format }
+          )
+          -- actual_file_extension remains 'format' (the default)
+        end
+      else
+        logger.error(
+          "Completely unable to access formatter_registry or its get_formatter_extension method (both attempts failed).",
+          { format = format }
+        )
+        -- actual_file_extension remains 'format'
+      end
+    end
+
+    logger.debug( -- This log will now always show the final determined extension.
+      "Final actual_file_extension for process_template.",
+      { format_name_arg = format, determined_extension = actual_file_extension }
+    )
+    local current_config = current_config_arg -- Use passed-in config
     local datetime = os.date("%Y-%m-%d_%H-%M-%S")
 
-    -- Replace placeholders in template
-    local path = template
-      :gsub("{format}", format)
-      :gsub("{type}", type)
-      :gsub("{date}", timestamp)
-      :gsub("{datetime}", datetime)
-      :gsub("{suffix}", config.report_suffix)
+    local test_file_slug = "report" -- Default slug
+    if file_context_for_slug and type(file_context_for_slug) == "string" and file_context_for_slug ~= "" then
+      local fs_slug = get_fs()
+      if fs_slug then
+        local basename = fs_slug.basename(file_context_for_slug) -- Use 'basename' instead of 'get_basename'
+        test_file_slug = basename:gsub("_test%.lua$", ""):gsub("%.lua$", "") -- Remove _test.lua or .lua
+        test_file_slug = test_file_slug:gsub("[^%w_-]", "-"):gsub("%-+", "-"):lower() -- Sanitize
+        if test_file_slug == "" or test_file_slug == "-" then
+          test_file_slug = "file"
+        end -- Fallback for empty slug after sanitize
+      end
+    end
 
-    -- If path doesn't start with / or X:\ (absolute), prepend base_dir
-    if not path:match("^[/\\]") and not path:match("^%a:[/\\]") then
-      path = base_dir .. "/" .. path
+    -- If no template provided, use default filename pattern
+    local path
+    if not template then
+      if report_type_arg == "quality" then
+        path = base_dir
+          .. "/"
+          .. report_type_arg
+          .. "-"
+          .. test_file_slug
+          .. current_config.report_suffix
+          .. "."
+          .. actual_file_extension
+      else -- existing default for coverage, results etc.
+        path = base_dir
+          .. "/"
+          .. report_type_arg
+          .. "-report"
+          .. current_config.report_suffix
+          .. "."
+          .. actual_file_extension
+      end
+    else
+      -- Replace placeholders in template
+      path = template
+        :gsub("{format}", format or "")
+        :gsub("{type}", report_type_arg or "")
+        :gsub("{test_file_slug}", test_file_slug or "") -- New placeholder
+        :gsub("{date}", timestamp or "")
+        :gsub("{datetime}", datetime or "")
+        :gsub("{suffix}", current_config.report_suffix or "")
+    end
+
+    -- If path doesn't seem absolute, prepend report_dir from config
+    local fs_path = get_fs()
+    -- Corrected logic for prepending base_dir IF path is not already absolute
+    -- AND path does not already start with base_dir (if base_dir is relative itself e.g. "./reports")
+    if base_dir and base_dir ~= "" then
+      local path_is_absolute = (fs_path and fs_path.is_absolute_path and fs_path.is_absolute_path(path))
+        or (path:match("^[/\\]") or path:match("^%a:[/\\]"))
+
+      local path_already_has_basedir = false
+      if #path >= #base_dir + 1 and path:sub(1, #base_dir + 1) == base_dir .. "/" then
+        path_already_has_basedir = true
+      elseif #path == #base_dir and path == base_dir then
+        path_already_has_basedir = true
+      end
+
+      if not path_is_absolute and not path_already_has_basedir then
+        path = base_dir .. "/" .. path:gsub("^[./]+", "") -- Prepend base_dir and remove leading ./
+      end
+    end
+
+    -- Ensure path is normalized and cleaned of redundant separators
+    if fs_path and fs_path.normalize_path then -- Use normalize_path
+      path = fs_path.normalize_path(path)
+    else
+      path = path:gsub("[/\\]+", "/") -- Basic normalization
+      path = path:gsub("/./", "/") -- remove /./
+      path = path:gsub("//", "/") -- remove //
     end
 
     -- If path doesn't have an extension and format is provided, add extension
-    if format and not path:match("%.%w+$") then
+    if actual_file_extension and not path:match("%.%w+$") then
+      path = path .. "." .. actual_file_extension
+    elseif format and not path:match("%.%w+$") then -- Fallback to original format name if actual_file_extension somehow nil
       path = path .. "." .. format
     end
 
@@ -2171,6 +2441,11 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
 
   -- Create the directory if it doesn't exist
   local dir_ok, dir_err = get_fs().ensure_directory_exists(base_dir)
+  get_logger().debug("[AUTO_SAVE_REPORTS] ensure_directory_exists result", {
+    dir_ok = dir_ok,
+    dir_err_type = type(dir_err),
+    dir_err_value = dir_err,
+  })
 
   if not dir_ok then
     get_logger().error("Failed to create report directory", {
@@ -2189,7 +2464,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
 
   get_logger().trace("Processing coverage reports loop")
   -- Always save coverage reports in multiple formats if coverage data is provided
-  if coverage_data then
+  if coverage_data and next(coverage_data) then -- Check if coverage_data is not nil AND not an empty table
     -- Prepare validation options
     local validation_options = {
       validate = config.validate ~= false, -- Default to true
@@ -2205,7 +2480,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
       -- Save validation report
       if validation_result then
         local validation_path = config.validation_report_path
-          or process_template(config.coverage_path_template, "json", "validation")
+          or process_template(config.coverage_path_template, "json", "validation", nil, config) -- Pass config
 
         -- Convert validation result to JSON
         local validation_json
@@ -2247,16 +2522,24 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     local formats = { "html", "json", "lcov", "cobertura" }
 
     get_logger().debug("Saving coverage reports", {
-      formats = formats,
-      has_template = config.coverage_path_template ~= nil,
+      formats_to_generate_for_coverage = formats,
+      has_coverage_path_template = config.coverage_path_template ~= nil,
       validate = validation_options.validate,
       strict = validation_options.strict_validation,
     })
 
     for _, format in ipairs(formats) do
+      get_logger().debug("[COVERAGE_LOOP_ITERATION] Processing format for coverage report:", {
+        current_format_name = format,
+        coverage_path_template_type = type(config.coverage_path_template),
+        coverage_path_template_value = config.coverage_path_template,
+      })
       get_logger().trace("Processing coverage format", { format = format })
-      local path = process_template(config.coverage_path_template, format, "coverage")
-      get_logger().trace("Calculated coverage path", { format = format, path = path })
+      local path = process_template(config.coverage_path_template, format, "coverage", nil, config) -- Pass config
+      get_logger().trace(
+        "Calculated coverage path",
+        { format = format, path_template_used = config.coverage_path_template, final_path = path }
+      )
 
       get_logger().debug("Saving coverage report", {
         format = format,
@@ -2265,6 +2548,13 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
 
       get_logger().trace("Calling save_coverage_report", { format = format, path = path })
       local ok, err = M.save_coverage_report(path, coverage_data, format, validation_options)
+      get_logger().debug("[COVERAGE_SAVE_RESULT]", {
+        format = format,
+        path = path,
+        ok = ok,
+        err_type = type(err),
+        err_message = (ok == false and type(err) == "table" and err.message) or (ok == false and tostring(err) or nil),
+      })
       results[format] = {
         success = ok,
         error = err,
@@ -2288,46 +2578,112 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
 
   -- Save quality reports if quality data is provided
   if quality_data then
-    -- Save reports in multiple formats
-    local formats = { "html", "json" }
+    local quality_formats_to_generate -- This variable will be defined by the pasted block
+    if type(config) == "table" and type(config.quality_formats) == "table" and #config.quality_formats > 0 then
+      quality_formats_to_generate = config.quality_formats
+      get_logger().debug(
+        "Using explicit quality_formats from auto_save_reports options",
+        { formats = quality_formats_to_generate }
+      )
+    elseif central_config then -- Existing logic if not overridden by direct options
+      quality_formats_to_generate = central_config.get("reporting.formats_override.quality")
+        or central_config.get("reporting.formats.quality.generate")
+        or central_config.get("reporting.formats.quality.default")
+    end
 
-    get_logger().debug("Saving quality reports", {
-      formats = formats,
+    -- Existing fallback logic for when quality_formats_to_generate is still not set or invalid
+    if not quality_formats_to_generate then
+      quality_formats_to_generate = { "html", "json", "summary" }
+    elseif type(quality_formats_to_generate) == "string" then
+      quality_formats_to_generate = { quality_formats_to_generate }
+    elseif type(quality_formats_to_generate) ~= "table" then
+      get_logger().warn(
+        "Invalid configuration for quality report formats, defaulting.",
+        { configured_value = quality_formats_to_generate }
+      )
+      quality_formats_to_generate = { "html", "json", "summary" }
+    end
+
+    local cli_override_val = central_config and central_config.get("reporting.formats_override.quality") or nil
+    local generate_val = central_config and central_config.get("reporting.formats.quality.generate") or nil
+    local default_val = central_config and central_config.get("reporting.formats.quality.default") or nil
+
+    get_logger().debug("Determined quality formats to generate in auto_save_reports", {
+      cli_override_attempted = (function()
+        if not central_config then
+          return nil
+        end
+        local s, r = pcall(central_config.get, "reporting.formats_override.quality") -- Pass only the path
+        return s and r or nil
+      end)(),
+      config_generate_attempted = (function()
+        if not central_config then
+          return nil
+        end
+        local s, r = pcall(central_config.get, "reporting.formats.quality.generate") -- Pass only the path
+        return s and r or nil
+      end)(),
+      config_default_attempted = (function()
+        if not central_config then
+          return nil
+        end
+        local s, r = pcall(central_config.get, "reporting.formats.quality.default") -- Pass only the path
+        return s and r or nil
+      end)(),
+      final_formats_to_generate = quality_formats_to_generate,
+    })
+
+    get_logger().debug("Saving quality reports for formats", {
+      formats = quality_formats_to_generate,
       has_template = config.quality_path_template ~= nil,
     })
 
-    for _, format in ipairs(formats) do
-      local path = process_template(config.quality_path_template, format, "quality")
+    results.quality = results.quality or {} -- Ensure quality sub-table exists in results
+    for _, format_name in ipairs(quality_formats_to_generate) do
+      -- Extract current_test_file_path from the merged config (originating from options)
+      local file_context_for_slug = (type(config) == "table" and config.current_test_file_path) or nil
+      -- config.quality_path_template is already correctly resolved from options/central/default
+      local path_template_to_use = config.quality_path_template -- This uses merged config
+
+      get_logger().debug("[QUALITY_LOOP_ITERATION] Processing format_name for quality report:", {
+        current_format_name = format_name,
+        path_template_being_used_type = type(path_template_to_use),
+        path_template_being_used_value = path_template_to_use,
+        file_context_for_slug_type = type(file_context_for_slug),
+        file_context_for_slug_value = file_context_for_slug,
+      })
+
+      local path = process_template(path_template_to_use, format_name, "quality", file_context_for_slug, config) -- Pass config
 
       get_logger().debug("Saving quality report", {
-        format = format,
+        format = format_name,
         path = path,
       })
 
-      local ok, err = M.save_quality_report(path, quality_data, format)
-      results["quality_" .. format] = {
+      local ok, err_save_report = M.save_quality_report(path, quality_data, format_name) -- Use format_name
+      results.quality[format_name] = { -- Store under format_name
         success = ok,
-        error = err,
         path = path,
+        error = not ok and err_save_report or nil,
       }
 
       if ok then
         get_logger().debug("Successfully saved quality report", {
-          format = format,
+          format = format_name,
           path = path,
         })
       else
-        get_logger().error("Failed to save quality report", {
-          format = format,
+        get_logger().warn("Failed to save one of the quality reports", {
+          format = format_name,
           path = path,
-          error = tostring(err),
+          error = err_save_report and (err_save_report.message or tostring(err_save_report)) or "Unknown",
         })
       end
     end
   end
 
   -- Save test results in multiple formats if results data is provided
-  if results_data then
+  if results_data and next(results_data) then -- Check if results_data is not nil AND not an empty table
     -- Test results formats
     local formats = {
       junit = { ext = "xml", name = "JUnit XML" },
@@ -2341,7 +2697,13 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
     })
 
     for format, info in pairs(formats) do
-      local path = process_template(config.results_path_template, info.ext, "test-results")
+      get_logger().debug("[RESULTS_LOOP_ITERATION] Processing format for test results report:", {
+        current_format_name = format,
+        current_format_ext = info.ext,
+        results_path_template_type = type(config.results_path_template),
+        results_path_template_value = config.results_path_template,
+      })
+      local path = process_template(config.results_path_template, info.ext, "test-results", nil, config) -- Pass config
 
       get_logger().debug("Saving test results report", {
         format = format,
@@ -2351,6 +2713,13 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
       })
 
       local ok, err = M.save_results_report(path, results_data, format)
+      get_logger().debug("[RESULTS_SAVE_RESULT]", {
+        format = format,
+        path = path,
+        ok = ok,
+        err_type = type(err),
+        err_message = (ok == false and type(err) == "table" and err.message) or (ok == false and tostring(err) or nil),
+      })
       results[format] = {
         success = ok,
         error = err,
@@ -2375,7 +2744,7 @@ function M.auto_save_reports(coverage_data, quality_data, results_data, options)
   end
 
   return results
-end
+end -- Closes M.auto_save_reports
 
 --- Resets the module's local configuration cache to defaults defined in `DEFAULT_CONFIG`.
 --- Does **not** reset central configuration or loaded formatters.

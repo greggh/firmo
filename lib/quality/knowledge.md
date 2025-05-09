@@ -2,16 +2,26 @@
 
 ## Purpose
 
-This document outlines key internal concepts, implementation patterns, and design considerations for the `lib/quality` module, intended for developers working on or understanding Firmo's test quality validation system. Note that this module is partially implemented, and some documented features may not be fully functional.
+This document outlines key internal concepts, implementation patterns, and design considerations for the `lib/quality` module, intended for developers working on or understanding Firmo's test quality validation system. This module has been significantly developed and integrated, with its core features now functional.
 
 ## Key Concepts
 
 -   **Quality Levels (1-5):** The module defines five levels of increasing test quality requirements, from Basic (level 1) to Complete (level 5).
 -   **Level Checkers (`level_checkers.lua`):** This file contains functions (`check_level_1`, `check_level_2`, etc.) that implement the specific validation rules for each quality level. These checks analyze collected test data (assertion counts, coverage, etc.).
--   **Data Collection:** The `init.lua` module provides functions (`start_test`, `track_assertion`, `end_test`) intended to be called by the test runner or test definition system during test execution to gather metrics like assertion types used and test duration.
--   **File Analysis:** Functions like `check_file` (implemented) and `analyze_file` (implemented) process collected data and potentially use the parser (`lib/tools/parser`) to evaluate static aspects of test files against the configured quality level. `validate_test_quality` is marked unimplemented in the header but seems used internally.
--   **Reporting Integration:** The `quality.report(format)` function (implemented) generates report content (summary, json, html) by summarizing the collected data and validation results, integrating with the main `lib/reporting` system for file saving.
--   **Configuration:** Uses `central_config` and `quality.configure` to manage settings like `enabled`, target `level`, `strict` mode, and potential `custom_rules`.
+-   **Data Collection:** The `init.lua` module provides functions (`start_test`, `track_assertion`, `end_test`) called by the test runner (via `lib/core/test_definition.lua` hooks for `start_test`/`end_test`) and the assertion system (`lib/assertion/init.lua` for `track_assertion`) during test execution to gather metrics like assertion types used and test duration.
+-   **File Analysis:** Functions like `analyze_file` process test files primarily for structural properties (describe/it blocks, hooks). Assertion counting and detailed type analysis are now handled dynamically via `M.track_assertion`. `check_file` and `validate_test_quality` use the collected dynamic data and structural info to evaluate against quality levels.
+-   **Reporting Integration:** The `quality.report(format)` function generates report content (summary/markdown, json, html) by summarizing collected data and validation results. It integrates with `lib/reporting` for file saving.
+    The HTML formatter (`lib/reporting/formatters/html.lua`) for quality reports is particularly feature-rich, now including:
+    *   Interactive "fix-it" examples for common issues.
+    *   A light/dark theme toggle with preference persistence.
+    *   A responsive pie chart visualizing summary statistics.
+    *   Conceptual syntax highlighting for Lua code examples (note: current implementation is a JS placeholder; full library integration like Prism.js is a future enhancement).
+-   **Configuration:** Uses `central_config` and `quality.configure` (internally `M.init`) to manage settings like `enabled`, target `level`, `strict` mode, and potential `custom_rules`.
+-   **CLI for Quality Reports:** When using the test runner (`scripts/runner.lua`):
+    *   Enable quality analysis with `--quality`.
+    *   Specify the desired report format(s) using the global `--format=<format_name>` flag (e.g., `--format=html`, `--format=json`, `--format=md`). The quality module supports `html`, `json`, and `summary` (which produces Markdown `.md` files).
+    *   Specify the output directory with the global `--report-dir=<path_to_directory>` flag.
+    *   Note: Quality-specific CLI flags like `--quality-format` or `--quality-output` are *not* implemented; use the global flags. The runner handles passing these to the reporting system for quality reports.
 
 ## Usage Examples / Patterns
 
@@ -53,10 +63,10 @@ quality.reset() -- Reset stats before a test file run
 describe("Example Quality Tracking", function()
   before(function() quality.start_test("Test 1") end) -- Name matches 'it' block
   it("Test 1", function()
+    -- Note: quality.track_assertion() is now called automatically by expect() assertions.
+    -- Manual calls are generally not needed in test scripts.
     expect(1).to.equal(1)
-    quality.track_assertion("equal") -- Track assertion type
     expect(true).to.be_truthy()
-    quality.track_assertion("be_truthy")
   end)
   after(function() quality.end_test() end) -- Records duration, finalizes data
 
@@ -64,7 +74,6 @@ describe("Example Quality Tracking", function()
   before(function() quality.start_test("Test 2") end)
   it("Test 2", function()
     expect("a").to.be.a("string")
-    quality.track_assertion("be_a")
   end)
   after(function() quality.end_test() end)
 end)
@@ -143,11 +152,17 @@ Functions like `check_file` and `report` return standard `result, error_object` 
 
 ```lua
 -- Example checking error from report generation
-local report_content, err = quality.report("invalid-format")
-
-if not report_content then
-  print("Failed to generate report:", err.message)
-  -- Handle error (e.g., log it, use default report)
+local report_output = quality.report("invalid-format-that-will-fail-fallback") -- Use a more specific non-existent format
+if type(report_output) == "table" and report_output.report_type == "quality" then
+  -- This branch is hit if formatting fails and raw data is returned
+  print("Failed to generate formatted report, received raw data instead. Tests analyzed: " .. (report_output.summary and report_output.summary.tests_analyzed or "N/A"))
+elseif type(report_output) == "string" then
+  -- This branch could be hit if it successfully fell back to 'summary' format
+  print("Report generation fell back to summary (or was successful):")
+  print(report_output)
+else
+  -- This case implies an even more severe failure if report_output is nil
+  print("Report generation failed, and no raw data or fallback was returned.")
 end
 ```
 

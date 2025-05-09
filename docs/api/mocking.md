@@ -1,13 +1,10 @@
 # Mocking API Reference
 
-
 This document provides comprehensive reference information about the mocking, spying, and stubbing facilities in Firmo.
 
 ## Overview
 
-
 The Firmo mocking system offers comprehensive facilities for creating test doubles that help isolate components during testing:
-
 
 - **Spies**: Track function calls without changing behavior
 - **Stubs**: Replace functions with custom implementations
@@ -18,12 +15,9 @@ The Firmo mocking system offers comprehensive facilities for creating test doubl
 - **Enhanced Error Handling**: Robust error handling with detailed diagnostics
 - **Advanced Matchers**: Flexible argument matching for verifying calls
 
-
 ## Module Structure
 
-
 The mocking system consists of these active, core components that work together:
-
 
 - `lib/mocking/init.lua`: The main integration module, exports `spy`, `stub`, `mock`, and helper functions.
 - `lib/mocking/spy.lua`: Implementation for creating spies to track calls.
@@ -33,7 +27,6 @@ The mocking system consists of these active, core components that work together:
 > 📌 **Note:** These modules integrate closely, with `mock.lua` and `stub.lua` utilizing `spy.lua` for call tracking. The system also uses `lib/tools/logging.lua` and `lib/tools/error_handler.lua` internally.
 
 ## Integration Architecture
-
 
 The mocking system uses a layered architecture with strong integration: `init.lua` provides the public API, wrapping functionality from `mock.lua`, `stub.lua`, and `spy.lua`. Internal tools like `error_handler` and `logging` support these modules.
 
@@ -59,35 +52,28 @@ The mocking system uses a layered architecture with strong integration: `init.lu
 
 This integration provides several benefits:
 
-
 - **Consistent Error Handling**: All components use the same error management
 - **Detailed Logging**: Comprehensive logging through the logging system
 - **Type Checking**: Consistent argument validation across components
 - **Shared Utilities**: Common functionality is shared between modules
 
-
 ## Spy Functions
-
 
 ### mocking.spy(target, [method_name])
 
-
 Creates a spy function or spies on an object method.
 **Parameters**:
-
 
 - `target` (function|table): Function to spy on or table containing method to spy on
 - `method_name` (string, optional): If target is a table, the name of the method to spy on
 
 **Returns**:
 
-
 - A spy object that tracks calls to the function
 
 **Example**:
 
-
-```lua
+````lua
 -- Spy on a function
 local fn = function(a, b) return a + b end
 local mocking = require("lib.mocking")
@@ -126,27 +112,21 @@ local spy = mocking.spy.new(fn)
 local result = spy(5) -- Returns 10, but tracking is enabled
 expect(result).to.equal(10)
 expect(spy.calls[1][1]).to.equal(5)
-```
-
-
+````
 
 ### mocking.spy.on(obj, method_name)
 
-
 Creates a spy on an object method, replacing it with the spy while preserving behavior.
 **Parameters**:
-
 
 - `obj` (table): The object containing the method to spy on
 - `method_name` (string): The name of the method to spy on
 
 **Returns**:
 
-
 - A spy for the object method
 
 **Example**:
-
 
 ```lua
 local calculator = {
@@ -159,14 +139,10 @@ expect(result).to.equal(7)
 expect(add_spy.called).to.be_truthy()
 ```
 
-
-
 ### spy.called
-
 
 A boolean value indicating whether the spy has been called at least once.
 **Example**:
-
 
 ```lua
 local fn = function() end
@@ -177,14 +153,10 @@ expect(spy_fn.called).to.equal(false)
 spy_fn()
 ```
 
-
-
 ### spy.call_count
-
 
 The number of times the spy has been called.
 **Example**:
-
 
 ```lua
 local mocking = require("lib.mocking")
@@ -195,20 +167,17 @@ spy_fn()
 expect(spy_fn.call_count).to.equal(2)
 ```
 
-
-
 ### spy.calls
 
-
 A table containing call record objects for each call. Each record contains:
+
 - `args` (table): Array-like table of arguments passed.
 - `timestamp` (number): Time of the call (`os.time()`).
 - `result` (any, optional): The value returned by the spied function.
 - `error` (any, optional): The error thrown by the spied function.
-**Example**:
+  **Example**:
 
-
-```lua
+````lua
 local fn = function() end
 local mocking = require("lib.mocking")
 local fn = function() end
@@ -245,26 +214,20 @@ local spy_fn = mocking.spy(fn)
 spy_fn("test", 123)
 expect(spy_fn:called_with("test")).to.be_truthy() -- Checks just the first arg
 expect(spy_fn:called_with("test", 123)).to.be_truthy() -- Checks both args
-```
-
-
+````
 
 ### spy:called_times(n)
 
-
 Checks whether the spy was called exactly n times.
 **Parameters**:
-
 
 - `n` (number): The expected number of calls
 
 **Returns**:
 
-
 - `true` if the spy was called exactly n times, `false` otherwise
 
 **Example**:
-
 
 ```lua
 local mocking = require("lib.mocking")
@@ -276,19 +239,14 @@ expect(spy_fn:called_times(2)).to.be_truthy()
 expect(spy_fn:called_times(3)).to.equal(false)
 ```
 
-
-
 ### spy:not_called()
-
 
 Checks whether the spy was never called.
 **Returns**:
 
-
 - `true` if the spy was never called, `false` otherwise
 
 **Example**:
-
 
 ```lua
 local mocking = require("lib.mocking")
@@ -299,19 +257,14 @@ spy_fn()
 expect(spy_fn:not_called()).to.equal(false)
 ```
 
-
-
 ### spy:called_once()
-
 
 Checks whether the spy was called exactly once.
 **Returns**:
 
-
 - `true` if the spy was called exactly once, `false` otherwise
 
 **Example**:
-
 
 local mocking = require("lib.mocking")
 local fn = function() end
@@ -321,7 +274,8 @@ expect(spy_fn:called_once()).to.be_truthy()
 spy_fn()
 spy_fn()
 expect(spy_fn:called_once()).to.equal(false)
-```
+
+````
 
 
 
@@ -345,27 +299,21 @@ spy_fn("second", "arg")
 local last_call_record = spy_fn:last_call()
 expect(last_call_record.args[1]).to.equal("second")
 expect(last_call_record.args[2]).to.equal("arg")
-```
-
-
+````
 
 ### spy:called_before(other_spy, [call_index])
 
-
 Checks whether this spy was called before another spy.
 **Parameters**:
-
 
 - `other_spy` (spy): Another spy to compare with
 - `call_index` (number, optional): The index of the call to check on the other spy (default: 1)
 
 **Returns**:
 
-
 - `true` if this spy was called before the other spy, `false` otherwise
 
 **Example**:
-
 
 local mocking = require("lib.mocking")
 local fn1 = function() end
@@ -377,7 +325,8 @@ spy2() -- Called second
 expect(spy1:called_before(spy2)).to.be_truthy()
 expect(spy2:called_before(spy1)).to.equal(false)
 expect(spy1:called_after(spy2)).to.equal(false)
-```
+
+````
 
 
 ### spy:called_after(other_spy, [call_index])
@@ -404,8 +353,7 @@ spy1() -- Called first
 spy2() -- Called second
 expect(spy2:called_after(spy1)).to.be_truthy()
 expect(spy1:called_after(spy2)).to.equal(false)
-```
-
+````
 
 ### spy:reset()
 
@@ -427,14 +375,12 @@ expect(spy_fn.call_count).to.equal(0)
 expect(spy_fn.called).to.equal(false)
 ```
 
-
 ### spy:restore()
 
 Restores the original function/method if the spy was created for an object method.
 **Example**:
 
-
-```lua
+````lua
 local obj = { method = function() return "original" end }
 local mocking = require("lib.mocking")
 local obj = { method = function() return "original" end }
@@ -587,8 +533,8 @@ Replace an object's method with a stub.
 ```lua
 
 
-local obj = { 
-  method = function() return "original" end 
+local obj = {
+  method = function() return "original" end
 }
 -- Replace with a value
 local mocking = require("lib.mocking")
@@ -874,8 +820,8 @@ Restore the original method (for stubs created with stub.on).
 ```lua
 
 
-local obj = { 
-  method = function() return "original" end 
+local obj = {
+  method = function() return "original" end
 }
 local mocking = require("lib.mocking")
 local stub = mocking.stub.on(obj, "method", "stubbed")
@@ -1268,12 +1214,6 @@ Registers a composite cleanup hook (suitable for `firmo.after`) that runs the op
 **Parameters**: `after_test_fn` (function, optional)
 **Returns**: `function` (the composite hook function)
 
-### mocking.ensure_assertions(firmo_module)
-
-Ensures mocking-related assertions are available (compatibility check, usually returns true).
-**Parameters**: `firmo_module` (table)
-**Returns**: `boolean, table?` (success, error)
-
 ### mocking.configure(options)
 
 Configures the mocking system (placeholder, currently no options).
@@ -1320,3 +1260,4 @@ String identifier for the stub module version.
 
 local mocking = require("lib.mocking")
 print(mocking.stub._VERSION) -- e.g., "1.0.0"
+````

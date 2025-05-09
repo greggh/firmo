@@ -90,6 +90,8 @@ local function try_require(module_name)
   return result
 end
 
+local quality_module = try_require("lib.quality")
+
 --- Get the success handler module with lazy loading to avoid circular dependencies
 ---@return table|nil The error handler module or nil if not available
 local function get_error_handler()
@@ -435,6 +437,7 @@ end
 --- Each test contains assertions that verify specific behaviors of the code
 --- being tested. Tests can have options for controlling execution,
 --- such as focusing, skipping, or expecting errors.
+--- If the `lib.quality` module is loaded and its `config.enabled` is true, this function will also call `quality_module.start_test()` before the test logic executes and `quality_module.end_test()` after the test logic completes (regardless of success or failure of the test itself).
 ---
 ---@param name string Name/description of the test case.
 ---@param options_or_fn table|function Either the test function itself, or an options table `{focused?: boolean, excluded?: boolean, expect_error?: boolean, tags?: string[], timeout?: number}`.
@@ -596,6 +599,31 @@ function M.it(name, options_or_fn, fn)
     get_error_handler().set_current_test_metadata(nil)
   end
 
+  -- Start quality analysis for this test if enabled
+  if quality_module and quality_module.config and quality_module.config.enabled then
+    -- Construct full_test_name similarly to how path_string is made for results
+    -- This needs to match the name that quality.end_test() will expect based on quality.start_test().
+    -- The 'path' variable is suitable here as it's already built for test results.
+    local full_test_name_for_quality = table.concat(path, " / ")
+
+    -- Calculate describe depth for quality context
+    local describe_depth = 0
+    local temp_block = current_describe_block -- current_describe_block is available in M.it
+    while temp_block do
+      describe_depth = describe_depth + 1
+      temp_block = temp_block.parent
+    end
+
+    local quality_context = {
+      has_describe = describe_depth > 0,
+      has_it = true, -- We are in an 'it' block
+      nesting_level = describe_depth + 1, -- +1 for the 'it' block itself
+      -- has_before_after could also be passed if M.before/M.after set a flag in current_describe_block
+    }
+    get_logger().trace("Calling quality_module.start_test", { test_name = full_test_name_for_quality, context = quality_context })
+    quality_module.start_test(full_test_name_for_quality, quality_context)
+  end
+
   local success, err = get_error_handler().try(function()
     -- Set temporary file context
     temp_file.set_current_test_context({
@@ -647,7 +675,15 @@ function M.it(name, options_or_fn, fn)
     })
   end)
 
-  -- Run cleanup to clear metadata
+  -- End quality analysis for this test if enabled
+  -- This is called after the try block and before final cleanup/error handling for the 'it' block.
+  if quality_module and quality_module.config and quality_module.config.enabled then
+    -- quality_module.end_test() uses its internal 'current_test' which was set by start_test.
+    get_logger().trace("Calling quality_module.end_test for", { test_name_ended = table.concat(path, " / ") })
+    quality_module.end_test()
+  end
+
+  -- Run cleanup to clear metadata (this was the original cleanup call for the 'it' block)
   cleanup()
 
   -- Handle test errors

@@ -95,6 +95,10 @@ This sub-plan is documented in the docs/firmo/add_more_async_functions_plan.md
 
 This sub-plan is documented in the docs/firmo/pcall_update_plan_initial_review.md
 
+### 12. Quality Module Integration Completion
+
+The functional integration of the `lib/quality` module, as detailed in `docs/firmo/quality_module_integration_plan.md`, is now complete. This includes CLI integration, test execution hooks, reporting formatters, and resolution of associated bugs (assertion tracking, exit codes, central_config warnings). JSDoc for key modified files has been updated. A full pass on Markdown API/Guide documentation and updates to main project planning/architecture documents for the quality module are still pending (see Phase III, Steps 2 & 3 in `quality_module_integration_plan.md`).
+
 ## Progress
 
 - [x] JSDoc Updates
@@ -108,3 +112,4 @@ This sub-plan is documented in the docs/firmo/pcall_update_plan_initial_review.m
 - [x] Duplicate JSON modules
 - [x] add fit_async, xit_async, describe_async, fdescribe_async, xdescribe_async
 - [x] Review pcall and xpcall usage in the codebase
+- [x] Quality Module Integration Completion

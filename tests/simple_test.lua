@@ -17,7 +17,7 @@ local it = firmo.it
 local expect = firmo.expect
 
 describe("Test", function()
-  it("works", function()
+  it("should work", function()
     expect(true).to.equal(true)
   end)
 end)

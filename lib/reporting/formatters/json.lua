@@ -65,6 +65,38 @@ end
 
 local Formatter = try_require("lib.reporting.formatters.base")
 
+---@diagnostic disable-next-line: unused-local
+local _logging -- Forward declare for get_logger
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
+local function get_logger()
+  if not _logging then
+    _logging = try_require("lib.tools.logging")
+  end
+  if _logging then
+    return _logging.get_logger("Reporting:JSON")
+  end
+  -- Return a stub logger if logging module isn't available
+  return {
+    error = function(msg)
+      print("[ERROR] Reporting:JSON: " .. msg)
+    end,
+    warn = function(msg)
+      print("[WARN] Reporting:JSON: " .. msg)
+    end,
+    info = function(msg)
+      print("[INFO] Reporting:JSON: " .. msg)
+    end,
+    debug = function(msg)
+      print("[DEBUG] Reporting:JSON: " .. msg)
+    end,
+    trace = function(msg)
+      print("[TRACE] Reporting:JSON: " .. msg)
+    end,
+  }
+end
+
 -- Create JSON formatter class
 local JSONFormatter = Formatter.extend("json", "json")
 
@@ -117,40 +149,64 @@ function JSONFormatter:validate(coverage_data)
   return true
 end
 
---- Formats coverage data into a JSON string based on the specified options.
+--- Formats data (coverage or quality) into a JSON string based on the specified options.
 ---@param self JSONFormatter The formatter instance.
----@param coverage_data CoverageReportData The coverage data structure.
+---@param data table The data structure (either coverage or quality).
 ---@param options? { pretty_print?: boolean, indent_size?: number, stream?: boolean } Formatting options:
 ---  - `pretty_print` (boolean, default true): Enable indentation and newlines.
 ---  - `indent_size` (number, default 2): Number of spaces per indentation level.
 ---  - `stream` (boolean, default false): Use streaming (currently placeholder).
 ---@return string|nil json_content The generated JSON content as a single string, or `nil` on validation error.
 ---@return table? error Error object if validation failed.
-function JSONFormatter:format(coverage_data, options)
+function JSONFormatter:format(data, options)
   -- Parameter validation
-  if not coverage_data then
-    return nil, get_error_handler().validation_error("Coverage data is required", { formatter = self.name })
+  if not data then
+    return nil, get_error_handler().validation_error("Input data is required", { formatter = self.name })
   end
 
   -- Apply options with defaults
-  options = options or {}
-  options.pretty_print = options.pretty_print ~= false -- Default to true
-  options.indent_size = options.indent_size or 2
+  -- Use self:_merge_options to merge with default options
+  options = self:_merge_options(options or {})
 
-  -- Normalize the coverage data
-  local normalized_data = self:normalize_coverage_data(coverage_data)
-
-  -- Begin building JSON content
-  local json
-
-  -- Use streaming approach for large data sets
-  if options.stream then
-    json = self:build_json_streaming(normalized_data, options)
+  local data_to_encode
+  if data and data.report_type == "quality" then
+    get_logger().debug("Formatting quality data as JSON", { data_keys = self:get_table_keys(data) })
+    -- For quality data, create a new structure that includes standard metadata
+    -- and merges all fields from the original quality data.
+    local quality_report_structure = {
+      version = self._VERSION,
+      timestamp = os.time(),
+      generated_at = os.date("%Y-%m-%dT%H:%M:%SZ", os.time()),
+      metadata = {
+        tool = "Firmo Quality", -- Correct tool name for quality reports
+        format = "json",
+      },
+    }
+    -- Merge all fields from the original quality data (level, level_name, tests, summary, report_type)
+    for k, v in pairs(data) do
+      quality_report_structure[k] = v
+    end
+    data_to_encode = quality_report_structure
+    -- Encode this combined structure
+    return self:encode_json_object(data_to_encode, options.pretty_print, options.indent_size or 2)
+  elseif data and (data.report_type == "coverage" or (not data.report_type and data.files and data.summary)) then
+    -- For coverage data, normalize and use build_json as before
+    data_to_encode = self:normalize_coverage_data(data)
+    get_logger().debug("Formatting coverage data as JSON", { data_keys = self:get_table_keys(data_to_encode) })
+    -- Use streaming approach for large data sets
+    if options.stream then
+      return self:build_json_streaming(data_to_encode, options)
+    else
+      return self:build_json(data_to_encode, options)
+    end
   else
-    json = self:build_json(normalized_data, options)
+    return nil,
+      get_error_handler().validation_error("Unsupported data structure for JSON formatter", {
+        formatter = self.name,
+        data_type = type(data),
+        report_type = data and data.report_type,
+      })
   end
-
-  return json
 end
 
 --- Builds the JSON content string using standard in-memory encoding.
@@ -384,6 +440,12 @@ function JSONFormatter.register(formatters)
   -- Register format_coverage function
   formatters.coverage.json = function(coverage_data, options)
     return formatter:format(coverage_data, options)
+  end
+
+  -- Register for quality reports
+  formatters.quality = formatters.quality or {}
+  formatters.quality.json = function(data, opts)
+    return formatter:format(data, opts)
   end
 
   return true

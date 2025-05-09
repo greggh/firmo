@@ -66,7 +66,7 @@ firmo.lua                  # Main entry point and public API
 │   ├── async/             # Asynchronous testing utilities (it_async, describe_async, etc.)
 │   │   └── init.lua
 │   │
-│   └── quality/           # Test quality validation (Partially Implemented)
+│   └── quality/           # Test quality validation
 │       ├── init.lua       # Quality API
 │       └── level_checkers.lua # Logic for different quality levels
 │
@@ -224,10 +224,7 @@ end
 
 The quality module validates that tests meet specified quality criteria:
 
-- Multiple quality levels (from basic to complete)
-- Customizable quality rules
-- Quality report generation
-- Integration with the test runner
+The quality module (`lib/quality`) validates that tests meet specified quality criteria. It features a multi-level system (defined in `lib/quality/level_checkers.lua`), dynamic assertion tracking (via hooks from `lib/assertion/init.lua`), and integrates with the test runner to collect data. Quality reports (HTML, JSON, Summary) are generated through the common `lib/reporting` system. All settings are managed via `lib/core/central_config.lua`.
 
 ### 7. Utility Modules
 
@@ -323,9 +320,9 @@ Several utility modules provide supporting functionality:
 ## Module Dependencies
 
 - **Core Modules**: central_config, version, utils, error_handler
-- **Assertion**: core, error_handler
+- **Assertion**: core, error_handler, lib.quality (calls track_assertion)
 - **Coverage**: core, central_config, error_handler, filesystem, assertion
 - **Mocking**: core, error_handler
-- **Quality**: core, central_config, error_handler
-- **Reporting**: core, central_config, error_handler, filesystem
+- **Quality**: core (central_config, error_handler, logging), level_checkers, lib.coverage (optional for data input), lib.reporting (for report output)
+- **Reporting**: core, central_config, error_handler, filesystem, lib.quality (provides data)
 - **Utilities**: core, error_handler
