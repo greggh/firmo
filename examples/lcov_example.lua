@@ -19,7 +19,7 @@
 -- @see lib.core.central_config
 -- @see lib.tools.test_helper
 -- @usage
--- Run embedded tests: lua test.lua examples/lcov_example.lua
+-- Run embedded tests: lua firmo.lua examples/lcov_example.lua
 --
 
 -- Import required modules
@@ -226,7 +226,7 @@ jobs:
       - name: Setup Lua
         uses: leafo/gh-actions-lua@v8
       - name: Run Tests with Coverage
-        run: lua test.lua --coverage tests/
+        run: lua firmo.lua --coverage tests/
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
@@ -238,7 +238,7 @@ jobs:
 test_with_coverage:
   stage: test
   script:
-    - lua test.lua --coverage tests/
+    - lua firmo.lua --coverage tests/
   artifacts:
     paths:
       - coverage-reports/lcov.info
@@ -253,7 +253,7 @@ pipeline {
   stages {
     stage('Test') {
       steps {
-        sh 'lua test.lua --coverage tests/'
+        sh 'lua firmo.lua --coverage tests/'
       }
     }
   }
@@ -287,7 +287,7 @@ logger.info("\nTo run this example directly:")
 logger.info("  lua examples/lcov_example.lua")
 
 logger.info("\nOr run it with firmo's test runner:")
-logger.info("  lua test.lua examples/lcov_example.lua")
+logger.info("  lua firmo.lua examples/lcov_example.lua")
 
 logger.info("\nCommon CI/CD services that support LCOV:")
 logger.info("- Codecov (codecov.io)")

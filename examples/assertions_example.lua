@@ -25,7 +25,7 @@
 --- @usage
 --- Run embedded tests:
 --- ```bash
---- lua test.lua examples/assertions_example.lua
+--- lua firmo.lua examples/assertions_example.lua
 --- ```
 
 -- Comprehensive example of Firmo's assertion functionality
@@ -58,7 +58,7 @@ end
 -- Start the demonstration
 print("=== Firmo Assertions Example ===\n")
 print("This example demonstrates the complete range of assertions available in Firmo.")
-print("Run this example with: lua test.lua examples/assertions_example.lua\n")
+print("Run this example with: lua firmo.lua examples/assertions_example.lua\n")
 
 -- Core example data we'll use throughout our tests
 local sample_string = "Testing with Firmo"

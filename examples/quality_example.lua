@@ -21,7 +21,7 @@
 --- @version 1.0.0
 -- @see firmo
 -- @usage
--- Run embedded tests: lua test.lua examples/quality_example.lua
+-- Run embedded tests: lua firmo.lua examples/quality_example.lua
 --
 
 local firmo = require("firmo")
@@ -303,4 +303,4 @@ logger.info("This example uses describe blocks named 'Level X' to illustrate tes
 logger.info("A hypothetical test runner might use a flag like '--quality' or '--quality-level=N'")
 logger.info("to filter tests based on these conceptual levels (this is not standard Firmo functionality).")
 logger.info("\nRun the tests normally:")
-logger.info("  lua test.lua examples/quality_example.lua")
+logger.info("  lua firmo.lua examples/quality_example.lua")

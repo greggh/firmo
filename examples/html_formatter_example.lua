@@ -12,7 +12,7 @@
 --- functions (`reporting.auto_save_reports`). It does **not** perform actual test
 --- execution or coverage collection. Its purpose is solely to demonstrate the
 --- various configuration *options* and *output features* of the HTML formatter.
---- In a real project, coverage data is collected via `lua test.lua --coverage ...`
+--- In a real project, coverage data is collected via `lua firmo.lua --coverage ...`
 --- and reports are generated based on the configuration in `.firmo-config.lua`
 --- or command-line flags (`--format=html`).
 ---
@@ -27,11 +27,11 @@
 --- @usage
 --- Run embedded tests (uses mock data):
 --- ```bash
---- lua test.lua examples/html_formatter_example.lua
+--- lua firmo.lua examples/html_formatter_example.lua
 --- ```
 --- Run with runner coverage (results may differ slightly from internal demo):
 --- ```bash
---- lua test.lua --coverage examples/html_formatter_example.lua
+--- lua firmo.lua --coverage examples/html_formatter_example.lua
 --- ```
 
 -- Extract the testing functions we need
@@ -427,4 +427,4 @@ describe("HTML report instructions", function()
 end)
 
 -- Run this example with:
--- lua test.lua --coverage examples/html_formatter_example.lua
+-- lua firmo.lua --coverage examples/html_formatter_example.lua

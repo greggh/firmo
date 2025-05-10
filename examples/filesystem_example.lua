@@ -29,7 +29,7 @@
 --- ```
 --- Run the embedded Firmo tests to verify filesystem functions:
 --- ```bash
---- lua test.lua examples/filesystem_example.lua
+--- lua firmo.lua examples/filesystem_example.lua
 --- ```
 
 -- Import required modules
@@ -755,7 +755,7 @@ describe("Directory Operations Tests", function()
   end)
 end)
 
-print("Run the tests with: lua test.lua examples/filesystem_example.lua\n")
+print("Run the tests with: lua firmo.lua examples/filesystem_example.lua\n")
 
 -- PART 8: Best Practices
 print("\nPART 8: Filesystem Best Practices\n")

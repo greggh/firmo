@@ -92,7 +92,7 @@ From the command line:
 # Run tests with coverage and generate HTML report
 
 
-lua test.lua --coverage --format=html tests/
+lua firmo.lua --coverage --format=html tests/
 ```
 
 
@@ -508,32 +508,32 @@ The reporting functionality can be controlled through command-line options:
 # Run tests with coverage and generate HTML report
 
 
-lua test.lua --coverage --format=html tests/
+lua firmo.lua --coverage --format=html tests/
 
 # Set custom output directory
 
 
-lua test.lua --coverage --output-dir=./reports tests/
+lua firmo.lua --coverage --output-dir=./reports tests/
 
 # Generate multiple report formats
 
 
-lua test.lua --coverage --format=html,json,lcov tests/
+lua firmo.lua --coverage --format=html,json,lcov tests/
 
 # Add a suffix to report filenames
 
 
-lua test.lua --coverage --report-suffix="-$(date +%Y%m%d)" tests/
+lua firmo.lua --coverage --report-suffix="-$(date +%Y%m%d)" tests/
 
 # Set custom path templates
 
 
-lua test.lua --coverage --coverage-path="coverage-{date}.{format}" tests/
+lua firmo.lua --coverage --coverage-path="coverage-{date}.{format}" tests/
 
 # Enable verbose output
 
 
-lua test.lua --coverage --verbose-reports tests/
+lua firmo.lua --coverage --verbose-reports tests/
 ```
 
 
@@ -753,7 +753,7 @@ For CI integration, use the LCOV or Cobertura formats:
 # Run in CI environment
 
 
-lua test.lua --coverage --format=lcov tests/
+lua firmo.lua --coverage --format=lcov tests/
 
 # Upload coverage to a service like Codecov
 

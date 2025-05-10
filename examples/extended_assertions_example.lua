@@ -14,7 +14,7 @@
 --- @version 1.0.0
 -- @see firmo
 -- @usage
--- Run embedded tests: lua test.lua examples/extended_assertions_example.lua
+-- Run embedded tests: lua firmo.lua examples/extended_assertions_example.lua
 --
 
 -- Extract the testing functions we need

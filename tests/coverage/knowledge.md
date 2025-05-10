@@ -131,7 +131,7 @@ end)
 - **Use Simple Targets:** Employ straightforward sample code (like `lib/samples/calculator.lua`) for testing basic coverage counting, where identifying executable lines and expected hit counts is unambiguous.
 - **Isolate Hook Tests:** Tests specifically targeting the debug hook (`hook_test.lua`) should be carefully constructed to avoid interfering with any coverage collection potentially performed by the test runner itself. They might need to directly manipulate hook state or use mocks.
 - **Verify Configuration Effects:** Tests should explicitly configure relevant options (e.g., `include`, `exclude`) and assert that the coverage results correctly reflect those settings.
-- **Consider Runner Coverage:** Be aware that running the entire test suite *with* coverage enabled (`lua test.lua --coverage tests/`) can add noise or interfere with tests *of* the coverage system. These tests might need special handling or should be run without global coverage enabled (`lua test.lua tests/coverage/`) when debugging specific issues.
+- **Consider Runner Coverage:** Be aware that running the entire test suite *with* coverage enabled (`lua firmo.lua --coverage tests/`) can add noise or interfere with tests *of* the coverage system. These tests might need special handling or should be run without global coverage enabled (`lua firmo.lua tests/coverage/`) when debugging specific issues.
 
 ## Troubleshooting / Common Pitfalls (Optional)
 
@@ -146,6 +146,6 @@ end)
     - **Cause:** Multiple parts of the code (e.g., the test itself, the runner, another module) might be trying to install or manage the debug hook simultaneously.
     - **Solution:** Ensure only one component manages the hook at a time. Tests directly manipulating the hook need careful setup and teardown.
 - **Interference from Runner Coverage:**
-    - **Symptom:** Tests in this directory pass when run individually (`lua test.lua tests/coverage/some_test.lua`) but fail when run as part of `lua test.lua --coverage tests/`.
+    - **Symptom:** Tests in this directory pass when run individually (`lua firmo.lua tests/coverage/some_test.lua`) but fail when run as part of `lua firmo.lua --coverage tests/`.
     - **Cause:** The global coverage hooks installed by the runner interfere with the hooks managed by the test itself.
     - **Solution:** Try running the test file without global coverage. If the test needs to manage hooks itself, it might require logic to temporarily disable or work around the runner's hooks, or it might be inherently incompatible with being run under global coverage.

@@ -25,7 +25,7 @@
 --- @usage
 --- Run the embedded tests:
 --- ```bash
---- lua test.lua examples/comprehensive_testing_example.lua
+--- lua firmo.lua examples/comprehensive_testing_example.lua
 --- ```
 
 -- Extract the testing functions we need
@@ -529,4 +529,4 @@ describe("FileProcessor", function()
 end)
 
 -- NOTE: Run this example using the standard test runner:
--- lua test.lua examples/comprehensive_testing_example.lua
+-- lua firmo.lua examples/comprehensive_testing_example.lua

@@ -4,7 +4,7 @@ This document provides an index and brief description of the example files avail
 
 To run most examples (those containing tests), use the Firmo test runner:
 ```bash
-lua test.lua examples/<example_file_name>.lua
+lua firmo.lua examples/<example_file_name>.lua
 ```
 Some examples are procedural scripts demonstrating specific features and should be run directly:
 ```bash

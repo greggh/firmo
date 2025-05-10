@@ -67,7 +67,7 @@ end)
 Run the test using the main `test.lua` script:
 
 ```bash
-lua test.lua example_test.lua
+lua firmo.lua example_test.lua
 ```
 
 
@@ -242,7 +242,7 @@ end)
 
 
 ```bash
-lua test.lua tests/example_test.lua
+lua firmo.lua tests/example_test.lua
 ```
 
 
@@ -255,7 +255,7 @@ Create a directory for your tests (e.g., `tests`) and use Firmo's test discovery
 Use the standard runner, passing the directory path:
 
 ```bash
-lua test.lua tests/
+lua firmo.lua tests/
 ```
 
 
@@ -264,7 +264,7 @@ lua test.lua tests/
 Run only tests matching a name pattern using `--filter`:
 
 ```bash
-lua test.lua --filter authentication tests/example_test.lua
+lua firmo.lua --filter authentication tests/example_test.lua
 ```
 
 Filtering by tags directly via the command line (`--tags`) is not currently supported. Use programmatic filtering (`firmo.only_tags(...)`) in your test setup or custom scripts for tag-based execution control.
@@ -279,7 +279,7 @@ For continuous testing that automatically reruns tests when files change:
 
 
 ```bash
-lua test.lua --watch tests/example_test.lua
+lua firmo.lua --watch tests/example_test.lua
 ```
 
 

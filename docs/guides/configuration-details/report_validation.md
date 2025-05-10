@@ -206,7 +206,7 @@ When running in CI, you can specify strict validation on the command line:
 
 
 ```bash
-lua test.lua --coverage --strict-validation tests/
+lua firmo.lua --coverage --strict-validation tests/
 ```
 
 

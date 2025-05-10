@@ -131,17 +131,17 @@ local success_dir, results_table = codefix.fix_lua_files("path/to/directory")
 # Fix a specific file
 
 
-lua test.lua --fix path/to/file.lua
+lua firmo.lua --fix path/to/file.lua
 
 # Fix all Lua files in a directory
 
 
-lua test.lua --fix path/to/directory
+lua firmo.lua --fix path/to/directory
 
 # Check a file without fixing
 
 
-lua test.lua --check path/to/file.lua
+lua firmo.lua --check path/to/file.lua
 ```
 
 *Note: The `--fix` and `--check` commands are registered with the main test runner (usually `test.lua`) via `codefix.register_with_firmo(firmo)`.*

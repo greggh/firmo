@@ -8,7 +8,7 @@ The `scripts/utilities/` directory serves as a location for auxiliary or more sp
 
 - **Test Suite Manifest (`all_tests.lua`):** This script functions as a "manifest" file. Its sole purpose is to explicitly `require` a large collection of individual test files from the `tests/` directory, effectively defining a comprehensive test suite for the Firmo project.
 - **Structure (`all_tests.lua`):** It uses Firmo's `describe()` function to logically group the required test files by the area of functionality they cover (e.g., "Core", "Coverage", "Tools", "Reporting"). Within each `describe` block, it uses standard Lua `require("path.to.test_file")` statements to load and execute the tests defined in those files.
-- **Execution Method (`all_tests.lua`):** **Crucially**, this script is **not** intended to be run directly via `lua scripts/utilities/all_tests.lua`. Instead, it is designed to be **passed as an argument** to the main Firmo test runner entry point (`test.lua` or `scripts/runner.lua`). For example: `lua test.lua scripts/utilities/all_tests.lua`. The test runner executes this script within its environment, causing all the required test files to be loaded and run under Firmo's control.
+- **Execution Method (`all_tests.lua`):** **Crucially**, this script is **not** intended to be run directly via `lua scripts/utilities/all_tests.lua`. Instead, it is designed to be **passed as an argument** to the main Firmo test runner entry point (`test.lua` or `scripts/runner.lua`). For example: `lua firmo.lua scripts/utilities/all_tests.lua`. The test runner executes this script within its environment, causing all the required test files to be loaded and run under Firmo's control.
 - **Path Handling & Maintenance (`all_tests.lua`):** The script includes comments and some conditional `require` paths (using `fs.file_exists`) suggesting that the locations of test files might change over time. This highlights that `all_tests.lua` requires manual maintenance to keep its `require` paths accurate as the `tests/` directory structure evolves.
 
 ## Usage Examples / Patterns
@@ -17,13 +17,13 @@ The `scripts/utilities/` directory serves as a location for auxiliary or more sp
 
 ```bash
 # Run the full suite of tests defined in all_tests.lua
-lua test.lua scripts/utilities/all_tests.lua
+lua firmo.lua scripts/utilities/all_tests.lua
 
 # Run the full suite with specific Firmo options (e.g., coverage)
-lua test.lua --coverage scripts/utilities/all_tests.lua
+lua firmo.lua --coverage scripts/utilities/all_tests.lua
 
 # Run the full suite with a pattern filter (applied by the runner)
-lua test.lua --pattern "filesystem" scripts/utilities/all_tests.lua
+lua firmo.lua --pattern "filesystem" scripts/utilities/all_tests.lua
 ```
 
 ## Related Components / Modules
@@ -37,7 +37,7 @@ lua test.lua --pattern "filesystem" scripts/utilities/all_tests.lua
 ## Best Practices / Critical Rules (Optional)
 
 - **Keep `all_tests.lua` Updated:** When test files are added, removed, renamed, or moved within the `tests/` directory structure, the corresponding `require()` statements in `scripts/utilities/all_tests.lua` **must be updated manually** to ensure the comprehensive suite remains accurate and functional.
-- **Use Case for `all_tests.lua`:** This script is most useful for ensuring complete test coverage runs, typically in Continuous Integration (CI) environments or for periodic full regression checks during development. For day-to-day development and faster feedback, running specific test files or subdirectories directly (e.g., `lua test.lua tests/core/`) is often more efficient.
+- **Use Case for `all_tests.lua`:** This script is most useful for ensuring complete test coverage runs, typically in Continuous Integration (CI) environments or for periodic full regression checks during development. For day-to-day development and faster feedback, running specific test files or subdirectories directly (e.g., `lua firmo.lua tests/core/`) is often more efficient.
 
 ## Troubleshooting / Common Pitfalls (Optional)
 

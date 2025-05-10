@@ -108,7 +108,6 @@ local function get_logger()
   }
 end
 
-
 -- Load mandatory modules with fatal error handling
 local discover_module = try_require("lib.tools.discover")
 local test_definition = try_require("lib.core.test_definition")
@@ -312,17 +311,18 @@ function M.format(options)
 
   -- Handle unknown options
   if #unknown_options > 0 then
-    local err = get_error_handler().validation_error("Unknown format option(s): " .. table.concat(unknown_options, ", "), {
-      function_name = "format",
-      unknown_options = unknown_options,
-      valid_options = (function()
-        local opts = {}
-        for k, _ in pairs(M.format_options) do
-          table.insert(opts, k)
-        end
-        return table.concat(opts, ", ")
-      end)(),
-    })
+    local err =
+      get_error_handler().validation_error("Unknown format option(s): " .. table.concat(unknown_options, ", "), {
+        function_name = "format",
+        unknown_options = unknown_options,
+        valid_options = (function()
+          local opts = {}
+          for k, _ in pairs(M.format_options) do
+            table.insert(opts, k)
+          end
+          return table.concat(opts, ", ")
+        end)(),
+      })
 
     get_logger().error("Unknown format options provided", {
       error = get_error_handler().format_error(err),
@@ -459,11 +459,19 @@ function M.configure(options)
     end
 
     -- Configure temp file system if available
-    if temp_file and options.cleanup_temp_files ~= false then
+    if temp_file and type(temp_file.configure) == "function" and options.cleanup_temp_files ~= false then -- <<< MODIFIED CONDITION
       temp_file.configure({
         auto_cleanup = true,
         track_files = true,
       })
+    elseif temp_file and options.cleanup_temp_files ~= false then
+      -- Log a warning if temp_file exists but .configure doesn't, and we intended to call it.
+      get_logger().debug(
+        "temp_file module loaded but does not have a .configure method. Skipping temp_file configuration.",
+        {
+          temp_file_type = type(temp_file),
+        }
+      )
     end
 
     return true
@@ -785,7 +793,7 @@ end
 ---@field options.coverage boolean Whether to track code coverage
 ---@field options.verbose boolean If `true`, enable more detailed output during execution (may depend on parallel execution settings).
 ---@field options.timeout number Timeout in milliseconds for parallel test execution (default: 30000).
----@return boolean success `true` if all tests in all executed files passed, `false` otherwise.
+---@return table results Test execution results, including success status, counts of passed, failed, and skipped tests, and elapsed time.
 ---@throws table If the `files` parameter validation fails.
 ---
 ---@usage
@@ -812,7 +820,7 @@ end
 --- })
 ---@param files string[] An array of test file paths to execute.
 ---@param options? {parallel?: boolean, coverage?: boolean, verbose?: boolean, timeout?: number} Optional configuration for this run.
-function M.run_tests(files, options)
+function M.run_tests(files, firmo_instance, options)
   -- Parameter validation
   if not files then
     local err = get_error_handler().validation_error("Files cannot be nil", {
@@ -824,7 +832,18 @@ function M.run_tests(files, options)
       error = get_error_handler().format_error(err),
       operation = "run_tests",
     })
-    return false
+    -- Return a table indicating failure, consistent with other return paths
+    return {
+      success = false,
+      passes = 0,
+      errors = 1,
+      skipped = 0,
+      total = 1,
+      elapsed = 0,
+      files_tested = 0,
+      files_passed = 0,
+      files_failed = 1,
+    }
   end
 
   if type(files) ~= "table" then
@@ -838,14 +857,28 @@ function M.run_tests(files, options)
       error = get_error_handler().format_error(err),
       operation = "run_tests",
     })
-    return false
+    return {
+      success = false,
+      passes = 0,
+      errors = 1,
+      skipped = 0,
+      total = 1,
+      elapsed = 0,
+      files_tested = 0,
+      files_passed = 0,
+      files_failed = 1,
+    }
   end
 
   options = options or {}
   local total_passes = 0
   local total_errors = 0
   local total_skipped = 0
-  local all_success = true
+  local all_success = true -- Tracks if all files executed successfully and had no test errors
+  local passed_files = 0
+  local failed_files = 0
+
+  local start_time = os.clock() -- <<< ADDED: Start timer for the whole M.run_tests execution
 
   -- Use parallel execution if available and requested
   if parallel_module and (options.parallel or (central_config and central_config.get("runner.parallel"))) then
@@ -858,22 +891,94 @@ function M.run_tests(files, options)
       isolate_state = true,
     })
 
-    -- Run files in parallel
     get_logger().info("Running tests in parallel", {
       file_count = #files,
     })
 
-    local results = parallel_module.run_files(files)
+    -- Pass relevant options to parallel.run_tests
+    local parallel_run_opts = {
+      workers = parallel_module.options.workers,
+      timeout = parallel_module.options.timeout,
+      verbose = parallel_module.options.verbose,
+      show_worker_output = parallel_module.options.show_worker_output,
+      fail_fast = parallel_module.options.fail_fast,
+      aggregate_coverage = parallel_module.options.aggregate_coverage,
+      coverage = options.coverage,
+      tags = options.tags,
+      filter = options.filter,
+    }
 
-    -- Process results
-    for _, result in ipairs(results) do
-      if result.success then
-        total_passes = total_passes + (result.passes or 0)
-      else
+    local aggregated_results = parallel_module.run_tests(files, parallel_run_opts)
+
+    -- Process the single aggregated_results object from parallel execution
+    if aggregated_results then
+      total_passes = aggregated_results.passed or 0
+      total_errors = aggregated_results.failed or 0 -- 'failed' field from parallel.Results object
+      total_skipped = aggregated_results.skipped or 0
+
+      -- Determine overall success based on parallel run's aggregated failures
+      all_success = ((aggregated_results.failed or 0) == 0)
+      -- Additionally, parallel.Results has an 'errors' table for execution errors, not test failures.
+      -- If that error table is populated, it's also not a full success.
+      if aggregated_results.errors and #aggregated_results.errors > 0 then
         all_success = false
-        total_errors = total_errors + (result.errors or 1)
       end
-      total_skipped = total_skipped + (result.skipped or 0)
+
+      -- The 'elapsed' time for the whole parallel run is in aggregated_results.elapsed
+      -- We will use the elapsed_time calculated at the end of M.run_tests for overall timing.
+      -- However, if you want parallel's specific elapsed time, you could use it here:
+      -- elapsed_time = aggregated_results.elapsed or elapsed_time
+
+      -- parallel.Results does not directly give files_passed/files_failed count.
+      -- Approximate based on all_success and total files.
+      if all_success then
+        passed_files = #files
+        failed_files = 0
+      else
+        -- If not all_success, it means at least one test in one file failed, or an execution error.
+        -- We can't know exactly how many *files* passed/failed without more detail from parallel_module.
+        -- For now, if any test failed (total_errors > 0), mark at least one file as failed.
+        if total_errors > 0 then
+          failed_files = 1 -- At least one file had test failures.
+          -- A more sophisticated approach would be needed if you want exact file pass/fail counts here.
+          -- Let's assume if any test fails, we mark all files as "involved" in failure for simplicity,
+          -- or just one file failed. For summary purposes, total_errors > 0 means not all files passed.
+          -- To be consistent with sequential, let's try:
+          if #files > 0 then
+            failed_files = (total_errors > 0) and 1 or 0 -- Crude, assumes 1 failing file if any test fails
+            -- A better approximation if many files but few errors:
+            if total_errors > 0 and failed_files == 0 then
+              failed_files = 1
+            end
+            if #files > 0 and failed_files == 0 and not all_success then
+              failed_files = 1
+            end -- if success is false for other reasons
+
+            passed_files = #files - failed_files
+            -- This is still an approximation. A truly accurate passed_files/failed_files count
+            -- would require parallel_module.run_tests to return per-file success status.
+            -- For now, if overall not success, say 1 file failed.
+            if not all_success and #files > 0 then
+              failed_files = math.max(failed_files, 1) -- ensure at least 1 failed file if not all_success
+              passed_files = #files - failed_files
+            end
+          end
+        else -- No test errors, but all_success might be false due to parallel execution errors
+          if not all_success and #files > 0 then
+            failed_files = 1 -- At least one file had an issue
+            passed_files = #files - 1
+          else
+            passed_files = #files
+            failed_files = 0
+          end
+        end
+      end
+      get_logger().debug("Processed results from parallel execution", aggregated_results)
+    else
+      get_logger().error("Parallel execution did not return results. Assuming failure for all files.")
+      all_success = false
+      failed_files = #files -- Assume all files failed if parallel module itself failed
+      passed_files = 0
     end
   else
     -- Run files sequentially
@@ -881,44 +986,51 @@ function M.run_tests(files, options)
       file_count = #files,
     })
 
-    for _, file in ipairs(files) do
-      local result, _ = M.run_file(file)
+    for _, file_path_str in ipairs(files) do -- Renamed 'file' to 'file_path_str' to avoid conflict with 'file' table key later
+      local result_table, run_file_err = M.run_file(file_path_str) -- M.run_file already returns a table
 
-      total_passes = total_passes + (result.passes or 0)
-      total_errors = total_errors + (result.errors or 0)
-      total_skipped = total_skipped + (result.skipped or 0)
+      if result_table then -- Check if M.run_file returned a result
+        total_passes = total_passes + (result_table.passes or 0)
+        total_errors = total_errors + (result_table.errors or 0)
+        total_skipped = total_skipped + (result_table.skipped or 0)
 
-      if not result.success or result.errors > 0 then
+        if result_table.success and (result_table.errors or 0) == 0 then
+          passed_files = passed_files + 1
+        else
+          all_success = false
+          failed_files = failed_files + 1
+        end
+      else -- M.run_file itself failed to return a result (e.g., critical error)
         all_success = false
+        failed_files = failed_files + 1
+        -- Optionally log run_file_err here
+        get_logger().error("M.run_file did not return a result table for: " .. file_path_str, { error = run_file_err })
       end
     end
   end
 
-  -- Print summary
-  if not M.format_options.dot_mode then
-    print("\nTest Results:")
-    print("- Passes:  " .. green .. total_passes .. normal)
-    print("- Failures: " .. (total_errors > 0 and red or normal) .. total_errors .. normal)
-    print("- Skipped:  " .. yellow .. total_skipped .. normal)
-    print("- Total:    " .. (total_passes + total_errors + total_skipped))
-    print(all_success and green .. "All tests passed!" .. normal or red .. "There were test failures!" .. normal)
-  else
-    print(
-      "\n" .. (all_success and green .. "All tests passed!" .. normal or red .. "There were test failures!" .. normal)
-    )
-    print("Passes: " .. total_passes .. ", Failures: " .. total_errors .. ", Skipped: " .. total_skipped)
-  end
+  local elapsed_time = os.clock() - start_time -- <<< ADDED: Calculate elapsed time
 
-  if total_errors > 0 then
-    get_logger().error("Test failures detected in file", {
-      success = false,
-      errors = total_errors,
-      path = file,
-      test_errors = total_errors,
-    })
-  end
+  -- This specific log for individual file failures is less relevant here as 'file' is not in scope
+  -- The overall all_success flag handles if any file caused a failure.
+  -- if total_errors > 0 then
+  --   get_logger().error("Test failures detected during run_tests", {
+  --     success = false, -- This should be all_success
+  --     errors = total_errors
+  --   })
+  -- end
 
-  return all_success
+  return {
+    success = all_success,
+    passes = total_passes,
+    errors = total_errors,
+    skipped = total_skipped,
+    total = total_passes + total_errors + total_skipped,
+    elapsed = elapsed_time, -- Now elapsed_time is defined
+    files_tested = #files,
+    files_passed = passed_files, -- Now tracking this
+    files_failed = failed_files, -- Now tracking this
+  }
 end
 
 -- Return the module

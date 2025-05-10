@@ -42,7 +42,7 @@ Quality validation is typically enabled and configured via the command line or t
 
     ```bash
     # Run tests with quality validation, aiming for level 3
-    lua test.lua --quality --quality-level=3 tests/
+    lua firmo.lua --quality --quality-level=3 tests/
     # Note: --quality-level is optional; defaults from .firmo-config.lua or to level 3 if not set anywhere.
     ```
 
@@ -127,13 +127,13 @@ Use the standard `--format` and `--report-dir` CLI flags.
 ```bash
 # Run tests with quality checks, generate an HTML quality report
 # Output usually to default directory (e.g., ./coverage-reports/quality-mytest.html)
-lua test.lua --quality --format=html tests/
+lua firmo.lua --quality --format=html tests/
 
 # Generate a JSON report to a custom directory
-lua test.lua --quality --format=json --report-dir=./my-reports tests/
+lua firmo.lua --quality --format=json --report-dir=./my-reports tests/
 
 # Generate a summary report (Markdown format, e.g., ./coverage-reports/quality-mytest.md)
-lua test.lua --quality --format=summary tests/
+lua firmo.lua --quality --format=summary tests/
 ```
 
 You can also generate report content programmatically using `quality.report()` if data has been collected:
@@ -219,7 +219,7 @@ Quality validation can be integrated into CI/CD pipelines:
 
 ```bash
 # In CI script: Run tests with quality checks and generate a JSON report
-lua test.lua --quality --quality-level=3 --format=json --report-dir=./ci-reports tests/
+lua firmo.lua --quality --quality-level=3 --format=json --report-dir=./ci-reports tests/
 
 # Check the exit code of `test.lua`. The runner exits with 0 if tests pass and
 # report generation succeeds. The `strict = true` setting in `.firmo-config.lua` (under `quality`)

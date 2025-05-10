@@ -127,47 +127,47 @@ The CLI processes various command line arguments:
 # Basic test run
 
 
-lua test.lua tests/
+lua firmo.lua tests/
 
 # Run with pattern filter
 
 
-lua test.lua --pattern="database" tests/
+lua firmo.lua --pattern="database" tests/
 
 # Run with coverage
 
 
-lua test.lua --coverage tests/
+lua firmo.lua --coverage tests/
 
 # Run in watch mode
 
 
-lua test.lua --watch tests/
+lua firmo.lua --watch tests/
 
 # Run in interactive mode
 
 
-lua test.lua --interactive tests/
+lua firmo.lua --interactive tests/
 
 # Run in parallel
 
 
-lua test.lua --parallel tests/
+lua firmo.lua --parallel tests/
 
 # Generate report
 
 
-lua test.lua --coverage --format=html tests/
+lua firmo.lua --coverage --format=html tests/
 
 # Run quality validation
 
 
-lua test.lua --quality --quality-level=3 tests/
+lua firmo.lua --quality --quality-level=3 tests/
 
 # Show help
 
 
-lua test.lua --help
+lua firmo.lua --help
 ```
 
 

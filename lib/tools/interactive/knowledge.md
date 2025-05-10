@@ -119,13 +119,13 @@ The `lib/tools/interactive` module implements the interactive command-line inter
 
 ## Best Practices / Critical Rules (Optional)
 
-- **Launch via Main CLI:** Always start the interactive mode using the main Firmo script (`lua test.lua --interactive`) to ensure the environment and dependencies (like `runner` and `discover`) are correctly set up.
+- **Launch via Main CLI:** Always start the interactive mode using the main Firmo script (`lua firmo.lua --interactive`) to ensure the environment and dependencies (like `runner` and `discover`) are correctly set up.
 - **Understand Filter Persistence:** Filters set using `filter`, `focus`, or `tags` remain active for all subsequent `run` commands until explicitly cleared (e.g., `focus` with no arguments).
 - **Use `status`:** Regularly use the `status` command to verify the current test directory, pattern, active filters, and watch mode settings.
 
 ## Troubleshooting / Common Pitfalls (Optional)
 
-- **"Runner module not available" / "Discovery module not available" Errors:** This typically means the interactive mode was started incorrectly, without the main `scripts/runner.lua` environment properly loading these core modules before calling `interactive.start`. Ensure you are using `lua test.lua --interactive`.
+- **"Runner module not available" / "Discovery module not available" Errors:** This typically means the interactive mode was started incorrectly, without the main `scripts/runner.lua` environment properly loading these core modules before calling `interactive.start`. Ensure you are using `lua firmo.lua --interactive`.
 - **Watch Mode Issues:**
     - `"Watch module not available"` error: The optional `lib/tools/watcher` module is missing or failed to load.
     - Watch mode doesn't detect changes: Check the directories being watched (`status` command or `state.watch_dirs`), ensure they are correct. Check `state.exclude_patterns`. Filesystem event handling can sometimes be unreliable depending on the OS and environment.

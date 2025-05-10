@@ -165,42 +165,42 @@ Firmo can be run directly from the command line to discover and run tests.
 # Run all tests in the ./tests directory
 
 
-lua test.lua tests/
+lua firmo.lua tests/
 
 # Run tests in a specific directory
 
 
-lua test.lua src/tests/
+lua firmo.lua src/tests/
 
 # Run a specific test file
 
 
-lua test.lua ./tests/user_test.lua
+lua firmo.lua ./tests/user_test.lua
 
 # Run tests with tag filtering
 
 
-lua test.lua tests/ --tags unit
+lua firmo.lua tests/ --tags unit
 
 # Run tests with multiple tags
 
 
-lua test.lua tests/ --tags unit,fast
+lua firmo.lua tests/ --tags unit,fast
 
 # Run tests with name filtering
 
 
-lua test.lua tests/ --filter validation
+lua firmo.lua tests/ --filter validation
 
 # Run tests with both tag and name filtering
 
 
-lua test.lua tests/ --tags unit --filter validation
+lua firmo.lua tests/ --tags unit --filter validation
 
 # Show help
 
 
-lua test.lua --help
+lua firmo.lua --help
 ```
 
 

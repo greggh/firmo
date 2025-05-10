@@ -12,7 +12,7 @@
 --- @version 1.0.0
 -- @see firmo
 -- @usage
--- Run embedded tests: lua test.lua examples/focused_tests_example.lua
+-- Run embedded tests: lua firmo.lua examples/focused_tests_example.lua
 --
 
 local firmo = require("firmo")
@@ -135,7 +135,7 @@ end)
 -- Log usage instructions and expected outcome
 logger.info("\n-- Focused Tests Example --")
 logger.info("Run this example using the standard test runner:")
-logger.info("  lua test.lua examples/focused_tests_example.lua")
+logger.info("  lua firmo.lua examples/focused_tests_example.lua")
 logger.info("\nExpected behavior:")
 logger.info("- Only tests marked with 'fit' or inside 'fdescribe' blocks will run.")
 logger.info("- Tests marked with 'xit' or inside 'xdescribe' blocks will be skipped.")

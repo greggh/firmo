@@ -21,7 +21,7 @@
   @usage
   Run embedded tests:
   ```bash
-  lua test.lua examples/tap_example.lua
+  lua firmo.lua examples/tap_example.lua
   ```
   The generated TAP reports will be saved to a temporary directory.
 ]]
@@ -135,7 +135,7 @@ print("\nTo run this example directly:")
 print("  lua examples/tap_example.lua")
 
 print("\nOr run it with firmo's test runner:")
-print("  lua test.lua examples/tap_example.lua")
+print("  lua firmo.lua examples/tap_example.lua")
 
 print("\nTAP Format Overview:")
 print("- 'TAP version 13' - Protocol version declaration")

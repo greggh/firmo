@@ -12,7 +12,7 @@ This document provides quick examples related to:
 -   Resource Cleanup Patterns
 -   Asynchronous Testing (`it_async`, `done`)
 -   Mocking (`mock`, `stub`)
--   CI Integration Commands (`lua test.lua ...`)
+-   CI Integration Commands (`lua firmo.lua ...`)
 
 ## Usage Examples / Patterns
 
@@ -138,16 +138,16 @@ end)
 
 ```bash
 # Run tests with coverage
-lua test.lua --coverage tests/
+lua firmo.lua --coverage tests/
 
 # Generate HTML and JSON report files (via reporting module)
-lua test.lua --coverage --format html,json tests/
+lua firmo.lua --coverage --format html,json tests/
 
 # Run with quality checks at level 3
-lua test.lua --quality --quality-level=3 tests/
+lua firmo.lua --quality --quality-level=3 tests/
 
 # Run tests filtering by name pattern "integration"
-lua test.lua --filter integration tests/
+lua firmo.lua --filter integration tests/
 ```
 
 ## Related Components / Modules

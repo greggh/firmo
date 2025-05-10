@@ -397,10 +397,10 @@ Quality validation is typically enabled and configured via CLI arguments when us
 
 ```bash
 # Run tests with quality validation at level 2
-lua test.lua --quality --quality-level=2 tests/
+lua firmo.lua --quality --quality-level=2 tests/
 
 # Generate an HTML report
-lua test.lua --quality --quality-level=2 --format=html --report-dir=./reports tests/
+lua firmo.lua --quality --quality-level=2 --format=html --report-dir=./reports tests/
 ```
 
 Programmatic example (simplified, as the runner handles most details):
@@ -474,21 +474,21 @@ reporting.save_quality_report("./quality/report.json", report_data, "json")
 
 ```bash
 # Run tests with quality validation enabled (uses configured default level, e.g., from .firmo-config.lua)
-lua test.lua --quality tests/
+lua firmo.lua --quality tests/
 
 # Specify quality level to enforce
-lua test.lua --quality --quality-level=3 tests/
+lua firmo.lua --quality --quality-level=3 tests/
 
 # Enable strict mode (via .firmo-config.lua: quality.strict = true)
 # Note: --quality-strict CLI flag is not currently implemented.
-# lua test.lua --quality --quality-level=3 tests/ (and ensure strict=true in config)
+# lua firmo.lua --quality --quality-level=3 tests/ (and ensure strict=true in config)
 
 # Set report format and output directory
-lua test.lua --quality --format=html --report-dir=./reports tests/
+lua firmo.lua --quality --format=html --report-dir=./reports tests/
 # Note: Specific output filenames within the report directory are typically auto-generated 
 # (e.g., quality-mytest.html). The exact naming can be influenced by 
 # `reporting.templates.quality` in `.firmo-config.lua`.
 
 # Run with both quality and coverage
-lua test.lua --quality --quality-level=3 --coverage tests/
+lua firmo.lua --quality --quality-level=3 --coverage tests/
 ```

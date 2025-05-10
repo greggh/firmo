@@ -328,7 +328,7 @@ jobs:
 
       - name: Run tests with coverage
 
-        run: lua test.lua --coverage --format=json tests/
+        run: lua firmo.lua --coverage --format=json tests/
 
       - name: Upload coverage artifact
 
@@ -360,7 +360,7 @@ Example pipeline stage:
 ```groovy
 stage('Test with Coverage') {
   steps {
-    sh 'lua test.lua --coverage --format=json tests/'
+    sh 'lua firmo.lua --coverage --format=json tests/'
 
     // Archive the JSON report as an artifact
     archiveArtifacts artifacts: 'coverage-reports/coverage-report.json'

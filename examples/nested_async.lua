@@ -13,7 +13,7 @@
 --- @usage
 --- Run embedded tests:
 --- ```bash
---- lua test.lua examples/nested_async.lua
+--- lua firmo.lua examples/nested_async.lua
 --- ```
 --- Observe the printed log messages to understand the hook execution order.
 

@@ -53,7 +53,7 @@ jobs:
 
         run: |
           # Run all tests in the tests directory
-          lua test.lua tests/
+          lua firmo.lua tests/
 
 
       - name: Generate test report (optional)
@@ -106,7 +106,7 @@ run_tests:
   script:
 
 
-    - lua test.lua tests/
+    - lua firmo.lua tests/
 
   artifacts:
     when: always
@@ -159,7 +159,7 @@ jobs:
 
           name: Run tests
           command: |
-            lua test.lua tests/
+            lua firmo.lua tests/
 
 
       - store_test_results:
@@ -199,7 +199,7 @@ pipeline {
         }
         stage('Test') {
             steps {
-                sh 'lua test.lua tests/'
+                sh 'lua firmo.lua tests/'
             }
             post {
                 always {
@@ -246,9 +246,9 @@ The command-line runner does not currently support direct filtering using `--tag
 1.  **Using `--filter`**: Filter tests by matching patterns in their *names* (including describe block names). This is less precise than tag filtering.
     ```bash
     # Run tests whose names contain "unit"
-    lua test.lua tests/ --filter unit
+    lua firmo.lua tests/ --filter unit
     # Run tests whose names contain "integration"
-    lua test.lua tests/ --filter integration
+    lua firmo.lua tests/ --filter integration
     ```
 2.  **Programmatic Filtering**: Set up different CI jobs or steps where each step configures Firmo programmatically using `firmo.only_tags(...)` before running the tests.
 
@@ -279,7 +279,7 @@ steps:
   - name: Run integration tests
 
     run: |
-      lua test.lua tests/ --tags integration
+      lua firmo.lua tests/ --tags integration
 ```
 
 
@@ -302,7 +302,7 @@ steps:
 
     timeout-minutes: 10
     run: |
-      lua test.lua tests/
+      lua firmo.lua tests/
 ```
 
 
@@ -313,7 +313,7 @@ For large test suites, consider running tests in parallel to speed up execution 
 
 ```bash
 # Run tests using 4 worker processes
-lua test.lua tests/ --parallel --workers=4
+lua firmo.lua tests/ --parallel --workers=4
 ```
 
 Alternatively, you can split tests across multiple CI jobs using matrix strategies, often combined with filtering:
@@ -331,7 +331,7 @@ jobs:
       - name: Run tests for group ${{ matrix.test-group }}
         run: |
           # Use --filter to run tests matching the group name pattern
-          lua test.lua tests/ --filter ${{ matrix.test-group }}
+          lua firmo.lua tests/ --filter ${{ matrix.test-group }}
 ```
 
 
@@ -363,7 +363,7 @@ For better CI integration, configure Firmo to generate JUnit XML reports using t
 
 ```bash
 # Run tests and ensure JUnit report is generated (via config or this flag)
-lua test.lua tests/ --format=junit
+lua firmo.lua tests/ --format=junit
 ```
 
 Most CI systems can automatically find and parse `junit.xml` (or similar) files if placed in expected locations or specified in the CI configuration. Make sure your artifact upload paths match where the report is saved.
@@ -376,7 +376,7 @@ For custom processing of test results:
 
 ```bash
 # Run tests and ensure a JSON report is generated
-lua test.lua tests/ --format=json
+lua firmo.lua tests/ --format=json
 ```
 This generates a structured JSON file (e.g., in `./coverage-reports/test-results.json`) containing detailed test results, suitable for custom processing or analysis tools.
 
@@ -443,14 +443,14 @@ jobs:
 
         run: |
           # Filters tests with "unit" in their name/path; --format generates JUnit file
-          lua test.lua tests/ --filter unit --format=junit
+          lua firmo.lua tests/ --filter unit --format=junit
 
       - name: Run integration tests
 
         if: success() || failure() # Run even if unit tests fail
         run: |
           # Filters tests with "integration" in their name/path; --format generates JUnit file
-          lua test.lua tests/ --filter integration --format=junit
+          lua firmo.lua tests/ --filter integration --format=junit
 
       - name: Upload test results
 

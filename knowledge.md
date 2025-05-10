@@ -179,13 +179,13 @@ end)
 
 ## Essential Commands
 
-- Run all tests: `lua test.lua tests/`
-- Run specific test: `lua test.lua tests/reporting_test.lua`
-- Run with pattern: `lua test.lua --pattern=coverage tests/`
-- Run with coverage: `lua test.lua --coverage --format=html tests/`
-- Run with coverage (JSON): `lua test.lua --coverage --format=json tests/`
-- Run with coverage (LCOV): `lua test.lua --coverage --format=lcov tests/`
-- Run with watch mode: `lua test.lua --watch tests/`
+- Run all tests: `lua firmo.lua tests/`
+- Run specific test: `lua firmo.lua tests/reporting_test.lua`
+- Run with pattern: `lua firmo.lua --pattern=coverage tests/`
+- Run with coverage: `lua firmo.lua --coverage --format=html tests/`
+- Run with coverage (JSON): `lua firmo.lua --coverage --format=json tests/`
+- Run with coverage (LCOV): `lua firmo.lua --coverage --format=lcov tests/`
+- Run with watch mode: `lua firmo.lua --watch tests/`
 
 ## JSDoc-Style Type Annotations
 
@@ -331,7 +331,7 @@ expect({name = "John"}).to.have_property("name", "John")
 1. Run failing test in isolation:
 
    ```lua
-   lua test.lua tests/specific_test.lua
+   lua firmo.lua tests/specific_test.lua
    ```
 
 2. Enable debug logging if needed:

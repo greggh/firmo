@@ -127,7 +127,7 @@ This function also adds CLI options for parallel execution to Firmo, allowing yo
 
 
 ```text
-lua test.lua --parallel --workers 4 tests/
+lua firmo.lua --parallel --workers 4 tests/
 ```
 
 

@@ -168,12 +168,12 @@ When running tests via the command line, focus mode works alongside tag and filt
 # Run tests with focus mode respecting focused tests
 
 
-lua test.lua tests/
+lua firmo.lua tests/
 
 # Focus mode can be combined with other filters
 
 
-lua test.lua tests/ --tags unit
+lua firmo.lua tests/ --tags unit
 ```
 
 

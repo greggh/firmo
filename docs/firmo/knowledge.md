@@ -40,7 +40,7 @@ Firmo's documentation is structured into several key areas:
     -   Guide: [`docs/guides/async.md`](../guides/async.md)
     -   API: [`docs/api/async.md`](../api/async.md)
 
--   **CLI:** Using the command-line interface (`lua test.lua ...`).
+-   **CLI:** Using the command-line interface (`lua firmo.lua ...`).
     -   Guide: [`docs/guides/cli.md`](../guides/cli.md)
     -   API: [`docs/api/cli.md`](../api/cli.md), [`docs/api/test_runner.md`](../api/test_runner.md)
 

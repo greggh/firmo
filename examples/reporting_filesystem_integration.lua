@@ -11,7 +11,7 @@
 --- @usage
 --- Run all the tests in this file:
 --- ```
---- lua test.lua examples/reporting_filesystem_integration.lua
+--- lua firmo.lua examples/reporting_filesystem_integration.lua
 --- ```
 --- Run as a standalone example:
 --- ```

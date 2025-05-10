@@ -24,7 +24,7 @@
 --- ```
 --- Run the embedded tests to verify configuration loading and access:
 --- ```bash
---- lua test.lua examples/central_config_example.lua
+--- lua firmo.lua examples/central_config_example.lua
 --- ```
 
 -- Import the required modules
@@ -493,9 +493,9 @@ describe("Central Config System Tests", function()
   end)
 end)
 
-logger.info("Run the tests with: lua test.lua examples/central_config_example.lua\n")
+logger.info("Run the tests with: lua firmo.lua examples/central_config_example.lua\n")
 
--- Cleanup is handled automatically by the test runner via temp_file integration when run with `lua test.lua ...`
+-- Cleanup is handled automatically by the test runner via temp_file integration when run with `lua firmo.lua ...`
 -- If run directly (`lua examples/...`), manual cleanup might be needed if errors occur before registration.
 logger.info("Temporary files/directories created in " .. temp_dir.path .. " will be cleaned up.")
 

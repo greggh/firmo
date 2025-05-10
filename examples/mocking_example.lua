@@ -19,7 +19,7 @@
 -- @see lib.tools.error_handler
 -- @see lib.tools.test_helper
 -- @usage
--- Run embedded tests: lua test.lua examples/mocking_example.lua
+-- Run embedded tests: lua firmo.lua examples/mocking_example.lua
 --
 
 local error_handler = require("lib.tools.error_handler")
@@ -563,4 +563,4 @@ logger.info("4. Testing error conditions with mocked functions")
 logger.info("5. Using the with_mocks context manager for clean testing")
 logger.info("6. Implementing robust error handling with mocks")
 logger.info("\nRun this example with:")
-logger.info("lua test.lua examples/mocking_example.lua")
+logger.info("lua firmo.lua examples/mocking_example.lua")

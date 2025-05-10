@@ -11,7 +11,7 @@
 --- functions. It does **not** perform actual test execution or coverage collection.
 --- Its purpose is solely to demonstrate the *options* and *output format* of the
 --- Cobertura reporter, particularly for CI/CD integration scenarios.
---- In a real project, coverage data is collected via `lua test.lua --coverage ...`
+--- In a real project, coverage data is collected via `lua firmo.lua --coverage ...`
 --- and reports are generated based on the configuration in `.firmo-config.lua`
 --- or command-line flags (`--format=cobertura`).
 ---
@@ -24,7 +24,7 @@
 --- @usage
 --- Run embedded tests:
 --- ```bash
---- lua test.lua examples/cobertura_jenkins_example.lua
+--- lua firmo.lua examples/cobertura_jenkins_example.lua
 --- ```
 
 -- Extract the testing functions we need
@@ -540,7 +540,7 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh 'lua test.lua --coverage --format=cobertura tests/'
+                sh 'lua firmo.lua --coverage --format=cobertura tests/'
             }
         }
     }
@@ -575,7 +575,7 @@ pipeline {
       logger.info(
         [[ -- Moved message to first argument
     1. Generate Cobertura report:
-       lua test.lua --coverage --format=cobertura tests/
+       lua firmo.lua --coverage --format=cobertura tests/
 
     2. Configure sonar-project.properties:
        sonar.projectKey=my-lua-project
@@ -609,7 +609,7 @@ jobs:
         uses: leafo/gh-actions-lua@v8
 
       - name: Run tests with coverage
-        run: lua test.lua --coverage --format=cobertura tests/
+        run: lua firmo.lua --coverage --format=cobertura tests/
 
       - name: Upload coverage report to Codecov
         uses: codecov/codecov-action@v2

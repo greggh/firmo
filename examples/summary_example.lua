@@ -20,7 +20,7 @@
 --- @usage
 --- Run embedded tests:
 --- ```bash
---- lua test.lua examples/summary_example.lua
+--- lua firmo.lua examples/summary_example.lua
 --- ```
 --- The generated text reports will be saved to a temporary directory.
 ---
@@ -243,7 +243,7 @@ logger.info("\nTo run this example directly:")
 logger.info("  lua examples/summary_example.lua")
 
 logger.info("\nOr run it with firmo's test runner:")
-logger.info("  lua test.lua examples/summary_example.lua")
+logger.info("  lua firmo.lua examples/summary_example.lua")
 
 logger.info("\nCommon summary configurations:")
 logger.info("- use_colors: true|false - Enable terminal colors")

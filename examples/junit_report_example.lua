@@ -17,7 +17,7 @@
 --- @see lib.reporting.formatters.junit
 --- @see lib.tools.test_helper
 --- @usage
---- Run embedded tests: lua test.lua examples/junit_report_example.lua
+--- Run embedded tests: lua firmo.lua examples/junit_report_example.lua
 ---
 
 -- Extract the testing functions we need

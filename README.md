@@ -172,42 +172,42 @@ Firmo provides a comprehensive command line interface:
 # Run all tests in the tests directory
 
 
-lua test.lua tests/
+lua firmo.lua tests/
 
 # Run with coverage and generate HTML report
 
 
-lua test.lua --coverage --format=html tests/
+lua firmo.lua --coverage --format=html tests/
 
 # Run in watch mode
 
 
-lua test.lua --watch tests/
+lua firmo.lua --watch tests/
 
 # Run in parallel with 8 workers
 
 
-lua test.lua --parallel --workers=8 tests/
+lua firmo.lua --parallel --workers=8 tests/
 
 # Run with quality validation
 
 
-lua test.lua --quality --quality-level=3 tests/
+lua firmo.lua --quality --quality-level=3 tests/
 
 # Run in interactive mode
 
 
-lua test.lua --interactive
+lua firmo.lua --interactive
 
 # Run with focused tags
 
 
-lua test.lua --tags="unit,fast" tests/
+lua firmo.lua --tags="unit,fast" tests/
 
 # Filter tests by pattern
 
 
-lua test.lua --pattern="database" tests/
+lua firmo.lua --pattern="database" tests/
 ```
 
 

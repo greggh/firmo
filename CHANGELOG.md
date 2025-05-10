@@ -146,7 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removing direct usage of `lib.coverage`, deferring to the test runner.
   - Ensuring consistent use of `expect`-style assertions.
   - Updating module usage (e.g., `fs`, `error_handler`) per current APIs.
-  - Updating CLI examples to use the standard `lua test.lua ...` pattern.
+  - Updating CLI examples to use the standard `lua firmo.lua ...` pattern.
 ## [0.7.4] - 2025-03-18
 
 

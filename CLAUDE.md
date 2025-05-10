@@ -464,13 +464,13 @@ For cross-version Lua compatibility:
 
 ### Testing Commands
 
-**NOTE:** Never run all tests at once (`lua test.lua tests/`) unless specifically needed and understood; prefer targeted testing.
+**NOTE:** Never run all tests at once (`lua firmo.lua tests/`) unless specifically needed and understood; prefer targeted testing.
 
-- Run Specific Test: `lua test.lua tests/reporting_test.lua`
-- Run Tests by Pattern: `lua test.lua --pattern=coverage tests/`
-- Run Tests with Coverage: `lua test.lua --coverage tests/`
-- Run Tests with Watch Mode: `lua test.lua --watch tests/`
-- Run Tests with Quality Validation: `lua test.lua --quality tests/`
+- Run Specific Test: `lua firmo.lua tests/reporting_test.lua`
+- Run Tests by Pattern: `lua firmo.lua --pattern=coverage tests/`
+- Run Tests with Coverage: `lua firmo.lua --coverage tests/`
+- Run Tests with Watch Mode: `lua firmo.lua --watch tests/`
+- Run Tests with Quality Validation: `lua firmo.lua --quality tests/`
 - Run Example: `lua examples/report_example.lua`
 
 ### Test Command Format
@@ -478,7 +478,7 @@ For cross-version Lua compatibility:
 The standard test command format follows this pattern:
 
 ```text
-lua test.lua [options] [path]
+lua firmo.lua [options] [path]
 ```
 
 Where:
@@ -949,17 +949,17 @@ tests/
 
 ### Test Execution
 
-- Tests are run using the standardized command: `lua test.lua [path]`
-- For a single test file: `lua test.lua tests/reporting_test.lua`
-- For a directory of tests: `lua test.lua tests/coverage/`
-- For all tests: `lua test.lua tests/`
+- Tests are run using the standardized command: `lua firmo.lua [path]`
+- For a single test file: `lua firmo.lua tests/reporting_test.lua`
+- For a directory of tests: `lua firmo.lua tests/coverage/`
+- For all tests: `lua firmo.lua tests/`
 
 ### Other Useful Commands
 
 - Fix Markdown Files: `lua scripts/fix_markdown.lua docs`
 - Fix Specific Markdown Files: `lua scripts/fix_markdown.lua README.md CHANGELOG.md`
-- Debug Report Generation: `lua test.lua --coverage --format=html tests/reporting_test.lua`
-- Test Quality Validation: `lua test.lua --quality --quality-level=2 tests/quality_test.lua`
+- Debug Report Generation: `lua firmo.lua --coverage --format=html tests/reporting_test.lua`
+- Test Quality Validation: `lua firmo.lua --quality --quality-level=2 tests/quality_test.lua`
 - Clean Orphaned Temp Files: `lua scripts/cleanup_temp_files.lua`
 - Clean Orphaned Temp Files (Dry Run): `lua scripts/cleanup_temp_files.lua --dry-run`
 - Check Lua Syntax: `lua scripts/check_syntax.lua <file_path>`

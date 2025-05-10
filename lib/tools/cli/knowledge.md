@@ -33,64 +33,64 @@ The CLI is typically used via the main `test.lua` script.
 ### Pattern 1: Run All Tests
 
 ```bash
-lua test.lua tests/
+lua firmo.lua tests/
 ```
 *(Runs all tests found within the `tests/` directory using default settings)*
 
 ### Pattern 2: Run with Code Coverage
 
 ```bash
-lua test.lua --coverage tests/
+lua firmo.lua --coverage tests/
 # or shorthand:
-lua test.lua -c tests/
+lua firmo.lua -c tests/
 ```
 *(Runs tests and collects code coverage data)*
 
 ### Pattern 3: Filter Tests by Name Pattern
 
 ```bash
-lua test.lua --pattern="core" tests/
+lua firmo.lua --pattern="core" tests/
 ```
 *(Runs only tests whose describe/it blocks or filenames match the Lua pattern "core")*
 
 ### Pattern 4: Run in Watch Mode
 
 ```bash
-lua test.lua --watch tests/
+lua firmo.lua --watch tests/
 # or shorthand:
-lua test.lua -w tests/
+lua firmo.lua -w tests/
 ```
 *(Runs tests initially, then watches files in `tests/` and reruns tests automatically on changes)*
 
 ### Pattern 5: Run Specific Files or Directories
 
 ```bash
-lua test.lua tests/unit/ test_file.lua path/to/another_test.lua
+lua firmo.lua tests/unit/ test_file.lua path/to/another_test.lua
 ```
 *(Runs only the specified tests)*
 
 ### Pattern 6: Show Help Message
 
 ```bash
-lua test.lua --help
+lua firmo.lua --help
 # or shorthand:
-lua test.lua -h
+lua firmo.lua -h
 ```
 *(Displays usage instructions and available options)*
 
 ### Pattern 7: Show Version
 
 ```bash
-lua test.lua --version
+lua firmo.lua --version
 # or shorthand:
-lua test.lua -V
+lua firmo.lua -V
 ```
 *(Displays the installed Firmo version)*
 
 ### Pattern 8: Combine Multiple Options
 
 ```bash
-lua test.lua -c -q --report --report-format=html --pattern="api" tests/
+lua firmo.lua -c -q --report --report-format=html --pattern="api" tests/
 ```
 *(Runs tests matching "api", enables coverage and quality checks, and generates an HTML report afterwards)*
 

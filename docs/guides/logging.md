@@ -495,7 +495,7 @@ This behavior ensures that when testing error conditions, you have appropriate v
 The `--debug` command-line flag will force all logs to be visible, regardless of configuration:
 
 ```bash
-lua test.lua --debug tests/coverage/
+lua firmo.lua --debug tests/coverage/
 ```
 
 This is useful for troubleshooting but can generate a large volume of output.

@@ -23,7 +23,7 @@
 --- ```
 --- Run the embedded performance tests using the Firmo test runner:
 --- ```bash
---- lua test.lua examples/benchmark_example.lua
+--- lua firmo.lua examples/benchmark_example.lua
 --- ```
 
 -- Import required modules

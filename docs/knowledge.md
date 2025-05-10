@@ -25,9 +25,9 @@ This document outlines key architectural principles, implementation guidelines, 
 
 After making significant changes, developers should typically run:
 
-1.  **All Tests:** `lua test.lua tests/`
-2.  **Coverage Check:** `lua test.lua --coverage tests/` (Ensure changes don't negatively impact coverage significantly).
-3.  **(Optional) Quality Check:** `lua test.lua --quality tests/` (If quality checks are configured).
+1.  **All Tests:** `lua firmo.lua tests/`
+2.  **Coverage Check:** `lua firmo.lua --coverage tests/` (Ensure changes don't negatively impact coverage significantly).
+3.  **(Optional) Quality Check:** `lua firmo.lua --quality tests/` (If quality checks are configured).
 
 ## Troubleshooting / Common Pitfalls
 

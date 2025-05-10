@@ -58,7 +58,7 @@
 
 ### 1. Testing
 
-- [x] Run lua test.lua --quality --format=html tests/simple_test.lua to confirm an HTML quality report is generated.
+- [x] Run lua firmo.lua --quality --format=html tests/simple_test.lua to confirm an HTML quality report is generated.
 - [x] Test with various --quality-level values to ensure the correct behavior for each level.
 - [x] Confirm no errors occur when the --quality flag is absent.
 - [x] Test other formats (e.g., JSON, summary) if implemented.
@@ -419,7 +419,7 @@ _(Steps 1-5 relate to the interactive fix examples feature)_
     - [x] Correct code examples shown.
     - [x] No layout or styling issues.
   - [x] Task 5.3: Refine based on feedback (Snippet for `before`/`after` was updated).
-  - **Note**: Investigated CLI arguments for quality report generation. Current method `lua test.lua --quality <test_file>` works for default HTML. Flags like `--quality-format` and `--quality-output` caused issues with the runner's argument parser, and default config may also be trying to generate unsupported formats (lcov/cobertura) for quality reports. This needs future clarification for optimal CLI usage but does not block the current feature. For now, rely on default HTML report generation or configure via `.firmo-config.lua`.
+  - **Note**: Investigated CLI arguments for quality report generation. Current method `lua firmo.lua --quality <test_file>` works for default HTML. Flags like `--quality-format` and `--quality-output` caused issues with the runner's argument parser, and default config may also be trying to generate unsupported formats (lcov/cobertura) for quality reports. This needs future clarification for optimal CLI usage but does not block the current feature. For now, rely on default HTML report generation or configure via `.firmo-config.lua`.
 
 _(Steps 6-9 relate to new UI/UX enhancements requested on 2025-05-09)_
 

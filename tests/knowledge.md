@@ -23,19 +23,19 @@ Tests are executed from the project's root directory using the main `test.lua` s
 
 ```bash
 # Run ALL tests within the tests/ directory
-lua test.lua tests/
+lua firmo.lua tests/
 
 # Run only the tests for a specific component (e.g., core)
-lua test.lua tests/core/
+lua firmo.lua tests/core/
 
 # Run only a single test file
-lua test.lua tests/core/config_test.lua
+lua firmo.lua tests/core/config_test.lua
 
 # Run tests with specific Firmo options (e.g., coverage collection, verbose output)
-lua test.lua --coverage --verbose tests/
+lua firmo.lua --coverage --verbose tests/
 
 # Run only tests whose describe/it block name matches a pattern
-lua test.lua --pattern "discovery" tests/
+lua firmo.lua --pattern "discovery" tests/
 ```
 
 ## Related Components / Modules (Directory Index)
@@ -76,7 +76,7 @@ When writing or maintaining tests for Firmo:
     - **Test Logic Errors:** An incorrect assertion, flawed setup/teardown logic, or misunderstanding of the feature being tested.
     - **Environment Issues:** Problems external to the code, such as missing dependencies (e.g., failed LPegLabel build), incorrect file permissions, or unexpected interactions if tests are not properly isolated.
 - **Debugging Steps:**
-    1.  **Isolate:** Run the specific failing test file or even a specific `it` block using pattern matching (`lua test.lua path/to/test.lua --pattern "specific it block name"`) to narrow down the problem.
+    1.  **Isolate:** Run the specific failing test file or even a specific `it` block using pattern matching (`lua firmo.lua path/to/test.lua --pattern "specific it block name"`) to narrow down the problem.
     2.  **Examine Output:** Check the detailed failure message provided by Firmo. Use the `--verbose` flag for more output.
     3.  **Logging:** Add targeted logging statements (`local logger = require("lib.tools.logging").get_logger("debug"); logger.debug("Value:", {myVar = value})`) within the test code or the framework code being tested to trace execution flow and variable states.
     4.  **Inspect Errors:** If testing error conditions, use `test_helper.with_error_capture` and print the structure of the captured error object (`parser.dump(err)`) to understand its properties.

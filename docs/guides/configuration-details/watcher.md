@@ -207,22 +207,22 @@ The watcher integrates directly with the test runner to implement continuous tes
 # Run tests in watch mode
 
 
-lua test.lua --watch tests/
+lua firmo.lua --watch tests/
 
 # Set custom watch interval
 
 
-lua test.lua --watch --watch-interval=0.5 tests/
+lua firmo.lua --watch --watch-interval=0.5 tests/
 
 # Exclude specific patterns
 
 
-lua test.lua --watch --exclude="node_modules,%.git" tests/
+lua firmo.lua --watch --exclude="node_modules,%.git" tests/
 
 # Set debounce time
 
 
-lua test.lua --watch --debounce=1.0 tests/
+lua firmo.lua --watch --debounce=1.0 tests/
 ```
 
 
@@ -388,7 +388,7 @@ local function watch_files()
       end
 
       -- Run tests
-      os.execute("lua test.lua")
+      os.execute("lua firmo.lua")
     end
 
     -- Sleep for a bit to prevent CPU hogging
@@ -412,32 +412,32 @@ When using the test runner's watch mode, you can configure the watcher through c
 # Basic watch mode
 
 
-lua test.lua --watch tests/
+lua firmo.lua --watch tests/
 
 # Set custom check interval (0.5 seconds)
 
 
-lua test.lua --watch --watch-interval=0.5 tests/
+lua firmo.lua --watch --watch-interval=0.5 tests/
 
 # Set custom debounce time
 
 
-lua test.lua --watch --debounce=1.0 tests/
+lua firmo.lua --watch --debounce=1.0 tests/
 
 # Set custom exclude patterns
 
 
-lua test.lua --watch --exclude="node_modules,%.git,%.vscode" tests/
+lua firmo.lua --watch --exclude="node_modules,%.git,%.vscode" tests/
 
 # Verbose output (show more details about file changes)
 
 
-lua test.lua --watch --verbose tests/
+lua firmo.lua --watch --verbose tests/
 
 # Focus on specific test patterns in watch mode
 
 
-lua test.lua --watch --pattern="database" tests/
+lua firmo.lua --watch --pattern="database" tests/
 ```
 
 

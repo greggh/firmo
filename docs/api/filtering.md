@@ -230,12 +230,12 @@ The `--tags` option allows you to specify tags to filter by, separated by commas
 # Run only tests tagged with "unit"
 
 
-lua test.lua --tags unit
+lua firmo.lua --tags unit
 
 # Run tests tagged with either "fast" or "critical"
 
 
-lua test.lua --tags fast,critical
+lua firmo.lua --tags fast,critical
 ```
 
 
@@ -252,7 +252,7 @@ The `--filter` option allows you to specify a pattern to match against test name
 # Run only tests with "validation" in their name
 
 
-lua test.lua --filter validation
+lua firmo.lua --filter validation
 ```
 
 
@@ -269,7 +269,7 @@ You can combine tag and pattern filters to further narrow the tests that run.
 # Run only "unit" tests with "validation" in their name
 
 
-lua test.lua --tags unit --filter validation
+lua firmo.lua --tags unit --filter validation
 ```
 
 

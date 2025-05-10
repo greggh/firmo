@@ -2,7 +2,7 @@
 ---
 --- This file provides a sample module (`MathUtilities`) and associated tests
 --- specifically designed to illustrate various code coverage scenarios when
---- analyzed by Firmo's coverage tool (`lua test.lua --coverage ...`).
+--- analyzed by Firmo's coverage tool (`lua firmo.lua --coverage ...`).
 ---
 --- It demonstrates how Firmo's coverage reports visualize:
 --- - Fully covered functions (`is_even`, `is_odd`).
@@ -22,7 +22,7 @@
 --- @usage
 --- Run tests with coverage analysis:
 --- ```bash
---- lua test.lua --coverage examples/coverage_example.lua
+--- lua firmo.lua --coverage examples/coverage_example.lua
 --- ```
 --- View the generated HTML report (usually in `coverage-report/index.html`) to see the results.
 
@@ -212,7 +212,7 @@ describe("MathUtilities Module Tests", function()
   after(function()
     -- This runs once after all tests in this describe block finish
     logger.info("\n--- Coverage Example Notes ---")
-    logger.info("Run with: `lua test.lua --coverage examples/coverage_example.lua`")
+    logger.info("Run with: `lua firmo.lua --coverage examples/coverage_example.lua`")
     logger.info("Expected coverage results:")
     logger.info(" - `is_even`, `is_odd`: Should show high/full coverage.")
     logger.info(" - `categorize_number`: Should show partial coverage (missing 'large positive' branch).")

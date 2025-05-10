@@ -154,5 +154,5 @@ end)
 ## Troubleshooting / Common Pitfalls (Optional)
 
 - **Test Failures:** Failures within `tests/core/` usually indicate significant bugs in Firmo's fundamental logic. Debugging requires a good understanding of the specific core component (`lib/core/...`) being tested.
-- **State Leakage:** If tests pass when run individually (`lua test.lua tests/core/specific_test.lua`) but fail when run as part of a larger suite or with other core tests, suspect state leakage between tests. Ensure the module state is correctly reset using `module_reset` or appropriate test lifecycle hooks (`before_each`, `after_each`). Check `module_reset_test.lua` for examples.
+- **State Leakage:** If tests pass when run individually (`lua firmo.lua tests/core/specific_test.lua`) but fail when run as part of a larger suite or with other core tests, suspect state leakage between tests. Ensure the module state is correctly reset using `module_reset` or appropriate test lifecycle hooks (`before_each`, `after_each`). Check `module_reset_test.lua` for examples.
 - **Configuration Conflicts:** Tests modifying global configuration state might interfere with each other. Ensure configuration changes made within a test are properly reverted using `after_each` or by utilizing module reset for `central_config`.

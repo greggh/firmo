@@ -103,12 +103,12 @@ Pattern filters match against the full test path (all describe blocks plus the t
 # Run tests containing "password" in their name
 
 
-lua test.lua --filter password tests/
+lua firmo.lua --filter password tests/
 
 # Run tests starting with "validates"
 
 
-lua test.lua --filter "^validates" tests/
+lua firmo.lua --filter "^validates" tests/
 ```
 
 
@@ -257,15 +257,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Use --filter to select tests by name pattern
-      - run: lua test.lua tests/ --filter unit
+      - run: lua firmo.lua tests/ --filter unit
 
   integration-tests:
     runs-on: ubuntu-latest
     steps:
       # ... setup ...
-      - run: lua test.lua tests/ --filter integration
+      - run: lua firmo.lua tests/ --filter integration
 ```
-Alternatively, configure each job to use a different entry script or configuration file that applies programmatic tag filtering (`firmo.only_tags(...)`) before running `lua test.lua tests/`.
+Alternatively, configure each job to use a different entry script or configuration file that applies programmatic tag filtering (`firmo.only_tags(...)`) before running `lua firmo.lua tests/`.
 
 
 

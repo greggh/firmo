@@ -367,7 +367,7 @@ To see suppressed errors during debugging:
 # Run tests with debug flag
 
 
-lua test.lua --debug tests/my_module_test.lua
+lua firmo.lua --debug tests/my_module_test.lua
 ```
 
 

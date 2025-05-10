@@ -17,7 +17,7 @@
 -- @see firmo.parallel_async
 -- @see firmo.async
 -- @usage
--- Run embedded tests: lua test.lua examples/parallel_async_example.lua
+-- Run embedded tests: lua firmo.lua examples/parallel_async_example.lua
 --
 
 local logging = require("lib.tools.logging")
@@ -254,7 +254,7 @@ describe("Parallel Async Operations Demo", function()
   logger.info("-- Parallel Async Example --")
   logger.info("This file demonstrates using firmo.parallel_async to run async operations concurrently.")
   logger.info("Run with:")
-  logger.info("  lua test.lua examples/parallel_async_example.lua")
+  logger.info("  lua firmo.lua examples/parallel_async_example.lua")
   logger.info("Key features demonstrated:")
   logger.info("1. Running multiple async operations concurrently")
   logger.info("2. Collecting results from parallel operations")

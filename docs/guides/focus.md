@@ -317,12 +317,12 @@ Focus mode works with the standard test runner:
 # Run all tests, respecting focus settings
 
 
-lua test.lua tests/
+lua firmo.lua tests/
 
 # Run with specific pattern, still respecting focus 
 
 
-lua test.lua --pattern=user tests/
+lua firmo.lua --pattern=user tests/
 ```
 
 
@@ -351,7 +351,7 @@ This runs tests, first filtering by name pattern (`--filter unit`), then applyin
 
 ```bash
 # Only runs focused tests whose name/path contains "unit"
-lua test.lua --filter unit tests/
+lua firmo.lua --filter unit tests/
 ```
 
 
@@ -442,7 +442,7 @@ If no tests are running:
 
    ```bash
    # Your focused test might not have this tag
-   lua test.lua --tags=unit tests/
+   lua firmo.lua --tags=unit tests/
    ```
 
 

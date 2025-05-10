@@ -32,7 +32,7 @@ Enable coverage through the command line:
 
 
 ```bash
-lua test.lua --coverage tests/
+lua firmo.lua --coverage tests/
 ```
 
 
@@ -55,17 +55,17 @@ Specify report formats:
 # Generate HTML report (rich visualization)
 
 
-lua test.lua --coverage --format html tests/
+lua firmo.lua --coverage --format html tests/
 
 # Generate JSON report (machine-readable)
 
 
-lua test.lua --coverage --format json tests/
+lua firmo.lua --coverage --format json tests/
 
 # Generate LCOV report (CI integration)
 
 
-lua test.lua --coverage --format lcov tests/
+lua firmo.lua --coverage --format lcov tests/
 ```
 
 
@@ -151,7 +151,7 @@ Include patterns determine which files to track:
 # Only track files in the src directory
 
 
-lua test.lua --coverage --include "src/**/*.lua" tests/
+lua firmo.lua --coverage --include "src/**/*.lua" tests/
 ```
 
 
@@ -167,7 +167,7 @@ Exclude patterns determine which files to ignore:
 # Ignore vendor files
 
 
-lua test.lua --coverage --exclude "src/vendor/**/*.lua" tests/
+lua firmo.lua --coverage --exclude "src/vendor/**/*.lua" tests/
 ```
 
 
@@ -183,7 +183,7 @@ You can combine include and exclude patterns:
 # Track src files except for vendor files
 
 
-lua test.lua --coverage --include "src/**/*.lua" --exclude "src/vendor/**/*.lua" tests/
+lua firmo.lua --coverage --include "src/**/*.lua" --exclude "src/vendor/**/*.lua" tests/
 ```
 
 
@@ -199,7 +199,7 @@ Set minimum coverage requirements:
 # Require at least 80% coverage
 
 
-lua test.lua --coverage --threshold 80 tests/
+lua firmo.lua --coverage --threshold 80 tests/
 ```
 
 
@@ -225,7 +225,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Run tests with coverage
 
-        run: lua test.lua --coverage --format lcov tests/
+        run: lua firmo.lua --coverage --format lcov tests/
 
 
       - name: Upload coverage report

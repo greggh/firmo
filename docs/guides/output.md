@@ -160,7 +160,7 @@ reporting.configure_formatter("html", {
   highlight_syntax = true       -- Enable syntax highlighting
 })
 -- Run tests, generating an HTML file report (does not change console output)
--- lua test.lua --format=html tests/
+-- lua firmo.lua --format=html tests/
 ```
 
 
@@ -171,13 +171,13 @@ Generate structured report files using the `--format` command-line flag. The out
 
 ```bash
 # Generate an HTML file report (e.g., coverage-reports/coverage-report.html)
-lua test.lua --coverage --format=html tests/
+lua firmo.lua --coverage --format=html tests/
 
 # Generate a JSON file report (e.g., coverage-reports/test-results.json)
-lua test.lua --format=json tests/
+lua firmo.lua --format=json tests/
 
 # Generate a JUnit XML file report (e.g., coverage-reports/test-results.xml)
-lua test.lua --format=junit tests/
+lua firmo.lua --format=junit tests/
 ```
 See the [Reporting Guide](./reporting.md) for more details on available report formats and configuration.
 
@@ -197,7 +197,7 @@ firmo.format({ compact = true })
 ```
 Run tests as usual:
 ```bash
-lua test.lua tests/
+lua firmo.lua tests/
 ```
 
 
@@ -209,7 +209,7 @@ For CI systems, you typically want standard console output (potentially disablin
 ```bash
 # Run tests and generate JUnit XML report file
 export NO_COLOR=1 # Optional: Disable console colors
-lua test.lua --format=junit tests/
+lua firmo.lua --format=junit tests/
 ```
 You can configure programmatic options like `summary_only` via central config if desired for CI runs.
 
@@ -244,12 +244,12 @@ Different formats serve different purposes:
 # Quick feedback in terminal
 
 
-lua test.lua --format compact tests/
+lua firmo.lua --format compact tests/
 
 # Generate comprehensive HTML report
 
 
-lua test.lua --format html --output-file coverage-report.html tests/
+lua firmo.lua --format html --output-file coverage-report.html tests/
 ```
 
 

@@ -59,10 +59,10 @@ The visibility and format of stack traces depend more on the error handling and 
 
 ```bash
 # Generate a JUnit XML report file (does NOT change console output)
-lua test.lua --format=junit tests/
+lua firmo.lua --format=junit tests/
 
 # Generate an HTML coverage report (does NOT change console output)
-lua test.lua --coverage --format=html tests/
+lua firmo.lua --coverage --format=html tests/
 ```
 
 See `docs/api/reporting.md` for details on available reporting formats.

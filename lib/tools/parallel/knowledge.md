@@ -47,30 +47,30 @@ The primary way to use this module is through the command line:
 
 ```bash
 # Run all tests in ./tests using default parallel settings (4 workers)
-lua test.lua --parallel
+lua firmo.lua --parallel
 # or shorthand:
-lua test.lua -p
+lua firmo.lua -p
 ```
 
 ### Pattern 2: Specifying Worker Count and Fail Fast
 
 ```bash
 # Run tests using 8 worker processes and stop immediately on the first failure
-lua test.lua --parallel --workers 8 --fail-fast
+lua firmo.lua --parallel --workers 8 --fail-fast
 # or shorthand:
-lua test.lua -p -w 8 --fail-fast
+lua firmo.lua -p -w 8 --fail-fast
 ```
 
 ### Pattern 3: Parallel Run with Coverage
 
 ```bash
 # Run tests in parallel and attempt to aggregate coverage data
-lua test.lua --parallel --coverage tests/unit/
+lua firmo.lua --parallel --coverage tests/unit/
 # or shorthand:
-lua test.lua -p -c tests/unit/
+lua firmo.lua -p -c tests/unit/
 
 # Run parallel coverage but disable aggregation (useful if aggregation fails)
-lua test.lua -p -c --no-aggregate-coverage
+lua firmo.lua -p -c --no-aggregate-coverage
 ```
 
 ### Pattern 4: Programmatic Use (Less Common)
@@ -129,7 +129,7 @@ end
 
 ## Best Practices / Critical Rules (Optional)
 
-- **Use via CLI:** The most robust and intended way to use parallel execution is via the main script: `lua test.lua --parallel [options]`. Programmatic use requires more careful setup.
+- **Use via CLI:** The most robust and intended way to use parallel execution is via the main script: `lua firmo.lua --parallel [options]`. Programmatic use requires more careful setup.
 - **Tune Worker Count (`--workers`):** The optimal number of workers depends heavily on the number of CPU cores, the nature of the tests (CPU-bound vs I/O-bound), and system resources. Start with a number close to the physical core count and experiment. Too many workers can decrease performance due to context switching and resource contention.
 - **Understand Overhead:** Creating separate processes for each test file introduces overhead. Parallel mode is most likely to provide speed benefits for:
     - Test suites with a large number of files.
@@ -149,7 +149,7 @@ end
 - **Debugging Worker Failures:** If a test fails only in parallel mode:
     - Use `--show-worker-output` to see if the worker printed any specific errors.
     - Use `--fail-fast` to stop after the first failure.
-    - Try running the specific failing file non-parallelly (`lua test.lua <failing_file>`) to see if the error is reproducible.
+    - Try running the specific failing file non-parallelly (`lua firmo.lua <failing_file>`) to see if the error is reproducible.
     - Suspect potential state isolation issues or race conditions if the failure only occurs randomly during parallel runs.
 - **Resource Contention:** If the system becomes slow or unresponsive during parallel runs, try reducing the number of workers (`--workers <num>`).
 - **Unimplemented Features:** Do not attempt to use functions like `cancel_all`, `monitor_process`, etc., as they are not implemented.

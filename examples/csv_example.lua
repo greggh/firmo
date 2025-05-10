@@ -22,7 +22,7 @@
 --- @usage
 --- Run the embedded tests (which generate the reports):
 --- ```bash
---- lua test.lua examples/csv_example.lua
+--- lua firmo.lua examples/csv_example.lua
 --- ```
 --- The generated CSV files will be placed in a temporary directory (path logged to console) and cleaned up afterward.
 

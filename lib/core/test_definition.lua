@@ -137,7 +137,6 @@ local function get_logger()
   }
 end
 
-
 local temp_file = try_require("lib.tools.filesystem.temp_file")
 
 --- Merges a user-provided options table with a defaults table.
@@ -325,7 +324,9 @@ function M.describe(name, fn, options)
     if quality_module.start_describe then -- Check if function exists
       quality_module.start_describe(name)
     else
-      get_logger().warn("quality_module.start_describe function not found, describe block tracking disabled for this call.")
+      get_logger().warn(
+        "quality_module.start_describe function not found, describe block tracking disabled for this call."
+      )
     end
   end
 
@@ -390,7 +391,9 @@ function M.describe(name, fn, options)
     if quality_module.end_describe then -- Check if function exists
       quality_module.end_describe()
     else
-      get_logger().warn("quality_module.end_describe function not found, describe block tracking disabled for this call.")
+      get_logger().warn(
+        "quality_module.end_describe function not found, describe block tracking disabled for this call."
+      )
     end
   end
 end
@@ -642,7 +645,10 @@ function M.it(name, options_or_fn, fn)
       nesting_level = describe_depth + 1, -- +1 for the 'it' block itself
       -- has_before_after could also be passed if M.before/M.after set a flag in current_describe_block
     }
-    get_logger().trace("Calling quality_module.start_test", { test_name = full_test_name_for_quality, context = quality_context })
+    get_logger().trace(
+      "Calling quality_module.start_test",
+      { test_name = full_test_name_for_quality, context = quality_context }
+    )
     quality_module.start_test(full_test_name_for_quality, quality_context)
   end
 

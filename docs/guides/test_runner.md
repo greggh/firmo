@@ -28,7 +28,7 @@ To run a single test file:
 
 
 ```bash
-lua test.lua path/to/test_file.lua
+lua firmo.lua path/to/test_file.lua
 ```
 
 
@@ -41,7 +41,7 @@ To run all test files in a directory:
 
 
 ```bash
-lua test.lua path/to/test/directory
+lua firmo.lua path/to/test/directory
 ```
 
 
@@ -54,7 +54,7 @@ To run only tests matching a specific pattern:
 
 
 ```bash
-lua test.lua --pattern=*_unit_test.lua tests/
+lua firmo.lua --pattern=*_unit_test.lua tests/
 ```
 
 This runs only files that match the specified pattern.
@@ -69,7 +69,7 @@ The standard run mode executes tests once and exits with a status code indicatin
 
 
 ```bash
-lua test.lua tests/
+lua firmo.lua tests/
 ```
 
 
@@ -81,7 +81,7 @@ Watch mode continuously monitors your project files and automatically reruns tes
 
 
 ```bash
-lua test.lua --watch tests/
+lua firmo.lua --watch tests/
 ```
 
 
@@ -104,7 +104,7 @@ Enable code coverage tracking to see which lines of code are executed during you
 
 
 ```bash
-lua test.lua --coverage tests/
+lua firmo.lua --coverage tests/
 ```
 
 
@@ -117,7 +117,7 @@ For more detailed test output:
 
 
 ```bash
-lua test.lua --verbose tests/
+lua firmo.lua --verbose tests/
 ```
 
 
@@ -130,7 +130,7 @@ Specify where to save test reports:
 
 
 ```bash
-lua test.lua --coverage --report-dir=my-reports tests/
+lua firmo.lua --coverage --report-dir=my-reports tests/
 ```
 
 
@@ -142,7 +142,7 @@ Enable quality validation to analyze test completeness:
 
 
 ```bash
-lua test.lua --quality --quality-level=3 tests/
+lua firmo.lua --quality --quality-level=3 tests/
 ```
 
 
@@ -155,7 +155,7 @@ Run tests in parallel for faster execution:
 
 
 ```bash
-lua test.lua --parallel tests/
+lua firmo.lua --parallel tests/
 ```
 
 
@@ -171,7 +171,7 @@ Run a subset of test files by specifying multiple paths:
 
 
 ```bash
-lua test.lua tests/unit/module1_test.lua tests/unit/module2_test.lua
+lua firmo.lua tests/unit/module1_test.lua tests/unit/module2_test.lua
 ```
 
 
@@ -183,7 +183,7 @@ Run only tests matching a specific filter:
 
 
 ```bash
-lua test.lua --filter="should handle invalid input" tests/
+lua firmo.lua --filter="should handle invalid input" tests/
 ```
 
 
@@ -196,7 +196,7 @@ Tags can be used to categorize tests (see [Filtering Guide](./filtering.md)), bu
 -- In a setup script or custom runner:
 local firmo = require("firmo")
 firmo.only_tags("unit", "fast")
--- Then run tests: lua test.lua tests/
+-- Then run tests: lua firmo.lua tests/
 ```
 You might also achieve pseudo-tag filtering using the `--filter` flag if your tags are part of the test names.
 This runs only tests tagged with "unit" and "fast".
@@ -234,7 +234,7 @@ Watch mode is particularly useful during development as it provides immediate fe
 You can customize watch mode behavior:
 
 ```bash
-lua test.lua --watch tests/
+lua firmo.lua --watch tests/
 ```
 
 Watch mode behavior (directories, interval, exclusions) is configured programmatically or via central configuration, not directly via command-line flags like `--watch-interval`.
@@ -247,7 +247,7 @@ You can exclude certain files or directories from being watched:
 
 
 ```bash
-lua test.lua --watch --exclude="%.git" --exclude="node_modules" tests/
+lua firmo.lua --watch --exclude="%.git" --exclude="node_modules" tests/
 ```
 
 
@@ -265,7 +265,7 @@ Enable basic coverage tracking:
 
 
 ```bash
-lua test.lua --coverage tests/
+lua firmo.lua --coverage tests/
 ```
 
 
@@ -278,7 +278,7 @@ You can customize coverage tracking behavior:
 
 
 ```bash
-lua test.lua --coverage --coverage-debug tests/
+lua firmo.lua --coverage --coverage-debug tests/
 ```
 
 This enables:
@@ -371,17 +371,17 @@ Then run specific test categories as needed:
 # Run just unit tests
 
 
-lua test.lua tests/unit/
+lua firmo.lua tests/unit/
 
 # Run integration tests with coverage
 
 
-lua test.lua --coverage tests/integration/
+lua firmo.lua --coverage tests/integration/
 
 # Run performance tests with specific options
 
 
-lua test.lua --timeout=30000 tests/performance/
+lua firmo.lua --timeout=30000 tests/performance/
 ```
 
 
@@ -432,14 +432,14 @@ Create environment-specific test configurations, potentially using `--filter` or
 
 ```bash
 # Development environment tests (filter by name)
-lua test.lua --filter dev tests/
+lua firmo.lua --filter dev tests/
 
 # Production environment tests (filter by name)
-lua test.lua --filter prod tests/
+lua firmo.lua --filter prod tests/
 
 # CI environment tests (using a different directory or config)
 # Assumes unit tests are separated or tagged programmatically
-lua test.lua tests/unit --coverage --report-dir=reports
+lua firmo.lua tests/unit --coverage --report-dir=reports
 ```
 
 
@@ -449,7 +449,7 @@ lua test.lua tests/unit --coverage --report-dir=reports
 
 
 1. Write a failing test
-2. Start watch mode: `lua test.lua --watch tests/`
+2. Start watch mode: `lua firmo.lua --watch tests/`
 3. Implement the code until the test passes
 4. Refactor while keeping tests green
 5. Repeat for the next feature
@@ -460,7 +460,7 @@ Watch mode provides immediate feedback during this cycle.
 
 
 
-1. Run tests with coverage: `lua test.lua --coverage tests/`
+1. Run tests with coverage: `lua firmo.lua --coverage tests/`
 2. Identify untested code paths in the coverage report
 3. Write tests for those paths
 4. Rerun with coverage to confirm improvement
@@ -474,7 +474,7 @@ In your CI pipeline, run tests with comprehensive validation:
 
 
 ```bash
-lua test.lua --coverage --quality --parallel tests/
+lua firmo.lua --coverage --quality --parallel tests/
 ```
 
 
@@ -549,32 +549,32 @@ Set up the CI to fail if tests fail or coverage falls below a threshold.
 # Run all tests
 
 
-lua test.lua tests/
+lua firmo.lua tests/
 
 # Run a specific test file
 
 
-lua test.lua tests/unit/module_test.lua
+lua firmo.lua tests/unit/module_test.lua
 
 # Run with coverage
 
 
-lua test.lua --coverage tests/
+lua firmo.lua --coverage tests/
 
 # Run with custom pattern
 
 
-lua test.lua --pattern="*_spec.lua" tests/
+lua firmo.lua --pattern="*_spec.lua" tests/
 
 # Run in watch mode
 
 
-lua test.lua --watch tests/
+lua firmo.lua --watch tests/
 
 # Run with multiple options
 
 
-lua test.lua --coverage --verbose --report-dir=reports tests/
+lua firmo.lua --coverage --verbose --report-dir=reports tests/
 ```
 
 
@@ -586,17 +586,17 @@ lua test.lua --coverage --verbose --report-dir=reports tests/
 ```makefile
 .PHONY: test test-unit test-integration test-coverage
 test:
-	lua test.lua tests/
+	lua firmo.lua tests/
 test-unit:
-	lua test.lua tests/unit/
+	lua firmo.lua tests/unit/
 test-integration:
-	lua test.lua tests/integration/
+	lua firmo.lua tests/integration/
 test-coverage:
-	lua test.lua --coverage --report-dir=coverage-reports tests/
+	lua firmo.lua --coverage --report-dir=coverage-reports tests/
 test-watch:
-	lua test.lua --watch tests/
+	lua firmo.lua --watch tests/
 ci-test:
-	lua test.lua --coverage --parallel --report-dir=reports tests/
+	lua firmo.lua --coverage --parallel --report-dir=reports tests/
 ```
 
 

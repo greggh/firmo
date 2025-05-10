@@ -12,13 +12,13 @@ testing
 
 ### Testing Commands
 
-**NEVER RUN ALL TESTS AT ONCE** (e.g., using `lua test.lua tests/`). This policy is in place to encourage targeted testing and prevent excessively long test runs during development. The conflicting example command has been removed from CLAUDE.md to maintain consistency.
+**NEVER RUN ALL TESTS AT ONCE** (e.g., using `lua firmo.lua tests/`). This policy is in place to encourage targeted testing and prevent excessively long test runs during development. The conflicting example command has been removed from CLAUDE.md to maintain consistency.
 
-- Run Specific Test: `lua test.lua tests/reporting_test.lua`
-- Run Tests by Pattern: `lua test.lua --pattern=coverage tests/`
-- Run Tests with Coverage: `lua test.lua --coverage tests/`
-- Run Tests with Watch Mode: `lua test.lua --watch tests/`
-- Run Tests with Quality Validation: `lua test.lua --quality tests/`
+- Run Specific Test: `lua firmo.lua tests/reporting_test.lua`
+- Run Tests by Pattern: `lua firmo.lua --pattern=coverage tests/`
+- Run Tests with Coverage: `lua firmo.lua --coverage tests/`
+- Run Tests with Watch Mode: `lua firmo.lua --watch tests/`
+- Run Tests with Quality Validation: `lua firmo.lua --quality tests/`
 - Run Example: `lua examples/report_example.lua`
 
 

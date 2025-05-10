@@ -545,7 +545,7 @@ echo "Codefix check passed."
 
 # Optionally, run quick unit tests
 # echo "Running unit tests..."
-# lua test.lua tests/ --filter unit
+# lua firmo.lua tests/ --filter unit
 # test_exit_code=$?
 # if [ $test_exit_code -ne 0 ]; then
 #   echo "Unit tests failed. Please fix tests before committing."

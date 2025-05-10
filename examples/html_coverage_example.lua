@@ -2,7 +2,7 @@
 --- specifically designed to demonstrate how different code execution states are
 -- visualized in Firmo's HTML coverage reports.
 --
--- Running this file with `lua test.lua --coverage --format=html ...` will generate
+-- Running this file with `lua firmo.lua --coverage --format=html ...` will generate
 -- an HTML report clearly showing:
 --   1. **Covered code (green):** Code executed and validated by assertions.
 --   2. **Executed-but-not-covered code (yellow):** Code executed during tests but not validated by assertions.
@@ -18,7 +18,7 @@
 -- @see lib.coverage
 -- @see lib.reporting.formatters.html
 -- @usage
--- Run embedded tests: lua test.lua --coverage --format=html examples/html_coverage_example.lua
+-- Run embedded tests: lua firmo.lua --coverage --format=html examples/html_coverage_example.lua
 --
 
 -- Extract the testing functions we need
@@ -126,7 +126,7 @@ end)
 -- Display instructions
 logger.info("\nRunning this example with the coverage flag will generate an HTML report.")
 logger.info("Execute the following command to see the HTML coverage report:")
-logger.info("\n  lua test.lua --coverage --format=html examples/html_coverage_example.lua\n")
+logger.info("\n  lua firmo.lua --coverage --format=html examples/html_coverage_example.lua\n")
 logger.info("The HTML report will show:")
 logger.info("1. add function: Covered (green) - executed and validated by tests")
 logger.info("2. subtract function: Executed-but-not-covered (yellow) - executed but not validated")

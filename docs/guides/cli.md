@@ -19,7 +19,7 @@ To run all tests in your project:
 
 
 ```bash
-lua test.lua tests/
+lua firmo.lua tests/
 ```
 
 
@@ -32,7 +32,7 @@ You can run specific test files directly:
 
 
 ```bash
-lua test.lua tests/unit/calculator_test.lua
+lua firmo.lua tests/unit/calculator_test.lua
 ```
 
 
@@ -40,7 +40,7 @@ Or use wildcard patterns with your shell:
 
 
 ```bash
-lua test.lua tests/unit/*_test.lua
+lua firmo.lua tests/unit/*_test.lua
 ```
 
 
@@ -52,14 +52,14 @@ To see all available options:
 
 
 ```bash
-lua test.lua --help
+lua firmo.lua --help
 ```
 
 
 
 ## Command Line Options
 
-The `lua test.lua` command accepts various options to control test discovery, execution, and reporting. Options parsed by `scripts/runner.lua`:
+The `lua firmo.lua` command accepts various options to control test discovery, execution, and reporting. Options parsed by `scripts/runner.lua`:
 
 | Option                     | Alias | Description                                                              |
 |----------------------------|-------|--------------------------------------------------------------------------|
@@ -93,15 +93,15 @@ You can filter tests based on their names (including `describe` block names) usi
 
 ```bash
 # Run tests with "validate" in their name
-lua test.lua --filter validate tests/
+lua firmo.lua --filter validate tests/
 
 # Run tests starting with "should"
-lua test.lua --filter "^should" tests/
+lua firmo.lua --filter "^should" tests/
 ```
 
 Filtering by tags directly via the command line (`--tags`) is **not** currently supported. To run specific tag groups in CI, you might:
 - Use `--filter` if your tags are reflected in test names (less precise).
-- Set up separate CI jobs/steps that configure Firmo programmatically using `firmo.only_tags(...)` before running `lua test.lua tests/`.
+- Set up separate CI jobs/steps that configure Firmo programmatically using `firmo.only_tags(...)` before running `lua firmo.lua tests/`.
 
 ## Console Output
 
@@ -132,7 +132,7 @@ Watch mode automatically re-runs tests when files change, providing immediate fe
 # Run tests in watch mode
 
 
-lua test.lua --watch tests/
+lua firmo.lua --watch tests/
 ```
 
 
@@ -146,10 +146,10 @@ lua test.lua --watch tests/
 # Watch specific test file
 
 
-lua test.lua --watch tests/unit/calculator_test.lua
+lua firmo.lua --watch tests/unit/calculator_test.lua
 
 # Watch with a name filter
-lua test.lua --watch --filter unit tests/
+lua firmo.lua --watch --filter unit tests/
 ```
 
 
@@ -175,7 +175,7 @@ Interactive mode provides a command shell for running tests with more control:
 # Start interactive mode
 
 
-lua test.lua --interactive
+lua firmo.lua --interactive
 ```
 
 
@@ -202,7 +202,7 @@ A typical interactive session might look like:
 
 
 ```text
-$ lua test.lua --interactive
+$ lua firmo.lua --interactive
 Firmo Interactive CLI
 Type 'help' for available commands
 -------------------------------
@@ -242,10 +242,10 @@ Firmo can track code coverage during test runs:
 # Run tests with coverage tracking
 
 
-lua test.lua --coverage tests/
+lua firmo.lua --coverage tests/
 
 # Specify the report file format for coverage report (e.g., HTML)
-lua test.lua --coverage --format=html tests/
+lua firmo.lua --coverage --format=html tests/
 ```
 
 Coverage reports are saved to the `coverage-reports` directory by default.
@@ -261,12 +261,12 @@ Firmo can validate the quality of your tests:
 # Run with quality validation
 
 
-lua test.lua --quality tests/
+lua firmo.lua --quality tests/
 
 # Set quality validation level (1-3)
 
 
-lua test.lua --quality --quality-level 2 tests/
+lua firmo.lua --quality --quality-level 2 tests/
 ```
 
 
@@ -280,7 +280,7 @@ For CI environments, you might want to disable colors and set appropriate format
 ```bash
 
 # Example CI command, potentially generating a JUnit report file
-lua test.lua tests/ --format=junit
+lua firmo.lua tests/ --format=junit
 ```
 (Note: `--no-color` and `--format plain` for console are not implemented flags)
 
@@ -310,12 +310,12 @@ jobs:
 
         # Use --filter to select tests based on name pattern
         # Use --format=junit if JUnit report generation is configured
-        run: lua test.lua tests/ --filter unit --format=junit
+        run: lua firmo.lua tests/ --filter unit --format=junit
 
       - name: Run integration tests
 
         # Use --filter to select tests based on name pattern
-        run: lua test.lua tests/ --filter integration --format=junit
+        run: lua firmo.lua tests/ --filter integration --format=junit
 ```
 
 
@@ -332,7 +332,7 @@ You can use environment variables with the CLI:
 ```bash
 
 # Run tests filtering by name based on environment variable
-TEST_TYPE=unit lua test.lua --filter $TEST_TYPE tests/
+TEST_TYPE=unit lua firmo.lua --filter $TEST_TYPE tests/
 ```
 
 

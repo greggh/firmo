@@ -187,7 +187,7 @@ if arg[0]:match("parallel_execution_example%.lua$") then
 
   logger.info("\nParallel Test Execution Example Complete")
   logger.info("To use parallel execution in your own tests, run:")
-  logger.info("  lua test.lua --parallel --workers 4 tests/")
+  logger.info("  lua firmo.lua --parallel --workers 4 tests/")
 end
 
 -- Cleanup is handled automatically by temp_file registration

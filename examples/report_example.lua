@@ -14,7 +14,7 @@
 --- functions. It does **not** perform actual test execution or coverage collection.
 --- Its purpose is solely to demonstrate generating reports in various formats using
 --- `reporting.format_coverage` and `reporting.auto_save_reports` with mock data.
---- In a real project, coverage data is collected via `lua test.lua --coverage ...`
+--- In a real project, coverage data is collected via `lua firmo.lua --coverage ...`
 --- and reports are generated based on the configuration.
 ---
 --- @module examples.report_example
@@ -27,11 +27,11 @@
 --- @usage
 --- Run embedded tests (coverage is handled internally for demo):
 --- ```bash
---- lua test.lua examples/report_example.lua
+--- lua firmo.lua examples/report_example.lua
 --- ```
 --- Run with runner coverage (results may differ slightly from internal demo):
 --- ```bash
---- lua test.lua --coverage examples/report_example.lua
+--- lua firmo.lua --coverage examples/report_example.lua
 --- ```
 
 -- Extract the testing functions we need

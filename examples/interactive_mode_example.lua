@@ -20,7 +20,7 @@
 --- @usage
 --- Start the interactive runner with this file:
 --- ```bash
---- lua test.lua --interactive examples/interactive_mode_example.lua
+--- lua firmo.lua --interactive examples/interactive_mode_example.lua
 --- ```
 --- Inside the interactive prompt, try commands like:
 --- - `run` or `r` (run all tests)
@@ -141,7 +141,7 @@ end)
 if arg and arg[0] and arg[0]:match("interactive_mode_example%.lua$") then
   logger.info("This file contains tests designed to be run using Firmo's interactive mode.")
   logger.info("Run with:")
-  logger.info("  lua test.lua --interactive examples/interactive_mode_example.lua")
+  logger.info("  lua firmo.lua --interactive examples/interactive_mode_example.lua")
   logger.info(
     "\nOnce in interactive mode, try commands like 'run', 'tags basic', 'focus \"should pass\"', 'watch', 'help', 'quit'."
   )

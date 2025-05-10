@@ -13,11 +13,11 @@
 --- @usage
 --- Run tests in watch mode:
 --- ```bash
---- lua test.lua --watch examples/watch_mode_example.lua
+--- lua firmo.lua --watch examples/watch_mode_example.lua
 --- ```
 --- Or watch a directory:
 --- ```bash
---- lua test.lua --watch examples/
+--- lua firmo.lua --watch examples/
 --- ```
 --- Then, modify and save this file (or others being watched) to see tests re-run.
 
@@ -87,9 +87,9 @@ if arg and arg[0] and arg[0]:match("watch_mode_example%.lua$") then
   logger.info("This file demonstrates the watch mode functionality for continuous testing.")
   logger.info("")
   logger.info("To run with watch mode, use:")
-  logger.info("  lua test.lua --watch examples/watch_mode_example.lua")
+  logger.info("  lua firmo.lua --watch examples/watch_mode_example.lua")
   logger.info("Or watch the whole directory:")
-  logger.info("  lua test.lua --watch examples/")
+  logger.info("  lua firmo.lua --watch examples/")
   logger.info("\nWatch mode will:")
   logger.info("1. Run the initial tests.")
   logger.info("2. Watch for changes to Lua files.")

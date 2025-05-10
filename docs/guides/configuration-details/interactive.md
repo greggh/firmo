@@ -242,22 +242,22 @@ Launch interactive mode from the command line:
 # Start interactive mode
 
 
-lua test.lua --interactive
+lua firmo.lua --interactive
 
 # Start with custom test directory
 
 
-lua test.lua --interactive --dir=custom/tests
+lua firmo.lua --interactive --dir=custom/tests
 
 # Start with watch mode enabled
 
 
-lua test.lua --interactive --watch
+lua firmo.lua --interactive --watch
 
 # Start with specific watch directories
 
 
-lua test.lua --interactive --watch --watch-dirs=src,tests
+lua firmo.lua --interactive --watch --watch-dirs=src,tests
 ```
 
 

@@ -276,7 +276,7 @@ else
 end
 
 logger.info("\nUsage with command line (hypothetical):")
-logger.info("lua test.lua --load-formatters examples/custom_formatters_example.lua --format=markdown")
+logger.info("lua firmo.lua --load-formatters examples/custom_formatters_example.lua --format=markdown")
 
 -- Cleanup is handled automatically by temp_file registration
 

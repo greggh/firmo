@@ -412,17 +412,17 @@ The quality module is integrated with the test runner by default:
 # Run tests with quality validation
 
 
-lua test.lua --quality --quality-level=3 tests/
+lua firmo.lua --quality --quality-level=3 tests/
 
 # Run with quality and generate reports
 
 
-lua test.lua --quality --quality-level=3 --report-dir=./reports tests/
+lua firmo.lua --quality --quality-level=3 --report-dir=./reports tests/
 
 # Run with both quality and coverage
 
 
-lua test.lua --quality --coverage tests/
+lua firmo.lua --quality --coverage tests/
 ```
 
 

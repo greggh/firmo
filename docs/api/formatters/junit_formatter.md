@@ -229,7 +229,7 @@ pipeline {
   stages {
     stage('Test') {
       steps {
-        sh 'lua test.lua --format=junit tests/'
+        sh 'lua firmo.lua --format=junit tests/'
       }
     }
   }
@@ -275,7 +275,7 @@ jobs:
 
       - name: Run tests
 
-        run: lua test.lua --format=junit tests/
+        run: lua firmo.lua --format=junit tests/
 
       - name: Publish Test Report
 
@@ -302,7 +302,7 @@ test:
   script:
 
 
-    - lua test.lua --format=junit tests/
+    - lua firmo.lua --format=junit tests/
 
   artifacts:
     when: always
@@ -324,7 +324,7 @@ test:
 steps:
 
 
-- script: lua test.lua --format=junit tests/
+- script: lua firmo.lua --format=junit tests/
 
   displayName: 'Run Tests'
 
@@ -365,7 +365,7 @@ jobs:
       - run:
 
           name: Run tests
-          command: lua test.lua --format=junit tests/
+          command: lua firmo.lua --format=junit tests/
 
 
       - store_test_results:

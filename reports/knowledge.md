@@ -6,7 +6,7 @@ The `reports/` directory, located at the root of the Firmo project, serves as th
 
 ## Key Concepts
 
-- **Default Output Directory:** Firmo's reporting, coverage, and quality modules are configured to save their output files within this `reports/` directory by default. If you run `lua test.lua --coverage --report`, you will typically find the coverage report files inside `reports/coverage/`.
+- **Default Output Directory:** Firmo's reporting, coverage, and quality modules are configured to save their output files within this `reports/` directory by default. If you run `lua firmo.lua --coverage --report`, you will typically find the coverage report files inside `reports/coverage/`.
 - **`.gitignore`:** This directory contains generated artifacts that change frequently and are usually specific to a particular test run. Therefore, it is standard practice and highly recommended to add `/reports/` to the project's `.gitignore` file to prevent these generated files from being accidentally committed to version control.
 - **Configurability:** While `reports/` is the default, the exact output directory and filenames for different report types can be customized in the project's Firmo configuration file (`.firmo-config.lua`). Settings under the `reporting`, `coverage.report`, and `quality.report` sections control where files are saved. If reports are not appearing here, check the configuration.
 - **Subdirectories:** Specific report formatters often create their own subdirectories within `reports/` to keep output organized. Common examples include `reports/coverage/` (for various coverage formats like HTML, JSON, LCOV) or `reports/junit/` (for JUnit XML test results).

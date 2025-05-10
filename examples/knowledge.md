@@ -211,13 +211,13 @@ You can run the example files directly using the Firmo test runner:
 
 ```bash
 # Run single example
-lua test.lua examples/basic_example.lua
+lua firmo.lua examples/basic_example.lua
 
 # Run with coverage
-lua test.lua --coverage examples/coverage_example.lua
+lua firmo.lua --coverage examples/coverage_example.lua
 
 # Run all examples in the directory
-lua test.lua examples/
+lua firmo.lua examples/
 ```
 
 ## Related Components / Modules

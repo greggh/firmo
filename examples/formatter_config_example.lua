@@ -13,7 +13,7 @@
 --- @version 1.0.0
 -- @see lib.core.central_config
 -- @usage
--- Run embedded tests: lua test.lua examples/formatter_config_example.lua
+-- Run embedded tests: lua firmo.lua examples/formatter_config_example.lua
 --
 
 local central_config = require("lib.core.central_config")
@@ -119,7 +119,7 @@ describe("Basic test", function()
 end)
 
 logger.info("\nTo see HTML output with configured light theme, use:")
-logger.info("lua test.lua --format=html examples/formatter_config_example.lua")
+logger.info("lua firmo.lua --format=html examples/formatter_config_example.lua")
 
 logger.info("\nNOTE: Run this example using the standard test runner:")
-logger.info("lua test.lua examples/formatter_config_example.lua")
+logger.info("lua firmo.lua examples/formatter_config_example.lua")

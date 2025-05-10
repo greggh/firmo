@@ -17,7 +17,7 @@
 -- @see lib.reporting.formatters.json
 -- @see lib.tools.json
 -- @usage
--- Run embedded tests (Part 1): lua test.lua examples/json_example.lua
+-- Run embedded tests (Part 1): lua firmo.lua examples/json_example.lua
 -- Run procedural example (Part 2): lua examples/json_example.lua
 --
 

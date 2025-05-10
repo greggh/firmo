@@ -18,7 +18,7 @@
 --- @usage
 --- Run embedded tests:
 --- ```bash
---- lua test.lua examples/async_example.lua
+--- lua firmo.lua examples/async_example.lua
 --- ```
 
 local firmo = require("firmo")

@@ -23,27 +23,27 @@ Note: The CLI functionality is typically accessed via the main `test.lua` script
 # Run all tests in the default directory (./tests)
 
 
-lua test.lua
+lua firmo.lua
 
 # Run tests in a specific directory
 
 
-lua test.lua --dir path/to/tests
+lua firmo.lua --dir path/to/tests
 
 # Run a specific test file
 
 
-lua test.lua path/to/test_file.lua
+lua firmo.lua path/to/test_file.lua
 
 # Run tests in watch mode (continuous testing)
 
 
-lua test.lua --watch
+lua firmo.lua --watch
 
 # Start interactive CLI mode
 
 
-lua test.lua --interactive
+lua firmo.lua --interactive
 ```
 
 
@@ -97,38 +97,38 @@ Note: Watch mode specific settings (directories, interval, exclude patterns) are
 # Run all tests
 
 
-lua test.lua
+lua firmo.lua
 
 # Run a specific test file
 
 
-lua test.lua tests/specific_test.lua
+lua firmo.lua tests/specific_test.lua
 
 # Run tests with custom pattern
 
 
-lua test.lua --dir src --pattern "*_spec.lua"
+lua firmo.lua --dir src --pattern "*_spec.lua"
 
 # Run tests with specific tags
 
 
-lua test.lua --tags unit,fast
+lua firmo.lua --tags unit,fast
 
 # Run tests with coverage and generate HTML report
 
-lua test.lua --coverage --report --report-format=html
+lua firmo.lua --coverage --report --report-format=html
 
 # Run tests in parallel with verbose output
 
-lua test.lua --parallel -v
+lua firmo.lua --parallel -v
 
 # Run tests with quality validation (level 3)
 
-lua test.lua --quality --quality-level=3
+lua firmo.lua --quality --quality-level=3
 
 # Run tests with 'dot' format output
 
-lua test.lua --format=dot
+lua firmo.lua --format=dot
 ```
 
 
@@ -144,11 +144,11 @@ lua test.lua --format=dot
 
 # Basic watch mode
 
-lua test.lua --watch
+lua firmo.lua --watch
 
 # Watch a specific test file
 
-lua test.lua --watch tests/specific_test.lua
+lua firmo.lua --watch tests/specific_test.lua
 ```
 
 
@@ -162,17 +162,17 @@ lua test.lua --watch tests/specific_test.lua
 # Fix code issues in current directory
 
 
-lua test.lua --fix
+lua firmo.lua --fix
 
 # Fix code issues in specific directory (using positional arg)
 
 
-lua test.lua --fix src
+lua firmo.lua --fix src
 
 # Check for issues without fixing (using positional arg)
 
 
-lua test.lua --check src
+lua firmo.lua --check src
 ```
 
 
@@ -267,7 +267,7 @@ TEST_TYPE=${TEST_TYPE:-unit}
 # Run tests with appropriate tags
 
 
-lua test.lua --tags $TEST_TYPE
+lua firmo.lua --tags $TEST_TYPE
 ```
 
 
@@ -289,13 +289,13 @@ You can integrate Firmo with Make for more complex test workflows:
 ```makefile
 .PHONY: test test-unit test-watch
 test:
-	lua test.lua
+	lua firmo.lua
 test-unit:
-	lua test.lua --tags unit
+	lua firmo.lua --tags unit
 test-watch:
-	lua test.lua --watch
+	lua firmo.lua --watch
 test-coverage:
-	lua test.lua --coverage
+	lua firmo.lua --coverage
 ```
 
 
@@ -314,7 +314,7 @@ Interactive mode provides a powerful command-line interface for running tests an
 # Start interactive mode
 
 
-lua test.lua --interactive
+lua firmo.lua --interactive
 ```
 
 
@@ -460,12 +460,12 @@ jobs:
 
     - name: Run unit tests
 
-      run: lua test.lua --tags unit
+      run: lua firmo.lua --tags unit
 
 
     - name: Run integration tests
 
-      run: lua test.lua --tags integration
+      run: lua firmo.lua --tags integration
 ```
 
 

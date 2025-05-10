@@ -18,7 +18,7 @@
 --- @version 1.0.0
 --- @see lib.reporting.formatters.junit
 --- @usage
---- Run this example: lua test.lua examples/junit_example.lua
+--- Run this example: lua firmo.lua examples/junit_example.lua
 
 -- Extract required testing functions
 local firmo = require("firmo")
@@ -203,7 +203,7 @@ describe("JUnit Coverage Formatter Example", function()
     logger.info("\nCI/CD Integration Examples:")
     logger.info("GitHub Actions:\n```yaml")
     logger.info("- name: Run Tests with Coverage")
-    logger.info("  run: lua test.lua --coverage --format=junit tests/")
+    logger.info("  run: lua firmo.lua --coverage --format=junit tests/")
     logger.info("- name: Publish Coverage Report")
     logger.info("  uses: mikepenz/action-junit-report@v3")
     logger.info("  if: always() # Always run")
@@ -215,7 +215,7 @@ describe("JUnit Coverage Formatter Example", function()
     logger.info("coverage:")
     logger.info("  stage: test")
     logger.info("  script:")
-    logger.info("    - lua test.lua --coverage --format=junit tests/")
+    logger.info("    - lua firmo.lua --coverage --format=junit tests/")
     logger.info("  artifacts:")
     logger.info("    reports:")
     logger.info("      junit: junit-coverage-results.xml")
@@ -227,7 +227,7 @@ describe("JUnit Coverage Formatter Example", function()
     logger.info("  stages {")
     logger.info("    stage('Test with Coverage') {")
     logger.info("      steps {")
-    logger.info("        sh 'lua test.lua --coverage --format=junit tests/'")
+    logger.info("        sh 'lua firmo.lua --coverage --format=junit tests/'")
     logger.info("      }")
     logger.info("      post {")
     logger.info("        always {")
@@ -242,7 +242,7 @@ describe("JUnit Coverage Formatter Example", function()
 end)
 
 -- Run this example using:
--- lua test.lua examples/junit_example.lua
+-- lua firmo.lua examples/junit_example.lua
 
 -- Example complete! To learn more about JUnit coverage reports, see: lib/reporting/formatters/junit.lua
 

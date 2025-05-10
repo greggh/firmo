@@ -21,7 +21,7 @@
 --- @usage
 --- Run embedded tests:
 --- ```bash
---- lua test.lua examples/basic_example.lua
+--- lua firmo.lua examples/basic_example.lua
 --- ```
 
 -- Extract the testing functions we need
@@ -168,4 +168,4 @@ describe("Calculator", function()
 end) -- Closes describe("Calculator", ...)
 
 -- NOTE: Run this example using the standard test runner:
--- lua test.lua examples/basic_example.lua
+-- lua firmo.lua examples/basic_example.lua

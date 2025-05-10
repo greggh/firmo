@@ -406,7 +406,7 @@ The TAP formatter integrates seamlessly with the Perl `prove` tool:
 # Generate TAP report
 
 
-lua test.lua --coverage --format=tap tests/ > results.tap
+lua firmo.lua --coverage --format=tap tests/ > results.tap
 
 # Process with prove
 
@@ -448,7 +448,7 @@ pipeline {
   stages {
     stage('Test') {
       steps {
-        sh 'lua test.lua --coverage --format=tap tests/ > coverage-reports/results.tap'
+        sh 'lua firmo.lua --coverage --format=tap tests/ > coverage-reports/results.tap'
       }
     }
   }
@@ -479,7 +479,7 @@ test:
   script:
 
 
-    - lua test.lua --coverage --format=tap tests/ > coverage-reports/results.tap
+    - lua firmo.lua --coverage --format=tap tests/ > coverage-reports/results.tap
 
   artifacts:
     paths:

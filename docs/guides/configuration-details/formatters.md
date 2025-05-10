@@ -420,7 +420,7 @@ You can generate multiple report formats simultaneously using the command line o
 # Generate both HTML and LCOV reports
 
 
-lua test.lua --coverage --format=html,lcov tests/
+lua firmo.lua --coverage --format=html,lcov tests/
 ```
 
 
@@ -571,7 +571,7 @@ To use the LCOV output with the `genhtml` tool:
 # Generate LCOV report
 
 
-lua test.lua --coverage --format=lcov tests/
+lua firmo.lua --coverage --format=lcov tests/
 
 # Generate HTML from LCOV data
 
@@ -592,7 +592,7 @@ For continuous integration, the Cobertura or JUnit formats are often most useful
 # Generate Cobertura report for CI
 
 
-lua test.lua --coverage --format=cobertura tests/
+lua firmo.lua --coverage --format=cobertura tests/
 ```
 
 

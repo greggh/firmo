@@ -12,19 +12,19 @@
 --- Run tests using tags or filters:
 --- ```bash
 --- # Run all tests in this file
---- lua test.lua examples/tagging_example.lua
+--- lua firmo.lua examples/tagging_example.lua
 ---
 --- # Run only tests tagged 'unit'
---- lua test.lua --tags unit examples/tagging_example.lua
+--- lua firmo.lua --tags unit examples/tagging_example.lua
 ---
 --- # Run only tests tagged 'api'
---- lua test.lua --tags api examples/tagging_example.lua
+--- lua firmo.lua --tags api examples/tagging_example.lua
 ---
 --- # Run tests tagged 'unit' but NOT 'error-handling'
---- lua test.lua --tags unit --exclude-tags error-handling examples/tagging_example.lua
+--- lua firmo.lua --tags unit --exclude-tags error-handling examples/tagging_example.lua
 ---
 --- # Run tests with 'calc' in their name (suite or case name)
---- lua test.lua --filter calc examples/tagging_example.lua
+--- lua firmo.lua --filter calc examples/tagging_example.lua
 --- ```
 
 -- Extract the testing functions we need

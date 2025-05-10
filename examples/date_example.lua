@@ -23,7 +23,7 @@
 --- @usage
 --- Run the embedded tests:
 --- ```bash
---- lua test.lua examples/date_example.lua
+--- lua firmo.lua examples/date_example.lua
 --- ```
 
 -- Import necessary modules

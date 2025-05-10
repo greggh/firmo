@@ -45,17 +45,17 @@ The simplest way to use parallel testing is through the command line:
 # Run all tests in parallel with 4 workers
 
 
-lua test.lua --parallel tests/
+lua firmo.lua --parallel tests/
 
 # Specify the number of worker processes
 
 
-lua test.lua --parallel --workers 8 tests/
+lua firmo.lua --parallel --workers 8 tests/
 
 # Run specific test files in parallel
 
 
-lua test.lua --parallel tests/module1_test.lua tests/module2_test.lua
+lua firmo.lua --parallel tests/module1_test.lua tests/module2_test.lua
 ```
 
 
@@ -75,7 +75,7 @@ parallel.configure({
   workers = 8  -- Use 8 worker processes
 })
 -- Alternatively, via command line
--- lua test.lua --parallel --workers 8 tests/
+-- lua firmo.lua --parallel --workers 8 tests/
 ```
 
 
@@ -97,7 +97,7 @@ parallel.configure({
   timeout = 30  -- 30 second timeout per test file
 })
 -- Via command line
--- lua test.lua --parallel --timeout 30 tests/
+-- lua firmo.lua --parallel --timeout 30 tests/
 ```
 
 
@@ -114,8 +114,8 @@ parallel.configure({
   verbose = false             -- Don't show verbose logging
 })
 -- Via command line
--- lua test.lua --parallel --no-worker-output tests/
--- lua test.lua --parallel --verbose-parallel tests/
+-- lua firmo.lua --parallel --no-worker-output tests/
+-- lua firmo.lua --parallel --verbose-parallel tests/
 ```
 
 
@@ -131,7 +131,7 @@ parallel.configure({
   fail_fast = true  -- Stop testing on first failure
 })
 -- Via command line
--- lua test.lua --parallel --fail-fast tests/
+-- lua firmo.lua --parallel --fail-fast tests/
 ```
 
 
@@ -147,8 +147,8 @@ parallel.configure({
   aggregate_coverage = true  -- Combine coverage data from all workers
 })
 -- Via command line
--- lua test.lua --parallel --coverage tests/
--- lua test.lua --parallel --no-aggregate-coverage --coverage tests/
+-- lua firmo.lua --parallel --coverage tests/
+-- lua firmo.lua --parallel --no-aggregate-coverage --coverage tests/
 ```
 
 
@@ -339,7 +339,7 @@ Via command line:
 
 
 ```bash
-lua test.lua --parallel --verbose-parallel --workers 2 tests/
+lua firmo.lua --parallel --verbose-parallel --workers 2 tests/
 ```
 
 

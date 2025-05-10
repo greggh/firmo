@@ -11,7 +11,7 @@
 --- @version 1.0.0
 -- @see lib.reporting.formatters.json
 -- @usage
--- Run with JSON output: lua test.lua --format=json examples/json_output_example.lua
+-- Run with JSON output: lua firmo.lua --format=json examples/json_output_example.lua
 --
 
 local logging = require("lib.tools.logging")
@@ -74,7 +74,7 @@ end)
 logger.info("\n-- JSON Output Example --")
 logger.info("This file demonstrates tests with different outcomes (pass, fail, skip).")
 logger.info("Run with the JSON results formatter to see the output structure:")
-logger.info("  lua test.lua --format=json examples/json_output_example.lua")
+logger.info("  lua firmo.lua --format=json examples/json_output_example.lua")
 logger.info(
   "(Note: The '--format' flag controls the *final* report format, not the inter-process format used by parallel execution, which is typically JSON internally.)"
 )

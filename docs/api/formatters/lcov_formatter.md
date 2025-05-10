@@ -162,7 +162,7 @@ The LCOV formatter integrates seamlessly with the standard `genhtml` tool:
 # Generate LCOV report
 
 
-lua test.lua --coverage --format=lcov tests/
+lua firmo.lua --coverage --format=lcov tests/
 
 # Generate HTML from LCOV data using genhtml
 
@@ -294,7 +294,7 @@ jobs:
 
       - name: Run tests with coverage
 
-        run: lua test.lua --coverage --format=lcov tests/
+        run: lua firmo.lua --coverage --format=lcov tests/
 
       - name: Coveralls
 
@@ -319,7 +319,7 @@ test:
   script:
 
 
-    - lua test.lua --coverage --format=lcov tests/
+    - lua firmo.lua --coverage --format=lcov tests/
 
   artifacts:
     paths:
@@ -347,7 +347,7 @@ pipeline {
   stages {
     stage('Test') {
       steps {
-        sh 'lua test.lua --coverage --format=lcov tests/'
+        sh 'lua firmo.lua --coverage --format=lcov tests/'
       }
     }
   }

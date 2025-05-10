@@ -16,7 +16,7 @@
 --- @usage
 --- To see watch mode in action with async tests, run:
 --- ```bash
---- lua test.lua --watch examples/async_watch_example.lua
+--- lua firmo.lua --watch examples/async_watch_example.lua
 --- ```
 --- Then, try modifying and saving this file to see the tests re-run automatically.
 
@@ -110,7 +110,7 @@ if arg and arg[0] and arg[0]:match("async_watch_example%.lua$") then
   print("This file demonstrates async testing with watch mode for continuous testing.")
   print("")
   print("To run with watch mode, use:")
-  print("  lua test.lua --watch examples/async_watch_example.lua")
+  print("  lua firmo.lua --watch examples/async_watch_example.lua")
   print("")
   print("Watch mode with async will:")
   print("1. Run the async tests in this file.")

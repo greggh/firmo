@@ -25,7 +25,7 @@ The main entry point for running tests is the `test.lua` file at the project roo
 
 
 ```bash
-lua test.lua [options] [path]
+lua firmo.lua [options] [path]
 ```
 
 
@@ -520,7 +520,7 @@ The test runner can automatically initialize and manage code coverage:
 
 ```lua
 -- Run tests with coverage from command line
-lua test.lua --coverage tests/
+lua firmo.lua --coverage tests/
 -- Or programmatically
 local runner = require("lib.core.runner")
 runner.configure({ coverage = true })
@@ -567,7 +567,7 @@ The test runner can be invoked from the command line with various options:
 
 
 ```bash
-lua test.lua [options] [path]
+lua firmo.lua [options] [path]
 ```
 
 

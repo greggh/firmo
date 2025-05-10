@@ -12,7 +12,7 @@
 -- @see firmo
 -- @see lib.mocking
 -- @usage
--- Run embedded tests: lua test.lua examples/mock_sequence_example.lua
+-- Run embedded tests: lua firmo.lua examples/mock_sequence_example.lua
 --
 
 -- Extract the testing functions we need

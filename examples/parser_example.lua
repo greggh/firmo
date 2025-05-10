@@ -21,7 +21,7 @@
 --- @usage
 --- Run the embedded tests:
 --- ```bash
---- lua test.lua examples/parser_example.lua
+--- lua firmo.lua examples/parser_example.lua
 --- ```
 
 -- Import necessary modules

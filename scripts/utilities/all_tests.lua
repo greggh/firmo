@@ -5,7 +5,7 @@
 --- It is primarily used for running the complete test suite in CI or development.
 ---
 --- Usage: Pass this file path to the Firmo test runner.
---- Example: lua test.lua scripts/utilities/all_tests.lua
+--- Example: lua firmo.lua scripts/utilities/all_tests.lua
 ---
 --- @author Firmo Team
 --- @version 1.0.0

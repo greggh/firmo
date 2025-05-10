@@ -21,7 +21,7 @@
 --- @usage
 --- Run embedded tests:
 --- ```bash
---- lua test.lua examples/async_focus_skip.lua
+--- lua firmo.lua examples/async_focus_skip.lua
 --- ```
 --- To test focus, uncomment the `fdescribe_async` or `fit_async` blocks in the file before running.
 

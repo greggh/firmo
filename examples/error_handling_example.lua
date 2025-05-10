@@ -18,7 +18,7 @@
 -- @see lib.tools.error_handler
 -- @see lib.tools.test_helper
 -- @usage
--- Run embedded tests: lua test.lua examples/error_handling_example.lua
+-- Run embedded tests: lua firmo.lua examples/error_handling_example.lua
 --
 
 -- Import the required modules
@@ -584,7 +584,7 @@ describe("User Validation", function()
   end)
 end)
 
--- logger.info("Run the tests with: lua test.lua examples/error_handling_example.lua\n")
+-- logger.info("Run the tests with: lua firmo.lua examples/error_handling_example.lua\n")
 
 -- PART 6: Best Practices
 -- logger.info("\nPART 6: Error Handling Best Practices\n")

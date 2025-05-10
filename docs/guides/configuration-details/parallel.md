@@ -100,37 +100,37 @@ The parallel execution module integrates with Firmo's command-line interface:
 # Basic parallel execution
 
 
-lua test.lua --parallel tests/
+lua firmo.lua --parallel tests/
 
 # Set number of workers
 
 
-lua test.lua --parallel --workers 6 tests/
+lua firmo.lua --parallel --workers 6 tests/
 
 # Set timeout per file
 
 
-lua test.lua --parallel --timeout 120 tests/
+lua firmo.lua --parallel --timeout 120 tests/
 
 # Enable verbose output
 
 
-lua test.lua --parallel --verbose-parallel tests/
+lua firmo.lua --parallel --verbose-parallel tests/
 
 # Hide worker output
 
 
-lua test.lua --parallel --no-worker-output tests/
+lua firmo.lua --parallel --no-worker-output tests/
 
 # Stop on first failure
 
 
-lua test.lua --parallel --fail-fast tests/
+lua firmo.lua --parallel --fail-fast tests/
 
 # Don't combine coverage data
 
 
-lua test.lua --parallel --no-aggregate-coverage tests/
+lua firmo.lua --parallel --no-aggregate-coverage tests/
 ```
 
 
@@ -280,7 +280,7 @@ return {
   }
 }
 -- Via command line
--- lua test.lua --parallel --fail-fast tests/
+-- lua firmo.lua --parallel --fail-fast tests/
 ```
 
 
