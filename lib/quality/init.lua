@@ -57,18 +57,27 @@ local function try_require(module_name)
   end
   return r
 end
+
+--- Get the filesystem module with lazy loading to avoid circular dependencies
+---@return table|nil The filesystem module or nil if not available
 local function get_fs()
   if not _fs then
     _fs = try_require("lib.tools.filesystem")
   end
   return _fs
 end
+
+--- Get the logging module with lazy loading to avoid circular dependencies
+---@return table|nil The logging module or nil if not available
 local function get_logging()
   if not _logging then
     _logging = try_require("lib.tools.logging")
   end
   return _logging
 end
+
+--- Get a logger instance for this module
+---@return table A logger instance (either real or stub)
 local function get_logger()
   local l = get_logging()
   if l then
@@ -143,6 +152,10 @@ M.config = {}
 for k, v in pairs(DEFAULT_CFG) do
   M.config[k] = v
 end
+
+--- Registers a listener with central_config to update local config cache when quality settings change.
+---@return nil
+---@private
 local function register_change_listener()
   if not central_config then
     return false
@@ -162,6 +175,11 @@ local function register_change_listener()
   end)
   get_logger().debug("Registered change listener for quality config")
 end
+
+--- Initializes the quality module with specified options, overriding defaults and central configuration values.
+--- Registers a change listener if central configuration is available. Connects to coverage module if loaded.
+---@param options? {enabled?: boolean, level?: number, strict?: boolean, custom_rules?: table, coverage_data?: table, debug?: boolean, verbose?: boolean} Configuration options. `coverage_data` should be the coverage module instance if provided. If `options` is provided but not a table, it will be ignored.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.init(opts)
   local cfg_src = central_config and central_config.get("quality") or DEFAULT_CFG
   for k, dv in pairs(DEFAULT_CFG) do
@@ -196,6 +214,10 @@ function M.init(opts)
   M.reset()
   return M
 end
+
+--- Resets the collected quality statistics (`M.stats`, `test_data`, `current_test`, `file_cache`)
+--- while preserving the current configuration (`M.config`).
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.reset()
   get_logger().debug("Resetting quality state")
   M.stats = {
@@ -214,6 +236,10 @@ function M.reset()
   test_data, current_test, active_spies, describe_context_stack = {}, nil, {}, {}
   return M
 end
+
+--- Performs a full reset: resets statistics (via `M.reset()`) and resets the module's
+--- configuration (`M.config`) back to the defaults (potentially reloading from central config).
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.full_reset()
   M.reset()
   if central_config then
@@ -236,6 +262,10 @@ function M.full_reset()
   end
   return M
 end
+
+--- Gets the requirements table for a specific quality level.
+---@param level? number The quality level number (1-5). Defaults to the currently configured `M.config.level`.
+---@return table requirements The requirements table for the specified level (defaults to Level 1 if level is invalid).
 function M.get_level_requirements(l)
   l = l or M.config.level
   for _, ld in ipairs(M.levels) do
@@ -245,6 +275,12 @@ function M.get_level_requirements(l)
   end
   return M.levels[1].requirements
 end
+
+--- Evaluates a test against all quality levels (1-5) to determine the highest level passed.
+--- Uses level_checkers module for actual evaluation logic.
+---@param ti table The test data structure to evaluate. This table will be updated with issues.
+---@return {level: number, scores: table<number, number>} result The highest level passed and scores achieved at each level.
+---@private
 local function eval_test_qual(ti)
   if not level_checkers then
     get_logger().error("level_checkers module missing")
@@ -360,6 +396,13 @@ local act_map = {
   resolve_with = "other",
   satisfy = "other",
 }
+
+--- Tracks the usage of an assertion type within the currently active test (`current_test`).
+--- Increments assertion counts and categorizes the assertion type based on `action_name`.
+--- This function is called dynamically from the assertion module (`lib/assertion/init.lua`).
+---@param action_name string The action name from the assertion (e.g., "equal", "exist", "be_a"). Must be a non-empty string.
+---@param test_name_override? string Optional name of the test; used if `current_test` is nil (should be rare with dynamic tracking).
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.track_assertion(act_name, test_name_ovr)
   if not (act_name and type(act_name) == "string" and act_name ~= "") then
     get_logger().warn("Invalid action_name for track_assertion", { action = act_name })
@@ -387,6 +430,14 @@ function M.track_assertion(act_name, test_name_ovr)
   end
   return M
 end
+
+--- Marks the start of analysis for a specific test.
+--- Initializes the test data structure (`test_data[test_name]`) if it doesn't exist.
+--- Records the `test_name` as the `current_test`. Stores `file_path` if `runtime.current_test_file` is set in `central_config`.
+--- Uses `context_opts` to set structural properties like `has_describe`, `has_it`, `nesting_level`.
+---@param test_name string The name of the test starting. If `nil`, not a string, or empty, it defaults to "unnamed_test".
+---@param context_opts? {has_describe?: boolean, has_it?: boolean, nesting_level?: number, has_before_after?: boolean} Optional context from the test runner.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.start_test(tn, ctx_opts)
   ctx_opts = ctx_opts or {}
   if not (tn and type(tn) == "string" and tn ~= "") then
@@ -455,6 +506,12 @@ function M.start_test(tn, ctx_opts)
   end
   return M
 end
+
+--- Marks the end of analysis for the `current_test`.
+--- Evaluates the completed test's quality level using an internal `evaluate_test_quality` function,
+--- which in turn relies on the `lib.quality.level_checkers` module.
+--- Updates global statistics (`M.stats`) based on the test's results. Resets `current_test` to nil.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.end_test()
   if not M.config.enabled or not current_test then
     current_test = nil
@@ -498,6 +555,19 @@ function M.end_test()
   current_test = nil
   return M
 end
+
+--- Performs static analysis on a test file to identify its structural properties like describe/it blocks, hooks, and nesting levels.
+--- Assertion counting and type analysis, which were previously part of static analysis, are now primarily handled dynamically via `M.track_assertion`
+--- (called from `lib/assertion/init.lua`) for greater accuracy during actual test execution.
+--- This function still plays a role in understanding test structure for quality evaluation.
+--- **Important:** This function calls `M.start_test` and `M.end_test` internally for each test (`it` block) it discovers via parsing its content.
+--- If `analyze_file` is called on a file that is *also* being run through the normal test execution flow (where `lib/core/test_definition.lua`
+--- also calls `M.start_test`/`M.end_test`), tests from that file might be processed twice by the quality module, potentially leading
+--- to duplicated entries in `test_data` or skewed aggregate statistics if not handled carefully by the calling context.
+--- The current primary use of `analyze_file` is in contexts where dynamic execution data might not be available or for supplementary structural checks.
+--- tests might be processed twice, potentially affecting aggregated statistics. This behavior may be revised in the future.
+---@param file_path string The path to the test file.
+---@return table analysis A table containing the analysis results for the file (tests found, counts, overall file quality_level, etc.).
 function M.analyze_file(fp)
   if not M.config.enabled then
     return {}
@@ -537,16 +607,13 @@ function M.analyze_file(fp)
     end
   end
   res.nesting_level = mno
-  get_logger().debug(
-    "Static analysis summary",
-    {
-      file = fp,
-      tests = #res.tests,
-      has_describe = res.has_describe,
-      has_it = res.has_it,
-      max_nesting = res.nesting_level,
-    }
-  )
+  get_logger().debug("Static analysis summary", {
+    file = fp,
+    tests = #res.tests,
+    has_describe = res.has_describe,
+    has_it = res.has_it,
+    max_nesting = res.nesting_level,
+  })
   for _, ti_s in ipairs(res.tests) do
     M.start_test(ti_s.name, {
       has_describe = res.has_describe,
@@ -568,6 +635,10 @@ function M.analyze_file(fp)
   get_logger().debug("File analysis complete", { file = fp, quality = res.quality_level, tests_analyzed = fac })
   return res
 end
+
+--- Gets structured data representing the quality analysis results, suitable for generating reports.
+--- Calculates final summary statistics before returning the data.
+---@return {report_type: "quality", level: number, level_name: string, tests: table<string, table>, summary: {tests_analyzed: number, tests_passing_quality: number, quality_percent: number, assertions_total: number, assertions_per_test_avg: number, assertion_types_found: table<string, number>, issues: table<{test: string, issue: string}>[]}} report_data Structured data suitable for generating reports. The `tests` field is a map of test names to their detailed `QualityTestInfo` (structure similar to `lib.quality.level_checkers.QualityTestInfo`). The `summary.issues` array contains objects with `test` (name) and `issue` (string description).
 function M.get_report_data()
   get_logger().debug("Generating quality report data")
   local tt = M.stats.tests_analyzed
@@ -598,6 +669,20 @@ function M.get_report_data()
     },
   }
 end
+
+--- Generate a quality report in the specified format
+--- This function generates a formatted quality report using the reporting module.
+--- If the reporting module is not available, it returns the raw quality data structure.
+---
+--- -- Generate a JSON report
+--- local json_data = quality.report("json")
+---
+--- -- Generate an HTML report
+--- local html = quality.report("html")
+--- fs.write_file("quality-report.html", html)
+---@param format? "summary"|"json"|"html" The format for the report (default is based on central_config)
+---@return string|table report The formatted quality report (string for "summary", "html"; table for "json"), or the raw report data table if the reporting module or formatting fails.
+---@throws table If the reporting module cannot be loaded or if formatting fails critically (errors wrapped by `pcall` are returned as the raw data table).
 function M.report(fmt)
   local df = "summary"
   if central_config then
@@ -623,6 +708,10 @@ function M.report(fmt)
     return d
   end
 end
+
+--- Generates a simplified summary report containing key quality metrics.
+--- Calls `get_report_data` internally.
+---@return {level: number, level_name: string, tests_analyzed: number, tests_passing_quality: number, quality_pct: number, assertions_total: number, assertions_per_test_avg: number, assertion_types_found: table<string, number>, issues: table<{test: string, issue: string}>[], tests: table} report A table containing summary statistics and detailed test results.
 function M.summary_report()
   local d = M.get_report_data()
   return {
@@ -638,6 +727,11 @@ function M.summary_report()
     tests = d.tests,
   }
 end
+
+--- Checks if the overall achieved quality level (`M.stats.quality_level_achieved`)
+--- meets or exceeds a specified required level.
+---@param level? number The quality level to check against (1-5). Defaults to the currently configured `M.config.level`.
+---@return boolean meets `true` if the achieved level is greater than or equal to the required level, `false` otherwise.
 function M.meets_level(l)
   l = l or M.config.level
   local r = M.summary_report()
@@ -645,6 +739,17 @@ function M.meets_level(l)
   get_logger().debug("Quality level check", { achieved = r.level, required = l, meets = meets })
   return meets
 end
+
+--- Save a quality report to a file in the specified format
+--- This function generates a quality report and saves it to the specified file path.
+--- It uses the reporting module to handle formatting and file output. The function
+--- applies central configuration settings for default format and path templates.
+---
+---@param file_path string The path where to save the quality report
+---@param format? "summary"|"json"|"html" The format for the report (default from central_config)
+---@return boolean success `true` if the report was successfully generated and saved, `false` otherwise.
+---@return string|nil error An error message string if saving failed, `nil` on success.
+---@throws table If the reporting module cannot be loaded or if saving fails critically (errors wrapped by `pcall` are returned as `false, error_message`).
 function M.save_report(fp, fmt)
   local df = "html"
   if central_config then
@@ -676,6 +781,17 @@ function M.save_report(fp, fmt)
     return false, "Failed to save: " .. tostring(se)
   end
 end
+
+--- Get the descriptive name for a quality level
+--- This function returns the human-readable name for a numeric quality level
+--- (e.g., "basic", "standard", "comprehensive", etc.)
+---
+---@param level number The quality level number (1-5)
+---@return string level_name The name of the quality level
+---
+---@usage
+--- local name = quality.get_level_name(3)
+--- print(name) -- "comprehensive"
 function M.get_level_name(l)
   for _, ld in ipairs(M.levels) do
     if ld.level == l then
@@ -685,6 +801,27 @@ function M.get_level_name(l)
   return "Not Assessed"
 end
 M.level_name = M.get_level_name
+
+--- Check if a test file meets quality requirements for a specific level
+--- This function analyzes a test file to determine if it meets the quality
+--- standards for the specified level. It performs static analysis on the file
+--- and returns whether it meets the requirements along with any issues found.
+---
+---@param file_path string The path to the test file to check
+---@param level? number The quality level to check against (defaults to configured level)
+---@return boolean meets `true` if the file meets the requirements for the specified level, `false` otherwise.
+---@return table[] issues An array of issue description tables (e.g., `{ test = "test_name", issue = "description" }`).
+---@throws table If the level checker function (from `level_checkers`) fails critically (errors wrapped by `pcall` are handled, but rethrows possible).
+---
+---@usage
+--- -- Check if a file meets level 3 requirements
+--- local meets, issues = quality.check_file("tests/my_test.lua", 3)
+--- if not meets then
+---   print("File doesn't meet quality level 3 requirements:")
+---   for _, issue in ipairs(issues) do
+---     print("- " .. issue.test .. ": " .. issue.issue)
+---   end
+--- end
 function M.check_file(file_path, level_to_check)
   level_to_check = level_to_check or M.config.level
   if type(level_to_check) ~= "number" or level_to_check < M.LEVEL_BASIC or level_to_check > M.LEVEL_COMPLETE then
@@ -779,13 +916,10 @@ function M.check_file(file_path, level_to_check)
   local meets = an.quality_level >= level_to_check
   if not meets and #iss == 0 then
     if an.quality_level then
-      table.insert(
-        iss,
-        {
-          test = file_path,
-          issue = "File achieved quality level " .. an.quality_level .. " but required " .. level_to_check,
-        }
-      )
+      table.insert(iss, {
+        test = file_path,
+        issue = "File achieved quality level " .. an.quality_level .. " but required " .. level_to_check,
+      })
     else
       table.insert(iss, { test = file_path, issue = "File did not meet required quality level " .. level_to_check })
     end
@@ -795,6 +929,31 @@ function M.check_file(file_path, level_to_check)
   M.config.enabled = prev_en
   return meets, iss
 end
+
+--- Validate a test against quality standards with detailed feedback
+--- This function examines a tracked test (already processed by `M.end_test`) to determine if it meets the
+--- quality standards for the specified level by checking its stored `quality_level`.
+--- It relies on `evaluate_test_quality` (which uses `level_checkers`) having been called via `M.end_test`.
+---@param test_name string The name of the test to validate (must exist in internal `test_data`).
+---@param options? {level?: number, strict?: boolean} Validation options. `level` overrides the configured `M.config.level`. `strict` is not directly used here but by the evaluation in `M.end_test`.
+---@return boolean meets `true` if the test's achieved quality_level is greater than or equal to the target `level`.
+---@return table[] issues An array of issue description strings associated with the test from `test_data[test_name].issues`.
+---
+---@usage
+--- -- After running a test
+--- quality.start_test("should properly validate user input")
+--- quality.track_assertion("equality")
+--- quality.track_assertion("type_checking")
+--- quality.end_test()
+---
+--- -- Validate the test meets level 3 requirements
+--- local meets, issues = quality.validate_test_quality("should properly validate user input", {level = 3})
+--- if not meets then
+---   print("Test doesn't meet level 3 requirements:")
+---   for _, issue in ipairs(issues) do
+---     print("- " .. issue)
+---   end
+--- end
 function M.validate_test_quality(tn, opts)
   opts = opts or {}
   local l = opts.level or M.config.level
@@ -810,6 +969,10 @@ function M.validate_test_quality(tn, opts)
   )
   return ev.level >= l, test_data[tn].issues
 end
+
+--- Prints the current quality module configuration settings to the logger (Info level).
+--- Includes source (local or central), enabled status, level, strictness, etc.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.debug_config()
   local cs = central_config and "Centralized" or "Module-local"
   get_logger().info("Quality config", {
@@ -831,6 +994,11 @@ function M.debug_config()
   end
   return M
 end
+
+--- Registers the quality module's reset function with a firmo instance.
+--- This allows `firmo.reset()` to also call `quality.reset()`.
+---@param firmo_instance table The firmo instance to register with.
+---@return boolean success True if registration was successful or not needed.
 function M.register_with_firmo(fi)
   if not (fi and type(fi) == "table") then
     get_logger().warn("Cannot register quality.reset: firmo_instance not table.")
@@ -848,6 +1016,11 @@ function M.register_with_firmo(fi)
   get_logger().info("quality.reset registered with firmo.")
   return true
 end
+
+--- Tracks the creation of a spy.
+--- This function should be called by the spy module (e.g., `firmo.spy.on`) when a spy is created.
+---@param spy_identifier string|number A unique identifier for the spy (e.g., a name or object reference string).
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.track_spy_created(spy_id)
   if not M.config.enabled then
     return M
@@ -865,6 +1038,11 @@ function M.track_spy_created(spy_id)
   get_logger().trace("Spy created", { test = current_test, spy = spy_id })
   return M
 end
+
+--- Tracks the restoration of a spy.
+--- This function should be called by the spy module when a spy's `restore()` method is called.
+---@param spy_identifier string|number The unique identifier for the spy that was restored.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.track_spy_restored(spy_id)
   if not M.config.enabled then
     return M
@@ -881,6 +1059,12 @@ function M.track_spy_restored(spy_id)
   end
   return M
 end
+
+--- Marks the start of a describe block for quality tracking.
+--- Retrieves the current file path from `central_config` and pushes a new
+--- context (name, file_path, it_blocks_found) onto the describe_context_stack.
+---@param describe_name string The name of the describe block.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.start_describe(dn)
   if not M.config.enabled then
     return M
@@ -899,6 +1083,11 @@ function M.start_describe(dn)
   get_logger().trace("Started describe block", { name = dn, file = fp, depth = #describe_context_stack })
   return M
 end
+
+--- Marks the end of the current describe block for quality tracking.
+--- Pops the current context from the describe_context_stack and checks if it was empty.
+--- If empty, an issue is added to `M.stats.issues`.
+---@return QualityModule self The quality module instance (`M`) for chaining.
 function M.end_describe()
   if not M.config.enabled then
     return M

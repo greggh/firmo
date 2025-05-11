@@ -175,17 +175,20 @@ end)
 - NEVER manually set coverage status
 - NEVER create test-specific workarounds
 - NEVER manipulate coverage data directly
-- ALWAYS run tests properly via test.lua
+- ALWAYS run tests properly via firmo.lua
 
 ## Essential Commands
 
-- Run all tests: `lua firmo.lua tests/`
-- Run specific test: `lua firmo.lua tests/reporting_test.lua`
-- Run with pattern: `lua firmo.lua --pattern=coverage tests/`
-- Run with coverage: `lua firmo.lua --coverage --format=html tests/`
-- Run with coverage (JSON): `lua firmo.lua --coverage --format=json tests/`
-- Run with coverage (LCOV): `lua firmo.lua --coverage --format=lcov tests/`
-- Run with watch mode: `lua firmo.lua --watch tests/`
+- Run all tests in default directory: `lua firmo.lua`
+- Run all tests in a specific directory: `lua firmo.lua ./tests/`
+- Run a specific test file: `lua firmo.lua ./tests/reporting_test.lua`
+- Run tests with file discovery pattern: `lua firmo.lua --pattern="*_spec.lua" ./tests/`
+- Run tests filtering by name: `lua firmo.lua --filter="User login" ./tests/`
+- Run with coverage and generate HTML report: `lua firmo.lua --coverage --report --report-formats=html ./tests/`
+- Run with coverage and generate JSON & LCOV reports: `lua firmo.lua --coverage --report --report-formats=json,lcov ./tests/`
+- Run with watch mode: `lua firmo.lua --watch ./tests/`
+- Run with quality validation: `lua firmo.lua --quality ./tests/`
+- Output console results as JSON: `lua firmo.lua --json ./tests/`
 
 ## JSDoc-Style Type Annotations
 

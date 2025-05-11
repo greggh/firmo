@@ -5,9 +5,25 @@
 --- @copyright 2023-2025
 --- @version 1.0.2
 
+---@class CLI The public API of the CLI module.
+--- Handles argument parsing, command execution, and different operational modes.
+---@field _VERSION string Version of the CLI module itself.
+---@field version string Overall Firmo version string (typically from `lib.core.version`).
+---@field parse_args fun(args?: table): table Parses command line arguments into a structured options table. See `default_options` in the source and `knowledge.md` for typical option fields.
+---@field show_help fun():nil Displays help information to the console.
+---@field run fun(args?: table, firmo_instance_passed_in: table):boolean Main entry point. Parses args, configures, and executes tests or other CLI actions. Returns overall success.
+---@field watch fun(firmo_instance: table, options: table):boolean Runs tests in watch mode. Requires `lib.tools.watcher`.
+---@field interactive fun(firmo_instance: table, options: table):boolean Runs tests in interactive mode. Requires `lib.tools.interactive`.
+
 local colors_enabled = true
 local SGR_CODES =
   { reset = 0, bold = 1, red = 31, green = 32, yellow = 33, blue = 34, magenta = 35, cyan = 36, white = 37 }
+
+--- Generates an SGR (Select Graphic Rendition) escape code string.
+--- If colors are disabled globally (via `colors_enabled` upvalue), returns an empty string.
+---@param code_or_name string|number The SGR code number or a predefined color/style name (e.g., "red", "bold").
+---@return string The ANSI SGR escape code string, or an empty string.
+---@private
 local function sgr(code_or_name)
   if not colors_enabled then
     return ""
@@ -18,6 +34,7 @@ local function sgr(code_or_name)
   end
   return ""
 end
+
 local cr, cg, cy, cb, cm, cc, bold, cn =
   sgr("red"), sgr("green"), sgr("yellow"), sgr("blue"), sgr("magenta"), sgr("cyan"), sgr("bold"), sgr("reset")
 
@@ -25,6 +42,12 @@ local M = {}
 M._VERSION = "1.0.2" -- Version increment
 
 local _error_handler, _logging, _fs
+
+--- Safely attempts to require a Lua module.
+--- Prints a warning to the console if the module fails to load.
+---@param module_name string The name of the module to require.
+---@return table|nil The loaded module, or `nil` if loading failed.
+---@private
 local function try_require(module_name)
   local success, result = pcall(require, module_name)
   if not success then
@@ -33,24 +56,42 @@ local function try_require(module_name)
   end
   return result
 end
+
+--- Lazily loads and returns the filesystem module (`lib.tools.filesystem`).
+---@return table|nil The filesystem module, or `nil` if unavailable.
+---@private
 local function get_fs()
   if not _fs then
     _fs = try_require("lib.tools.filesystem")
   end
   return _fs
 end
+
+--- Lazily loads and returns the error handler module (`lib.tools.error_handler`).
+---@return table|nil The error handler module, or `nil` if unavailable.
+---@private
 local function get_error_handler()
   if not _error_handler then
     _error_handler = try_require("lib.tools.error_handler")
   end
   return _error_handler
 end
+
+--- Lazily loads and returns the logging module (`lib.tools.logging`).
+---@return table|nil The logging module, or `nil` if unavailable.
+---@private
 local function get_logging()
   if not _logging then
     _logging = try_require("lib.tools.logging")
   end
   return _logging
 end
+
+--- Gets a logger instance specifically for the CLI module.
+--- If the main logging module is unavailable, it returns a basic stub logger
+--- that prints to the console with a "[LEVEL] CLI:" prefix.
+---@return table A logger instance (either from `lib.tools.logging` or a stub).
+---@private
 local function get_logger()
   local logging = get_logging()
   if logging then
@@ -77,6 +118,10 @@ end
 
 local central_config, coverage_module, quality_module, watcher_module, interactive_module, parallel_module, runner_module, discover_module, version_module, json_module
 
+--- Loads essential and optional modules required by the CLI.
+--- Assigns loaded modules to upvalues (e.g., `central_config`, `runner_module`).
+--- Sets `M.version` using `lib.core.version`.
+---@private
 local function load_modules()
   central_config = try_require("lib.core.central_config")
   coverage_module = try_require("lib.coverage")
@@ -124,6 +169,13 @@ local default_options = {
   parse_errors = {},
 }
 
+--- Parses command line arguments into a structured options table.
+--- It handles various flag formats (short, long, with values, combined short flags),
+--- positional arguments (interpreted as test paths), and integrates with
+--- `central_config` to load defaults and apply CLI overrides.
+--- Errors encountered during parsing are collected in `options.parse_errors`.
+---@param args? table Optional array of argument strings (defaults to Lua's global `_G.arg`).
+---@return table options A table containing parsed options, merged with defaults from `default_options` and potentially `central_config`. Refer to `default_options` in the source and `lib/tools/cli/knowledge.md` for a detailed description of the fields in the returned options table.
 function M.parse_args(args)
   args = args or _G.arg or {}
   local options = {}
@@ -134,11 +186,12 @@ function M.parse_args(args)
     local cli_defaults_cen = central_config.get("cli_options")
     if cli_defaults_cen then
       for k, v in pairs(cli_defaults_cen) do
-        if options[k] ~= nil then
+        if options[k] ~= nil then -- Only override if the key exists in our defaults
           options[k] = v
         end
       end
     end
+    -- Override specific options from other central_config sections
     local q_cfg = central_config.get("quality")
     if q_cfg then
       options.quality_level = q_cfg.level or options.quality_level
@@ -151,59 +204,68 @@ function M.parse_args(args)
     options.file_discovery_pattern = central_config.get("runner.default_pattern") or options.file_discovery_pattern
     options.base_test_dir = central_config.get("runner.default_test_dir") or options.base_test_dir
   end
+
+  -- Initialize potentially dynamic fields
   options.specific_paths_to_run = {}
-  options.report_file_formats = {}
+  options.report_file_formats = {} -- Ensure this is always a table
   options.extra_config_settings = {}
   options.parse_errors = {}
+
   local i = 1
   while i <= #args do
     local arg_val = args[i]
     local consumed_next = false
     local key, value
+
+    -- Try to parse '--key=value'
     if arg_val:match("^%-%-.+=.") then
       key, value = arg_val:match("^%-%-([^=]+)=(.+)")
-    elseif args[i + 1] and not args[i + 1]:match("^%-") then
-      if arg_val:match("^%-%-.") or arg_val:match("^%-%a$") then
+    -- Try to parse '--key value' or '-k value'
+    elseif args[i + 1] and not args[i + 1]:match("^%-") then -- Next arg exists and is not an option itself
+      if arg_val:match("^%-%-.") or arg_val:match("^%-%a$") then -- Long option or single char short option
         key = arg_val:match("^%-%-(.+)") or arg_val:match("^%-(.+)")
         value = args[i + 1]
         consumed_next = true
       end
+    -- Try to parse '--key' (boolean long option)
     elseif arg_val:match("^%-%-.") then
       key = arg_val:match("^%-%-(.+)")
-      value = true
+      value = true -- Assume boolean flag if no value part
+    -- Try to parse '-abc' (combined short boolean options) or '-k' (single short boolean option)
     elseif arg_val:match("^%-%a+$") then
-      local fs = arg_val:sub(2)
-      if #fs == 1 then
-        key = fs
+      local short_flags = arg_val:sub(2)
+      if #short_flags == 1 then -- Single short flag like '-v'
+        key = short_flags
         value = true
-      else
-        for kx = 1, #fs do
-          local fc = fs:sub(kx, kx)
-          if fc == "h" then
+      else -- Combined short flags like '-vcq'
+        for k_idx = 1, #short_flags do
+          local flag_char = short_flags:sub(k_idx, k_idx)
+          if flag_char == "h" then
             options.show_help = true
-          elseif fc == "V" then
+          elseif flag_char == "V" then
             options.show_version = true
-          elseif fc == "v" then
+          elseif flag_char == "v" then
             options.verbose = true
-          elseif fc == "c" then
+          elseif flag_char == "c" then
             options.coverage_enabled = true
-          elseif fc == "q" then
+          elseif flag_char == "q" then
             options.quality_enabled = true
-          elseif fc == "w" then
+          elseif flag_char == "w" then
             options.watch_mode = true
-          elseif fc == "i" then
+          elseif flag_char == "i" then
             options.interactive_mode = true
-          elseif fc == "p" then
+          elseif flag_char == "p" then
             options.parallel_execution = true
-          elseif fc == "r" then
+          elseif flag_char == "r" then
             options.generate_reports = true
           else
-            table.insert(options.parse_errors, "Unknown short flag: -" .. fc)
+            table.insert(options.parse_errors, "Unknown short flag in combined group: -" .. flag_char)
           end
         end
-        key = nil
+        key = nil -- Processed combined flags, skip main key processing
       end
     end
+
     if key then
       if key == "help" or key == "h" then
         options.show_help = true
@@ -214,7 +276,7 @@ function M.parse_args(args)
       elseif key == "coverage" or key == "c" then
         options.coverage_enabled = true
       elseif key == "coverage-debug" then
-        options.coverage_debug = true
+        options.coverage_debug = true -- Assuming boolean
       elseif key == "quality" or key == "q" then
         options.quality_enabled = true
       elseif key == "watch" or key == "w" then
@@ -227,9 +289,9 @@ function M.parse_args(args)
         options.perform_create_config = true
       elseif key == "report" or key == "r" then
         options.generate_reports = true
-      elseif key == "json" then
+      elseif key == "json" then -- New shorthand for console JSON dump
         options.console_json_dump = true
-        options.console_format = "json_dump_internal"
+        options.console_format = "json_dump_internal" -- Internal format key for this
       elseif key == "pattern" then
         options.file_discovery_pattern = value
       elseif key == "filter" then
@@ -240,99 +302,126 @@ function M.parse_args(args)
         options.coverage_threshold = tonumber(value) or options.coverage_threshold
       elseif key == "console-format" or key == "results-format" then
         options.console_format = value
-        if value == "json_dump_internal" or value == "json" then
+        if value == "json_dump_internal" or value == "json" then -- Ensure json flag is also set
           options.console_json_dump = true
         end
       elseif key == "output-json-file" then
-        options.output_json_filepath = value -- ADDED: Parse new argument
+        options.output_json_filepath = value -- ADDED
       elseif key == "report-formats" then
-        options.report_file_formats = {}
-        for fn in value:gmatch("([^,]+)") do
-          table.insert(options.report_file_formats, fn:match("^%s*(.-)%s*$"))
+        options.report_file_formats = {} -- Reset if specified multiple times
+        for fmt_name in value:gmatch("([^,]+)") do
+          table.insert(options.report_file_formats, fmt_name:match("^%s*(.-)%s*$")) -- Trim whitespace
         end
       elseif key == "report-dir" then
         options.report_output_dir = value
       elseif key == "config" then
         options.config_file_path = value
         if central_config and get_fs() and get_fs().file_exists(options.config_file_path) then
-          local lok, ler = central_config.load_from_file(options.config_file_path)
-          if not lok then
-            table.insert(options.parse_errors, "Failed to load " .. options.config_file_path .. ": " .. tostring(ler))
+          local loaded_ok, load_err = central_config.load_from_file(options.config_file_path)
+          if not loaded_ok then
+            table.insert(
+              options.parse_errors,
+              "Failed to load config file '" .. options.config_file_path .. "': " .. tostring(load_err)
+            )
           else
-            local to = {}
+            -- Config loaded, re-apply defaults and central config to effectively refresh options
+            -- Store critical flags like help/version before refresh
+            local prev_help = options.show_help
+            local prev_version = options.show_version
+
+            local temp_opts = {} -- Start from scratch
             for kd, vd in pairs(default_options) do
-              to[kd] = vd
+              temp_opts[kd] = vd
             end
-            local cv = central_config.get_all()
-            if cv.cli_options then
-              for kc, vc in pairs(cv.cli_options) do
-                if to[kc] ~= nil then
-                  to[kc] = vc
+            local cc_all = central_config.get_all()
+            if cc_all.cli_options then
+              for kc, vc in pairs(cc_all.cli_options) do
+                if temp_opts[kc] ~= nil then
+                  temp_opts[kc] = vc
                 end
               end
             end
-            if cv.quality then
-              to.quality_level = cv.quality.level or to.quality_level
+            if cc_all.quality then
+              temp_opts.quality_level = cc_all.quality.level or temp_opts.quality_level
             end
-            if cv.coverage then
-              to.coverage_threshold = cv.coverage.threshold or to.coverage_threshold
+            if cc_all.coverage then
+              temp_opts.coverage_threshold = cc_all.coverage.threshold or temp_opts.coverage_threshold
             end
-            to.report_output_dir = cv.reporting and cv.reporting.report_dir or to.report_output_dir
-            local psh = options.show_help
-            local psv = options.show_version
-            options = to
-            options.show_help = psh or options.show_help
-            options.show_version = psv or options.show_version
+            temp_opts.report_output_dir = cc_all.reporting and cc_all.reporting.report_dir
+              or temp_opts.report_output_dir
+            -- temp_opts.file_discovery_pattern = cc_all.runner and cc_all.runner.default_pattern or temp_opts.file_discovery_pattern -- Already handled by initial load
+
+            options = temp_opts -- Replace options with refreshed ones
+            options.show_help = prev_help or options.show_help -- Restore critical flags
+            options.show_version = prev_version or options.show_version
+            -- Re-initialize dynamic fields
             options.specific_paths_to_run = {}
             options.report_file_formats = {}
             options.extra_config_settings = {}
-            options.parse_errors = {}
+            options.parse_errors = {} -- Clear parse errors as config file is now the source of truth
           end
         elseif not central_config then
-          table.insert(options.parse_errors, "Central_config not available for --config")
+          table.insert(options.parse_errors, "central_config module not available to load --config file.")
         elseif not (get_fs() and get_fs().file_exists(options.config_file_path)) then
-          table.insert(options.parse_errors, "Config file not found: " .. options.config_file_path)
+          table.insert(options.parse_errors, "Specified config file not found: " .. options.config_file_path)
         end
+      -- Handle boolean flags that might already exist in options
       elseif type(value) == "boolean" and options[key] ~= nil and type(options[key]) == "boolean" then
         options[key] = value
+      -- Fallback for unrecognized --long-options; store them for central_config
       elseif arg_val:match("^%-%-") then
         options.extra_config_settings[key] = value
-      else
-        if arg_val:match("^%-") then
+      else -- Unrecognized option or positional argument
+        if arg_val:match("^%-") then -- It's an option we don't know
           table.insert(options.parse_errors, "Unknown option: " .. arg_val)
-        else
+        else -- It's a positional argument (path)
           table.insert(options.specific_paths_to_run, arg_val)
         end
       end
-    else
-      table.insert(options.specific_paths_to_run, arg_val)
+    else -- Not a recognized key format, assume positional path
+      if not arg_val:match("^%-") then -- Ensure it's not an option we missed
+        table.insert(options.specific_paths_to_run, arg_val)
+      elseif not key and not arg_val:match("^%-%a%a+$") then -- Avoid erroring on already processed combined short flags
+        table.insert(options.parse_errors, "Malformed or unknown option: " .. arg_val)
+      end
     end
     i = i + (consumed_next and 2 or 1)
   end
-  local proc_paths = {}
-  local dir_set = false
+
+  -- Post-process paths: if a directory is first among specific_paths_to_run,
+  -- it becomes base_test_dir, and other paths are relative or absolute files/dirs.
+  local processed_paths = {}
+  local base_dir_set_from_paths = false
   if #options.specific_paths_to_run > 0 then
-    for _, pa in ipairs(options.specific_paths_to_run) do
-      if not dir_set and get_fs() then
-        local isd_ok, isd = pcall(get_fs().is_directory, pa)
-        if isd_ok and isd then
-          options.base_test_dir = pa
-          dir_set = true
+    for _, path_arg in ipairs(options.specific_paths_to_run) do
+      if not base_dir_set_from_paths and get_fs() then
+        local is_dir_ok, is_dir_val = pcall(get_fs().is_directory, path_arg)
+        if is_dir_ok and is_dir_val then
+          options.base_test_dir = path_arg
+          base_dir_set_from_paths = true
+          -- This directory itself isn't added to processed_paths, it sets the context
         else
-          table.insert(proc_paths, pa)
+          table.insert(processed_paths, path_arg) -- It's a file or non-existent, treat as specific target
         end
       else
-        table.insert(proc_paths, pa)
+        table.insert(processed_paths, path_arg) -- Subsequent paths are specific targets
       end
     end
-    options.specific_paths_to_run = proc_paths
+    options.specific_paths_to_run = processed_paths
   end
-  if #options.specific_paths_to_run == 0 and not dir_set then
+
+  -- If no specific paths led to setting base_test_dir, and no specific files are listed,
+  -- ensure base_test_dir has its default.
+  if #options.specific_paths_to_run == 0 and not base_dir_set_from_paths then
     options.base_test_dir = options.base_test_dir or default_options.base_test_dir
   end
+
   return options
 end
 
+--- Displays detailed help information for the Firmo CLI to the console.
+--- Lists available options, their descriptions, and usage examples.
+---@return nil
 function M.show_help()
   print("Firmo Test Framework - Unified CLI")
   print("Usage: lua firmo.lua [options] [paths...]")
@@ -388,6 +477,12 @@ function M.show_help()
   get_logger().info("Help displayed to user.")
 end
 
+--- Prints a formatted summary of test results to the console.
+--- Adapts output based on the `options.console_format` (e.g., "dot" or "default").
+--- Uses colors if enabled via the global `colors_enabled` and not plain format.
+---@param results table A results table, typically from `runner_module.run_tests` or `runner_module.run_file`. Expected fields include `passes`, `errors`, `skipped`, `total`, `elapsed`, `success`, and optionally `file` or `files_tested`, `files_passed`, `files_failed`.
+---@param options? table The CLI options table, used to determine `console_format` and color usage.
+---@private
 local function print_final_summary(results, options)
   local logger = get_logger()
   if not results then
@@ -457,6 +552,26 @@ local function print_final_summary(results, options)
   end
 end
 
+--- Main entry point for the Firmo CLI.
+--- This function orchestrates the entire CLI process:
+--- 1. Loads necessary modules.
+--- 2. Parses command-line arguments using `M.parse_args`.
+--- 3. Handles informational flags like `--help` and `--version`.
+--- 4. Handles `--create-config` to generate a default configuration file.
+--- 5. Applies CLI options to configure logging, coverage, quality, and the test runner.
+--- 6. Determines the execution mode (standard run, watch, interactive).
+--- 7. For standard runs:
+---    a. Discovers test files or uses specified paths.
+---    b. Applies test name filters.
+---    c. Invokes `runner_module.run_file` or `runner_module.run_tests`.
+---    d. Handles JSON output for results if requested (for single file/worker or multi-file).
+---    e. Prints a final summary using `print_final_summary`.
+--- 8. For watch or interactive modes, delegates to `M.watch` or `M.interactive`.
+--- 9. Triggers report generation via `lib.reporting.auto_save_reports` if `--report` is specified.
+---
+---@param args? table Optional array of command-line argument strings (defaults to `_G.arg`).
+---@param firmo_instance_passed_in table The main Firmo instance, which provides core functionalities and interfaces like `set_filter`, `reset`, etc. This instance is passed through to other modules like the runner.
+---@return boolean success Overall success status of the CLI operation. `true` if all tests passed and reports generated successfully (if requested), `false` otherwise or if critical errors occurred.
 function M.run(args, firmo_instance_passed_in)
   load_modules()
   local options = M.parse_args(args)
@@ -774,6 +889,12 @@ function M.run(args, firmo_instance_passed_in)
   return overall_success and reporting_ok
 end
 
+--- Runs tests in watch mode using the `lib.tools.watcher` module.
+--- Monitors specified directories/files and re-runs tests on changes.
+--- Requires `watcher_module` and `runner_module` to be available.
+---@param firmo_instance table The main Firmo instance.
+---@param options table Parsed command line options (expects fields like `base_test_dir`, `specific_paths_to_run`, `file_discovery_pattern`, `console_format`, `parallel_execution`, `coverage_instance`, `verbose`).
+---@return boolean success `false` if required modules are missing, otherwise this function typically doesn't return as the watcher takes over.
 function M.watch(firmo_instance, options)
   if not watcher_module then
     get_logger().error("Watcher module not available.")
@@ -787,11 +908,11 @@ function M.watch(firmo_instance, options)
   end
   watcher_module.configure({
     dirs = { options.base_test_dir },
-    ignore = { "node_modules", ".git" },
-    debounce = 500,
-    clear_console = true,
+    ignore = { "node_modules", ".git" }, -- Consider making this configurable
+    debounce = 500, -- Consider making this configurable
+    clear_console = true, -- Consider making this configurable
   })
-  runner_module.configure({
+  runner_module.configure({ -- Ensure runner is configured for watch loop
     format = { dot_mode = options.console_format == "dot", summary_only = options.console_format == "summary" },
     parallel = options.parallel_execution,
     coverage_instance = options.coverage_instance,
@@ -809,9 +930,15 @@ function M.watch(firmo_instance, options)
       return runner_module.run_discovered(options.base_test_dir, options.file_discovery_pattern, firmo_instance)
     end
   end)
-  return true
+  return true -- Typically not reached as watcher.watch() blocks
 end
 
+--- Runs tests in interactive mode using the `lib.tools.interactive` module.
+--- Provides a TUI for selecting and running tests.
+--- Requires `interactive_module` to be available.
+---@param firmo_instance table The main Firmo instance.
+---@param options table Parsed command line options (expects fields like `base_test_dir`, `coverage_instance`, `quality_instance`).
+---@return boolean success `false` if the interactive module is missing, otherwise this function typically doesn't return as the interactive mode takes over.
 function M.interactive(firmo_instance, options)
   if not interactive_module then
     get_logger().error("Interactive module not available.")
@@ -824,7 +951,7 @@ function M.interactive(firmo_instance, options)
     quality_instance = options.quality_instance,
   })
   interactive_module.start(firmo_instance)
-  return true
+  return true -- Typically not reached as interactive.start() blocks
 end
 
 return M

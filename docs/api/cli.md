@@ -1,3 +1,113 @@
+# CLI Module API (`lib.tools.cli`)
+
+This document describes the public Application Programming Interface (API) of the `lib/tools/cli` module, which powers Firmo's command-line interface.
+
+## Overview
+
+The `lib/tools/cli` module is responsible for parsing command-line arguments, configuring various Firmo systems (like logging, coverage, quality, and the test runner), and orchestrating the execution of tests in different modes (standard run, watch mode, interactive mode). It is typically invoked by the main `firmo.lua` script.
+
+To use this module programmatically (though direct usage is less common than via `firmo.lua`):
+
+```lua
+local cli = require("lib.tools.cli")
+local firmo_instance = require("firmo") -- Assuming firmo instance is needed for M.run
+
+-- Example: Parse arguments (if running in a script that receives them)
+local options = cli.parse_args(_G.arg)
+
+-- Example: Run tests programmatically
+-- Note: M.run expects a fully initialized firmo instance.
+-- Direct programmatic invocation of M.run is advanced and requires careful setup.
+-- local success = cli.run(_G.arg, firmo_instance)
+```
+
+## Module API
+
+The following fields and functions are available on the table returned by `require("lib.tools.cli")`.
+
+### Fields
+
+#### `M._VERSION`
+- **Type:** `string`
+- **Description:** The version of the CLI module itself (e.g., `"1.0.2"`).
+
+#### `M.version`
+- **Type:** `string`
+- **Description:** The overall Firmo framework version string, typically sourced from `lib.core.version` (e.g., `"1.2.0"`). This is set when `load_modules()` is called internally.
+
+### Functions
+
+#### `M.parse_args(args?)`
+- **Description:** Parses an array of command-line argument strings into a structured options table. This function handles various flag formats (short, long, with values, combined short flags), positional arguments (interpreted as test paths), and integrates with `lib.core.central_config` to load defaults and apply CLI overrides. Errors encountered during parsing are collected in the `options.parse_errors` field of the returned table.
+- **Parameters:**
+    - `args` (`table?`): Optional. An array of argument strings. Defaults to Lua's global `_G.arg` table if not provided.
+- **Returns:**
+    - `table` (options): A table containing parsed options, merged with defaults. For a detailed description of the fields in this options table, refer to the `default_options` table within the `lib/tools/cli/init.lua` source code and the [CLI Guide](/docs/guides/cli.md).
+- **Example:**
+  ```lua
+  local cli_options = require("lib.tools.cli").parse_args({"--coverage", "./tests/specific"})
+  if #cli_options.parse_errors > 0 then
+    print("Arg parse errors:", cli_options.parse_errors)
+  end
+  -- cli_options.coverage_enabled would be true
+  -- cli_options.specific_paths_to_run would contain "./tests/specific"
+  ```
+
+#### `M.show_help()`
+- **Description:** Displays detailed help information for the Firmo command-line interface to the console, listing available options, their descriptions, and usage examples.
+- **Parameters:** None.
+- **Returns:** `nil`.
+- **Example:**
+  ```lua
+  require("lib.tools.cli").show_help()
+  ```
+
+#### `M.run(args?, firmo_instance_passed_in)`
+- **Description:** The main entry point for the Firmo CLI. This function orchestrates the entire CLI process:
+    1.  Loads necessary internal modules.
+    2.  Parses command-line arguments using `M.parse_args`.
+    3.  Handles informational flags like `--help` and `--version`.
+    4.  Handles `--create-config` to generate a default configuration file.
+    5.  Applies CLI options to configure logging, coverage, quality, and the test runner.
+    6.  Determines the execution mode (standard run, watch, interactive).
+    7.  Invokes the appropriate mode handler (`M.watch`, `M.interactive`, or directly uses `lib.core.runner` for standard runs).
+    8.  Triggers report generation if requested.
+- **Parameters:**
+    - `args` (`table?`): Optional. An array of command-line argument strings. Defaults to `_G.arg`.
+    - `firmo_instance_passed_in` (`table`): The main Firmo instance (usually the table returned by `require("firmo")`). This instance provides core functionalities and interfaces used by the CLI and its sub-components.
+- **Returns:**
+    - `boolean` (success): Overall success status of the CLI operation. `true` if all tests passed and reports generated successfully (if requested), `false` otherwise or if critical errors occurred.
+- **Example (conceptual, as `firmo.lua` usually handles this):**
+  ```lua
+  local cli = require("lib.tools.cli")
+  local firmo = require("firmo") -- Get the firmo instance
+  local success = cli.run(_G.arg, firmo)
+  os.exit(success and 0 or 1)
+  ```
+
+#### `M.watch(firmo_instance, options)`
+- **Description:** Runs tests in watch mode. This function initializes and uses the `lib.tools.watcher` module to monitor specified directories/files for changes and re-runs tests accordingly using `lib.core.runner`. This function typically does not return as the watcher takes over the process.
+- **Parameters:**
+    - `firmo_instance` (`table`): The main Firmo instance.
+    - `options` (`table`): Parsed command line options table (from `M.parse_args`), which should contain settings relevant to watch mode (e.g., `base_test_dir`, `file_discovery_pattern`, runner configurations).
+- **Returns:**
+    - `boolean`: `false` if required modules (like `lib.tools.watcher` or `lib.core.runner`) are missing. Otherwise, this function usually blocks and doesn't return.
+- **Note:** Requires `lib.tools.watcher` and `lib.core.runner` modules to be available.
+
+#### `M.interactive(firmo_instance, options)`
+- **Description:** Runs tests in interactive mode. This function initializes and uses the `lib.tools.interactive` module to provide a command-line shell or TUI for selecting and running tests. This function typically does not return as the interactive mode takes over.
+- **Parameters:**
+    - `firmo_instance` (`table`): The main Firmo instance.
+    - `options` (`table`): Parsed command line options table (from `M.parse_args`), which should contain settings relevant to interactive mode (e.g., `base_test_dir`).
+- **Returns:**
+    - `boolean`: `false` if the `lib.tools.interactive` module is missing. Otherwise, this function usually blocks and doesn't return.
+- **Note:** Requires `lib.tools.interactive` module to be available. The features and commands available in interactive mode depend on the implementation of `lib/tools/interactive/init.lua`.
+
+---
+
+For detailed examples of command-line usage, refer to the [CLI Guide](/docs/guides/cli.md).
+```
+
 # Command Line Interface
 
 

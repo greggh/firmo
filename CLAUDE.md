@@ -104,7 +104,7 @@ This is an ABSOLUTE rule that must NEVER be violated:
 
 3. **NEVER create test-specific workarounds**: NEVER add special-case coverage tracking to tests
 4. **NEVER manipulate coverage data directly**: Coverage data should ONLY be managed by runner.lua
-5. **ALWAYS run tests properly**: ALWAYS use test.lua to run tests with coverage enabled
+5. **ALWAYS run tests properly**: ALWAYS use firmo.lua to run tests with coverage enabled
 
 Any violation of these rules constitutes a harmful hack that:
 
@@ -486,16 +486,18 @@ Where:
 - `[options]` are command-line flags like `--coverage`, `--watch`, `--pattern=coverage`
 - `[path]` is a file or directory path (the system automatically detects which)
 
-Common options include:
+  Common options include:
 
-- `--coverage`: Enable coverage tracking
-- `--quality`: Enable quality validation
-- `--pattern=<pattern>`: Filter test files by pattern
-- `--watch`: Enable watch mode for continuous testing
-- `--verbose`: Show more detailed output
-- `--help`: Show all available options
+  - `--coverage` or `-c`: Enable coverage tracking
+  - `--quality` or `-q`: Enable quality validation (with `--quality-level=<1-5>`)
+  - `--pattern=<glob>`: Glob pattern for test file discovery
+  - `--filter=<lua_pattern>`: Lua pattern to filter tests by name
+  - `--watch` or `-w`: Enable watch mode for continuous testing
+  - `--report` or `-r`: Generate reports (use with `--report-formats=<list>`)
+  - `--verbose` or `-v`: Show more detailed output
+  - `--help` or `-h`: Show all available options
 
-> **Note:** We have completed the transition to a standardized test system where all tests run through the `test.lua` utility in the project root. All special-purpose runners have been removed in favor of this unified approach.
+  > **Note:** Firmo uses a standardized test system where `firmo.lua` (leveraging `lib/tools/cli`) serves as the unified entry point for all test execution and related commands.
 
 ## Important Testing Notes
 
@@ -712,27 +714,29 @@ expect(value).to_not.be.a("number")
 ### Complete Assertion Pattern Mapping
 
 If you're coming from a busted-style background, use this mapping to convert assertions:
-| busted-style                      | firmo style                         | Notes                              |
+| busted-style | firmo style | Notes |
 | --------------------------------- | ----------------------------------- | ---------------------------------- |
-| `assert.is_not_nil(value)`        | `expect(value).to.exist()`          | Checks if a value is not nil       |
-| `assert.is_nil(value)`            | `expect(value).to_not.exist()`      | Checks if a value is nil           |
-| `assert.is_true(value)`           | `expect(value).to.be_truthy()`      | Checks if a value is truthy        |
-| `assert.is_false(value)`          | `expect(value).to.be_falsy()`       | Checks if value is `false` or `nil`|
+| `assert.is_not_nil(value)` | `expect(value).to.exist()` | Checks if a value is not nil |
+| `assert.is_nil(value)` | `expect(value).to_not.exist()` | Checks if a value is nil |
+| `assert.is_true(value)` | `expect(value).to.be_truthy()` | Checks if a value is truthy |
+| `assert.is_false(value)` | `expect(value).to.be_falsy()` | Checks if value is `false` or `nil`|
 | `assert.equals(expected, actual)` | `expect(actual).to.equal(expected)` | Deep equality check (reversed args)|
-| `assert.same(expected, actual)`   | `expect(actual).to.equal(expected)` | Deep equality check (reversed args)|
-| `assert.type_of(value, "string")` | `expect(value).to.be.a("string")`   | Checks `type(value)`               |
-| `assert.is_string(value)`         | `expect(value).to.be.a("string")`   | Checks `type(value)`               |
-| `assert.is_number(value)`         | `expect(value).to.be.a("number")`   | Checks `type(value)`               |
-| `assert.is_table(value)`          | `expect(value).to.be.a("table")`    | Checks `type(value)`               |
-| `assert.matches(pattern, value)`  | `expect(value).to.match(pattern)`   | String/Value pattern matching      |
-| `assert.has_error(fn)`            | `expect(fn).to.fail()`              | Checks if function throws error    |
+| `assert.same(expected, actual)` | `expect(actual).to.equal(expected)` | Deep equality check (reversed args)|
+| `assert.type_of(value, "string")` | `expect(value).to.be.a("string")` | Checks `type(value)` |
+| `assert.is_string(value)` | `expect(value).to.be.a("string")` | Checks `type(value)` |
+| `assert.is_number(value)` | `expect(value).to.be.a("number")` | Checks `type(value)` |
+| `assert.is_table(value)` | `expect(value).to.be.a("table")` | Checks `type(value)` |
+| `assert.matches(pattern, value)` | `expect(value).to.match(pattern)` | String/Value pattern matching |
+| `assert.has_error(fn)` | `expect(fn).to.fail()` | Checks if function throws error |
 
 **Note on Negation**: Use `.to_not` before the assertion method for negation, e.g., `expect(actual).to_not.equal(unexpected)`.
+
 ### Extended Assertions
 
 Firmo includes a comprehensive set of advanced assertions beyond the basic mappings:
 
 #### Core & Type Assertions
+
 ```lua
 expect(value).to.exist()                   -- Asserts value is not nil
 expect(nil).to_not.exist()                 -- Asserts value is nil
@@ -748,6 +752,7 @@ expect(my_instance).to.be.a(MyClass)       -- Checks metatable inheritance
 ```
 
 #### Numeric Assertions
+
 ```lua
 expect(5).to.be_greater_than(4)
 expect(4).to.be_less_than(5)
@@ -760,6 +765,7 @@ expect(5.5).to_not.be_integer()
 ```
 
 #### String Assertions
+
 ```lua
 expect("hello").to.match("ell")            -- Checks string.find(value, pattern)
 expect("hello").to.match_regex("^h.*o$")   -- More explicit regex match
@@ -772,6 +778,7 @@ expect("hello").to.be_lowercase()
 ```
 
 #### Table & Collection Assertions
+
 ```lua
 expect({1, 2, 3}).to.contain(2)            -- Checks if value exists in table values
 expect({a=1, b=2}).to_not.contain(1)       -- Checks values, not keys
@@ -789,6 +796,7 @@ expect({name="a"}).to_not.match_schema({name="string", age="number"})
 ```
 
 #### Function & Error Assertions
+
 ```lua
 local function may_fail(ok) if not ok then error("failed!") end end
 expect(function() may_fail(false) end).to.fail()
@@ -806,6 +814,7 @@ expect(function() obj.count = obj.count - 1 end).to.decrease(get_count)
 ```
 
 #### Date Assertions (Requires `lib.tools.date`)
+
 ```lua
 expect("2024-01-01").to.be_date()
 expect("2024-01-01T10:00:00Z").to.be_iso_date()
@@ -815,6 +824,7 @@ expect("2024-01-01T10:00:00Z").to.be_same_day_as("2024-01-01T23:00:00+05:00")
 ```
 
 #### Async Assertions (Requires `lib.async` and async context)
+
 ```lua
 -- Assume async_fn accepts a `done` callback
 it("tests async completion", { async = true }, function(done)
@@ -829,6 +839,7 @@ end)
 ```
 
 #### Other Assertions
+
 ```lua
 expect(value).to.satisfy(function(v) return v > 10 end) -- Custom predicate
 expect(my_obj).to.implement_interface({ method1 = "function", property = "string" })
@@ -997,12 +1008,12 @@ The firmo project is organized as follows:
   - `/docs/api/`: Generated API documentation.
   - `/docs/guides/`: Usage guides (e.g., `central_config.md`).
   - `/docs/firmo/`: Internal planning and architecture documents (e.g., `plan.md`, `architecture.md`, `claude_document_update_plan.md`).
-- `firmo.lua`: Main entry point for using firmo as a library (re-exports core components).
-- `test.lua`: The primary test runner script.
+- `firmo.lua`: Main entry point for using firmo as a library and for invoking the CLI (which handles test execution).
 - `.firmo-config.lua`: Default configuration file for project-specific settings.
 - `README.md`: Project overview and setup instructions.
 - `CHANGELOG.md`: Record of changes.
 - Other config/meta files: `.luacheckrc`, `.stylua.toml`, `LICENSE`, etc.
+
 ## Coverage Module Architecture
 
 ### Components (Debug Hook Architecture)
@@ -1010,39 +1021,44 @@ The firmo project is organized as follows:
 The coverage system leverages Lua's `debug.sethook` mechanism to track line execution without modifying the source code directly. This approach avoids the complexities of source code instrumentation and provides accurate coverage data based on runtime execution.
 
 1.  **Coverage Core (`lib/coverage/init.lua`)**:
-    *   **Public API**: Provides functions like `init`, `start`, `stop`, `pause`, `resume`, `save_stats`, `load_stats`.
-    *   **State Management**: Manages the coverage state (`initialized`, `paused`), coverage data (`state.data`), and configuration cache.
-    *   **Hook Management**: Sets the debug hook (`debug_hook`) on the main thread and patches `coroutine.create`/`wrap` to apply hooks to new coroutines. Ensures hooks are properly removed during `shutdown`.
-    *   **Configuration**: Integrates with `central_config` to get settings like `enabled`, `include`/`exclude` patterns, `statsfile`, `savestepsize`.
-    *   **Stats Handling**: Implements saving/loading coverage data to/from the configured stats file, using an atomic save process and handling potential errors. Merges loaded stats with existing data.
-    *   **Error Handling**: Uses `lib.tools.error_handler` and `lib.tools.filesystem` for robust operation and error reporting. Tracks write failures to prevent infinite loops if saving fails repeatedly.
+
+    - **Public API**: Provides functions like `init`, `start`, `stop`, `pause`, `resume`, `save_stats`, `load_stats`.
+    - **State Management**: Manages the coverage state (`initialized`, `paused`), coverage data (`state.data`), and configuration cache.
+    - **Hook Management**: Sets the debug hook (`debug_hook`) on the main thread and patches `coroutine.create`/`wrap` to apply hooks to new coroutines. Ensures hooks are properly removed during `shutdown`.
+    - **Configuration**: Integrates with `central_config` to get settings like `enabled`, `include`/`exclude` patterns, `statsfile`, `savestepsize`.
+    - **Stats Handling**: Implements saving/loading coverage data to/from the configured stats file, using an atomic save process and handling potential errors. Merges loaded stats with existing data.
+    - **Error Handling**: Uses `lib.tools.error_handler` and `lib.tools.filesystem` for robust operation and error reporting. Tracks write failures to prevent infinite loops if saving fails repeatedly.
 
 2.  **Debug Hook (`debug_hook` function inside `init.lua`)**:
-    *   **Execution Tracking**: Called by the Lua runtime for each executed line (`"l"` event).
-    *   **File Filtering**: Determines the source file, normalizes its path (`filesystem.normalize_path`), and checks if it should be tracked based on `include`/`exclude` patterns using `should_track_file`. Uses a cache (`ignored_files`) for efficiency.
-    *   **Data Recording**: If the file is tracked, increments the hit count for the specific line number in `state.data`. Initializes the file's entry if it's the first hit.
-    *   **Buffering & Saving**: Manages a buffer (`state.buffer`) and triggers `save_stats` periodically based on configuration (`savestepsize`, `tick`) or buffer limits (`MAX_BUFFER_SIZE`) to persist data.
+
+    - **Execution Tracking**: Called by the Lua runtime for each executed line (`"l"` event).
+    - **File Filtering**: Determines the source file, normalizes its path (`filesystem.normalize_path`), and checks if it should be tracked based on `include`/`exclude` patterns using `should_track_file`. Uses a cache (`ignored_files`) for efficiency.
+    - **Data Recording**: If the file is tracked, increments the hit count for the specific line number in `state.data`. Initializes the file's entry if it's the first hit.
+    - **Buffering & Saving**: Manages a buffer (`state.buffer`) and triggers `save_stats` periodically based on configuration (`savestepsize`, `tick`) or buffer limits (`MAX_BUFFER_SIZE`) to persist data.
 
 3.  **Configuration (`lib/core/central_config.lua`)**:
-    *   **Settings Source**: Provides all configuration for the coverage module (enabled status, include/exclude patterns, stats file path, save frequency).
-    *   **Defaults**: Defines default coverage settings.
-    *   **Project Overrides**: Reads project-specific settings from `.firmo-config.lua`.
+
+    - **Settings Source**: Provides all configuration for the coverage module (enabled status, include/exclude patterns, stats file path, save frequency).
+    - **Defaults**: Defines default coverage settings.
+    - **Project Overrides**: Reads project-specific settings from `.firmo-config.lua`.
 
 4.  **Filesystem (`lib/tools/filesystem/init.lua`)**:
-    *   **Path Normalization**: Provides `normalize_path` used extensively for consistent file tracking.
-    *   **File Operations**: Used by `save_stats` and `load_stats` for reading, writing, moving, and checking file existence.
+
+    - **Path Normalization**: Provides `normalize_path` used extensively for consistent file tracking.
+    - **File Operations**: Used by `save_stats` and `load_stats` for reading, writing, moving, and checking file existence.
 
 5.  **Error Handling (`lib.tools.error_handler.lua`)**:
-    *   **Error Reporting**: Used throughout the coverage module to create structured errors and handle exceptions gracefully (e.g., during file I/O).
+
+    - **Error Reporting**: Used throughout the coverage module to create structured errors and handle exceptions gracefully (e.g., during file I/O).
 
 6.  **Assertion Integration for Three-State Coverage**:
-    *   The core coverage mechanism (`debug_hook`) tracks all executed lines, recording a hit count (> 0) for each line in the coverage data (`state.data`).
-    *   To differentiate verified code, the assertion module (`lib/assertion/init.lua`), upon successful execution of an assertion (`expect(...).to...`), explicitly calls `coverage.mark_line_covered(file_path, line_number)`. This function flags the specific line within the coverage data as having been covered by a passing assertion.
-    *   The reporting system uses both pieces of information:
-        - **Covered (Green)**: Line has a hit count > 0 AND was explicitly marked by `coverage.mark_line_covered`.
-        - **Executed (Orange)**: Line has a hit count > 0 BUT was NOT explicitly marked by an assertion.
-        - **Not Covered (Red)**: Line has a hit count of 0 (or was never recorded).
-    *   This explicit marking by assertions is crucial for providing the distinction between merely executed code and code whose behavior was actively verified by a test.
+    - The core coverage mechanism (`debug_hook`) tracks all executed lines, recording a hit count (> 0) for each line in the coverage data (`state.data`).
+    - To differentiate verified code, the assertion module (`lib/assertion/init.lua`), upon successful execution of an assertion (`expect(...).to...`), explicitly calls `coverage.mark_line_covered(file_path, line_number)`. This function flags the specific line within the coverage data as having been covered by a passing assertion.
+    - The reporting system uses both pieces of information:
+      - **Covered (Green)**: Line has a hit count > 0 AND was explicitly marked by `coverage.mark_line_covered`.
+      - **Executed (Orange)**: Line has a hit count > 0 BUT was NOT explicitly marked by an assertion.
+      - **Not Covered (Red)**: Line has a hit count of 0 (or was never recorded).
+    - This explicit marking by assertions is crucial for providing the distinction between merely executed code and code whose behavior was actively verified by a test.
 
 This architecture differs significantly from instrumentation-based systems by relying on runtime hooks rather than code transformation.
 

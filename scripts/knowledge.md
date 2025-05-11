@@ -2,13 +2,12 @@
 
 ## Purpose
 
-The `scripts/` directory houses a collection of standalone Lua scripts used for various tasks related to the development, maintenance, testing, and execution of the Firmo framework. These scripts range from essential entry points for running tests to utilities for checking code quality, managing versions, fixing documentation, and performing other development-related operations.
+The `scripts/` directory houses a collection of standalone Lua scripts used for various tasks related to the development, maintenance, and utility operations for the Firmo framework. These scripts focus on tasks like code quality checks, version management, documentation fixing, and other development aids. The primary test execution entry point has moved to `firmo.lua` (utilizing `lib/tools/cli`).
 
 ## Key Concepts
 
 - **Standalone Execution:** Most scripts in this directory are intended to be executed directly from the command line using the Lua interpreter (e.g., `lua scripts/check_syntax.lua lib/`). They often perform a specific, self-contained task.
 - **Development & Maintenance Aids:** Many scripts function as tools for developers working on Firmo. They automate checks (syntax, assertion patterns, print statements), help with repetitive tasks (version bumping, markdown fixing), or assist in debugging (monitoring temp files).
-- **Framework Entry Point (`runner.lua`):** The `scripts/runner.lua` script is a crucial component. It serves as the primary procedural entry point that loads the core Firmo library modules (like `lib/core/runner`, `lib/tools/cli`, `lib/tools/discover`) and orchestrates the execution of the test suite based on command-line arguments parsed by the CLI module. The `test.lua` file in the project root often acts as a very simple wrapper that simply requires and runs `scripts/runner.lua`.
 
 ## Usage Examples / Patterns
 
@@ -31,13 +30,10 @@ lua scripts/find_print_statements.lua tests/
 # Example: Bump the patch version of the project
 # lua scripts/version_bump.lua patch
 
-# Example: Execute the main runner logic (usually done via test.lua)
-# lua scripts/runner.lua tests/ --coverage
 ```
 
 ## Related Components / Modules (Scripts in this Directory)
 
-- **`runner.lua`**: The main script that initializes and runs the Firmo test framework based on command-line arguments. It loads and coordinates core library modules. Usually invoked indirectly via `test.lua`.
 - **`check_assertion_patterns.lua`**: Scans specified Lua test files using the `lib/tools/parser` to detect potentially incorrect or outdated assertion styles (e.g., Busted-style `assert.*` instead of Firmo's `expect.*`).
 - **`check_syntax.lua`**: Uses the external Lua compiler command (`luac -p`) to perform a basic syntax check on Lua files within given paths. Helps catch syntax errors quickly without full execution.
 - **`cleanup_temp_files.lua`**: Attempts to locate and delete temporary files that might have been left behind by Firmo's temporary file system (`lib/tools/filesystem/temp_file.lua`), using common temporary directory locations as a heuristic.
@@ -57,13 +53,13 @@ lua scripts/find_print_statements.lua tests/
 ## Troubleshooting / Common Pitfalls (Optional)
 
 - **Script Errors:**
-    - Check console output for Lua error messages and stack traces.
-    - **Incorrect Arguments:** Ensure you are passing the correct type and number of arguments (e.g., file paths) to the script.
-    - **Missing Dependencies:**
-        - Firmo Libraries: If a script fails with a `module 'lib....' not found` error, ensure you are running the script from the project root directory.
-        - External Tools: Some scripts rely on external commands (e.g., `check_syntax.lua` needs `luac`). Ensure these tools are installed and available in your system's PATH.
-    - **Permissions:** Scripts reading or writing files (`check_syntax.lua`, `fix_markdown.lua`, etc.) might fail due to filesystem permissions. Ensure the user running the script has appropriate access.
+  - Check console output for Lua error messages and stack traces.
+  - **Incorrect Arguments:** Ensure you are passing the correct type and number of arguments (e.g., file paths) to the script.
+  - **Missing Dependencies:**
+    - Firmo Libraries: If a script fails with a `module 'lib....' not found` error, ensure you are running the script from the project root directory.
+    - External Tools: Some scripts rely on external commands (e.g., `check_syntax.lua` needs `luac`). Ensure these tools are installed and available in your system's PATH.
+  - **Permissions:** Scripts reading or writing files (`check_syntax.lua`, `fix_markdown.lua`, etc.) might fail due to filesystem permissions. Ensure the user running the script has appropriate access.
 - **Unexpected Behavior:**
-    - Verify the script's logic matches your expectations.
-    - Double-check the arguments you provided.
-    - Add `print()` statements within the script (temporarily) for debugging if needed.
+  - Verify the script's logic matches your expectations.
+  - Double-check the arguments you provided.
+  - Add `print()` statements within the script (temporarily) for debugging if needed.

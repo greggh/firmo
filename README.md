@@ -3,7 +3,6 @@ THIS IS ALPHA SOFTWARE, DO NOT USE UNLESS YOU UNDERSTAND THAT, AND ARE LOOKING T
 
 # Firmo
 
-
 [![CI](https://github.com/greggh/firmo/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/greggh/firmo/actions/workflows/ci.yml)
 [![Documentation](https://github.com/greggh/firmo/actions/workflows/docs.yml/badge.svg?style=flat-square)](https://github.com/greggh/firmo/actions/workflows/docs.yml)
 [![GitHub License](https://img.shields.io/github/license/greggh/firmo?style=flat-square)](https://github.com/greggh/firmo/blob/main/LICENSE)
@@ -18,11 +17,10 @@ _A powerful testing library for Lua projects. This enhanced fork of [lust](https
 [Contributing](#contributing) •
 [License](#license) •
 [Discussions](https://github.com/greggh/firmo/discussions)
+
 </div>
 
 ## Features
-
-
 
 - 🧪 **Familiar Syntax** - BDD-style `describe`/`it` blocks for intuitive test organization
 - ✅ **Rich Assertions** - Extensive expect-style assertion library with detailed diffs
@@ -48,15 +46,11 @@ _A powerful testing library for Lua projects. This enhanced fork of [lust](https
 - 📝 **Structured Logging** - Comprehensive logging with multiple output formats
 - 🔌 **Interactive Mode** - Command-line interface for interactive test running
 
-
 ## Quick Start
-
 
 Copy the `firmo.lua` file to your project and require it:
 
 ### Option 1: Expose all functions globally (new in v0.7.1)
-
-
 
 ```lua
 local firmo = require('firmo')
@@ -77,11 +71,7 @@ describe('my project', function()
 end)
 ```
 
-
-
 ### Option 2: Import specific functions (traditional approach)
-
-
 
 ```lua
 local firmo = require 'firmo'
@@ -102,13 +92,9 @@ describe('my project', function()
 end)
 ```
 
-
-
 ## Configuration and Customization
 
-
 Firmo provides extensive configuration options through its central configuration system:
-
 
 ```lua
 -- Create or modify .firmo-config.lua in your project root
@@ -158,14 +144,11 @@ return {
 }
 ```
 
-
 For detailed configuration options, see the [Configuration Details](docs/guides/configuration-details/README.md) directory.
 
 ## Command Line Interface
 
-
 Firmo provides a comprehensive command line interface:
-
 
 ```bash
 
@@ -177,7 +160,7 @@ lua firmo.lua tests/
 # Run with coverage and generate HTML report
 
 
-lua firmo.lua --coverage --format=html tests/
+lua firmo.lua --coverage --report-format=html tests/
 
 # Run in watch mode
 
@@ -187,7 +170,7 @@ lua firmo.lua --watch tests/
 # Run in parallel with 8 workers
 
 
-lua firmo.lua --parallel --workers=8 tests/
+lua firmo.lua --parallel tests/
 
 # Run with quality validation
 
@@ -199,35 +182,23 @@ lua firmo.lua --quality --quality-level=3 tests/
 
 lua firmo.lua --interactive
 
-# Run with focused tags
-
-
-lua firmo.lua --tags="unit,fast" tests/
 
 # Filter tests by pattern
 
 
-lua firmo.lua --pattern="database" tests/
+lua firmo.lua --filter="database" tests/
 ```
 
-
-
 ## Documentation
-
 
 Comprehensive documentation is available in the [docs](docs/) directory:
 
 ### Getting Started
 
-
-
 - [Getting Started Guide](docs/guides/getting-started.md) - Detailed guide for beginners
 - [Migration Guide](docs/guides/migrating.md) - Migrating from other test frameworks
 
-
 ### API Reference
-
-
 
 - [Core API](docs/api/core.md) - Core testing functionality
 - [Assertions API](docs/api/assertions.md) - Assertion functions and matchers
@@ -235,37 +206,24 @@ Comprehensive documentation is available in the [docs](docs/) directory:
 - [Async API](docs/api/async.md) - Asynchronous testing
 - [Logging API](docs/api/logging.md) - Structured logging
 
-
 ### Configuration
-
-
 
 - [Central Configuration Guide](docs/guides/central_config.md) - Unified configuration system
 - [Configuration Details](docs/guides/configuration-details/README.md) - Detailed module-specific configuration
 
-
 ### Advanced Features
-
-
 
 - [Coverage Guide](docs/guides/coverage.md) - Code coverage tracking and reporting
 - [Quality Validation](docs/guides/quality.md) - Ensuring test quality
 - [Parallel Execution](docs/guides/parallel.md) - Running tests in parallel
 
-
 ### Example Code
-
-
 
 - [Examples Directory](examples/) - Example scripts demonstrating features
 
-
 ## Core Functions
 
-
 ### Test Definition
-
-
 
 ```lua
 describe("math operations", function()
@@ -291,11 +249,7 @@ xit("work in progress", function()
 end)
 ```
 
-
-
 ### Lifecycle Hooks
-
-
 
 ```lua
 describe("database tests", function()
@@ -313,13 +267,9 @@ describe("database tests", function()
 end)
 ```
 
-
-
 ### Assertions
 
-
 Firmo uses "expect style" assertions that can be chained for readable tests:
-
 
 ```lua
 -- Basic assertions
@@ -343,11 +293,7 @@ expect(function_that_throws).to.fail()
 expect(function_that_throws).to.fail.with("pattern")
 ```
 
-
-
 ### Mocking
-
-
 
 ```lua
 -- Create a spy to track function calls
@@ -369,11 +315,7 @@ expect(result.rows[1].name).to.equal("Test")
 expect(db_mock.query:called_with("SELECT * FROM users")).to.be.truthy()
 ```
 
-
-
 ### Async Testing
-
-
 
 ```lua
 -- Test asynchronous code
@@ -407,16 +349,11 @@ it_async("waits for a condition", function()
 end)
 ```
 
-
-
 ## Installation
-
 
 ### Method 1: Direct File
 
-
 Simply copy `firmo.lua` into your project directory:
-
 
 ```bash
 
@@ -432,21 +369,13 @@ git clone https://github.com/greggh/firmo.git
 cp firmo/firmo.lua your-project/
 ```
 
-
-
 ### Method 2: LuaRocks
-
-
 
 ```bash
 luarocks install firmo
 ```
 
-
-
 ### Method 3: As a Git Submodule
-
-
 
 ```bash
 
@@ -461,11 +390,7 @@ git submodule add https://github.com/greggh/firmo.git deps/firmo
 package.path = package.path .. ";./deps/firmo/?.lua"
 ```
 
-
-
 ### Method 4: With [packer.nvim](https://github.com/wbthomason/packer.nvim)
-
-
 
 ```lua
 use {
@@ -475,11 +400,7 @@ use {
 }
 ```
 
-
-
 ### Method 5: With [lazy.nvim](https://github.com/folke/lazy.nvim)
-
-
 
 ```lua
 {
@@ -489,41 +410,33 @@ use {
 }
 ```
 
-
-
 ## Usage with Non-Console Environments
 
-
 If Lua is embedded in an application without ANSI color support:
-
 
 ```lua
 local firmo = require('firmo').nocolor()
 ```
 
-
-
 ## Contributing
-
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-
 MIT, see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-
 firmo builds on the original [Lust](https://github.com/bjornbytes/lust) testing framework and takes inspiration from several excellent Lua testing libraries:
-
 
 - [lunarmodules/busted](https://github.com/lunarmodules/busted) - A powerful, flexible testing framework with rich features
 - [lunarmodules/luassert](https://github.com/lunarmodules/luassert) - An extensible assertion library with advanced matching capabilities
 
   We're grateful to these projects for advancing the state of Lua testing and providing inspiration for firmo's enhanced features.
+
 ---
+
 <div align="center">
   <p>Made with ❤️ by <a href="https://github.com/greggh">Gregg Housh</a></p>
 </div>
