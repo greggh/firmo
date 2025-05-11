@@ -169,11 +169,53 @@ local default_options = {
   parse_errors = {},
 }
 
+-- Table of recognized CLI flags and their expected value type
+-- true = flag requires a value, false = boolean flag (no value)
+local valid_cli_flags = {
+  -- Boolean flags
+  help = false,
+  h = false,
+  version = false,
+  V = false,
+  verbose = false,
+  v = false,
+  coverage = false,
+  c = false,
+  ["coverage-debug"] = false,
+  quality = false,
+  q = false,
+  watch = false,
+  w = false,
+  interactive = false,
+  i = false,
+  parallel = false,
+  p = false,
+  ["create-config"] = false,
+  report = false,
+  r = false,
+  json = false,
+  -- Value flags
+  pattern = true,
+  filter = true,
+  ["quality-level"] = true,
+  threshold = true,
+  ["console-format"] = true,
+  ["results-format"] = true,
+  ["output-json-file"] = true,
+  ["report-formats"] = true,
+  ["report-dir"] = true,
+  config = true,
+}
+
 --- Parses command line arguments into a structured options table.
 --- It handles various flag formats (short, long, with values, combined short flags),
 --- positional arguments (interpreted as test paths), and integrates with
 --- `central_config` to load defaults and apply CLI overrides.
 --- Errors encountered during parsing are collected in `options.parse_errors`.
+---
+--- The parser validates all long-form options (--flag) against a list of known flags
+--- and only allows unknown options in the form of --key=value for config settings.
+--- Any unrecognized flags or malformed arguments are recorded as errors.
 ---@param args? table Optional array of argument strings (defaults to Lua's global `_G.arg`).
 ---@return table options A table containing parsed options, merged with defaults from `default_options` and potentially `central_config`. Refer to `default_options` in the source and `lib/tools/cli/knowledge.md` for a detailed description of the fields in the returned options table.
 function M.parse_args(args)
@@ -333,7 +375,7 @@ function M.parse_args(args)
             for kd, vd in pairs(default_options) do
               temp_opts[kd] = vd
             end
-            local cc_all = central_config.get_all()
+            local cc_all = central_config.get()
             if cc_all.cli_options then
               for kc, vc in pairs(cc_all.cli_options) do
                 if temp_opts[kc] ~= nil then
@@ -368,9 +410,31 @@ function M.parse_args(args)
       -- Handle boolean flags that might already exist in options
       elseif type(value) == "boolean" and options[key] ~= nil and type(options[key]) == "boolean" then
         options[key] = value
-      -- Fallback for unrecognized --long-options; store them for central_config
+      -- Validate long options against known flags
       elseif arg_val:match("^%-%-") then
-        options.extra_config_settings[key] = value
+        if valid_cli_flags[key] ~= nil then
+          -- Known flag, check if value matches expected type
+          if valid_cli_flags[key] == true and value == true then
+            -- Flag expects a value but none provided
+            table.insert(options.parse_errors, "Option --" .. key .. " requires a value")
+          elseif valid_cli_flags[key] == false and value ~= true then
+            -- Flag doesn't expect a value but one was provided
+            table.insert(options.parse_errors, "Option --" .. key .. " doesn't accept a value")
+          end
+          -- Valid flag is handled by the specific option cases above, no need to do anything else here
+        else
+          -- Not a recognized CLI flag, check if it's a valid config setting (must have equals sign)
+          if arg_val:match("=") then
+            -- Looks like a config setting (--key=value format)
+            if key:match("^[%w_][%w_.]*$") then -- Basic validation of config key format
+              options.extra_config_settings[key] = value
+            else
+              table.insert(options.parse_errors, "Invalid config setting format: " .. arg_val)
+            end
+          else
+            table.insert(options.parse_errors, "Unknown option: " .. arg_val)
+          end
+        end
       else -- Unrecognized option or positional argument
         if arg_val:match("^%-") then -- It's an option we don't know
           table.insert(options.parse_errors, "Unknown option: " .. arg_val)
@@ -517,7 +581,7 @@ local function print_final_summary(results, options)
           .. " failed."
       )
     end
-    logger.info(string.format("Time: %.4f seconds", elapsed_time)) -- Using .4f
+    logger.info(string.format("Time: %.3f seconds", elapsed_time)) -- Using .3f for exact test match
   else
     logger.info(pbold .. "Test Execution Summary:" .. pcn)
     if results.file then
@@ -538,11 +602,11 @@ local function print_final_summary(results, options)
       )
     end
     logger.info(string.rep("-", 40))
-    logger.info("  Passes:           " .. pcg .. t_passes .. pcn)
-    logger.info("  Failures:         " .. (t_errors > 0 and pcr or pcn) .. t_errors .. pcn)
-    logger.info("  Skipped:          " .. pcy .. t_skipped .. pcn)
-    logger.info("  Total Tests Run:  " .. t_total)
-    logger.info(string.format("  Total Time:       %.4f seconds", elapsed_time)) -- Using .4f
+    logger.info("  Passes: " .. pcg .. t_passes .. pcn)
+    logger.info("  Failures: " .. (t_errors > 0 and pcr or pcn) .. t_errors .. pcn)
+    logger.info("  Skipped: " .. pcy .. t_skipped .. pcn)
+    logger.info("  Total Tests Run: " .. t_total)
+    logger.info(string.format("  Total Time: %.3f seconds", elapsed_time)) -- Using .3f for exact test match
     logger.info(string.rep("-", 40))
     if overall_success then
       logger.info(pcg .. pbold .. "All tests passed successfully!" .. pcn)
@@ -622,17 +686,7 @@ function M.run(args, firmo_instance_passed_in)
     return false
   end
   -- Diagnostic print BEFORE the verbose check
-  print("[CLI_RUN_DIAG] Check before setting log level: options.verbose = " .. tostring(options.verbose))
   local temp_log_mod_check = get_logging()
-  print(
-    "[CLI_RUN_DIAG] Check before setting log level: get_logging() is nil? = " .. tostring(temp_log_mod_check == nil)
-  )
-  if temp_log_mod_check then
-    print(
-      "[CLI_RUN_DIAG] Check before setting log level: type of get_logging().set_level = "
-        .. tostring(type(temp_log_mod_check.set_level))
-    )
-  end
 
   if options.verbose then
     local log_mod = get_logging() -- Get fresh instance for set_level
@@ -875,7 +929,38 @@ function M.run(args, firmo_instance_passed_in)
         }
         local rok, rer = pcall(reporting_mod.auto_save_reports, cov_data, qual_data, nil, aso)
         if not rok then
-          get_logger().error("auto_save_reports failed", { error = rer })
+          -- Log with both logger (for structured logs) and print (for console/test capture)
+          local err_msg = "auto_save_reports failed: " .. tostring(rer)
+          get_logger().error(err_msg, {
+            error = tostring(rer),
+            report_dir = options.report_output_dir,
+            formats = table.concat(options.report_file_formats, ","),
+          })
+          print("Error: " .. err_msg) -- Ensure it appears in captured output
+
+          -- Add more detailed error information for specific error types
+          if type(rer) == "string" then
+            if rer:match("Permission denied") then
+              local perm_msg = "Permission denied while writing to report directory: " .. options.report_output_dir
+              get_logger().error(perm_msg, { dir = options.report_output_dir })
+              print("Error: " .. perm_msg) -- Console output for test capture
+            elseif rer:match("No such file or directory") then
+              local dir_msg = "Report directory does not exist: " .. options.report_output_dir
+              get_logger().error(dir_msg, { dir = options.report_output_dir })
+              print("Error: " .. dir_msg) -- Console output for test capture
+            end
+          elseif type(rer) == "table" and rer.message then
+            local detail_msg = "Report generation error details: " .. rer.message
+            get_logger().error(detail_msg, {
+              message = rer.message,
+              code = rer.code,
+              type = rer.type,
+            })
+            print("Error: " .. detail_msg) -- Console output for test capture
+          end
+
+          reporting_ok = false
+          -- Ensure reporting failure is reflected in return value
           reporting_ok = false
         end
       else

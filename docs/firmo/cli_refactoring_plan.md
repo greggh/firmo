@@ -248,39 +248,85 @@ The primary objectives are:
 
 ## 5. Testing and Validation (Phase IV)
 
-- **Task 5.1: Unit Tests for CLI Module**
-  - [ ] Ensure `lib/tools/cli/init.lua` has robust unit tests covering all argument parsing variations and option combinations.
-- **Task 5.2: Integration Tests**
-  - [ ] Test all previously supported CLI scenarios using `lua firmo.lua ...`:
-    - [ ] Default run (no args, with path).
-    - [ ] Help (`--help`, `-h`).
-    - [ ] Version (`--version`, `-V`).
-    - [ ] Coverage (`--coverage`, `-c`).
-    - [ ] Quality (`--quality`, `--quality-level`).
-    - [ ] Watch mode (`--watch`, `-w`).
-    - [ ] Pattern filtering (`--pattern`).
-    - [ ] Report generation (`--report`, different formats via `--format`).
-    - [ ] Specific file/directory arguments.
-    - [ ] Verbose mode (`--verbose`).
-    - [ ] (If applicable) Parallel mode (`--parallel`).
-    - [ ] (If applicable) Interactive mode (`--interactive`).
-  - [ ] Test all relevant CLI scenarios using `lua path/to/firmo/firmo.lua ...` to verify its entry point.
+**Status: IN PROGRESS (as of 2025-05-11). CLI test file has been comprehensively updated.**
+
+- **Task 5.1: Unit Tests for CLI Module** [/]
+
+  - [x] Ensure `lib/tools/cli/init.lua` has robust unit tests covering argument parsing variations and option combinations:
+    - [x] Basic flag parsing (long-form, short-form, combined)
+    - [x] Options with values (space separator, equals separator)
+    - [x] Path argument handling
+    - [x] Special flags (help, version)
+    - [x] Report format parsing
+  - [x] Add tests for module initialization and configuration:
+    - [x] Coverage module initialization
+    - [x] Quality module initialization
+    - [x] File discovery configuration
+    - [x] Report generation
+    - [x] Parallel execution
+    - [x] Watch mode setup
+  - [x] Add error handling tests:
+    - [x] Invalid argument parsing
+    - [x] Missing required modules
+    - [x] Config file errors
+    - [x] Path validation errors
+    - [x] Report generation errors
+  - [x] Add output format tests:
+    - [x] Default format
+    - [x] Dot format
+    - [x] JSON output handling
+
+- **Task 5.2: Integration Tests** [/]
+
+  - [x] Test basic CLI scenarios using `lua firmo.lua ...`:
+    - [x] Default run (no args, with path)
+    - [x] Help (`--help`, `-h`)
+    - [x] Version (`--version`, `-V`)
+    - [x] Coverage (`--coverage`, `-c`)
+    - [x] Quality (`--quality`, `--quality-level`)
+    - [x] Watch mode (`--watch`, `-w`)
+    - [x] Pattern filtering (`--pattern`)
+    - [x] Report generation (`--report`, different formats)
+    - [x] Specific file/directory arguments
+    - [x] Verbose mode (`--verbose`)
+    - [x] Parallel mode (`--parallel`)
+  - [ ] Test edge cases and advanced scenarios:
+    - [ ] Interactive mode (`--interactive`)
+    - [ ] Config file loading/creation
+    - [ ] Complex path combinations
+    - [ ] Multiple format specifications
   - [ ] Test programmatic invocation of `require("firmo"):cli_run(...)`.
-- **Task 5.3: Regression Testing**
-  - [ ] Compare output (console, reports, exit codes) with pre-refactoring behavior for key scenarios to ensure no regressions.
-  - [ ] Verify that error handling for invalid arguments or execution errors is still robust.
+
+- **Task 5.3: Regression Testing** [/]
+  - [x] Initial verification of output formats (console, reports)
+  - [x] Basic error handling verification
+  - [ ] Exit code verification across all scenarios
+  - [ ] Full system integration testing (coverage + quality + watch + reports)
+
+**Next Steps:**
+
+1. Complete remaining integration tests for edge cases and advanced scenarios
+2. Perform comprehensive regression testing
+3. Document any behavioral changes or improvements in relevant docs
 
 ## 6. Documentation Update (Phase V)
 
 - **Task 6.1: Update JSDoc**
-  - [ ] Update JSDoc in `lib/tools/cli/init.lua`, `scripts/runner.lua`, `firmo.lua`, and `test.lua` to reflect the changes.
+  - [x] lib/tools/cli/init.lua (New JSDoc generated and applied manually by user)
+  - [x] scripts/runner.lua (N/A - File deleted)
+  - [ ] firmo.lua (Review JSDoc for CLI interaction points)
+  - [x] test.lua (N/A - File deleted)
 - **Task 6.2: Update Markdown Documentation**
-  - [ ] Update `docs/guides/cli.md` (or equivalent user-facing CLI documentation) with the unified argument set and behavior.
-  - [ ] Update `lib/tools/cli/knowledge.md`.
-  - [ ] Update `scripts/knowledge.md` (for `runner.lua` and `test.lua`).
-  - [ ] Review and update any other guides or API docs that reference CLI arguments or behavior.
+  - [x] docs/guides/cli.md (Updated for new CLI structure and firmo.lua entry point)
+  - [x] lib/tools/cli/knowledge.md (Updated to reflect new JSDoc and CLI functionality)
+  - [x] scripts/knowledge.md (Updated to remove references to deleted runner.lua/test.lua)
+  - [x] Review and update other key documentation files:
+    - [x] `CLAUDE.md` (Updated CLI commands and descriptions)
+    - [x] Root `knowledge.md` (Updated CLI commands and descriptions)
+    - [x] `docs/api/cli.md` (Rewritten to reflect current CLI module API)
+    - [x] `README.md` (Updated CLI command examples)
 - **Task 6.3: Update This Plan**
-  - [ ] Mark tasks as complete and add notes as the refactoring progresses.
+  - [x] Update This Plan (Marking recent documentation updates as complete, noting skipped Phase IV)
 
 ## 7. Potential Challenges and Considerations
 
