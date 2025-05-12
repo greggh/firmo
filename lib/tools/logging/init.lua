@@ -1413,4 +1413,11 @@ function M.create_buffered_logger(module_name, options)
   return li
 end
 
+function M.reset_internal_config_flag_for_testing()
+  config._configured = false
+  -- Optionally, also fully reset 'config' table to its initial defaults here
+  -- For now, just allowing re-trigger of _ensure_configured should be enough
+  -- via a subsequent get_logger() call.
+end
+
 return M

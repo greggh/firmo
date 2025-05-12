@@ -172,6 +172,7 @@ describe("reporting formatter interface", function()
   local temp_dir
 
   before(function()
+    reporting = require("lib.reporting")
     -- Load the reporting module before each test
     expect(reporting).to.exist()
 

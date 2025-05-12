@@ -1,3 +1,4 @@
+print("PERF_TEST: File loaded")
 ---@diagnostic disable: missing-parameter, param-type-mismatch
 --- Firmo Performance Tests
 ---
@@ -37,7 +38,9 @@ describe("Performance Tests", function()
   module_reset.register_with_firmo(firmo)
 
   describe("Test suite isolation", function()
+    print("PERF_TEST: First describe block entered")
     it("should measure performance impact of module reset", function()
+      print("PERF_TEST: First 'it' block entered")
       -- Memory usage before tests
       local initial_memory = collectgarbage("count")
 
@@ -45,31 +48,35 @@ describe("Performance Tests", function()
       local module_count = 10
       local modules = {}
 
+      local module_content_template = [[
+        local M = {{}} -- Use double curlies to escape for string.format
+        M.data = {{}}
+        M.counter = 0
+        function M.increment() M.counter = M.counter + 1 end
+        function M.add_data(k, v) M.data[k] = v end
+        function M.get_counter() return M.counter end
+        function M.get_data() return M.data end
+        function M.get_name() return "%s" end -- To ensure each module can report its name
+        return M
+      ]]
+
       for i = 1, module_count do
         -- Create a temporary module for testing module reset
         local name = "test_module_" .. i
         local path = "/tmp/" .. name .. ".lua"
-        -- Use pcall with dofile for safer execution
-        local success, err = pcall(dofile, file)
-        if not success then
-          logger.error("Failed to run test file", {
-            file = file,
-            error = err,
-            index = i,
-            context = "test_execution",
-          })
-        end
+        -- local success, err = pcall(dofile, file) -- `file` was undefined, and dofile not needed here.
 
         -- Write module file
-        local success, err = test_helper.with_error_capture(function()
-          return fs.write_file(path, module_content)
+        local err_obj, write_success = test_helper.with_error_capture(function()
+          local current_module_content = string.format(module_content_template, name)
+          return fs.write_file(path, current_module_content)
         end)()
 
-        if not success then
+        if err_obj or not write_success then
           logger.error("Failed to write module file", {
             name = name,
             path = path,
-            error = err,
+            error = err_obj or "write_file returned false",
             context = "module_creation",
           })
           goto continue
@@ -118,6 +125,8 @@ describe("Performance Tests", function()
         firmo.reset()
         collectgarbage("collect")
       end
+
+      print("PERF_TEST: First 'it' block - before critical section")
 
       -- Run benchmarks
       local without_reset_results = firmo.benchmark.measure(run_without_reset, nil, {
