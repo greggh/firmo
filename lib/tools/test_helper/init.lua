@@ -7,6 +7,7 @@
 ---@field register_temp_directory fun(dir_path: string): boolean Registers a directory for automatic cleanup via `temp_file`.
 ---@field execute_string fun(code: string): any|nil, string? Executes a string of Lua code using `load()`. Returns results or `nil, error_message`.
 ---@field expect_async_error fun(async_fn: function, timeout_ms: number, message_pattern?: string): table Asserts that an async function throws an error within a timeout, optionally matching the message. Returns the error object. @throws table If the function succeeds, times out, or the message doesn't match.
+---@field with_isolated_module_run fun(module_name: string, setup_fn: function|nil, run_fn: function, ...):boolean,any Calls run_fn with a freshly required module, after setup_fn. Returns success flag and results or error object.
 --- Firmo Test Helper Module
 ---
 --- This module provides utility functions specifically designed to simplify writing
@@ -648,6 +649,67 @@ function helper.expect_async_error(async_fn, timeout_ms, message_pattern, option
   end
 
   return err_norm
+end
+
+--- Runs a function with a specific module freshly required, after executing a setup function.
+--- Ensures the module is re-required for the scope of the run_fn call and then restored.
+--- This is useful for testing modules that cache their dependencies upon initial require,
+--- allowing mocks to be injected for a specific test run.
+---
+---@param module_name_to_isolate string The fully qualified name of the module to isolate and re-require.
+---@param setup_fn function|nil A function to run *after* the module is marked for re-requiring but *before* it's actually re-required.
+---                         This function should set up any mocks in `package.loaded` for dependencies of the isolated module.
+---@param run_fn function The function to execute, which will receive the freshly required isolated_module as its first argument.
+---@param ... any Additional arguments to pass to run_fn after the isolated_module.
+---@return boolean success True if setup_fn, require, and run_fn all completed without error; false otherwise.
+---@return any ... If success is true, returns the results of run_fn. If success is false, returns a single error_object.
+function helper.with_isolated_module_run(module_name_to_isolate, setup_fn, run_fn, ...)
+  local eh = get_error_handler() -- Get the error handler instance
+  if not eh then
+    error("Critical: error_handler module not available in test_helper.with_isolated_module_run", 0)
+  end
+
+  local original_package_loaded_entry = package.loaded[module_name_to_isolate]
+  package.loaded[module_name_to_isolate] = nil -- Force re-require
+
+  if setup_fn then
+    local setup_ok, setup_err_val = pcall(setup_fn)
+    if not setup_ok then
+      package.loaded[module_name_to_isolate] = original_package_loaded_entry -- Restore
+      local err_obj = eh.new("SETUP_ERROR", "Error during setup_fn for with_isolated_module_run: " .. tostring(setup_err_val), {
+        module_name = module_name_to_isolate,
+        original_error = setup_err_val,
+      })
+      return false, err_obj
+    end
+  end
+
+  local require_ok, isolated_module_or_err = pcall(require, module_name_to_isolate)
+  if not require_ok then
+      package.loaded[module_name_to_isolate] = original_package_loaded_entry -- Restore
+      local err_obj = eh.new("REQUIRE_ERROR", "Failed to re-require isolated module '" .. module_name_to_isolate .. "': " .. tostring(isolated_module_or_err), {
+        module_name = module_name_to_isolate,
+        original_error = isolated_module_or_err,
+      })
+      return false, err_obj
+  end
+  -- If require_ok is true, isolated_module_or_err is the actual module
+
+  local pcall_results = { pcall(run_fn, isolated_module_or_err, ...) } -- Pass the loaded module
+  local run_fn_success = table.remove(pcall_results, 1)
+
+  package.loaded[module_name_to_isolate] = original_package_loaded_entry -- Always restore
+
+  if not run_fn_success then
+    local run_fn_err_val = pcall_results[1]
+    local err_obj = eh.new("RUN_FN_ERROR", "Error during isolated run_fn for module '" .. module_name_to_isolate .. "': " .. tostring(run_fn_err_val), {
+      module_name = module_name_to_isolate,
+      original_error = run_fn_err_val,
+    })
+    return false, err_obj
+  end
+  
+  return true, unpack_table(pcall_results)
 end
 
 return helper

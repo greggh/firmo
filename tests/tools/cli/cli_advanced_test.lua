@@ -2151,4 +2151,329 @@ describe("CLI Advanced Tests", function()
       end)
     end)
   end)
+
+  describe("Programmatic Invocation", function()
+    it("successfully runs with array of args and returns true", function()
+      testname = "programmatic run with array of args" -- Keep for AFTER test hook consistency
+
+      local firmo_instance_for_run = require("firmo")
+      expect(firmo_instance_for_run).to.be.a("table", "Firmo module should be loadable")
+
+      local fake_test_path
+      local runner_function_called = "none" -- Keep for assertion
+      local runner_paths_received = nil -- Keep for assertion
+
+      local setup_mocks_fn = function()
+        local fake_test_content = [[
+          local firmo_for_fake_test = require("firmo")
+          firmo_for_fake_test.describe("Fake Suite", function()
+            firmo_for_fake_test.it("Fake Test", function()
+              firmo_for_fake_test.expect(true).to.equal(true)
+            end)
+          end)
+        ]]
+        fake_test_path = temp_dir:create_file("programmatic_fake_test.lua", fake_test_content)
+
+        local mock_discover = {
+          discover = function(dir_path_arg, pattern_arg)
+            if
+              dir_path_arg == fake_test_path
+              or (dir_path_arg == temp_dir.path and pattern_arg == "programmatic_fake_test.lua")
+            then
+              return { files = { fake_test_path } }
+            end
+            if
+              dir_path_arg == temp_dir.path
+              and fs.file_exists(fs.join_paths(temp_dir.path, "programmatic_fake_test.lua"))
+            then
+              return { files = { fs.join_paths(temp_dir.path, "programmatic_fake_test.lua") } }
+            end
+            return { files = {} }
+          end,
+        }
+        mock_module("lib.tools.discover", mock_discover)
+
+        local mock_runner = {
+          configure = function() end,
+          run_file = function(path, ...)
+            runner_function_called = "run_file"
+            runner_paths_received = path
+            return { success = true, passes = 1, errors = 0, skipped = 0, elapsed = 0.01 }
+          end,
+          run_tests = function(paths, ...)
+            runner_function_called = "run_tests"
+            runner_paths_received = paths
+            return { success = true, passes = (paths and #paths or 0), errors = 0, skipped = 0, elapsed = 0.01 }
+          end,
+          run_discovered = function(base_dir, pattern, ...)
+            runner_function_called = "run_discovered"
+            runner_paths_received = { base_dir, pattern }
+            return { success = true, passes = 1, errors = 0, skipped = 0, elapsed = 0.01 }
+          end,
+        }
+        mock_module("lib.core.runner", mock_runner)
+      end
+
+      local run_cli_fn = function(freshly_loaded_cli_module)
+        local cli_args = { fake_test_path }
+        return freshly_loaded_cli_module.run(cli_args, firmo_instance_for_run)
+      end
+
+      start_capture_output()
+      local isolated_run_success, cli_run_result_or_error =
+        test_helper.with_isolated_module_run("lib.tools.cli", setup_mocks_fn, run_cli_fn)
+      stop_capture_output()
+
+      expect(isolated_run_success).to.equal(
+        true,
+        "with_isolated_module_run should succeed. Error: "
+          .. (not isolated_run_success and inspect(cli_run_result_or_error) or "none")
+      )
+
+      expect(cli_run_result_or_error).to.equal(
+        true,
+        "Programmatic cli.run (isolated) should return true on success. Got: " .. tostring(cli_run_result_or_error)
+      )
+
+      local expected_runner_path = fake_test_path
+      if runner_function_called == "run_file" then
+        expect(runner_paths_received).to.equal(
+          expected_runner_path,
+          "Runner function 'run_file' should have been called with the fake test path."
+        )
+      elseif runner_function_called == "run_tests" then
+        expect(runner_paths_received).to.be.a("table")
+        expect(#runner_paths_received).to.equal(1)
+        expect(runner_paths_received[1]).to.equal(
+          expected_runner_path,
+          "Runner function 'run_tests' should have been called with the fake test path."
+        )
+      else
+        expect(false).to.equal(
+          true,
+          "Unexpected runner function called: "
+            .. runner_function_called
+            .. " with paths: "
+            .. inspect(runner_paths_received)
+        )
+      end
+    end)
+
+    it("handles --help flag programmatically and returns true", function()
+      testname = "programmatic run with --help"
+
+      local firmo_instance_for_run = require("firmo")
+
+      local run_cli_fn = function(freshly_loaded_cli_module)
+        return freshly_loaded_cli_module.run({ "--help" }, firmo_instance_for_run)
+      end
+
+      start_capture_output()
+      -- No mocks needed for --help as it should short-circuit before discovery/runner
+      local isolated_run_success, cli_run_result =
+        test_helper.with_isolated_module_run("lib.tools.cli", nil, run_cli_fn)
+      local output = stop_capture_output()
+
+      expect(isolated_run_success).to.equal(true, "with_isolated_module_run for --help should succeed")
+      expect(cli_run_result).to.equal(true, "Programmatic cli.run with --help should return true")
+
+      local help_message_found = false
+      if output then
+        for _, line in ipairs(output) do
+          if line:match("Usage: lua firmo%.lua") then
+            help_message_found = true
+            break
+          end
+        end
+      end
+      expect(help_message_found).to.equal(true, "Help message should be printed to output")
+    end)
+
+    it("successfully runs with a pre-parsed options table", function()
+      testname = "programmatic run with options table"
+
+      -- Use a global for diagnostics
+      _G._TEST_RUNNER_TRACKING_TABLE = {
+        function_called = "none",
+        paths_received = nil,
+        options_received = nil,
+      }
+      -- Ensure cleanup of the global. This 'after' is local to this 'it' block's scope.
+      -- However, Firmo's 'after' is associated with 'describe' blocks.
+      -- For simplicity in this diagnostic step, we'll rely on the main 'after' hook for the describe block
+      -- or manually ensure this global is nilled if the test is interrupted.
+      -- A more robust solution would be a dedicated cleanup mechanism if this pattern were permanent.
+
+      local firmo_instance_for_run = require("firmo")
+      local fake_test_path
+
+      local setup_mocks_fn = function()
+        print("DEBUG_SETUP: setup_mocks_fn called")
+        local fake_test_content = [[
+          local firmo_for_fake_test = require("firmo")
+          firmo_for_fake_test.describe("Fake Options Suite", function()
+            firmo_for_fake_test.it("Fake Options Test", function()
+              firmo_for_fake_test.expect(1).to.equal(1)
+            end)
+          end)
+        ]]
+        fake_test_path = temp_dir:create_file("options_fake_test.lua", fake_test_content)
+        print("DEBUG_SETUP: Fake test file created at:", fake_test_path)
+
+        mock_module("lib.tools.discover", {
+          discover = function(dir_path_arg, pattern_arg)
+            print("DEBUG_MOCK_DISCOVER: discover called with dir:", dir_path_arg, "pattern:", pattern_arg)
+            if
+              dir_path_arg == fake_test_path
+              or (dir_path_arg == temp_dir.path and pattern_arg == "options_fake_test.lua")
+            then
+              print("DEBUG_MOCK_DISCOVER: Returning fake_test_path:", fake_test_path)
+              return { files = { fake_test_path } }
+            end
+            if
+              dir_path_arg == temp_dir.path and fs.file_exists(fs.join_paths(temp_dir.path, "options_fake_test.lua"))
+            then
+              print(
+                "DEBUG_MOCK_DISCOVER: Returning fake_test_path from temp_dir scan:",
+                fs.join_paths(temp_dir.path, "options_fake_test.lua")
+              )
+              return { files = { fs.join_paths(temp_dir.path, "options_fake_test.lua") } }
+            end
+            print("DEBUG_MOCK_DISCOVER: Returning empty files table")
+            return { files = {} }
+          end,
+        })
+        print("DEBUG_SETUP: lib.tools.discover mocked")
+
+        local mock_runner = {
+          configure = function(...)
+            print("DEBUG_MOCK_RUNNER: configure called with:", inspect({ ... }))
+          end,
+          run_file = function(path, firmo_inst, opts)
+            print(
+              "DEBUG_MOCK_RUNNER: run_file called. Path:",
+              path,
+              "opts.verbose:",
+              opts and opts.verbose,
+              "Full opts:",
+              inspect(opts)
+            )
+            _G._TEST_RUNNER_TRACKING_TABLE.function_called = "run_file"
+            _G._TEST_RUNNER_TRACKING_TABLE.paths_received = path
+            _G._TEST_RUNNER_TRACKING_TABLE.options_received = opts
+            print(
+              "DEBUG_MOCK_RUNNER: INSIDE run_file, _G._TEST_RUNNER_TRACKING_TABLE.options_received.verbose IS:",
+              _G._TEST_RUNNER_TRACKING_TABLE.options_received
+                and _G._TEST_RUNNER_TRACKING_TABLE.options_received.verbose
+            )
+            return { success = true, passes = 1, errors = 0, skipped = 0, elapsed = 0.01 }
+          end,
+          run_tests = function(paths, firmo_inst, opts)
+            print(
+              "DEBUG_MOCK_RUNNER: run_tests called. Paths:",
+              inspect(paths),
+              "opts.verbose:",
+              opts and opts.verbose,
+              "Full opts:",
+              inspect(opts)
+            )
+            _G._TEST_RUNNER_TRACKING_TABLE.function_called = "run_tests"
+            _G._TEST_RUNNER_TRACKING_TABLE.paths_received = paths
+            _G._TEST_RUNNER_TRACKING_TABLE.options_received = opts
+            print(
+              "DEBUG_MOCK_RUNNER: INSIDE run_tests, _G._TEST_RUNNER_TRACKING_TABLE.options_received.verbose IS:",
+              _G._TEST_RUNNER_TRACKING_TABLE.options_received
+                and _G._TEST_RUNNER_TRACKING_TABLE.options_received.verbose
+            )
+            return { success = true, passes = (paths and #paths or 0), errors = 0, skipped = 0, elapsed = 0.01 }
+          end,
+          run_discovered = function(base_dir, pattern, ...)
+            print(
+              "DEBUG_MOCK_RUNNER: run_discovered called with base_dir:",
+              base_dir,
+              "pattern:",
+              pattern,
+              " other_args:",
+              inspect({ ... })
+            )
+            _G._TEST_RUNNER_TRACKING_TABLE.function_called = "run_discovered"
+            _G._TEST_RUNNER_TRACKING_TABLE.paths_received = { base_dir, pattern }
+            return { success = true, passes = 1, errors = 0, skipped = 0, elapsed = 0.01 }
+          end,
+        }
+        mock_module("lib.core.runner", mock_runner)
+        print("DEBUG_SETUP: lib.core.runner mocked")
+        print("DEBUG_SETUP: setup_mocks_fn finished")
+      end
+
+      local run_cli_fn = function(freshly_loaded_cli_module)
+        local options_table = {
+          specific_paths_to_run = { fake_test_path },
+          verbose = true,
+        }
+        print("DEBUG_PRE_PARSED_TEST: options_table being passed to cli.run:", inspect(options_table))
+        -- No longer returning the tracking table from here
+        return freshly_loaded_cli_module.run(options_table, firmo_instance_for_run)
+      end
+
+      start_capture_output()
+      -- Capture only success and primary result of cli.run
+      local isolated_run_success, cli_run_actual_result =
+        test_helper.with_isolated_module_run("lib.tools.cli", setup_mocks_fn, run_cli_fn)
+      stop_capture_output()
+
+      expect(isolated_run_success).to.equal(
+        true,
+        "with_isolated_module_run for options table should succeed. Error: "
+          .. (not isolated_run_success and inspect(cli_run_actual_result) or "none")
+      )
+      expect(cli_run_actual_result).to.equal(true, "Programmatic cli.run with options table should return true")
+
+      -- Use the global _G._TEST_RUNNER_TRACKING_TABLE for assertions
+      print(
+        "DEBUG_TEST_BODY: AFTER isolated_run, _G._TEST_RUNNER_TRACKING_TABLE.options_received IS:",
+        inspect(_G._TEST_RUNNER_TRACKING_TABLE and _G._TEST_RUNNER_TRACKING_TABLE.options_received)
+      )
+      print(
+        "DEBUG_TEST_BODY: AFTER isolated_run, _G._TEST_RUNNER_TRACKING_TABLE.options_received.verbose IS:",
+        _G._TEST_RUNNER_TRACKING_TABLE
+          and _G._TEST_RUNNER_TRACKING_TABLE.options_received
+          and _G._TEST_RUNNER_TRACKING_TABLE.options_received.verbose
+      )
+
+      expect(_G._TEST_RUNNER_TRACKING_TABLE.options_received).to.be.a(
+        "table",
+        "Runner options should have been received by the runner"
+      )
+      if _G._TEST_RUNNER_TRACKING_TABLE.options_received then
+        expect(_G._TEST_RUNNER_TRACKING_TABLE.options_received.verbose).to.equal(
+          true,
+          "Runner option 'verbose' should be true as set in options_table"
+        )
+        expect(_G._TEST_RUNNER_TRACKING_TABLE.options_received.stop_on_fail).to.be.falsy(
+          "Runner option 'stop_on_fail' should not be present or be falsy from pre-parsed top-level options"
+        )
+      end
+
+      local correct_path_passed = false
+      if
+        _G._TEST_RUNNER_TRACKING_TABLE.function_called == "run_file"
+        and _G._TEST_RUNNER_TRACKING_TABLE.paths_received == fake_test_path
+      then
+        correct_path_passed = true
+      elseif
+        _G._TEST_RUNNER_TRACKING_TABLE.function_called == "run_tests"
+        and type(_G._TEST_RUNNER_TRACKING_TABLE.paths_received) == "table"
+        and #_G._TEST_RUNNER_TRACKING_TABLE.paths_received == 1
+        and _G._TEST_RUNNER_TRACKING_TABLE.paths_received[1] == fake_test_path
+      then
+        correct_path_passed = true
+      end
+      expect(correct_path_passed).to.equal(
+        true,
+        "Runner should have been called with the fake test path. Called: "
+          .. _G._TEST_RUNNER_TRACKING_TABLE.function_called
+      )
+    end)
+  end)
 end)
