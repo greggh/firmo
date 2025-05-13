@@ -559,6 +559,19 @@ function M.run_file(file)
   -- Reset test state if test_definition module is available
   if test_definition and test_definition.reset then
     test_definition.reset()
+    print("[RUNNER_DEBUG] M.run_file: test_definition.reset() CALLED for file: " .. file)
+    if test_definition.get_state then
+      local current_state_after_reset = test_definition.get_state() -- Call get_state once
+      print(
+        string.format(
+          "[RUNNER_DEBUG] M.run_file: state AFTER reset for %s: passes=%d, errors=%d, skipped=%d",
+          file,
+          current_state_after_reset.passes,
+          current_state_after_reset.errors,
+          current_state_after_reset.skipped
+        )
+      )
+    end
   end
 
   get_logger().debug("Running test file", {
@@ -619,7 +632,16 @@ function M.run_file(file)
     if test_definition and test_definition.get_state then
       test_state = test_definition.get_state()
     end
-
+    print(
+      string.format(
+        "[RUNNER_DEBUG] M.run_file: For file %s, final test_state before returning result: passes=%d, errors=%d, skipped=%d. Calculated success: %s",
+        file,
+        test_state.passes,
+        test_state.errors,
+        test_state.skipped,
+        tostring(test_state.errors == 0)
+      )
+    )
     return {
       success = test_state.errors == 0,
       passes = test_state.passes,
@@ -630,6 +652,13 @@ function M.run_file(file)
   end)
 
   if not success then
+    print(
+      string.format(
+        "[RUNNER_DEBUG] M.run_file: ERROR during pcall(chunk) for file %s. Error: %s",
+        file,
+        get_error_handler().format_error(result)
+      )
+    )
     -- Handle errors during file execution
     get_logger().error("Failed to run test file", {
       file = file,

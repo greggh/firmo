@@ -15,6 +15,7 @@
 ---@field watch fun(firmo_instance: table, options: table):boolean Runs tests in watch mode. Requires `lib.tools.watcher`.
 ---@field interactive fun(firmo_instance: table, options: table):boolean Runs tests in interactive mode. Requires `lib.tools.interactive`.
 
+local inspect = require("inspect")
 local colors_enabled = true
 local SGR_CODES =
   { reset = 0, bold = 1, red = 31, green = 32, yellow = 33, blue = 34, magenta = 35, cyan = 36, white = 37 }
@@ -699,6 +700,13 @@ function M.run(args, firmo_instance_passed_in)
   end
   if options.coverage_enabled then
     if coverage_module and coverage_module.init and coverage_module.start then
+      print(
+        string.format(
+          "[CLI.RUN DEBUG] coverage_module in cli.run: %s, type of init: %s",
+          tostring(coverage_module),
+          type(coverage_module.init)
+        )
+      )
       local co = { enabled = true }
       if options.coverage_debug then
         co.debug_mode = true
@@ -706,6 +714,20 @@ function M.run(args, firmo_instance_passed_in)
       if options.coverage_threshold then
         co.threshold = options.coverage_threshold
       end
+      print(
+        string.format(
+          "[CLI.RUN DEBUG] coverage_module in cli.run: %s, type of init: %s",
+          tostring(coverage_module),
+          type(coverage_module.init)
+        )
+      )
+      print(
+        string.format(
+          "[CLI.RUN DEBUG] Value of 'co' before calling coverage_module.init: %s (type: %s)",
+          tostring(co),
+          type(co)
+        )
+      )
       coverage_module.init(co)
       coverage_module.start()
       options.coverage_instance = coverage_module
@@ -810,6 +832,7 @@ function M.run(args, firmo_instance_passed_in)
         -- This is the path taken by WORKER processes invoked by the parallel runner
         local result_table_single_file =
           runner_module.run_file(target_files_to_run[1], firmo_instance, runner_opts_for_run)
+        print(cr .. "Worker: result_table_single_file" .. cn .. inspect(result_table_single_file))
         if result_table_single_file then
           overall_success = result_table_single_file.success and (result_table_single_file.errors or 0) == 0
           if options.output_json_filepath and json_module and get_fs() then -- Check for dedicated JSON output file path
@@ -869,6 +892,7 @@ function M.run(args, firmo_instance_passed_in)
       else -- Multi-file execution path (main process when running multiple files)
         local results_table_multi_file =
           runner_module.run_tests(target_files_to_run, firmo_instance, runner_opts_for_run)
+        print(cr .. "Worker: results_table_multi_file" .. cn .. inspect(results_table_multi_file))
         if results_table_multi_file then
           overall_success = results_table_multi_file.success
           if options.console_json_dump and json_module then
@@ -971,7 +995,26 @@ function M.run(args, firmo_instance_passed_in)
       reporting_ok = false
     end
   end
-  return overall_success and reporting_ok
+  print(
+    "[CLI.RUN DEBUG] FINAL RETURN VALUES: overall_success type = "
+      .. type(overall_success)
+      .. ", value = "
+      .. tostring(overall_success)
+  )
+  print(
+    "[CLI.RUN DEBUG] FINAL RETURN VALUES: reporting_ok type = "
+      .. type(reporting_ok)
+      .. ", value = "
+      .. tostring(reporting_ok)
+  )
+  local final_return_value = overall_success and reporting_ok
+  print(
+    "[CLI.RUN DEBUG] FINAL RETURN VALUES: (overall_success and reporting_ok) evaluates to type = "
+      .. type(final_return_value)
+      .. ", value = "
+      .. tostring(final_return_value)
+  )
+  return final_return_value
 end
 
 --- Runs tests in watch mode using the `lib.tools.watcher` module.

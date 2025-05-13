@@ -30,6 +30,29 @@
 ---@field STATUS TestStatus Enum containing test status constants (PASS, FAIL, SKIP, PENDING).
 local M = {}
 
+local colors_enabled = true
+local SGR_CODES =
+  { reset = 0, bold = 1, red = 31, green = 32, yellow = 33, blue = 34, magenta = 35, cyan = 36, white = 37 }
+
+--- Generates an SGR (Select Graphic Rendition) escape code string.
+--- If colors are disabled globally (via `colors_enabled` upvalue), returns an empty string.
+---@param code_or_name string|number The SGR code number or a predefined color/style name (e.g., "red", "bold").
+---@return string The ANSI SGR escape code string, or an empty string.
+---@private
+local function sgr(code_or_name)
+  if not colors_enabled then
+    return ""
+  end
+  local code = type(code_or_name) == "number" and code_or_name or SGR_CODES[code_or_name]
+  if code then
+    return string.char(27) .. "[" .. code .. "m"
+  end
+  return ""
+end
+
+local cr, cg, cy, cb, cm, cc, bold, cn =
+  sgr("red"), sgr("green"), sgr("yellow"), sgr("blue"), sgr("magenta"), sgr("cyan"), sgr("bold"), sgr("reset")
+
 -- Forward declaration of module-level variables
 local level = 0
 local befores = {}
@@ -371,14 +394,19 @@ function M.describe(name, fn, options)
   -- The 'it' function will handle skipping based on the 'excluded' flag on the block.
   local success, err = get_error_handler().try(fn)
   if not success then
-    -- Handle errors during describe block definition
+    print(
+      string.format(
+        "[TEST_DEFINITION_DEBUG] Error in M.describe('%s'). Error message: %s",
+        name,
+        get_error_handler().format_error(err)
+      )
+    )
     get_logger().error("Error during describe block definition: " .. get_error_handler().format_error(err), {
       block_name = name,
       level = level,
     })
     errors = errors + 1
-    -- Record this suite itself as failing due to definition error? Might be complex.
-    -- For now, just log the error. The runner should still report failures.
+    print(cr .. "Errors variable added +1: " .. errors .. cn)
   end
 
   -- Restore previous state
@@ -972,6 +1000,7 @@ end
 --- firmo.only_tags("unit") -- Only run unit tests after reset
 --- firmo.run()
 function M.reset()
+  print("[TEST_DEFINITION_DEBUG] M.reset() called. errors BEFORE reset:", errors)
   level = 0
   befores = {}
   afters = {}
@@ -981,11 +1010,12 @@ function M.reset()
   focus_mode = false
   current_describe_block = nil
   passes = 0
-  errors = 0
+  errors = 0 -- This is the crucial line
   skipped = 0
   test_blocks = {}
   test_paths = {}
-  test_results = {} -- Clear all test results
+  test_results = {}
+  print("[TEST_DEFINITION_DEBUG] M.reset() finished. errors AFTER reset:", errors)
 end
 
 --- Get the current state of the test system
@@ -1014,6 +1044,14 @@ end
 ---   end
 --- end
 function M.get_state()
+  print(
+    string.format(
+      "[TEST_DEFINITION_DEBUG] M.get_state() returning: passes=%d, errors=%d, skipped=%d",
+      passes,
+      errors,
+      skipped
+    )
+  )
   return {
     level = level,
     passes = passes,
@@ -1126,12 +1164,31 @@ function M.add_test_result(result)
   end
 
   -- Update counters based on status
+  print(
+    string.format(
+      "[TEST_DEFINITION_DEBUG] add_test_result CALLED FOR: %s, STATUS: %s, EXPECT_ERROR: %s",
+      tostring(result.name),
+      tostring(result.status),
+      tostring(result.options and result.options.expect_error)
+    )
+  )
+
   if result.status == TEST_STATUS.PASS then
     passes = passes + 1
+    print(string.format("[TEST_DEFINITION_DEBUG]     PASSES incremented for: %s", tostring(result.name)))
   elseif result.status == TEST_STATUS.FAIL then
     errors = errors + 1
+    print(cr .. "Errors variable added +1: " .. errors .. cn)
+    print(
+      string.format(
+        "[TEST_DEFINITION_DEBUG] M.add_test_result: INCREMENTING ERRORS for test: %s (path: %s)",
+        tostring(result.name),
+        tostring(result.path_string)
+      )
+    )
   elseif result.status == TEST_STATUS.SKIP or result.status == TEST_STATUS.PENDING then
     skipped = skipped + 1
+    print(string.format("[TEST_DEFINITION_DEBUG]     SKIPPED incremented for: %s", tostring(result.name)))
   end
 
   return result
