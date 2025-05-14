@@ -394,19 +394,11 @@ function M.describe(name, fn, options)
   -- The 'it' function will handle skipping based on the 'excluded' flag on the block.
   local success, err = get_error_handler().try(fn)
   if not success then
-    print(
-      string.format(
-        "[TEST_DEFINITION_DEBUG] Error in M.describe('%s'). Error message: %s",
-        name,
-        get_error_handler().format_error(err)
-      )
-    )
     get_logger().error("Error during describe block definition: " .. get_error_handler().format_error(err), {
       block_name = name,
       level = level,
     })
     errors = errors + 1
-    print(cr .. "Errors variable added +1: " .. errors .. cn)
   end
 
   -- Restore previous state
@@ -1000,7 +992,6 @@ end
 --- firmo.only_tags("unit") -- Only run unit tests after reset
 --- firmo.run()
 function M.reset()
-  print("[TEST_DEFINITION_DEBUG] M.reset() called. errors BEFORE reset:", errors)
   level = 0
   befores = {}
   afters = {}
@@ -1015,7 +1006,6 @@ function M.reset()
   test_blocks = {}
   test_paths = {}
   test_results = {}
-  print("[TEST_DEFINITION_DEBUG] M.reset() finished. errors AFTER reset:", errors)
 end
 
 --- Get the current state of the test system
@@ -1044,14 +1034,6 @@ end
 ---   end
 --- end
 function M.get_state()
-  print(
-    string.format(
-      "[TEST_DEFINITION_DEBUG] M.get_state() returning: passes=%d, errors=%d, skipped=%d",
-      passes,
-      errors,
-      skipped
-    )
-  )
   return {
     level = level,
     passes = passes,
@@ -1150,45 +1132,15 @@ function M.add_test_result(result)
     else
       status_color = "\27[33m" -- yellow
     end
-
-    print(
-      string.format(
-        "ADD RESULT: %s[%s]\27[0m %s (%s) %s",
-        status_color,
-        result.status:upper(),
-        result.name,
-        result.path_string or "",
-        result.expect_error and "[expects error]" or ""
-      )
-    )
   end
 
   -- Update counters based on status
-  print(
-    string.format(
-      "[TEST_DEFINITION_DEBUG] add_test_result CALLED FOR: %s, STATUS: %s, EXPECT_ERROR: %s",
-      tostring(result.name),
-      tostring(result.status),
-      tostring(result.options and result.options.expect_error)
-    )
-  )
-
   if result.status == TEST_STATUS.PASS then
     passes = passes + 1
-    print(string.format("[TEST_DEFINITION_DEBUG]     PASSES incremented for: %s", tostring(result.name)))
   elseif result.status == TEST_STATUS.FAIL then
     errors = errors + 1
-    print(cr .. "Errors variable added +1: " .. errors .. cn)
-    print(
-      string.format(
-        "[TEST_DEFINITION_DEBUG] M.add_test_result: INCREMENTING ERRORS for test: %s (path: %s)",
-        tostring(result.name),
-        tostring(result.path_string)
-      )
-    )
   elseif result.status == TEST_STATUS.SKIP or result.status == TEST_STATUS.PENDING then
     skipped = skipped + 1
-    print(string.format("[TEST_DEFINITION_DEBUG]     SKIPPED incremented for: %s", tostring(result.name)))
   end
 
   return result
