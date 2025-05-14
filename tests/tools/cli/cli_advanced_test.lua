@@ -1889,81 +1889,83 @@ describe("CLI Advanced Tests", function()
 
         mock_module("lib.core.runner", mock_runner)
 
-        -- Capture output
-        start_capture_output()
+        local output = test_helper.with_captured_output(function()
+          -- Capture output
+          start_capture_output()
 
-        -- Run CLI with basic test run
-        local mock_firmo = create_mock_firmo()
+          -- Run CLI with basic test run
+          local mock_firmo = create_mock_firmo()
 
-        -- The error from the mock runner should propagate out of cli.run
-        -- and be caught by the test framework because of { expect_error = true }
-        cli.run({ "./tests" }, mock_firmo)
+          -- The error from the mock runner should propagate out of cli.run
+          -- and be caught by the test framework because of { expect_error = true }
+          cli.run({ "./tests" }, mock_firmo)
 
-        -- Get output
-        local output = stop_capture_output()
+          -- Get output
+          return stop_capture_output()
+        end)
 
-        -- For now, we're just checking if the error propagates.
         -- The test framework handles the { expect_error = true } part.
         -- If the test passes, it means an error occurred as expected.
         -- If it fails, it means cli.run completed without an error.
         -- We can add more specific checks later if needed.
       end)
 
-      it(
-        "propagates coverage module errors to exit code",
-        { expect_error = true },
-        function() -- ADDED expect_error = true
-          testname = "propagates coverage module errors to exit code"
-          print(cg .. "TEST: " .. testname .. cn)
-          local mock_runner = {
-            configure = function() end,
-            run_tests = function()
-              return { success = true, passes = 5, errors = 0, elapsed = 0.01 }
-            end,
-            run_file = function()
-              return { success = true, passes = 1, errors = 0, elapsed = 0.01 }
-            end,
-          }
-          local mock_coverage = {
-            init = function()
-              logger.debug("Mock coverage.init called for 'propagates coverage errors' test")
-              return true
-            end,
-            start = function()
-              logger.debug("Mock coverage.start is about to error() for 'propagates coverage errors' test")
-              error("Coverage module crashed during start")
-            end,
-            shutdown = function() end,
-            get_report_data = function() end,
-          }
+      it("propagates coverage module errors to exit code", { expect_error = true }, function()
+        testname = "propagates coverage module errors to exit code"
+        print(cg .. "TEST: " .. testname .. cn)
+        local mock_runner = {
+          configure = function() end,
+          run_tests = function()
+            return { success = true, passes = 5, errors = 0, elapsed = 0.01 }
+          end,
+          run_file = function()
+            return { success = true, passes = 1, errors = 0, elapsed = 0.01 }
+          end,
+        }
+        local mock_coverage = {
+          init = function()
+            logger.debug("Mock coverage.init called for 'propagates coverage errors' test")
+            return true
+          end,
+          start = function()
+            logger.debug("Mock coverage.start is about to error() for 'propagates coverage errors' test")
+            error("Coverage module crashed during start")
+          end,
+          shutdown = function() end,
+          get_report_data = function() end,
+        }
 
-          mock_module("lib.core.runner", mock_runner)
-          mock_module("lib.coverage", mock_coverage)
+        mock_module("lib.core.runner", mock_runner)
+        mock_module("lib.coverage", mock_coverage)
 
+        local output = test_helper.with_captured_output(function()
+          -- Capture output
           start_capture_output()
+
+          -- Run CLI with coverage flag
           local mock_firmo = create_mock_firmo()
 
-          -- Call cli.run directly. The error from mock_coverage.start() should propagate
-          -- and be caught by the test runner because of { expect_error = true }.
+          -- The error from the mock coverage module should propagate out of cli.run
+          -- and be caught by the test framework because of { expect_error = true }
           cli.run({ "--coverage", "./tests" }, mock_firmo)
 
-          -- The above line is expected to error out. Code here might not be reached fully.
-          local output = stop_capture_output()
+          -- Get output
+          return stop_capture_output()
+        end)
 
-          local error_message_found = false
-          for _, line in ipairs(output) do
-            if
-              line:match("Coverage module crashed during start")
-              or line:match("[ERROR] RUNTIME: .*Coverage module crashed during start") -- ErrorHandler might format it
-              or line:match("Warning: Failed to start coverage analysis") -- A more generic CLI warning
-            then
-              error_message_found = true
-              break
-            end
+        local error_message_found = false
+        for _, line in ipairs(output) do
+          if
+            line:match("Coverage module crashed during start")
+            or line:match("[ERROR] RUNTIME: .*Coverage module crashed during start") -- ErrorHandler might format it
+            or line:match("Warning: Failed to start coverage analysis") -- A more generic CLI warning
+          then
+            error_message_found = true
+            break
           end
-          expect(error_message_found).to.equal(true, "Error message from coverage crash should be in output")
         end
-      )
+        expect(error_message_found).to.equal(true, "Error message from coverage crash should be in output")
+      end)
 
       it("combines multiple failing modules correctly", { timeout = 5000 }, function()
         testname = "combines multiple failing modules correctly"
