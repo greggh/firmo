@@ -23,6 +23,8 @@ local describe = firmo.describe
 local it = firmo.it
 ---@type fun(value: any) expect Assertion generator function
 local expect = firmo.expect
+---@type fun(callback: function) after Test cleanup function
+local after = firmo.after
 
 local fs = require("lib.tools.filesystem")
 local test_helper = require("lib.tools.test_helper")
@@ -48,6 +50,14 @@ logging.configure({
 })
 
 describe("Logging System", function()
+  after(function()
+    local result = logging.configure({
+      level = logging.LEVELS.INFO, -- Only hide errors
+      timestamps = true,
+      use_colors = true,
+    })
+  end)
+
   -- Basic logging functionality
   describe("Core logging", function()
     it("should provide different log levels", function()
