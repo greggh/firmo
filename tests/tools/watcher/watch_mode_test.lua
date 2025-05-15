@@ -88,7 +88,6 @@ describe("Watch Mode", function()
     end
 
     -- Initialize watcher with test directory
-    -- Initialize watcher with test directory
     local init_success, init_result = pcall(function()
       -- Pass directories as a table and empty exclude_patterns
       local success, err = watcher.init({ temp_dir }, {})

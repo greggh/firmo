@@ -111,15 +111,27 @@ end
 
 --- Checks if the current operating system is Windows based on the path separator.
 ---@return boolean True if running on Windows, false otherwise.
----@private
-local function is_windows()
+function fs.is_windows()
   return package.config:sub(1, 1) == "\\"
+end
+
+--- Checks if the current operating system is MacOS based on the results of uname.
+---@return boolean True if running on MacOS, false otherwise.
+function fs.is_macos()
+  -- `uname -s` returns "Darwin" on macOS.  We read only the first line.
+  local p = io.popen("uname -s")
+  if not p then
+    return false
+  end
+  local osname = p:read("*l") or ""
+  p:close()
+  return osname == "Darwin"
 end
 
 --- Platform-specific path separator character
 --- @private
 --- @type string
-local path_separator = is_windows() and "\\" or "/"
+local path_separator = fs.is_windows() and "\\" or "/"
 
 --- Safely execute an I/O operation with error handling
 --- This utility function wraps I/O operations in a pcall to catch errors,
@@ -463,7 +475,7 @@ function fs.create_directory(path)
 
     -- Create this directory
     local result, err = nil, nil
-    if is_windows() then
+    if fs.is_windows() then
       -- Use mkdir command on Windows
       result = os.execute('mkdir "' .. normalized_path .. '"')
       if not result then
@@ -545,7 +557,7 @@ function fs.delete_directory(path, recursive)
 
     if recurse then
       local result, err = nil, nil
-      if is_windows() then
+      if fs.is_windows() then
         -- Use rmdir /s /q command on Windows
         result = os.execute('rmdir /s /q "' .. dir_path .. '"')
         if not result then
@@ -624,7 +636,7 @@ function fs.get_directory_contents(path, include_hidden)
     local normalized_path = fs.normalize_path(dir_path)
     local command
 
-    if is_windows() then
+    if fs.is_windows() then
       command = 'dir /b "' .. normalized_path .. '"'
     else
       -- Use -a flag for ls to show hidden files, we'll filter them later if needed
@@ -1016,7 +1028,7 @@ function fs.get_absolute_path(path)
 
   local success, result, err = get_error_handler().try(function()
     -- If already absolute, return normalized path
-    if path:sub(1, 1) == "/" or (is_windows() and path:match("^%a:")) then
+    if path:sub(1, 1) == "/" or (fs.is_windows() and path:match("^%a:")) then
       return fs.normalize_path(path)
     end
 
@@ -1687,7 +1699,7 @@ function fs.is_symlink(path)
   return safe_io_action(function(check_path)
     local result = false
 
-    if is_windows() then
+    if fs.is_windows() then
       -- Use PowerShell to check if path is a symlink on Windows
       local command = string.format(
         "powershell -Command \"if ((Get-Item -Path '%s' -Force).LinkType -ne $null) { exit 0 } else { exit 1 }\"",
@@ -1780,7 +1792,7 @@ function fs.directory_exists(path)
 
   -- Check if the path exists and is a directory
   local attributes
-  if is_windows() then
+  if fs.is_windows() then
     -- On Windows, use dir command to check if directory exists
     local result = os.execute('if exist "' .. normalized_path .. '\\*" (exit 0) else (exit 1)')
     return result == true or result == 0
@@ -1866,9 +1878,11 @@ function fs.get_modified_time(path)
   end
 
   local command
-  if is_windows() then
+  if fs.is_windows() then
     -- PowerShell command for Windows
     command = string.format('powershell -Command "(Get-Item -Path "%s").LastWriteTime.ToFileTime()"', path)
+  elseif fs.is_macos() then
+    command = string.format("stat -f %%m %s", path)
   else
     -- stat command for Unix-like systems
     command = string.format('stat -c %%Y "%s"', path)
@@ -1927,9 +1941,11 @@ function fs.get_creation_time(path)
   end
 
   local command
-  if is_windows() then
+  if fs.is_windows() then
     -- PowerShell command for Windows
     command = string.format('powershell -Command "(Get-Item -Path "%s").CreationTime.ToFileTime()"', path)
+  elseif fs.is_macos() then
+    command = string.format("stat -f %%B %s", path)
   else
     -- stat command for Unix-like systems (birth time if available, otherwise modified time)
     command = string.format('stat -c %%W 2>/dev/null "%s" || stat -c %%Y "%s"', path, path)
@@ -2061,7 +2077,7 @@ function fs.list_files(dir_path, include_hidden)
   local files = {}
 
   -- Use different approach depending on platform
-  if is_windows() then
+  if fs.is_windows() then
     local handle = io.popen('dir /b "' .. dir_path .. '"')
     if not handle then
       return nil, "Failed to execute dir command"
@@ -2148,7 +2164,7 @@ function fs.list_files_recursive(dir_path, include_hidden)
     local items
 
     -- Use different approach depending on platform
-    if is_windows() then
+    if fs.is_windows() then
       local handle = io.popen('dir /b "' .. current_path .. '"')
       if not handle then
         return
@@ -2282,7 +2298,7 @@ function fs.get_current_directory()
   local success, result, err = get_error_handler().try(function()
     -- Fallback method if lfs is not available
     local handle, err
-    if is_windows() then
+    if fs.is_windows() then
       handle, err = io.popen("cd")
     else
       handle, err = io.popen("pwd")
@@ -2400,7 +2416,7 @@ function fs.resolve_symlink(path)
     local handle
     local resolved_path
 
-    if is_windows() then
+    if fs.is_windows() then
       -- Windows PowerShell command to resolve symlinks
       command = string.format(
         "powershell -Command \"if (Test-Path -Path '%s' -PathType Any) { $item = Get-Item -Path '%s' -Force; if ($item.LinkType) { $item.Target } else { '%s' } } else { '%s' }\"",
@@ -2491,7 +2507,7 @@ function fs.is_absolute_path(path)
   -- Normalize path separators for consistency
   local normalized = path:gsub("\\", "/")
 
-  if is_windows() then
+  if fs.is_windows() then
     -- Windows: Check for drive letter (C:/, etc.) or UNC paths (//server)
     return normalized:match("^%a:/") ~= nil or normalized:match("^//") ~= nil
   else
@@ -2539,7 +2555,7 @@ end
 --- @return boolean has_support True if the platform supports symbolic links
 local function has_symlink_support()
   -- Check based on platform
-  if is_windows() then
+  if fs.is_windows() then
     -- On Windows, try to determine if symlinks are supported
     -- Windows 10+ in developer mode or with admin rights supports symlinks
     local handle = io.popen("cmd /c ver")
@@ -2701,7 +2717,7 @@ function fs.create_symlink(target_path, link_path)
     local is_dir = fs.is_directory(target)
     local result, err
 
-    if is_windows() then
+    if fs.is_windows() then
       -- Windows command to create symlink
       local command
       if is_dir then
