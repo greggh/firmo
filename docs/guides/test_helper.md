@@ -1,11 +1,8 @@
 # Test Helper Usage Guide
 
-
 The Test Helper module provides essential utilities for writing robust tests, handling errors gracefully, and managing temporary files and directories. This guide explains how to use the module's features effectively in your tests.
 
 ## Table of Contents
-
-
 
 - [Introduction](#introduction)
 - [Testing Error Conditions](#testing-error-conditions)
@@ -15,37 +12,28 @@ The Test Helper module provides essential utilities for writing robust tests, ha
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
 
-
 ## Introduction
-
 
 ### Getting Started
 
-
 To use the Test Helper module, first require it in your test file:
-
 
 ```lua
 local test_helper = require("lib.tools.test_helper")
 ```
 
-
 The module works seamlessly with the Firmo testing framework and provides several categories of utilities:
-
 
 1. **Error testing**: Safely capture and verify errors (`with_error_capture`, `expect_error`).
 2. **Temporary file management**: Register external temporary files/directories for automatic cleanup (`register_temp_file`, `register_temp_directory`). Note: File creation is handled by the `temp_file` module.
 3. **Test directory utilities**: Create temporary directories with helper methods for file manipulation (`create_temp_test_directory`, `with_temp_test_directory`).
 4. **Utility Functions**: Execute Lua code strings (`execute_string`).
 
-
 ## Testing Error Conditions
-
 
 ### Capturing Errors Safely
 
 - (function): A new function that wraps the original `func`. When this new function is called, it executes `func` safely. The wrapped function returns `result, nil` on success, or `nil, error_object` if `func` throws an error.
-
 
 ```lua
 -- Traditional pcall approach
@@ -73,14 +61,11 @@ else
 end
 ```
 
-
 The benefit of `with_error_capture` is that errors are returned as structured objects with categories, messages, and context, rather than just strings.
 
 ### Expecting Errors
 
-
 When testing functions that should fail under certain conditions, use `expect_error`:
-
 
 ```lua
 it("should throw error for invalid input", function()
@@ -94,19 +79,14 @@ it("should throw error for invalid input", function()
 end)
 ```
 
-
 `expect_error` automatically fails the test if:
-
 
 1. The function doesn't throw an error
 2. The error message doesn't match the expected pattern (if provided)
 
-
 ### Testing with Error Flags
 
-
 For tests focused on error conditions, use the `expect_error` flag:
-
 
 ```lua
 it("should handle file not found gracefully", { expect_error = true }, function()
@@ -121,22 +101,19 @@ it("should handle file not found gracefully", { expect_error = true }, function(
 end)
 ```
 
-
 The `expect_error` flag indicates to the test framework that this test intentionally tests error conditions, which helps with reporting and test quality validation.
-## Working with Temporary Files
 
+## Working with Temporary Files
 
 ### Creating Temporary Files
 
-
 Register externally created temporary files that should be automatically cleaned up after tests:
 
-> Note: For creating temporary files and directories with automatic registration, use the dedicated `temp_file` module (`require("lib.tools.filesystem.temp_file")`). The `test_helper` module primarily provides functions to *register* files/directories created by other means.
+> Note: For creating temporary files and directories with automatic registration, use the dedicated `temp_file` module (`require("lib.tools.filesystem.temp_file")`). The `test_helper` module primarily provides functions to _register_ files/directories created by other means.
+
 ### Registering External Files
 
-
 For files created outside the test helper system:
-
 
 ```lua
 it("should handle files created by the system", function()
@@ -156,7 +133,6 @@ it("should handle files created by the system", function()
   -- No need to manually delete - happens automatically
 end)
 ```
-
 
 This ensures all files and directories are cleaned up, even those created outside the `temp_file` module's creation functions.
 
@@ -179,8 +155,6 @@ it("should handle directories created externally", function()
   -- No need to manually delete - happens automatically
 end)
 ```
-
-
 
 ## Creating Test Directories
 
@@ -210,7 +184,7 @@ function test_helper.create_temp_test_directory()
 it("should process project structure correctly", function()
   local test_dir = test_helper.create_temp_test_directory()
   expect(test_dir).to.exist()
-  expect(test_dir.path).to.be.a("string")
+  expect(test_dir:path()).to.be.a("string")
 
   -- Create project structure using helper methods
   test_dir:create_file("src/main.lua", "print('Hello')")
@@ -220,22 +194,19 @@ it("should process project structure correctly", function()
   test_dir:create_file(".firmo-config.lua", "return {watch_mode = true}")
 
   -- Test project operations
-  local files = find_project_files(test_dir.path) -- Assuming this function exists
+  local files = find_project_files(test_dir:path()) -- Assuming this function exists
   expect(#files).to.equal(4)
 
-  local config = load_project_config(test_dir.path) -- Assuming this function exists
+  local config = load_project_config(test_dir:path()) -- Assuming this function exists
   expect(config.watch_mode).to.equal(true)
 
   -- Directory and all created files/subdirs are automatically cleaned up
 end)
 ```
 
-
 ### Using with_temp_test_directory
 
-
 For tests that need a complete directory structure created at once:
-
 
 ```lua
 it("should build project correctly", function()
@@ -260,7 +231,6 @@ it("should build project correctly", function()
   end)
 end)
 ```
-
 
 This approach is more concise and doesn't require creating files individually.
 
@@ -295,17 +265,14 @@ it("should execute lua code string", function()
   expect(err).to.be.a("string")
 end)
 ```
-## Best Practices
 
+## Best Practices
 
 ### Structuring Error Tests
 
-
 Follow these best practices for testing error conditions:
 
-
 1. **Use the `expect_error` flag** for tests focused on error conditions:
-
 
 ```lua
 it("should handle invalid input gracefully", { expect_error = true }, function()
@@ -313,10 +280,7 @@ it("should handle invalid input gracefully", { expect_error = true }, function()
 end)
 ```
 
-
-
 1. **Prefer `with_error_capture` over raw `pcall`** for better error objects:
-
 
 ```lua
 -- Better approach
@@ -327,10 +291,7 @@ end)()
 local success, result = pcall(function() return risky_function() end)
 ```
 
-
-
 1. **Check error categories** rather than exact error messages when appropriate:
-
 
 ```lua
 -- More resilient to message changes
@@ -339,12 +300,9 @@ expect(err.category).to.equal("VALIDATION")
 expect(err.message).to.equal("Invalid email: missing @ symbol")
 ```
 
-
-
 1. **Test both happy path and error cases** for thorough coverage:
 
-
-```lua
+````lua
 it("should parse valid JSON", function()
   local result = parse_json('{"key": "value"}')
   expect(result.key).to.equal("value")
@@ -379,28 +337,23 @@ Follow these best practices for temporary file and directory management:
     end)
     ```
 -- Instead of deeply nested directories
-test_dir.create_file("system/subsystem/module/component/config.json", "{}")
-```
-
-
+test_dir:create_file("system/subsystem/module/component/config.json", "{}")
+````
 
 ### Clean Test Structure
 
-
 Structure your tests for clarity and maintainability:
 
-
 1. **Group related test utilities**:
-
 
 ```lua
 -- Setup common test environment
 local function setup_test_environment()
   local test_dir = test_helper.create_temp_test_directory()
-  test_dir.create_file("config.json", '{"test": true}')
+  test_dir:create_file("config.json", '{"test": true}')
 
   -- Initialize system with test directory
-  local system = init_system(test_dir.path)
+  local system = init_system(test_dir:path())
 
   return {
     dir = test_dir,
@@ -413,10 +366,7 @@ it("should load configuration", function()
 end)
 ```
 
-
-
 1. **Use `before` and `after` hooks for common setup**:
-
 
 ```lua
 describe("Configuration system", function()
@@ -425,8 +375,8 @@ describe("Configuration system", function()
 
   before(function()
     test_dir = test_helper.create_temp_test_directory()
-    test_dir.create_file("config.json", '{"test": true}')
-    system = init_system(test_dir.path)
+    test_dir:create_file("config.json", '{"test": true}')
+    system = init_system(test_dir:path())
   end)
 
   -- Tests can use test_dir and system
@@ -435,7 +385,7 @@ describe("Configuration system", function()
   end)
 
   it("should detect configuration changes", function()
-    test_dir.create_file("config.json", '{"test": false}')
+    test_dir:create_file("config.json", '{"test": false}')
     system.reload()
     expect(system.config.test).to.equal(false)
   end)
@@ -444,13 +394,9 @@ describe("Configuration system", function()
 end)
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues and Solutions
-
 
 #### Files Not Being Cleaned Up
 
@@ -462,9 +408,7 @@ If temporary files aren't being cleaned up properly:
 
 #### Error Tests Failing Unexpectedly
 
-
 If error tests are failing:
-
 
 ```lua
 -- Make sure you're using the expect_error flag
@@ -477,21 +421,15 @@ local result, err = test_helper.with_error_capture(function()
 end)() -- <-- Don't forget to call the returned function
 ```
 
-
-
-
 ### Getting Help
 
-
 For more details on test helper functions:
-
 
 1. See the [Test Helper API Reference](../api/test_helper.md)
 2. Look at examples in [Test Helper Examples](../../examples/test_helper_examples.md)
 3. Check existing tests in the codebase for practical usage patterns
 
 If you encounter persistent issues:
-
 
 1. Enable debug logging to see more details:
 
@@ -502,7 +440,6 @@ If you encounter persistent issues:
      verbose = true
    })
    ```
-
 
 2. Use structured error handling to get more context:
 
@@ -516,6 +453,7 @@ If you encounter persistent issues:
      print("Error:", error_handler.format_error(result))
    end
    ```
+
 ## Conclusion
 
 The Test Helper module provides essential utilities for robust testing in Firmo, particularly for handling error conditions (`with_error_capture`, `expect_error`) and managing temporary test directory structures (`create_temp_test_directory`, `with_temp_test_directory`). It also allows registration of externally created temporary files/directories for cleanup and provides a simple way to execute Lua code strings. By incorporating these helpers, you can write cleaner, more reliable tests focused on validating your code's behavior.

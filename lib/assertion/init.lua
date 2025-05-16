@@ -446,8 +446,8 @@ local paths = {
     "be_greater_than",
     "be_less_than",
     "be_between",
-    "be_near", -- Added
-    "be_approximately", -- Alias for be_near
+    "be_near",
+    "be_approximately",
     "throw",
     "satisfy",
     "implement_interface",
@@ -466,13 +466,13 @@ local paths = {
     "decrease",
     "deep_equal",
     "match_regex",
-    "match_with_options", -- Added
+    "match_with_options",
     "be_date",
     "be_iso_date",
     "be_before",
     "be_after",
     "be_same_day_as",
-    "be_between_dates", -- Added
+    "be_between_dates",
     "complete",
     "complete_within",
     "resolve_with",
@@ -493,8 +493,8 @@ local paths = {
     "be_greater_than",
     "be_less_than",
     "be_between",
-    "be_near", -- Added
-    "be_approximately", -- Alias for be_near
+    "be_near",
+    "be_approximately",
     "throw",
     "satisfy",
     "implement_interface",
@@ -2258,6 +2258,27 @@ paths.deep_key = {
   end,
 }
 
+--- Tests if a string or table is empty.
+---@field test fun(v: string|table): boolean, string, string
+paths.empty = {
+  ---@param v string|table The value to check.
+  ---@return boolean success True if the string has length 0 or table has no keys.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` is not a string or table.
+  test = function(v)
+    local type_v = type(v)
+
+    if type_v == "string" then
+      return #v == 0, 'expected string "' .. v .. '" to be empty', 'expected string "' .. v .. '" to not be empty'
+    elseif type_v == "table" then
+      return next(v) == nil, "expected table to be empty", "expected table to not be empty"
+    else
+      error("expected a string or table for emptiness check, got " .. type_v)
+    end
+  end,
+}
+
 --- Tests if a table `v` contains *exactly* the keys listed in `expected_keys` and no others.
 ---@field test fun(v: table, expected_keys: table): boolean, string, string
 paths.exact_keys = {
@@ -2341,7 +2362,7 @@ paths.be_greater_than = {
   end,
 }
 
---- Tests if number `v` is negative (`v < 0`).
+--- Tests if a number `v` is negative (`v < 0`).
 ---@field test fun(v: number): boolean, string, string
 paths.negative = {
   ---@param v number The number to check.
@@ -2355,6 +2376,23 @@ paths.negative = {
     end
 
     return v < 0, "expected " .. tostring(v) .. " to be negative", "expected " .. tostring(v) .. " to not be negative"
+  end,
+}
+
+--- Tests if a number `v` is positive (`v > 0`).
+---@field test fun(v: number): boolean, string, string
+paths.positive = {
+  ---@param v number The number to check.
+  ---@return boolean success True if `v > 0`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  ---@throws string If `v` is not a number.
+  test = function(v)
+    if type(v) ~= "number" then
+      error("expected " .. tostring(v) .. " to be a number")
+    end
+
+    return v > 0, "expected " .. tostring(v) .. " to be positive", "expected " .. tostring(v) .. " to not be positive"
   end,
 }
 
@@ -2522,6 +2560,40 @@ paths.be_type = {
     end
   end,
 }
+
+-- Missing assertions for be_truthy, be_falsy, and be_falsey
+
+--- Tests if a value is "truthy" (not `false` and not `nil`).
+---@field test fun(v: any): boolean, string, string
+paths.be_truthy = {
+  ---@param v any The value to check.
+  ---@return boolean success True if `v` is neither `false` nor `nil`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  test = function(v)
+    return v ~= false and v ~= nil,
+      "expected " .. tostring(v) .. " to be truthy",
+      "expected " .. tostring(v) .. " to not be truthy"
+  end,
+}
+
+--- Tests if a value is "falsy" (`false` or `nil`).
+---@field test fun(v: any): boolean, string, string
+paths.be_falsy = {
+  ---@param v any The value to check.
+  ---@return boolean success True if `v` is `false` or `nil`.
+  ---@return string success_message Message for success.
+  ---@return string failure_message Message for failure.
+  test = function(v)
+    return v == false or v == nil,
+      "expected " .. tostring(v) .. " to be falsy",
+      "expected " .. tostring(v) .. " to not be falsy"
+  end,
+}
+
+--- Alias for `be_falsy`. Tests if a value is "falsy" (`false` or `nil`).
+---@field test fun(v: any): boolean, string, string
+paths.be_falsey = paths.be_falsy
 
 -- Enhanced error assertions
 paths.throw = {
@@ -2949,18 +3021,18 @@ function M.expect(v)
                 val = tostring(t.val),
                 action = t.action,
               })
-              local error_obj = error_handler.create(
+              get_logger().debug("Assertion failed", {
+                error_message = err or "Assertion failed",
+                context = context,
+              })
+
+              -- Use error_handler.throw() to ensure error propagates
+              get_error_handler().throw(
                 err or "Assertion failed",
                 error_handler.CATEGORY.VALIDATION,
                 error_handler.SEVERITY.ERROR,
                 context
               )
-
-              get_logger().debug("Assertion failed", {
-                error = get_error_handler().format_error(error_obj, false),
-              })
-
-              error(get_error_handler().format_error(error_obj, false), 2)
             else
               -- Fallback without error_handler
               error(err or "unknown failure", 2)

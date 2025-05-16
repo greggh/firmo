@@ -51,10 +51,10 @@ describe("Hash Module", function()
     -- Create a test file
     local test_dir = test_helper.create_temp_test_directory()
     local content = "Test file content"
-    test_dir.create_file("test.txt", content)
+    test_dir:create_file("test.txt", content)
 
     -- Hash the file
-    local file_hash = hash.hash_file(test_dir.path .. "/test.txt")
+    local file_hash = hash.hash_file(test_dir:path() .. "/test.txt")
     expect(file_hash).to.exist()
     expect(file_hash).to.equal(hash.hash_string(content))
   end)

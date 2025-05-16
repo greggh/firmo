@@ -169,7 +169,7 @@ describe("Logging Formatter Integration Module", function()
 
   it("creates JSON formatted output", function()
     local temp_dir = test_helper.create_temp_test_directory()
-    local output_file = temp_dir.create_file("test_results.json", "")
+    local output_file = temp_dir:create_file("test_results.json", "")
 
     local formatter = formatter_integration.create_log_formatter()
     expect(formatter).to.exist()

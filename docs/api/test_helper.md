@@ -1,11 +1,8 @@
 # Test Helper API Reference
 
-
 The Test Helper module provides utilities to make it easier to test error conditions and work with temporary files in tests. It's an essential tool for writing robust, reliable tests in the Firmo framework.
 
 ## Table of Contents
-
-
 
 - [Module Overview](#module-overview)
 - [Error Testing Functions](#error-testing-functions)
@@ -15,9 +12,7 @@ The Test Helper module provides utilities to make it easier to test error condit
 
 ## Module Overview
 
-
 The Test Helper module provides several key capabilities:
-
 
 1. **Error Testing**: Functions to safely capture and test error conditions
 2. **Temporary File Management**: Functions to create and manage temporary files during tests
@@ -28,20 +23,15 @@ This module is designed to make writing tests easier, more reliable, and less er
 
 ## Error Testing Functions
 
-
 ### with_error_capture
 
-
 Wraps a function to safely capture errors.
-
 
 ```lua
 function test_helper.with_error_capture(func)
 ```
 
-
 **Parameters:**
-
 
 - `func` (function): The function to wrap
 
@@ -50,7 +40,6 @@ function test_helper.with_error_capture(func)
 - (function): A new function that wraps the original `func`. When this new function is called, it executes `func` safely. It returns `result, nil` on success, or `nil, error_object` if `func` throws an error.
 
 **Example:**
-
 
 ```lua
 local result, err = test_helper.with_error_capture(function()
@@ -65,32 +54,24 @@ else
 end
 ```
 
-
-
 ### expect_error
 
-
 Throws an assertion error if the function doesn't raise an error matching the expected message.
-
 
 ```lua
 function test_helper.expect_error(func, expected_message)
 ```
 
-
 **Parameters:**
-
 
 - `func` (function): The function expected to throw an error
 - `expected_message` (string, optional): Pattern to match against the error message
 
 **Returns:**
 
-
 - (table): The error object if the function throws an error
 
 **Example:**
-
 
 ```lua
 local err = test_helper.expect_error(function()
@@ -100,36 +81,27 @@ end, "Invalid input")
 expect(err.category).to.equal("VALIDATION")
 ```
 
-
-
 ## Temporary File Management
-
 
 The test_helper module integrates with the temp_file module to provide easy-to-use functions for managing temporary files and directories in tests. The following functions handle test-specific file operations with automatic tracking and cleanup.
 
 ### register_temp_file
 
-
 Register a file for cleanup after tests.
-
 
 ```lua
 function test_helper.register_temp_file(file_path)
 ```
 
-
 **Parameters:**
-
 
 - `file_path` (string): Path to the file to register for cleanup
 
 **Returns:**
 
-
 - (boolean): Whether the file was successfully registered
 
 **Example:**
-
 
 ```lua
 -- For files created outside the test_helper system
@@ -141,31 +113,23 @@ f:close()
 test_helper.register_temp_file(file_path)
 ```
 
-
-
 ### register_temp_directory
 
-
 Register a directory for cleanup after tests.
-
 
 ```lua
 function test_helper.register_temp_directory(dir_path)
 ```
 
-
 **Parameters:**
-
 
 - `dir_path` (string): Path to the directory to register for cleanup
 
 **Returns:**
 
-
 - (boolean): Whether the directory was successfully registered
 
 **Example:**
-
 
 ```lua
 -- For directories created outside the test_helper system
@@ -175,7 +139,6 @@ fs.create_directory(dir_path)
 -- Register for automatic cleanup
 test_helper.register_temp_directory(dir_path)
 ```
-
 
 ### create_temp_test_directory
 
@@ -202,27 +165,26 @@ function test_helper.create_temp_test_directory()
 ```lua
 local test_dir = test_helper.create_temp_test_directory()
 expect(test_dir).to.exist()
-expect(test_dir.path).to.be.a("string")
+expect(test_dir:path()).to.be.a("string")
 
 -- Create a file
-local file_path = test_dir.create_file("my_config.txt", "data=123")
-expect(test_dir.file_exists("my_config.txt")).to.be_truthy()
+local file_path = test_dir:create_file("my_config.txt", "data=123")
+expect(test_dir:file_exists("my_config.txt")).to.be_truthy()
 
 -- Create a file in a subdirectory
-local nested_path = test_dir.create_file("subdir/nested.log", "Log entry")
-expect(test_dir.file_exists("subdir/nested.log")).to.be_truthy()
+local nested_path = test_dir:create_file("subdir/nested.log", "Log entry")
+expect(test_dir:file_exists("subdir/nested.log")).to.be_truthy()
 
 -- Read content
-local content = test_dir.read_file("my_config.txt")
+local content = test_dir:read_file("my_config.txt")
 expect(content).to.equal("data=123")
 
 -- Directory and all created files are automatically cleaned up
 ```
+
 ### with_temp_test_directory
 
-
 Creates a temporary directory with specified files and executes a callback function with that directory.
-
 
 ```lua
 ---@param files_map table<string, string> Map of file paths to their content
@@ -231,20 +193,16 @@ Creates a temporary directory with specified files and executes a callback funct
 function test_helper.with_temp_test_directory(files_map, callback)
 ```
 
-
 **Parameters:**
-
 
 - `files_map` (table): A table mapping file paths to their content
 - `callback` (function): Function to call with the created directory
 
 **Returns:**
 
-
 - (any): The return values from the callback function
 
 **Example:**
-
 
 ```lua
 test_helper.with_temp_test_directory({
@@ -265,13 +223,11 @@ test_helper.with_temp_test_directory({
   expect(config.setting).to.equal("value")
 
   -- Add more files if needed during the test
-  test_dir.create_file("data.txt", "Some test data")
+  test_dir:create_file("data.txt", "Some test data")
 
   -- All files are automatically cleaned up after the callback returns
 end)
 ```
-
-
 
 ### execute_string
 

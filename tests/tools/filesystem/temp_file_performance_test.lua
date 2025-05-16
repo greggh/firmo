@@ -40,6 +40,7 @@ local unpack_table = table.unpack or unpack
 ---@return ... any The return values from the executed `func`.
 ---@private
 local function measure_time(operation_name, func, ...)
+  local start_time = os.clock() -- Add initialization of start_time
   local results = { func(...) }
   local end_time = os.clock()
   local elapsed = end_time - start_time
@@ -141,7 +142,7 @@ describe("temp_file_performance", function()
       local create_time = measure_time("Creating " .. structure_count .. " complex directory structures", function()
         for i = 1, structure_count do
           local test_dir = test_helper.create_temp_test_directory()
-          table.insert(base_paths, test_dir.path)
+          table.insert(base_paths, test_dir:path())
 
           -- Create 3 levels of nested directories with files
           for j = 1, 3 do
@@ -149,7 +150,7 @@ describe("temp_file_performance", function()
               for l = 1, 3 do
                 local dir_path = string.format("level%d/level%d/level%d", j, k, l)
                 for m = 1, 2 do
-                  test_dir.create_file(dir_path .. "/file_" .. m .. ".txt", string.rep("content line " .. m .. "\n", 3))
+                  test_dir:create_file(dir_path .. "/file_" .. m .. ".txt", string.rep("content line " .. m .. "\n", 3))
                 end
               end
             end

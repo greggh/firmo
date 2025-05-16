@@ -117,16 +117,16 @@ describe("temp_file", function()
       local test_dir = test_helper.create_temp_test_directory()
 
       -- Create files using the helper
-      local file1 = test_dir.create_file("test.txt", "test content")
-      local file2 = test_dir.create_file("nested/file.lua", "return {}")
+      local file1 = test_dir:create_file("test.txt", "test content")
+      local file2 = test_dir:create_file("nested/file.lua", "return {}")
 
       -- Verify files exist
       expect(fs.file_exists(file1)).to.be_truthy()
       expect(fs.file_exists(file2)).to.be_truthy()
 
       -- Verify helper functions work
-      expect(test_dir.file_exists("test.txt")).to.be_truthy()
-      expect(test_dir.read_file("test.txt")).to.equal("test content")
+      expect(test_dir:file_exists("test.txt")).to.be_truthy()
+      expect(test_dir:read_file("test.txt")).to.equal("test content")
 
       -- Cleanup happens automatically through the temp_file system
     end)
@@ -146,7 +146,7 @@ describe("temp_file", function()
         expect(fs.read_file(dir_path .. "/config.json")).to.equal('{"setting":"value"}')
 
         -- Create additional file
-        local new_file = test_dir.create_file("additional.txt", "more data")
+        local new_file = test_dir:create_file("additional.txt", "more data")
         expect(fs.file_exists(new_file)).to.be_truthy()
 
         -- Cleanup happens automatically through the with_temp_test_directory function

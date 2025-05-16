@@ -300,7 +300,7 @@ describe("FileProcessor", function()
     test_dir = test_helper.create_temp_test_directory("fileproc_test_")
 
     logger.debug("Test setup complete", {
-      directory = test_dir.path,
+      directory = test_dir:path(),
       extensions = table.concat(processor:get_allowed_extensions(), ", "),
     })
   end)

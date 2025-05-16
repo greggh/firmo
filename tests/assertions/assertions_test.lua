@@ -14,6 +14,16 @@
 --- @author Firmo Team
 --- @test
 
+-- Define try_require function to safely load modules
+local function try_require(module_name)
+  local success, result = pcall(require, module_name)
+  if not success then
+    print("Warning: Failed to load module:", module_name, "Error:", result)
+    return nil
+  end
+  return result
+end
+
 local test_helper = try_require("lib.tools.test_helper")
 -- Extract the testing functions we need
 local firmo = require("firmo")

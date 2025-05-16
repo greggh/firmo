@@ -68,7 +68,7 @@ describe("Logging Export Module", function()
 ]]
 
     local test_dir = test_helper.create_temp_test_directory()
-    log_file_path = test_dir.create_file("sample.log", log_content)
+    log_file_path = test_dir:create_file("sample.log", log_content)
   end)
 
   it("lists supported platforms", function()
@@ -116,7 +116,7 @@ describe("Logging Export Module", function()
 
   it("creates platform configuration files", function()
     local test_dir = test_helper.create_temp_test_directory()
-    local config_file = test_dir.create_file("platform_config.txt", "")
+    local config_file = test_dir:create_file("platform_config.txt", "")
 
     local result, err = log_export.create_platform_config("elasticsearch", config_file, {
       es_host = "localhost:9200",
@@ -137,7 +137,7 @@ describe("Logging Export Module", function()
 
   it("converts log files to platform formats", function()
     local test_dir = test_helper.create_temp_test_directory()
-    local platform_file = test_dir.create_file("platform_output.txt", "")
+    local platform_file = test_dir:create_file("platform_output.txt", "")
 
     local result, err = log_export.create_platform_file(
       log_file_path, -- The log file created in before()

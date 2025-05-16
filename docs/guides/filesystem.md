@@ -1,27 +1,18 @@
 # Filesystem Usage Guide
 
-
 ## Introduction
-
 
 The filesystem module provides a robust, cross-platform interface for file and directory operations in Lua. This guide explains how to use the module effectively, covering common use cases, best practices, and migration strategies from standard Lua I/O functions.
 
 ## Getting Started
 
-
 ### Importing the Module
-
-
 
 ```lua
 local fs = require("lib.tools.filesystem")
 ```
 
-
-
 ### Basic Usage
-
-
 
 ```lua
 -- Create a directory
@@ -33,14 +24,9 @@ local content = fs.read_file("/path/to/file.txt")
 print(content)  -- "Hello, world!"
 ```
 
-
-
 ## File Operations
 
-
 ### Reading Files
-
-
 
 ```lua
 -- Read an entire file
@@ -58,11 +44,7 @@ for line in content:gmatch("[^\r\n]+") do
 end
 ```
 
-
-
 ### Writing Files
-
-
 
 ```lua
 -- Write a new file (creates parent directories if needed)
@@ -75,11 +57,7 @@ end
 fs.write_file("/path/to/existing.txt", "New content")
 ```
 
-
-
 ### Appending to Files
-
-
 
 ```lua
 -- Append to a file (creates file if it doesn't exist)
@@ -90,13 +68,9 @@ if not success then
 end
 ```
 
-
-
 ### Working with Binary Files
 
-
 The filesystem module handles binary files correctly without any special configuration:
-
 
 ```lua
 -- Read binary file
@@ -113,11 +87,7 @@ if not success then
 end
 ```
 
-
-
 ### Copying Files
-
-
 
 ```lua
 -- Copy a file to a new location
@@ -128,11 +98,7 @@ if not success then
 end
 ```
 
-
-
 ### Moving Files
-
-
 
 ```lua
 -- Move a file to a new location
@@ -143,11 +109,7 @@ if not success then
 end
 ```
 
-
-
 ### Deleting Files
-
-
 
 ```lua
 -- Delete a file
@@ -158,14 +120,9 @@ if not success then
 end
 ```
 
-
-
 ## Directory Operations
 
-
 ### Creating Directories
-
-
 
 ```lua
 -- Create a directory (including parent directories)
@@ -176,11 +133,7 @@ if not success then
 end
 ```
 
-
-
 ### Ensuring Directories Exist
-
-
 
 ```lua
 -- Create a directory only if it doesn't already exist
@@ -191,11 +144,7 @@ if not success then
 end
 ```
 
-
-
 ### Listing Directory Contents
-
-
 
 ```lua
 -- Get all files and directories in a directory
@@ -214,11 +163,7 @@ for i, item in ipairs(contents) do
 end
 ```
 
-
-
 ### Listing Files Only
-
-
 
 ```lua
 -- Get only files in a directory (not subdirectories)
@@ -232,11 +177,7 @@ for _, file in ipairs(files) do
 end
 ```
 
-
-
 ### Recursive Directory Listing
-
-
 
 ```lua
 -- Get all files in a directory and its subdirectories
@@ -250,11 +191,7 @@ for _, file in ipairs(files) do
 end
 ```
 
-
-
 ### Finding Files by Pattern
-
-
 
 ```lua
 -- Find files matching a pattern in a directory
@@ -268,11 +205,7 @@ for _, file in ipairs(lua_files) do
 end
 ```
 
-
-
 ### Deleting Directories
-
-
 
 ```lua
 -- Delete an empty directory
@@ -289,14 +222,9 @@ if not success then
 end
 ```
 
-
-
 ## Path Manipulation
 
-
 ### Joining Paths
-
-
 
 ```lua
 -- Join path components
@@ -307,11 +235,7 @@ local path = fs.join_paths("/base/", "/subdirectory/", "file.txt")
 print(path)  -- "/base/subdirectory/file.txt"
 ```
 
-
-
 ### Normalizing Paths
-
-
 
 ```lua
 -- Normalize path with redundant components
@@ -322,11 +246,7 @@ local normalized = fs.normalize_path("C:\\Windows\\System32\\..\\Drivers")
 print(normalized)  -- "C:/Windows/Drivers"
 ```
 
-
-
 ### Extracting Path Components
-
-
 
 ```lua
 -- Get directory part of a path
@@ -340,11 +260,7 @@ local ext = fs.get_extension("/path/to/file.txt")
 print(ext)  -- "txt"
 ```
 
-
-
 ### Absolute and Relative Paths
-
-
 
 ```lua
 -- Convert a relative path to absolute
@@ -355,14 +271,9 @@ local rel_path = fs.get_relative_path("/home/user/project/src/file.lua", "/home/
 print(rel_path)  -- "src/file.lua"
 ```
 
-
-
 ## File Discovery
 
-
 ### Matching Files with Glob Patterns
-
-
 
 ```lua
 -- Find all Lua files in a directory
@@ -378,11 +289,7 @@ local config_files = fs.discover_files(
 )
 ```
 
-
-
 ### Testing File Patterns
-
-
 
 ```lua
 -- Check if a file matches a pattern
@@ -393,11 +300,7 @@ end
 local is_jsx = fs.matches_pattern("/path/to/Component.jsx", "**/*.jsx")
 ```
 
-
-
 ### Scanning Directories
-
-
 
 ```lua
 -- Scan a directory non-recursively
@@ -412,11 +315,7 @@ for _, file in ipairs(all_files) do
 end
 ```
 
-
-
 ### Filtering Files
-
-
 
 ```lua
 -- Get all files in a directory
@@ -428,14 +327,9 @@ for _, file in ipairs(lua_files) do
 end
 ```
 
-
-
 ## File Information
 
-
 ### Checking Existence
-
-
 
 ```lua
 -- Check if a file exists
@@ -448,11 +342,7 @@ if fs.directory_exists("/path/to/directory") then
 end
 ```
 
-
-
 ### Checking File Type
-
-
 
 ```lua
 -- Check if a path is a file
@@ -465,11 +355,7 @@ if fs.is_directory("/path/to/something") then
 end
 ```
 
-
-
 ### Getting File Information
-
-
 
 ```lua
 -- Get file size
@@ -489,26 +375,17 @@ if create_time then
 end
 ```
 
-
-
 ## Temporary Files
-
 
 For temporary file management, firmo provides a dedicated `temp_file` module that integrates with the filesystem module.
 
 ### Importing the Module
 
-
-
 ```lua
 local temp_file = require("lib.tools.filesystem.temp_file")
 ```
 
-
-
 ### Creating Temporary Files
-
-
 
 ```lua
 -- Create a temporary file with content
@@ -520,11 +397,7 @@ end
 -- The file is automatically registered for cleanup when tests complete
 ```
 
-
-
 ### Creating Temporary Directories
-
-
 
 ```lua
 -- Create a temporary directory
@@ -536,11 +409,7 @@ end
 -- The directory is automatically registered for cleanup when tests complete
 ```
 
-
-
 ### Using Temporary Files with Callbacks
-
-
 
 ```lua
 -- Create a temporary file, use it, and clean it up when done
@@ -557,11 +426,7 @@ local result, err = temp_file.with_temp_directory(function(path)
 end)
 ```
 
-
-
 ### Registering Existing Files for Cleanup
-
-
 
 ```lua
 -- If you create files through other means, register them for cleanup
@@ -569,31 +434,23 @@ temp_file.register_file("/path/to/file.txt")
 temp_file.register_directory("/path/to/directory")
 ```
 
-
-
 ### Creating Test Directory Structures
 
-
 For more complex test scenarios, you can use the `test_helper` module to create directory structures:
-
 
 ```lua
 local test_helper = require("lib.tools.test_helper")
 -- Create a test directory
 local test_dir = test_helper.create_temp_test_directory()
 -- Create files in the directory
-test_dir.create_file("config.json", '{"setting": "value"}')
-test_dir.create_file("nested/file.txt", "Nested file content")
+test_dir:create_file("config.json", '{"setting": "value"}')
+test_dir:create_file("nested/file.txt", "Nested file content")
 -- Use the directory in tests
-local config_path = fs.join_paths(test_dir.path, "config.json")
+local config_path = fs.join_paths(test_dir:path(), "config.json")
 local content = fs.read_file(config_path)
 ```
 
-
-
 ### Creating Predefined Directory Structures
-
-
 
 ```lua
 -- Create a directory with a predefined structure
@@ -607,17 +464,12 @@ test_helper.with_temp_test_directory({
 end)
 ```
 
-
-
 ## Error Handling
-
 
 All filesystem functions follow a consistent error handling pattern:
 
-
 1. On success, they return the result
 2. On failure, they return `nil` and an error message
-
 
 ```lua
 local result, err = fs.some_function(args)
@@ -627,13 +479,9 @@ if not result then
 end
 ```
 
-
-
 ### Integration with Error Handler
 
-
 The filesystem module integrates with firmo's error handler for structured error objects:
-
 
 ```lua
 local error_handler = require("lib.tools.error_handler")
@@ -651,16 +499,11 @@ end
 return result
 ```
 
-
-
 ## Migration from Lua I/O Functions
-
 
 ### Reading Files
 
-
 **Before:**
-
 
 ```lua
 local file, err = io.open("data.txt", "r")
@@ -673,9 +516,7 @@ file:close()
 return content
 ```
 
-
 **After:**
-
 
 ```lua
 local fs = require("lib.tools.filesystem")
@@ -687,13 +528,9 @@ end
 return content
 ```
 
-
-
 ### Writing Files
 
-
 **Before:**
-
 
 ```lua
 local file, err = io.open("output.txt", "w")
@@ -706,9 +543,7 @@ file:close()
 return true
 ```
 
-
 **After:**
-
 
 ```lua
 local fs = require("lib.tools.filesystem")
@@ -720,13 +555,9 @@ end
 return true
 ```
 
-
-
 ### Appending to Files
 
-
 **Before:**
-
 
 ```lua
 local file, err = io.open("log.txt", "a")
@@ -739,9 +570,7 @@ file:close()
 return true
 ```
 
-
 **After:**
-
 
 ```lua
 local fs = require("lib.tools.filesystem")
@@ -753,13 +582,9 @@ end
 return true
 ```
 
-
-
 ### Checking if a File Exists
 
-
 **Before:**
-
 
 ```lua
 local file = io.open("data.txt", "r")
@@ -770,22 +595,16 @@ end
 return false
 ```
 
-
 **After:**
-
 
 ```lua
 local fs = require("lib.tools.filesystem")
 return fs.file_exists("data.txt")
 ```
 
-
-
 ### Creating a Directory
 
-
 **Before:**
-
 
 ```lua
 local success = os.execute('mkdir "new_dir"')
@@ -796,9 +615,7 @@ end
 return true
 ```
 
-
 **After:**
-
 
 ```lua
 local fs = require("lib.tools.filesystem")
@@ -810,13 +627,9 @@ end
 return true
 ```
 
-
-
 ### Creating Nested Directories
 
-
 **Before:**
-
 
 ```lua
 local function create_recursive(path)
@@ -829,22 +642,16 @@ local function create_recursive(path)
 end
 ```
 
-
 **After:**
-
 
 ```lua
 local fs = require("lib.tools.filesystem")
 local success, err = fs.create_directory("path/to/nested/directory")
 ```
 
-
-
 ### Listing Directory Contents
 
-
 **Before:**
-
 
 ```lua
 local function list_directory(path)
@@ -868,9 +675,7 @@ local function list_directory(path)
 end
 ```
 
-
 **After:**
-
 
 ```lua
 local fs = require("lib.tools.filesystem")
@@ -881,13 +686,9 @@ end
 return contents
 ```
 
-
-
 ### Copying a File
 
-
 **Before:**
-
 
 ```lua
 local function copy_file(source, destination)
@@ -895,9 +696,9 @@ local function copy_file(source, destination)
     if not input then return false end
 
     local output = io.open(destination, "wb")
-    if not output then 
+    if not output then
         input:close()
-        return false 
+        return false
     end
 
     local content = input:read("*a")
@@ -909,22 +710,16 @@ local function copy_file(source, destination)
 end
 ```
 
-
 **After:**
-
 
 ```lua
 local fs = require("lib.tools.filesystem")
 local success, err = fs.copy_file(source, destination)
 ```
 
-
-
 ### Moving/Renaming a File
 
-
 **Before:**
-
 
 ```lua
 local success = os.rename(source, destination)
@@ -935,9 +730,7 @@ end
 return true
 ```
 
-
 **After:**
-
 
 ```lua
 local fs = require("lib.tools.filesystem")
@@ -949,14 +742,9 @@ end
 return true
 ```
 
-
-
 ## Best Practices
 
-
 ### File Path Handling
-
-
 
 1. **Use join_paths for path construction**:
 
@@ -964,20 +752,17 @@ return true
    local path = fs.join_paths(base_dir, "subdirectory", "file.txt")
    ```
 
-
 2. **Always normalize user-provided paths**:
 
    ```lua
    local normalized = fs.normalize_path(user_path)
    ```
 
-
 3. **Use absolute paths for clarity**:
 
    ```lua
    local abs_path = fs.get_absolute_path(relative_path)
    ```
-
 
 4. **Check file existence before reading/writing**:
 
@@ -989,8 +774,6 @@ return true
 
 ### Error Handling
 
-
-
 1. **Always check return values**:
 
    ```lua
@@ -1000,7 +783,6 @@ return true
    end
    ```
 
-
 2. **Provide detailed error messages**:
 
    ```lua
@@ -1008,7 +790,6 @@ return true
        print("Failed to read configuration from " .. path .. ": " .. (err or "unknown error"))
    end
    ```
-
 
 3. **Use with error_handler for structured errors**:
 
@@ -1019,8 +800,6 @@ return true
    ```
 
 ### Performance Optimization
-
-
 
 1. **Cache frequently accessed file content**:
 
@@ -1039,7 +818,6 @@ return true
    end
    ```
 
-
 2. **Minimize directory scanning in tight loops**:
 
    ```lua
@@ -1052,7 +830,6 @@ return true
    end
    ```
 
-
 3. **Use filters to reduce the number of files processed**:
 
    ```lua
@@ -1060,8 +837,6 @@ return true
    ```
 
 ### Temporary File Management
-
-
 
 1. **Always use temp_file module instead of os.tmpname()**:
 
@@ -1072,7 +847,6 @@ return true
    -- Good:
    local temp_name, err = temp_file.create_with_content("", "tmp")
    ```
-
 
 2. **Let the temp_file system handle cleanup**:
 
@@ -1088,7 +862,6 @@ return true
    -- No manual cleanup needed
    ```
 
-
 3. **Use with_temp_file for controlled scope**:
 
    ```lua
@@ -1100,10 +873,7 @@ return true
 
 ## Advanced Usage
 
-
 ### Working with Binary Data
-
-
 
 ```lua
 -- Reading binary file content
@@ -1125,13 +895,9 @@ end
 print(hex_dump(binary_data:sub(1, 128)))
 ```
 
-
-
 ### File Watching and Monitoring
 
-
 You can implement a simple file watching mechanism:
-
 
 ```lua
 local function watch_file(path, callback, interval)
@@ -1179,11 +945,7 @@ end, 2)  -- Check every 2 seconds
 controller.stop()
 ```
 
-
-
 ### Recursive Directory Operations
-
-
 
 ```lua
 -- Recursively process all files in a directory
@@ -1204,11 +966,7 @@ process_directory("/path/to/project", function(file)
 end)
 ```
 
-
-
 ### File-Based Configuration
-
-
 
 ```lua
 local function load_config(config_path)
@@ -1245,13 +1003,9 @@ end
 print("Setting: " .. (config.setting or "not found"))
 ```
 
-
-
 ## Integration with Logging
 
-
 The filesystem module integrates with firmo's logging system for detailed diagnostics:
-
 
 ```lua
 -- Configure verbose logging for filesystem operations
@@ -1268,14 +1022,9 @@ local fs = require("lib.tools.filesystem")
 fs.read_file("config.json")  -- Will log detailed information about the operation
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues and Solutions
-
-
 
 1. **Permission Denied Errors**
 
@@ -1285,7 +1034,6 @@ fs.read_file("config.json")  -- Will log detailed information about the operatio
        print("You don't have permission to read this file. Try running with elevated privileges.")
    end
    ```
-
 
 2. **File Not Found Errors**
 
@@ -1297,12 +1045,11 @@ fs.read_file("config.json")  -- Will log detailed information about the operatio
    end
    ```
 
-
 3. **Cross-Platform Path Issues**
 
    ```lua
    -- Always use forward slashes and normalize paths
-   local platform_path = "/path/on/unix" 
+   local platform_path = "/path/on/unix"
    if package.config:sub(1,1) == '\\' then
        -- We're on Windows, so adjust the path
        platform_path = "C:\\path\\on\\windows"
@@ -1311,7 +1058,6 @@ fs.read_file("config.json")  -- Will log detailed information about the operatio
    -- Normalize to work on any platform
    local normalized = fs.normalize_path(platform_path)
    ```
-
 
 4. **Temporary File Cleanup Issues**
 
@@ -1328,7 +1074,6 @@ fs.read_file("config.json")  -- Will log detailed information about the operatio
    ```
 
 ## Conclusion
-
 
 The filesystem module provides a robust, cross-platform interface for file and directory operations in Lua. By following the patterns and best practices in this guide, you can create reliable code that works consistently across different operating systems and handles errors gracefully.
 For a complete reference of all available functions, see the [Filesystem API Reference](../api/filesystem.md).

@@ -46,10 +46,10 @@ This is a test file
 with multiple lines
 of content.
 ]]
-test_dir.create_file("test.txt", file_content)
+test_dir:create_file("test.txt", file_content)
 
 -- Hash the file
-local file_path_for_hash = test_dir.path_for("test.txt") or (test_dir.path .. "/test.txt")
+local file_path_for_hash = test_dir:path_for("test.txt") or (test_dir:path() .. "/test.txt")
 local file_hash = hash.hash_file(file_path_for_hash)
 print("File content:", file_content:gsub("\n", "\\n"))
 print("File hash:", file_hash)
@@ -60,8 +60,8 @@ logger.info("-------------------------")
 
 -- Create a file
 local original_content = "Original content"
-local file_path = test_dir.path .. "/watched.txt"
-test_dir.create_file("watched.txt", original_content)
+local file_path = test_dir:path() .. "/watched.txt"
+test_dir:create_file("watched.txt", original_content)
 
 -- Get original hash
 local original_hash = hash.hash_file(file_path)
@@ -70,7 +70,7 @@ print("Original hash:", original_hash)
 
 -- Modify the file
 local new_content = "Modified content"
-test_dir.write_file("watched.txt", new_content)
+test_dir:write_file("watched.txt", new_content)
 
 -- Get new hash
 local new_hash = hash.hash_file(file_path)

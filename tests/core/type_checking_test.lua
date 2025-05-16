@@ -160,17 +160,11 @@ describe("Enhanced Type Checking", function()
         return type(obj) == "table" and getmetatable(obj) == class
       end
 
-      local err1 = test_helper.expect_error(function()
-        expect(is_instance_of(instance, TestSubclass)).to.be_truthy()
-      end)
-
-      expect(err1).to.exist()
-
-      local err2 = test_helper.expect_error(function()
-        expect(is_instance_of({}, TestClass)).to.be_truthy()
-      end)
-
-      expect(err2).to.exist()
+      -- Direct negative assertion instead of expecting error
+      expect(is_instance_of(instance, TestSubclass)).to.be_falsy()
+      
+      -- Direct negative assertion instead of expecting error
+      expect(is_instance_of({}, TestClass)).to.be_falsy()
     end)
 
     it("fails when non-table values are provided", { expect_error = true }, function()
@@ -179,17 +173,11 @@ describe("Enhanced Type Checking", function()
         return type(obj) == "table" and type(class) == "table" and getmetatable(obj) == class
       end
 
-      local err1 = test_helper.expect_error(function()
-        expect(is_instance_of("string", TestClass)).to.be_truthy()
-      end)
-
-      expect(err1).to.exist()
-
-      local err2 = test_helper.expect_error(function()
-        expect(is_instance_of(TestClass.new(), "not a class")).to.be_truthy()
-      end)
-
-      expect(err2).to.exist()
+      -- Direct negative assertion instead of expecting error
+      expect(is_instance_of("string", TestClass)).to.be_falsy()
+      
+      -- Direct negative assertion instead of expecting error
+      expect(is_instance_of(TestClass.new(), "not a class")).to.be_falsy()
     end)
   end)
 
@@ -250,11 +238,8 @@ describe("Enhanced Type Checking", function()
         return true
       end
 
-      local err = test_helper.expect_error(function()
-        expect(implements(obj, TestInterface)).to.be_truthy()
-      end)
-
-      expect(err).to.exist()
+      -- Direct negative assertion instead of expecting error
+      expect(implements(obj, TestInterface)).to.be_falsy()
     end)
 
     it("fails when method types don't match", { expect_error = true }, function()
@@ -281,11 +266,8 @@ describe("Enhanced Type Checking", function()
         return true
       end
 
-      local err = test_helper.expect_error(function()
-        expect(implements(obj, TestInterface)).to.be_truthy()
-      end)
-
-      expect(err).to.exist()
+      -- Direct negative assertion instead of expecting error
+      expect(implements(obj, TestInterface)).to.be_falsy()
     end)
 
     it("reports missing keys and wrong types in error messages", { expect_error = true }, function()
@@ -362,11 +344,8 @@ describe("Enhanced Type Checking", function()
       expect(contains(t, 2)).to.be_truthy()
       expect(contains(t, "test")).to.be_truthy()
 
-      local err = test_helper.expect_error(function()
-        expect(contains(t, 5)).to.be_truthy()
-      end)
-
-      expect(err).to.exist()
+      -- Direct negative assertion instead of expecting error
+      expect(contains(t, 5)).to.be_falsy()
     end)
 
     it("works with strings", { expect_error = true }, function()
@@ -380,11 +359,8 @@ describe("Enhanced Type Checking", function()
       expect(contains(s, "This")).to.be_truthy()
       expect(contains(s, " is ")).to.be_truthy()
 
-      local err = test_helper.expect_error(function()
-        expect(contains(s, "banana")).to.be_truthy()
-      end)
-
-      expect(err).to.exist()
+      -- Direct negative assertion instead of expecting error
+      expect(contains(s, "banana")).to.be_falsy()
     end)
 
     it("converts non-string values to strings for string containment", function()

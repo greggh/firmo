@@ -93,6 +93,9 @@ end
 ---@private
 local function add_to_package_path(path)
   local original_path = package.path
+  
+  -- Update package.path by prepending the new path with semicolon separator
+  package.path = path .. ";" .. original_path
 
   -- Return a function that restores the original path
   return function()

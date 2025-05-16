@@ -23,6 +23,7 @@ local expect = firmo.expect
 
 local test_helper = require("lib.tools.test_helper")
 local fs = require("lib.tools.filesystem")
+local inspect = require("inspect")
 
 describe("Test Discovery", function()
   it("has discovery function", function()
@@ -110,6 +111,7 @@ describe("Test Discovery", function()
       return firmo.run_discovered(temp_dir, "temp_*.lua")
     end)()
 
+    print("run_result: " .. inspect(run_result))
     -- Should fail because the test intentionally fails
     expect(run_result).to_not.exist()
     expect(run_err).to.exist()

@@ -875,10 +875,10 @@ For tests that need to work with multiple files, use the test directory helpers:
 -- Create a test directory context
 local test_dir = test_helper.create_temp_test_directory()
 -- Create files in the directory
-test_dir.create_file("config.json", '{"setting": "value"}')
-test_dir.create_file("subdir/data.txt", "nested file content")
+test_dir:create_file("config.json", '{"setting": "value"}')
+test_dir:create_file("subdir/data.txt", "nested file content")
 -- Use the directory in tests
-local config_path = test_dir.path .. "/config.json"
+local config_path = test_dir:path() .. "/config.json"
 expect(fs.file_exists(config_path)).to.be_truthy()
 ```
 

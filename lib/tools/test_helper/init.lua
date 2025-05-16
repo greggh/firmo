@@ -34,7 +34,7 @@
 --- 3. Using `create_temp_test_directory` and `with_temp_test_directory`:
 ---    ```lua
 ---    local test_dir = test_helper.create_temp_test_directory()
----    test_dir.create_file("config.json", '{"setting": "value"}')
+---    test_dir:create_file("config.json", '{"setting": "value"}')
 ---
 ---    test_helper.with_temp_test_directory({
 ---      ["data.txt"] = "test data"
@@ -48,6 +48,8 @@
 --- @license MIT
 --- @copyright 2023-2025
 --- @version 1.0.0
+
+local inspect = require("inspect")
 
 --- Returns the name of the current test from debug information
 ---@return string name The name of the test based on the debug info, or "unknown" if not available
@@ -122,11 +124,21 @@ local function get_logger()
   end
   -- Return a stub logger if logging module isn't available
   return {
-    error = function(msg, ctx) print("[ERROR] TestHelper: " .. msg, ctx) end,
-    warn = function(msg, ctx) print("[WARN] TestHelper: " .. msg, ctx) end,
-    info = function(msg, ctx) print("[INFO] TestHelper: " .. msg, ctx) end,
-    debug = function(msg, ctx) print("[DEBUG] TestHelper: " .. msg, ctx) end,
-    trace = function(msg, ctx) print("[TRACE] TestHelper: " .. msg, ctx) end,
+    error = function(msg, ctx)
+      print("[ERROR] TestHelper: " .. msg, ctx)
+    end,
+    warn = function(msg, ctx)
+      print("[WARN] TestHelper: " .. msg, ctx)
+    end,
+    info = function(msg, ctx)
+      print("[INFO] TestHelper: " .. msg, ctx)
+    end,
+    debug = function(msg, ctx)
+      print("[DEBUG] TestHelper: " .. msg, ctx)
+    end,
+    trace = function(msg, ctx)
+      print("[TRACE] TestHelper: " .. msg, ctx)
+    end,
   }
 end
 
@@ -162,9 +174,9 @@ function helper.with_error_capture(fn) -- Removed options, was unused by simplif
       local thrown_err_val = pcall_results[1]
       logger_instance.debug("with_error_capture: fn threw an error", { error = thrown_err_val })
       local err_obj = eh.test_expected_error( -- Use test_expected_error for consistency
-          (type(thrown_err_val) == "string" and thrown_err_val or "Function threw an error"),
-          { original_error_type = type(thrown_err_val), source = "pcall_direct_error" },
-          (type(thrown_err_val) == "table" and thrown_err_val or nil) -- cause
+        (type(thrown_err_val) == "string" and thrown_err_val or "Function threw an error"),
+        { original_error_type = type(thrown_err_val), source = "pcall_direct_error" },
+        (type(thrown_err_val) == "table" and thrown_err_val or nil) -- cause
       )
       return nil, err_obj
     end
@@ -178,7 +190,10 @@ function helper.with_error_capture(fn) -- Removed options, was unused by simplif
     if fn_first_return == nil and fn_second_return ~= nil then
       -- fn indicated an error by returning (nil, error_val).
       -- Normalize fn_second_return into a standard error object.
-      logger_instance.debug("with_error_capture: fn returned (nil, error_val)", { error_val_type = type(fn_second_return) })
+      logger_instance.debug(
+        "with_error_capture: fn returned (nil, error_val)",
+        { error_val_type = type(fn_second_return) }
+      )
       if eh.is_error(fn_second_return) then -- It's already a standard error object
         return nil, fn_second_return
       elseif type(fn_second_return) == "string" then -- It's an error string
@@ -186,13 +201,19 @@ function helper.with_error_capture(fn) -- Removed options, was unused by simplif
       else
         -- fn returned (nil, some_other_non_error_type_value).
         -- This is treated as a successful return of (nil, other_val).
-        logger_instance.debug("with_error_capture: fn returned (nil, non_error_value), passing through.", { results_count = #pcall_results })
+        logger_instance.debug(
+          "with_error_capture: fn returned (nil, non_error_value), passing through.",
+          { results_count = #pcall_results }
+        )
         return unpack_table(pcall_results) -- Contains original (nil, other_val, ...)
       end
     end
 
     -- If fn succeeded and didn't return the (nil, error_indicator) pattern, pass through all its results.
-    logger_instance.debug("with_error_capture: fn succeeded, passing through results.", { results_count = #pcall_results })
+    logger_instance.debug(
+      "with_error_capture: fn succeeded, passing through results.",
+      { results_count = #pcall_results }
+    )
     return unpack_table(pcall_results)
   end
 end
@@ -227,12 +248,13 @@ function helper.expect_error(fn, message_pattern, options)
   get_error_handler().set_current_test_metadata(nil)
 
   if success then
-    -- Function did not throw an error as expected
+    print("Location of test: " .. test_location)
+    print("Result value: " .. inspect(result))
     error(get_error_handler().test_expected_error("Function was expected to throw an error but it returned a value", {
       returned_value = result,
       source_file = caller_info.source,
       source_line = caller_info.currentline,
-      "test_context = true"
+      "test_context = true",
     }))
   end
 
@@ -319,7 +341,10 @@ function helper.create_temp_test_directory()
   -- Return a directory context with helper functions
   return {
     -- Full path to the temporary directory
-    path = dir_path,
+    path = function()
+      return dir_path
+    end,
+
     -- Internal mapping of relative names to full paths
     _created_files = {},
 
@@ -466,13 +491,16 @@ function helper.with_temp_test_directory(files_map, callback)
   local created_files = {}
   get_logger().debug("Iterating files_map in with_temp_test_directory", { files_map_content = files_map }) -- Reverted to debug
   for file_name, content in pairs(files_map) do
-    get_logger().debug("Processing entry from files_map", { key_file_name = file_name, value_content = content, type_key = type(file_name), type_value = type(content) }) -- Reverted to debug
+    get_logger().debug(
+      "Processing entry from files_map",
+      { key_file_name = file_name, value_content = content, type_key = type(file_name), type_value = type(content) }
+    ) -- Reverted to debug
     local file_path = test_dir:create_file(file_name, content) -- Use colon notation for method call
     table.insert(created_files, file_path)
   end
 
   -- Call the callback with the directory path and context
-  local results = { pcall(callback, test_dir.path, created_files, test_dir) }
+  local results = { pcall(callback, test_dir:path(), created_files, test_dir) }
   local success = table.remove(results, 1)
 
   -- Note: cleanup happens automatically via temp_file.cleanup_test_context
@@ -559,10 +587,10 @@ function helper.expect_async_error(async_fn, timeout_ms, message_pattern, option
   local test_name = get_test_name()
   local test_location = get_test_location()
   error_handler.set_current_test_metadata({
-      name = test_name,
-      expect_error = true,
-      caller_info = caller_info,
-      function_info = debug.getinfo(async_fn, "Sl"),
+    name = test_name,
+    expect_error = true,
+    caller_info = caller_info,
+    function_info = debug.getinfo(async_fn, "Sl"),
     explicit_expect_error = true,
     async_expected_error = true, -- Custom flag
   })
@@ -676,22 +704,27 @@ function helper.with_isolated_module_run(module_name_to_isolate, setup_fn, run_f
     local setup_ok, setup_err_val = pcall(setup_fn)
     if not setup_ok then
       package.loaded[module_name_to_isolate] = original_package_loaded_entry -- Restore
-      local err_obj = eh.new("SETUP_ERROR", "Error during setup_fn for with_isolated_module_run: " .. tostring(setup_err_val), {
-        module_name = module_name_to_isolate,
-        original_error = setup_err_val,
-      })
+      local err_obj =
+        eh.new("SETUP_ERROR", "Error during setup_fn for with_isolated_module_run: " .. tostring(setup_err_val), {
+          module_name = module_name_to_isolate,
+          original_error = setup_err_val,
+        })
       return false, err_obj
     end
   end
 
   local require_ok, isolated_module_or_err = pcall(require, module_name_to_isolate)
   if not require_ok then
-      package.loaded[module_name_to_isolate] = original_package_loaded_entry -- Restore
-      local err_obj = eh.new("REQUIRE_ERROR", "Failed to re-require isolated module '" .. module_name_to_isolate .. "': " .. tostring(isolated_module_or_err), {
+    package.loaded[module_name_to_isolate] = original_package_loaded_entry -- Restore
+    local err_obj = eh.new(
+      "REQUIRE_ERROR",
+      "Failed to re-require isolated module '" .. module_name_to_isolate .. "': " .. tostring(isolated_module_or_err),
+      {
         module_name = module_name_to_isolate,
         original_error = isolated_module_or_err,
-      })
-      return false, err_obj
+      }
+    )
+    return false, err_obj
   end
   -- If require_ok is true, isolated_module_or_err is the actual module
 
@@ -702,13 +735,17 @@ function helper.with_isolated_module_run(module_name_to_isolate, setup_fn, run_f
 
   if not run_fn_success then
     local run_fn_err_val = pcall_results[1]
-    local err_obj = eh.new("RUN_FN_ERROR", "Error during isolated run_fn for module '" .. module_name_to_isolate .. "': " .. tostring(run_fn_err_val), {
-      module_name = module_name_to_isolate,
-      original_error = run_fn_err_val,
-    })
+    local err_obj = eh.new(
+      "RUN_FN_ERROR",
+      "Error during isolated run_fn for module '" .. module_name_to_isolate .. "': " .. tostring(run_fn_err_val),
+      {
+        module_name = module_name_to_isolate,
+        original_error = run_fn_err_val,
+      }
+    )
     return false, err_obj
   end
-  
+
   return true, unpack_table(pcall_results)
 end
 

@@ -5,7 +5,7 @@ NEVER remove diagnostic disable comments from the codebase, unless you've remove
 
 JSDoc
 
-In the firmo project we use JSDoc to document complete files and each function in those files. When adding, removing or editing functionality in a file, all relevant JSDoc must be updated or created. Adhere to the comprehensive JSDoc guidelines detailed in CLAUDE.md (lines 293-426), which cover required annotation locations (including module interfaces with `---@class`), formatting standards, common patterns (like error returns, optional parameters), and annotation priorities.
+In the firmo project we use JSDoc to document complete files and each function in those files. When adding, removing or editing functionality in a file, all relevant JSDoc must be updated or created. Adhere to the comprehensive JSDoc guidelines detailed in CLAUDE.md, which cover required annotation locations (including module interfaces with `---@class`), formatting standards, common patterns (like error returns, optional parameters), and annotation priorities.
 
 
 testing
@@ -42,17 +42,17 @@ assert.equals(expected, actual)  -- wrong (and reversed args)
 assert.type_of(value, "string")  -- wrong
 assert.is_true(value)            -- wrong
 
-For detailed guidance, including a mapping from busted-style assertions, common mistakes (like negation syntax `to_not` vs `not_to`, member access `to.be` vs `to_be`), a comprehensive list of extended assertions, and reinforcement of the `expect(actual).to.equal(expected)` argument order, refer to CLAUDE.md (lines 510-739, 839).
+For detailed guidance, including a mapping from busted-style assertions, common mistakes (like negation syntax `to_not` vs `not_to`, member access `to.be` vs `to_be`), a comprehensive list of extended assertions, and reinforcement of the `expect(actual).to.equal(expected)` argument order, refer to CLAUDE.md.
 
 
 No special case
 
-NEVER ADD SPECIAL CASE CODE FOR SPECIFIC FILES OR SPECIFIC SITUATIONS IN CORE / NON-TEST CODE. This includes avoiding conditional logic based on specific file names (e.g., `calculator.lua`), path patterns (e.g., `samples/`), or other unique identifiers. Refer to CLAUDE.md (lines 61-85, 154-184) for explicit examples of banned patterns. Always implement general solutions that work consistently across all inputs.
+NEVER ADD SPECIAL CASE CODE FOR SPECIFIC FILES OR SPECIFIC SITUATIONS IN CORE / NON-TEST CODE. This includes avoiding conditional logic based on specific file names (e.g., `calculator.lua`), path patterns (e.g., `samples/`), or other unique identifiers. Refer to CLAUDE.md for explicit examples of banned patterns. Always implement general solutions that work consistently across all inputs.
 
 
 Central config
 
-In the firmo project, always use the central_config system for configuration/settings, documented here: docs/guides/central_config.md. Adherence to this rule explicitly includes *never hardcoding file paths, patterns, or other settings* that should reasonably be managed via configuration. Use configuration values derived from `central_config.get_config()` instead. Refer to examples in CLAUDE.md (lines 22-34, 49).
+In the firmo project, always use the central_config system for configuration/settings, documented here: docs/guides/central_config.md. Adherence to this rule explicitly includes *never hardcoding file paths, patterns, or other settings* that should reasonably be managed via configuration. Use configuration values derived from `central_config.get_config()` instead. Refer to examples in CLAUDE.md.
 
 
 Documenting Major Changes
@@ -67,7 +67,7 @@ Maintain accuracy in documentation regarding partially implemented features. Ens
 
 Coverage Fix Procedure
 
-When fixing coverage issues: Adhere strictly to the procedure in CLAUDE.md (lines 199-226). Prioritize identifying the fundamental problem, implementing a SINGLE general solution at the appropriate boundary (e.g., normalization), removing ALL special-case code, and testing broadly.
+When fixing coverage issues: Adhere strictly to the procedure in CLAUDE.md. Prioritize identifying the fundamental problem, implementing a SINGLE general solution at the appropriate boundary (e.g., normalization), removing ALL special-case code, and testing broadly.
 
 
 Temporary File Management in Tests
@@ -77,7 +77,7 @@ ALWAYS use the integrated temporary file system for test resources (temp_file.cr
 
 Error Testing Pattern
 
-Standard pattern for testing errors: 1. Add the { expect_error = true } flag to the it block options. 2. Wrap the code expected to error within test_helper.with_error_capture(). 3. Assert on the returned err object using flexible checks (e.g., expect(err).to.exist(), expect(err.message).to.match('pattern')). Avoid overly specific checks like expect(err.category).to.equal(...) unless essential. Refer to CLAUDE.md (lines 530-666) for details.
+Standard pattern for testing errors: 1. Add the { expect_error = true } flag to the it block options. 2. Wrap the code expected to error within test_helper.with_error_capture(). 3. Assert on the returned err object using flexible checks (e.g., expect(err).to.exist(), expect(err.message).to.match('pattern')). Avoid overly specific checks like expect(err.category).to.equal(...) unless essential. Refer to CLAUDE.md for details.
 
 
 Test Function Usage

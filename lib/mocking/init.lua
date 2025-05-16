@@ -237,26 +237,8 @@ mocking.spy = setmetatable({
         target_type = type(target),
       })
 
-      -- Use error handling to safely create the spy
-      ---@diagnostic disable-next-line: unused-local
-      local success, spy_obj, err = get_error_handler().try(function()
-        return spy.new(target)
-      end)
-
-      if not success then
-        local error_obj = get_error_handler().runtime_error(
-          "Failed to create spy on function",
-          {
-            function_name = "mocking.spy",
-            target_type = type(target),
-          },
-          spy_obj -- On failure, spy_obj contains the error
-        )
-        get_logger().error(error_obj.message, error_obj.context)
-        return nil, error_obj
-      end
-
-      return spy_obj
+      -- Let any errors from spy.new propagate up (remove error handling here)
+      return spy.new(target)  -- This will let the error propagate up to test_helper.expect_error
     end
   end,
 })

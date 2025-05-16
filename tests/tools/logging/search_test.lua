@@ -44,7 +44,7 @@ describe("Logging Search Module", function()
 2025-03-26 14:33:20 | ERROR | payment | Transaction failed (transaction_id=tx-67890, amount=99.99, currency=USD, reason=insufficient_funds)
 ]]
 
-    local file_path = test_dir.create_file("sample.log", log_content)
+    local file_path = test_dir:create_file("sample.log", log_content)
     table.insert(test_files, file_path)
 
     -- Create a JSON log file
@@ -54,7 +54,7 @@ describe("Logging Search Module", function()
 {"timestamp":"2025-03-26T14:33:00","level":"INFO","module":"application","message":"Application started","params":{"version":"1.0.0","environment":"production"}}
 ]]
 
-    local json_path = test_dir.create_file("sample.json", json_content)
+    local json_path = test_dir:create_file("sample.json", json_content)
     table.insert(test_files, json_path)
   end)
 
@@ -127,7 +127,7 @@ describe("Logging Search Module", function()
 
   it("exports logs to different formats", function()
     local test_dir = test_helper.create_temp_test_directory()
-    local export_file = test_dir.path .. "/export.csv"
+    local export_file = test_dir:path()() .. "/export.csv"
     table.insert(test_files, export_file)
 
     local result = log_search.export_logs(test_files[1], export_file, "csv")
@@ -144,7 +144,7 @@ describe("Logging Search Module", function()
 
   it("creates a log processor", function()
     local test_dir = test_helper.create_temp_test_directory()
-    local output_file = test_dir.create_file("processor_output.json", "")
+    local output_file = test_dir:create_file("processor_output.json", "")
     table.insert(test_files, output_file)
 
     local processor = log_search.get_log_processor({

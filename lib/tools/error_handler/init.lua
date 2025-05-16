@@ -525,7 +525,7 @@ function M.throw(message, category, severity, context, cause)
   end
 
   -- 4. If the error is for validation and we're in test context
-  if category == M.CATEGORY.VALIDATION and is_test_mode() then
+  if category == M.CATEGORY.VALIDATION and M.is_test_mode() then
     -- Tests with validation errors should generally use TEST_EXPECTED
     error_category = M.CATEGORY.TEST_EXPECTED
   end

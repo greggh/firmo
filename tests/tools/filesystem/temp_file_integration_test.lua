@@ -153,17 +153,17 @@ describe("temp_file_integration", function()
       local test_dir = test_helper.create_temp_test_directory()
 
       -- Create nested directory structure with files
-      test_dir.create_file("level1/level2/level3/file.txt", "deep nested file")
-      test_dir.create_file("level1/sibling1.txt", "sibling file 1")
-      test_dir.create_file("level1/level2/sibling2.txt", "sibling file 2")
+      test_dir:create_file("level1/level2/level3/file.txt", "deep nested file")
+      test_dir:create_file("level1/sibling1.txt", "sibling file 1")
+      test_dir:create_file("level1/level2/sibling2.txt", "sibling file 2")
 
       -- Verify files were created
-      expect(fs.file_exists(test_dir.path .. "/level1/level2/level3/file.txt")).to.be_truthy()
-      expect(fs.file_exists(test_dir.path .. "/level1/sibling1.txt")).to.be_truthy()
-      expect(fs.file_exists(test_dir.path .. "/level1/level2/sibling2.txt")).to.be_truthy()
+      expect(fs.file_exists(test_dir:path() .. "/level1/level2/level3/file.txt")).to.be_truthy()
+      expect(fs.file_exists(test_dir:path() .. "/level1/sibling1.txt")).to.be_truthy()
+      expect(fs.file_exists(test_dir:path() .. "/level1/level2/sibling2.txt")).to.be_truthy()
 
       -- Store dir path for verification in next test
-      _G._complex_dir_path = test_dir.path
+      _G._complex_dir_path = test_dir:path()
     end)
 
     it("should verify complex directory was cleaned up", function()

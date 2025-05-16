@@ -20,6 +20,7 @@ local expect = firmo.expect
 
 -- Import test_helper for improved error handling
 local test_helper = require("lib.tools.test_helper")
+local inspect = require("inspect")
 
 -- Try to load the logging module
 local logging = require("lib.tools.logging")
@@ -100,7 +101,7 @@ describe("firmo", function()
 
     -- Test spying on nil
     local err1 = test_helper.expect_error(function()
-      return firmo.spy.new(nil)
+      firmo.spy.new(nil) -- Remove the return statement
     end)
 
     expect(err1).to.exist()
@@ -112,7 +113,7 @@ describe("firmo", function()
     end)
 
     expect(err2).to.exist()
-    expect(err2.message).to.match("Cannot spy on non-function")
+    expect(err2.message).to.match(".*Cannot spy on non%-function.*")
 
     -- Test spy.on with non-table
     local err3 = test_helper.expect_error(function()
@@ -140,7 +141,7 @@ describe("firmo", function()
       return firmo.spy.on(obj, "method")
     end)()
 
-    expect(spy_err).to_not.exist("Spying on a valid method should not produce errors")
+    expect(spy_err).to_not.exist("Failed to create spy")
     expect(spy_result).to.exist()
 
     -- Test the spy tracks calls
