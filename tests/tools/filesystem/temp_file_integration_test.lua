@@ -31,16 +31,16 @@ local temp_file = require("lib.tools.filesystem.temp_file")
 local temp_file_integration = require("lib.tools.filesystem.temp_file_integration")
 local fs = require("lib.tools.filesystem")
 local test_helper = require("lib.tools.test_helper")
+local inspect = require("inspect")
+
+-- Initialize temp_file_integration at file scope, before any tests run
+-- This ensures consistent test context tracking throughout all tests
+_G.firmo = firmo -- Set global firmo instance
+temp_file_integration.initialize(firmo) -- Initialize with explicit instance
 
 describe("temp_file_integration", function()
-  -- Initialize the integration at the start
-
   before(function()
-    -- Since we're making direct changes to the local firmo instance,
-    -- expose it globally for tests and reset the integration each time
-    _G.firmo = firmo
-    -- Initialize with our local firmo instance instead of relying on global scope
-    temp_file_integration.initialize(firmo)
+    -- No need to initialize here anymore since we do it at file scope
   end)
 
   describe("initialization", function()
@@ -64,6 +64,7 @@ describe("temp_file_integration", function()
     it("should track test context during execution", function()
       -- During test execution, the current context should be set
       local context = firmo.get_current_test_context()
+      print("Context: " .. inspect(context))
       expect(context).to.exist()
 
       -- In the current implementation, the context may have a filename or path
@@ -75,6 +76,7 @@ describe("temp_file_integration", function()
     it("should create different contexts for different tests", function()
       -- Get current context
       local context = firmo.get_current_test_context()
+      print("Context: " .. inspect(context))
       expect(context).to.exist()
 
       -- Just verify that we have a basic context structure

@@ -326,21 +326,23 @@ function M.patch_firmo(firmo)
         local original_fn = args[fn_index]
         args[fn_index] = function(...)
           -- Create a test context object with name
+          local prev_context = firmo.get_current_test_context()
           local test_context = {
-            type = "it",
-            name = description,
+            type = "test",
+            name = prev_context and prev_context.path or description,  -- Use path from file context if available
+            path = description,
             options = options,
           }
 
           -- Set as current test context
-          local prev_context = firmo._current_test_context
-          firmo._current_test_context = test_context
+          -- prev_context is already declared at line 329
+          firmo.set_current_test_context(test_context)
 
           -- Call the original function
           local success, result = pcall(original_fn, ...)
 
           -- Restore previous context
-          firmo._current_test_context = prev_context
+          firmo.set_current_test_context(prev_context)
 
           -- Propagate any errors
           if not success then
@@ -395,14 +397,14 @@ function M.patch_firmo(firmo)
           }
 
           -- Set as current test context (for nested describes)
-          local prev_context = firmo._current_test_context
-          firmo._current_test_context = test_context
+          local prev_context = firmo.get_current_test_context()
+          firmo.set_current_test_context(test_context)
 
           -- Call the original function
           local success, result = pcall(original_fn, ...)
 
           -- Restore previous context
-          firmo._current_test_context = prev_context
+          firmo.set_current_test_context(prev_context)
 
           -- Propagate any errors
           if not success then

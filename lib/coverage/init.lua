@@ -599,7 +599,12 @@ function coverage.pause()
 
   if was_paused then
     get_logger().debug("Coverage is already paused")
-    return false
+    get_error_handler().throw(
+      "Cannot pause: coverage is already paused",
+      get_error_handler().CATEGORY.TEST_EXPECTED,
+      get_error_handler().SEVERITY.ERROR,
+      { operation = "pause" }
+    )
   end
 
   -- Set pause state - this is where coverage counting stops
@@ -645,7 +650,12 @@ function coverage.resume()
 
   if not was_paused then
     get_logger().debug("Coverage is already running")
-    return false
+    get_error_handler().throw(
+      "Cannot resume: coverage is already running",
+      get_error_handler().CATEGORY.TEST_EXPECTED,
+      get_error_handler().SEVERITY.ERROR,
+      { operation = "resume" }
+    )
   end
 
   -- Resume coverage counting

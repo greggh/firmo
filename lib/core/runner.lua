@@ -114,6 +114,7 @@ local test_definition = try_require("lib.core.test_definition")
 local central_config = try_require("lib.core.central_config")
 local parallel_module = try_require("lib.tools.parallel")
 local temp_file = try_require("lib.tools.filesystem.temp_file")
+local inspect = try_require("inspect")
 
 --- Output formatting options used by the test runner.
 ---@field use_color boolean Whether to use ANSI color codes in console output.
@@ -584,9 +585,15 @@ function M.run_file(file)
     end
 
     -- Set context for temp file tracking
+    local fs = get_fs()
+    local file_basename = file
+    if fs and fs.basename then
+      file_basename = fs.basename(file)
+    end
     temp_file.set_current_test_context({
       type = "file",
       path = file,
+      name = file_basename,
     })
 
     -- Load and execute the test file

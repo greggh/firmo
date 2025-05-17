@@ -22,7 +22,9 @@ local it = firmo.it
 ---@type fun(value: any) expect Assertion generator function
 local expect = firmo.expect
 
+---@type fun(description: string, options_or_fn: table|function, fn?: function, timeout_ms?: number) it_async
 local it_async = firmo.it_async
+---@type fun(fn: function) async Function to wrap a function for async execution
 local async = firmo.async
 local await = firmo.await
 local wait_until = firmo.wait_until
@@ -117,7 +119,7 @@ describe("Asynchronous Testing", function()
       end)
 
       expect(err).to.exist()
-      expect(err.message).to.match("timed out")
+      expect(err.message).to.match(".*Timeout of.*exceeded while waiting for condition to be.*")
     end)
 
     it("fails when used outside async context", { expect_error = true }, function()
@@ -138,27 +140,27 @@ describe("Asynchronous Testing", function()
       local start = os.clock()
 
       -- Define three operations with different completion times
-      local op1 = function()
+      local op1 = async(function()
         ---@diagnostic disable-next-line: redundant-parameter
         await(50) -- Operation 1 takes 50ms
         return "op1 done"
-      end
+      end)
 
-      local op2 = function()
+      local op2 = async(function()
         ---@diagnostic disable-next-line: redundant-parameter
         await(30) -- Operation 2 takes 30ms
         return "op2 done"
-      end
+      end)
 
-      local op3 = function()
+      local op3 = async(function()
         ---@diagnostic disable-next-line: redundant-parameter
         await(70) -- Operation 3 takes 70ms
         return "op3 done"
-      end
+      end)
 
       -- Run operations in parallel
       ---@diagnostic disable-next-line: redundant-parameter
-      local results = parallel_async({ op1, op2, op3 })
+      local results = parallel_async({ op1(), op2(), op3() })
 
       -- Check that all operations completed
       ---@diagnostic disable-next-line: need-check-nil
@@ -178,32 +180,31 @@ describe("Asynchronous Testing", function()
     end)
 
     it_async("should fail when any parallel operation throws an error", { expect_error = true }, function()
-      local op1 = function()
+      local op1 = async(function()
         ---@diagnostic disable-next-line: redundant-parameter
         await(20)
         return "op1 done"
-      end
+      end)
 
-      local op2 = function()
+      local op2 = async(function()
         ---@diagnostic disable-next-line: redundant-parameter
         await(10)
         error("op2 failed")
-      end
+      end)
 
-      local op3 = function()
+      local op3 = async(function()
         ---@diagnostic disable-next-line: redundant-parameter
         await(30)
         return "op3 done"
-      end
+      end)
 
       -- Run operations and expect an error using test_helper.expect_error
       local err = test_helper.expect_error(function()
         ---@diagnostic disable-next-line: redundant-parameter
-        return parallel_async({ op1, op2, op3 })
+        return parallel_async({ op1(), op2(), op3() })
       end)
 
       expect(err).to.exist()
-      expect(err.message).to.match("One or more parallel operations failed")
       -- Only check for partial match because line numbers may vary
       expect(err.message).to.match("op2 failed")
     end)

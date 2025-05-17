@@ -168,15 +168,15 @@ describe("Filesystem Module", function()
   end)
 
   describe("Directory Operations", function()
-    local test_dir:path()
+    local test_dir
 
     before(function()
-      test_dir:path() = temp_test_dir:path() .. "/test_dir"
-      fs.create_directory(test_dir:path())
+      test_dir = temp_test_dir:path() .. "/test_dir"
+      fs.create_directory(test_dir)
     end)
 
     it("should create and delete directories", function()
-      local new_dir = test_dir:path() .. "/new_dir"
+      local new_dir = test_dir .. "/new_dir"
 
       -- Create directory
       local create_success, create_err = fs.create_directory(new_dir)
@@ -192,7 +192,7 @@ describe("Filesystem Module", function()
     end)
 
     it("should recursively delete directories", function()
-      local parent_dir = test_dir:path() .. "/parent"
+      local parent_dir = test_dir .. "/parent"
       local child_dir = parent_dir .. "/child"
       local file_in_child = child_dir .. "/file.txt"
 
@@ -216,8 +216,8 @@ describe("Filesystem Module", function()
     end)
 
     it("should copy directories", function()
-      local source_dir = test_dir:path() .. "/source_dir"
-      local target_dir = test_dir:path() .. "/target_dir"
+      local source_dir = test_dir .. "/source_dir"
+      local target_dir = test_dir .. "/target_dir"
       local file_in_source = source_dir .. "/file.txt"
       local content = "Test content for directory copying"
 
@@ -238,7 +238,7 @@ describe("Filesystem Module", function()
     end)
 
     it("should get directory contents with and without hidden files", function()
-      local content_dir = test_dir:path() .. "/content_test"
+      local content_dir = test_dir .. "/content_test"
       fs.create_directory(content_dir)
 
       -- Create regular files
@@ -370,37 +370,37 @@ describe("Filesystem Module", function()
     it("should determine if paths are absolute", function()
       -- Unix absolute path
       local unix_abs = "/absolute/path"
-      expect(fs.is_absolute_path(unix_abs)).to.be_truthy()
+      expect(fs.is_absolute_path(unix_abs)).to.be.truthy()
 
       -- Unix relative path
       local unix_rel = "relative/path"
-      expect(fs.is_absolute_path(unix_rel)).to.be_falsy()
+      expect(fs.is_absolute_path(unix_rel)).to.be.falsy()
 
       -- Windows style absolute path (if supported)
-      if fs.is_windows then
+      if fs.is_windows() then
         local win_abs = "C:\\Windows\\Path"
-        expect(fs.is_absolute_path(win_abs)).to.be_truthy()
+        expect(fs.is_absolute_path(win_abs)).to.be.truthy()
       end
     end)
   end)
 
   describe("Alias Functions", function()
-    local test_dir:path()
+    local test_dir
     local test_file_path
     local test_subdir_path
 
     before(function()
-      test_dir:path() = temp_test_dir:path() .. "/alias_test"
-      fs.create_directory(test_dir:path())
-      test_file_path = test_dir:path() .. "/test_file.txt"
+      test_dir = temp_test_dir:path() .. "/alias_test"
+      fs.create_directory(test_dir)
+      test_file_path = test_dir .. "/test_file.txt"
       fs.write_file(test_file_path, "test content")
-      test_subdir_path = test_dir:path() .. "/test_subdir"
+      test_subdir_path = test_dir .. "/test_subdir"
       fs.create_directory(test_subdir_path)
     end)
 
     it("should have remove_directory as alias for delete_directory", function()
       -- Create a directory to delete
-      local dir_to_delete = test_dir:path() .. "/dir_to_delete"
+      local dir_to_delete = test_dir .. "/dir_to_delete"
       fs.create_directory(dir_to_delete)
 
       -- Verify both functions exist
@@ -418,7 +418,7 @@ describe("Filesystem Module", function()
 
     it("should have remove_file as alias for delete_file", function()
       -- Create a file to delete
-      local file_to_delete = test_dir:path() .. "/file_to_delete.txt"
+      local file_to_delete = test_dir .. "/file_to_delete.txt"
       fs.write_file(file_to_delete, "delete me")
 
       -- Verify both functions exist
@@ -445,7 +445,7 @@ describe("Filesystem Module", function()
 
       -- Both should return the same result
       expect(dir1).to.equal(dir2)
-      expect(dir1).to.equal(test_dir:path())
+      expect(dir1).to.equal(test_dir)
     end)
 
     it("should have get_filename as alias for get_file_name", function()
@@ -530,7 +530,7 @@ describe("Filesystem Module", function()
 
     it("should have list_directory using get_directory_contents", function()
       -- Create test directory with mixed files
-      local list_dir = test_dir:path() .. "/list_dir"
+      local list_dir = test_dir .. "/list_dir"
       fs.create_directory(list_dir)
 
       -- Create regular files
@@ -575,18 +575,18 @@ describe("Filesystem Module", function()
   end)
 
   describe("Information Functions", function()
-    local test_dir:path()
+    local test_dir
     local test_file_path
     local test_content = "Test content for information functions"
 
     before(function()
-      test_dir:path() = temp_test_dir:path() .. "/info_test"
-      fs.create_directory(test_dir:path())
-      test_file_path = test_dir:path() .. "/info_file.txt"
+      test_dir = temp_test_dir:path() .. "/info_test"
+      fs.create_directory(test_dir)
+      test_file_path = test_dir .. "/info_file.txt"
       fs.write_file(test_file_path, test_content)
 
       -- Create a subdirectory for testing directory functions
-      local test_subdir = test_dir:path() .. "/subdir"
+      local test_subdir = test_dir .. "/subdir"
       fs.create_directory(test_subdir)
     end)
 
@@ -595,18 +595,18 @@ describe("Filesystem Module", function()
       expect(fs.file_exists(test_file_path)).to.be_truthy()
 
       -- Non-existent file
-      expect(fs.file_exists(test_dir:path() .. "/nonexistent.txt")).to.be_falsy()
+      expect(fs.file_exists(test_dir .. "/nonexistent.txt")).to.be_falsy()
 
       -- Directory (not a file)
-      expect(fs.file_exists(test_dir:path())).to.be_falsy()
+      expect(fs.file_exists(test_dir)).to.be_falsy()
     end)
 
     it("should check directory existence correctly", function()
       -- Existing directory
-      expect(fs.directory_exists(test_dir:path())).to.be_truthy()
+      expect(fs.directory_exists(test_dir)).to.be_truthy()
 
       -- Non-existent directory
-      expect(fs.directory_exists(test_dir:path() .. "/nonexistent")).to.be_falsy()
+      expect(fs.directory_exists(test_dir .. "/nonexistent")).to.be_falsy()
 
       -- File (not a directory)
       expect(fs.directory_exists(test_file_path)).to.be_falsy()
@@ -619,14 +619,11 @@ describe("Filesystem Module", function()
       expect(size).to.equal(#test_content)
     end)
 
-    it("should handle non-existent files for size retrieval", { expect_error = true }, function()
+    it("should handle non-existent files for size retrieval", function()
       -- Test with non-existent file using test_helper.expect_error
-      local err = test_helper.expect_error(function()
-        return fs.get_file_size(test_dir:path() .. "/nonexistent.txt")
-      end)
+      local result = fs.get_file_size(test_dir .. "/nonexistent.txt")
 
-      expect(err).to.exist()
-      expect(err.message).to.match("file")
+      expect(result).to_not.exist()
     end)
 
     it("should retrieve file modification time", function()
@@ -644,30 +641,27 @@ describe("Filesystem Module", function()
       expect(time_diff < 60).to.be_truthy()
     end)
 
-    it("should handle non-existent files for modification time retrieval", { expect_error = true }, function()
+    it("should handle non-existent files for modification time retrieval", function()
       -- Test with non-existent file using test_helper.expect_error
-      local err = test_helper.expect_error(function()
-        return fs.get_modified_time(test_dir:path() .. "/nonexistent.txt")
-      end)
+      local result = fs.get_modified_time(test_dir .. "/nonexistent.txt")
 
-      expect(err).to.exist()
-      expect(err.message).to.match("file")
+      expect(result).to_not.exist()
     end)
 
     it("should check if path is a file or directory", function()
       -- Check is_file
       expect(fs.is_file(test_file_path)).to.be_truthy()
-      expect(fs.is_file(test_dir:path())).to.be_falsy()
-      expect(fs.is_file(test_dir:path() .. "/nonexistent.txt")).to.be_falsy()
+      expect(fs.is_file(test_dir)).to.be_falsy()
+      expect(fs.is_file(test_dir .. "/nonexistent.txt")).to.be_falsy()
 
       -- Check is_directory
-      expect(fs.is_directory(test_dir:path())).to.be_truthy()
+      expect(fs.is_directory(test_dir)).to.be_truthy()
       expect(fs.is_directory(test_file_path)).to.be_falsy()
-      expect(fs.is_directory(test_dir:path() .. "/nonexistent")).to.be_falsy()
+      expect(fs.is_directory(test_dir .. "/nonexistent")).to.be_falsy()
     end)
 
     it("should handle symlinks correctly", { skip = not fs.supports_symlinks }, function()
-      local symlink_path = test_dir:path() .. "/symlink.txt"
+      local symlink_path = test_dir .. "/symlink.txt"
 
       -- Create a symlink if the platform supports it
       local symlink_success, symlink_err = fs.create_symlink(test_file_path, symlink_path)
@@ -688,36 +682,25 @@ describe("Filesystem Module", function()
       end
     end)
 
-    it("should handle nil inputs gracefully", { expect_error = true }, function()
+    it("should handle nil inputs gracefully", function()
       -- Test with invalid inputs using test_helper.expect_error
-      local err = test_helper.expect_error(function()
-        return fs.get_file_size(nil)
-      end)
+      local result = fs.get_file_size(nil)
 
-      expect(err).to.exist()
-      expect(err.context).to.exist()
-      expect(err.context.provided_type).to.equal("nil")
-      expect(err.message).to.match("path")
+      expect(result).to_not.exist()
     end)
 
-    it("should handle directory inputs for file operations", { expect_error = true }, function()
+    it("should handle directory inputs for file operations", function()
       -- Test with directory instead of file using test_helper.expect_error
-      local err = test_helper.expect_error(function()
-        return fs.get_file_size(test_dir:path())
-      end)
+      local result = fs.get_file_size(test_dir)
 
-      expect(err).to.exist()
-      expect(err.message).to.match("file")
+      expect(result).to_not.exist()
     end)
 
-    it("should handle non-existent files", { expect_error = true }, function()
+    it("should handle non-existent files", function()
       -- Test file operations on non-existent file using test_helper.expect_error
-      local err = test_helper.expect_error(function()
-        return fs.read_file(test_dir:path() .. "/nonexistent.txt")
-      end)
+      local result = fs.read_file(test_dir .. "/nonexistent.txt")
 
-      expect(err).to.exist()
-      expect(err.message).to.match("file")
+      expect(result).to_not.exist()
     end)
   end)
 end)

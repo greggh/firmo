@@ -34,6 +34,7 @@ M._VERSION = "1.0.0"
 -- Lazy-load dependencies to avoid circular dependencies
 ---@diagnostic disable-next-line: unused-local
 local _fs
+local _json
 
 -- Local helper for safe requires without dependency on error_handler
 local function try_require(module_name)
@@ -52,6 +53,15 @@ local function get_fs()
     _fs = try_require("lib.tools.filesystem")
   end
   return _fs
+end
+
+--- Get the json module with lazy loading to avoid circular dependencies
+---@return table|nil The json module or nil if not available
+local function get_json()
+  if not _json then
+    _json = try_require("lib.tools.json")
+  end
+  return _json
 end
 
 -- Try to import JSON module if available

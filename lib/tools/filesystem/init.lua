@@ -232,12 +232,14 @@ function fs.write_file(path, content)
     if dir and dir ~= "" then
       local success, err = fs.ensure_directory_exists(dir)
       if not success then
+        print("Error creating parent directory: " .. (err or "unknown error"))
         return nil, err
       end
     end
 
     local file, err = io.open(file_path, "w")
     if not file then
+      print("Error opening file for writing: " .. (err or "unknown error"))
       return nil, err
     end
 
@@ -2508,7 +2510,7 @@ function fs.is_absolute_path(path)
   local normalized = path:gsub("\\", "/")
 
   if fs.is_windows() then
-    -- Windows: Check for drive letter (C:/, etc.) or UNC paths (//server)
+    -- Windows: Check for drive letter (C:, C:/, etc.) or UNC paths (//server)
     return normalized:match("^%a:/") ~= nil or normalized:match("^//") ~= nil
   else
     -- Unix-like: Check for leading slash

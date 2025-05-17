@@ -127,7 +127,7 @@ describe("Logging Search Module", function()
 
   it("exports logs to different formats", function()
     local test_dir = test_helper.create_temp_test_directory()
-    local export_file = test_dir:path()() .. "/export.csv"
+    local export_file = test_dir:path() .. "/export.csv"
     table.insert(test_files, export_file)
 
     local result = log_search.export_logs(test_files[1], export_file, "csv")

@@ -564,8 +564,8 @@ end
 ---@return nil
 function M.set_current_test_context(context)
   -- If we can modify firmo, use it
-  if _G.firmo then
-    _G.firmo._current_test_context = context
+  if _G.firmo and _G.firmo.set_current_test_context then
+    _G.firmo.set_current_test_context(context)
   end
 
   -- Also set a global for fallback

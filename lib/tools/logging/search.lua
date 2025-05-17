@@ -160,6 +160,7 @@ end
 function M.search_logs(options)
   options = options or {}
 
+  local fs = get_fs()
   if not fs then
     return nil, "Filesystem module not available"
   end
@@ -171,7 +172,7 @@ function M.search_logs(options)
   end
 
   -- Check if file exists
-  if not get_fs().file_exists(log_file) then
+  if not fs.file_exists(log_file) then
     return nil, "Log file does not exist: " .. log_file
   end
 
@@ -179,7 +180,7 @@ function M.search_logs(options)
   local is_json = log_file:match("%.json$") or options.format == "json"
 
   -- Read log file
-  local content, err = get_fs().read_file(log_file)
+  local content, err = fs.read_file(log_file)
   if not content then
     return nil, "Failed to read log file: " .. (err or "unknown error")
   end
@@ -277,7 +278,12 @@ function M.get_log_stats(log_file, options)
   options = options or {}
 
   -- Check if file exists
-  if not get_fs().file_exists(log_file) then
+  local fs = get_fs()
+  if not fs then
+    return nil, "Filesystem module not available"
+  end
+  
+  if not fs.file_exists(log_file) then
     return nil, "Log file does not exist: " .. log_file
   end
 
@@ -285,7 +291,7 @@ function M.get_log_stats(log_file, options)
   local is_json = log_file:match("%.json$") or options.format == "json"
 
   -- Read log file
-  local content, err = get_fs().read_file(log_file)
+  local content, err = fs.read_file(log_file)
   if not content then
     return nil, "Failed to read log file: " .. (err or "unknown error")
   end
@@ -347,7 +353,7 @@ function M.get_log_stats(log_file, options)
   end
 
   -- Add file size information
-  stats.file_size = get_fs().get_file_size(log_file)
+  stats.file_size = fs.get_file_size(log_file)
 
   -- Always return a valid stats object even if there are no entries
   return stats
@@ -366,7 +372,12 @@ function M.export_logs(log_file, output_file, format, options)
   options = options or {}
 
   -- Check if source file exists
-  if not get_fs().file_exists(log_file) then
+  local fs = get_fs()
+  if not fs then
+    return nil, "Filesystem module not available"
+  end
+  
+  if not fs.file_exists(log_file) then
     return nil, "Log file does not exist: " .. log_file
   end
 
@@ -374,15 +385,15 @@ function M.export_logs(log_file, output_file, format, options)
   local is_json_source = log_file:match("%.json$") or options.source_format == "json"
 
   -- Read source log file
-  local source_content, err = get_fs().read_file(log_file)
+  local source_content, err = fs.read_file(log_file)
   if not source_content then
     return nil, "Failed to read source log file: " .. (err or "unknown error")
   end
 
   -- Ensure output directory exists
-  local output_dir = get_fs().get_directory_name(output_file)
+  local output_dir = fs.get_directory_name(output_file)
   if output_dir and output_dir ~= "" then
-    local success, err = get_fs().ensure_directory_exists(output_dir)
+    local success, err = fs.ensure_directory_exists(output_dir)
     if not success then
       return nil, "Failed to create output directory: " .. (err or "unknown error")
     end
@@ -510,7 +521,7 @@ function M.export_logs(log_file, output_file, format, options)
   end
 
   -- Write the complete output content to file
-  local success, write_err = get_fs().write_file(output_file, output_content)
+  local success, write_err = fs.write_file(output_file, output_content)
   if not success then
     return nil, "Failed to write output file: " .. (write_err or "unknown error")
   end
@@ -624,9 +635,17 @@ function M.get_log_processor(options)
   -- Add file output if configured
   if options.output_file then
     -- Ensure output directory exists
-    local dir = get_fs().get_directory_name(options.output_file)
+    local fs = get_fs()
+    if not fs then
+      return nil, "Filesystem module not available"
+    end
+    
+    local dir = fs.get_directory_name(options.output_file)
     if dir and dir ~= "" then
-      get_fs().ensure_directory_exists(dir)
+      local success, err = fs.ensure_directory_exists(dir)
+      if not success then
+        return nil, "Failed to create output directory: " .. (err or "unknown error")
+      end
     end
 
     -- Create an output handler
@@ -639,8 +658,11 @@ function M.get_log_processor(options)
       last_flush = os.time(),
       flush = function(self)
         if self.buffer and self.buffer ~= "" then
-          get_fs().append_file(self.path, self.buffer)
-          self.buffer = ""
+          local fs = get_fs()
+          if fs then
+            fs.append_file(self.path, self.buffer)
+            self.buffer = ""
+          end
           self.last_flush = os.time()
         end
       end,

@@ -622,10 +622,6 @@ function async_module.parallel_async(operations, timeout)
   for i, err in pairs(errors) do
     -- Removed log line
     if err then
-      -- Include "Simulated failure" in the message for test matching
-      if type(err) == 'string' and err:match("op2 failed") then
-        err = "Simulated failure in operation 2"
-      end
       table.insert(error_ops, string.format("Operation %d failed: %s", i, tostring(err)))
     end
   end
