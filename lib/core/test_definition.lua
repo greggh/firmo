@@ -34,6 +34,9 @@ local colors_enabled = true
 local SGR_CODES =
   { reset = 0, bold = 1, red = 31, green = 32, yellow = 33, blue = 34, magenta = 35, cyan = 36, white = 37 }
 
+-- Compatibility function for table unpacking
+local unpack_table = table.unpack or unpack
+
 --- Generates an SGR (Select Graphic Rendition) escape code string.
 --- If colors are disabled globally (via `colors_enabled` upvalue), returns an empty string.
 ---@param code_or_name string|number The SGR code number or a predefined color/style name (e.g., "red", "bold").
@@ -62,6 +65,7 @@ local active_tags = {}
 local filter_pattern = nil
 local focus_mode = false
 local current_describe_block = nil
+local async_module -- Lazy-loaded async module
 
 -- Define test status constants
 ---@class TestStatus Enum defining possible test statuses.
@@ -115,13 +119,30 @@ end
 
 local quality_module = try_require("lib.quality")
 
---- Get the success handler module with lazy loading to avoid circular dependencies
----@return table|nil The error handler module or nil if not available
-local function get_error_handler()
-  if not _error_handler then
-    _error_handler = try_require("lib.tools.error_handler")
+--- Get the async module with lazy loading to avoid circular dependencies
+---@return table|nil The async module or nil if not available
+local function get_async_module()
+  if not async_module then
+    async_module = try_require("lib.async")
   end
-  return _error_handler
+  return async_module
+end
+
+--- Check if a function is an async function (wrapped with async())
+---@param fn function The function to check
+---@return boolean True if the function is an async function, false otherwise
+local function is_async_function(fn)
+  if type(fn) ~= "function" then
+    return false
+  end
+
+  local async = get_async_module()
+  if not async then
+    return false -- If async module is not available, assume not async
+  end
+
+  -- Check if the function is an async function using the async module
+  return async.is_async_function and async.is_async_function(fn)
 end
 
 --- Get the logging module with lazy loading to avoid circular dependencies
@@ -158,6 +179,83 @@ local function get_logger()
       print("[TRACE] " .. msg)
     end,
   }
+end
+
+--- Safely await an async function, or just call it if it's not async
+--- This function handles executing both synchronous and asynchronous functions.
+--- For async functions, it properly awaits their completion and propagates any errors.
+---@param fn function The function to call or await
+---@param context? string Optional context string for debugging (e.g., "before hook", "test", "after hook")
+---@return any The result of the function
+local function safe_await(fn, context)
+  context = context or "function"
+  local logger = get_logger()
+
+  if not is_async_function(fn) then
+    logger.debug("Running synchronous " .. context)
+    return fn() -- Not async, just call normally
+  end
+
+  local async = get_async_module()
+  if not async then
+    logger.warn("Async module not available, running " .. context .. " synchronously")
+    return fn() -- Can't await, just call normally
+  end
+
+  logger.debug("Awaiting async " .. context .. " execution")
+
+  -- For async functions, we need to execute and ensure completion
+  local success, result = pcall(function()
+    -- Get the executor function by calling fn()
+    local executor = fn()
+
+    if executor == nil then
+      logger.warn("Async " .. context .. " returned nil executor")
+      return { true, nil }
+    end
+
+    -- If executor is not a function, return the direct result
+    if type(executor) ~= "function" then
+      logger.debug("Async " .. context .. " returned non-function: " .. type(executor))
+      return { true, executor }
+    end
+
+    -- Execute it and get success/result
+    logger.debug("Executing async " .. context .. " executor")
+    local exec_result = executor()
+    logger.debug("Async " .. context .. " executor completed")
+    return exec_result
+  end)
+
+  if not success then
+    logger.error("Error in async " .. context .. ": " .. tostring(result))
+    error(result) -- Propagate any pcall errors
+  end
+
+  -- Check if result is valid (should be a table with success/result pair)
+  if type(result) ~= "table" or result[1] == nil then
+    logger.error("Invalid result from async " .. context .. ": " .. tostring(result))
+    error("Invalid result from async " .. context .. ": expected {success, result} pair")
+  end
+
+  -- executor() returns {success, result} pair
+  local exec_success, exec_result = unpack_table(result)
+  if not exec_success then
+    logger.error("Error in async " .. context .. " executor: " .. tostring(exec_result))
+    error(exec_result) -- Propagate executor errors
+  end
+
+  logger.debug("Async " .. context .. " completed successfully")
+  return exec_result -- Return the actual result
+end
+
+--- Get the success handler module with lazy loading to avoid circular dependencies
+---@return table|nil The error handler module or nil if not available
+local function get_error_handler()
+  if not _error_handler then
+    _error_handler = try_require("lib.tools.error_handler")
+  end
+  return _error_handler
 end
 
 local temp_file = try_require("lib.tools.filesystem.temp_file")
@@ -673,6 +771,9 @@ function M.it(name, options_or_fn, fn)
   end
 
   local success, err = get_error_handler().try(function()
+    local logger = get_logger()
+    logger.debug("Starting test execution: " .. name)
+
     -- Set temporary file context
     temp_file.set_current_test_context({
       type = "test",
@@ -680,23 +781,89 @@ function M.it(name, options_or_fn, fn)
       path = table.concat(path, " / "),
     })
 
-    -- Run before hooks for each level
-    for i = 1, level do -- Correctly iterate through levels
-      for _, hook in ipairs(befores[i] or {}) do -- Iterate hooks within the level loop
-        hook()
+    -- Track hook execution state for debugging
+    local hook_counts = {
+      before = 0,
+      after = 0,
+      before_async = 0,
+      after_async = 0,
+    }
+
+    -- Run before hooks for each level, properly handling async hooks
+    logger.debug("Starting before hooks execution for test: " .. name)
+    for i = 1, level do
+      local level_hooks = befores[i] or {}
+      logger.debug(string.format("Processing %d before hook(s) at level %d", #level_hooks, i))
+
+      for j, hook in ipairs(level_hooks) do
+        local hook_id = string.format("Before hook %d/%d at level %d", j, #level_hooks, i)
+        logger.debug("Starting " .. hook_id)
+
+        -- Check if hook is async and handle accordingly
+        if is_async_function(hook) then
+          hook_counts.before_async = hook_counts.before_async + 1
+          logger.debug(hook_id .. " is async, awaiting completion")
+          safe_await(hook, hook_id)
+        else
+          hook_counts.before = hook_counts.before + 1
+          logger.debug(hook_id .. " is synchronous")
+          hook()
+        end
+
+        logger.debug("Completed " .. hook_id)
       end
-    end -- Correctly close the level loop
+
+      logger.debug(string.format("Completed all before hooks at level %d", i))
+    end
+
+    logger.debug(
+      string.format("Before hooks execution complete: %d sync, %d async", hook_counts.before, hook_counts.before_async)
+    )
 
     -- Run the test
-    assert(type(test_fn) == "function", "INTERNAL ERROR: test_fn is nil before pcall in test runner!") -- Add assertion
-    test_fn() -- Use the correctly assigned test function variable
+    assert(type(test_fn) == "function", "INTERNAL ERROR: test_fn is nil before pcall in test runner!")
 
-    -- Run after hooks in reverse order
-    for i = level, 1, -1 do
-      for _, hook in ipairs(afters[i] or {}) do
-        hook()
-      end
+    -- Handle test function, which might be async
+    logger.debug("Starting test function execution: " .. name)
+    if is_async_function(test_fn) then
+      logger.debug("Test function is async, awaiting completion")
+      safe_await(test_fn, "test function")
+    else
+      logger.debug("Test function is synchronous")
+      test_fn() -- Use the correctly assigned test function variable
     end
+    logger.debug("Test function execution completed: " .. name)
+
+    -- Run after hooks in reverse order, properly handling async hooks
+    logger.debug("Starting after hooks execution for test: " .. name)
+    for i = level, 1, -1 do
+      local level_hooks = afters[i] or {}
+      logger.debug(string.format("Processing %d after hook(s) at level %d", #level_hooks, i))
+
+      for j, hook in ipairs(level_hooks) do
+        local hook_id = string.format("After hook %d/%d at level %d", j, #level_hooks, i)
+        logger.debug("Starting " .. hook_id)
+
+        -- Check if hook is async and handle accordingly
+        if is_async_function(hook) then
+          hook_counts.after_async = hook_counts.after_async + 1
+          logger.debug(hook_id .. " is async, awaiting completion")
+          safe_await(hook, hook_id)
+        else
+          hook_counts.after = hook_counts.after + 1
+          logger.debug(hook_id .. " is synchronous")
+          hook()
+        end
+
+        logger.debug("Completed " .. hook_id)
+      end
+
+      logger.debug(string.format("Completed all after hooks at level %d", i))
+    end
+
+    logger.debug(
+      string.format("After hooks execution complete: %d sync, %d async", hook_counts.after, hook_counts.after_async)
+    )
 
     -- Clean up test context
     temp_file.set_current_test_context(nil)
@@ -918,6 +1085,11 @@ end
 function M.before(fn)
   befores[level] = befores[level] or {}
   table.insert(befores[level], fn)
+
+  -- Log if the hook is async for debugging purposes
+  if is_async_function(fn) then
+    get_logger().debug("Registered async before hook at level " .. level)
+  end
 end
 
 --- Add a teardown hook for the current block
@@ -967,6 +1139,11 @@ end
 function M.after(fn)
   afters[level] = afters[level] or {}
   table.insert(afters[level], fn)
+
+  -- Log if the hook is async for debugging purposes
+  if is_async_function(fn) then
+    get_logger().debug("Registered async after hook at level " .. level)
+  end
 end
 
 --- Reset the test state

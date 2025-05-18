@@ -14,6 +14,7 @@
 ---@class async_module The public API for the async module.
 ---@field _VERSION string Module version.
 ---@field async fun(fn: function): fun(...): any Wraps a function to run within a managed async context, enabling `await` and `wait_until`. Returns a new function that, when called, executes the original function asynchronously.
+---@field is_async_function fun(fn: any): boolean Checks if a function was wrapped by async.async(). Returns true for async-wrapped functions, false otherwise.
 ---@field parallel_async fun(operations: {function}, timeout_ms?: number): {any} Runs multiple async functions concurrently (simulated) and collects results. Throws on error or timeout.
 ---@field await fun(ms: number): nil Pauses execution within an async context for a duration.
 ---@field wait_until fun(condition: function, timeout_ms?: number, check_interval?: number): boolean Waits within an async context until `condition()` returns true or `timeout_ms` expires. Throws error on timeout.
@@ -411,9 +412,10 @@ function async_module.async(fn)
   end
 
   -- Return a function that captures the arguments
-  return function(...)
+  -- Mark the wrapper function with a special marker for is_async_function to detect
+  local wrapper = function(...)
     local args = { ... }
-
+    
     -- Return the actual executor function
     return function()
       -- Set that we're in an async context
@@ -447,6 +449,53 @@ function async_module.async(fn)
       return true, unpack(results)
     end
   end
+  
+  -- Add a special marker as the first upvalue that can be reliably detected
+  debug.setupvalue(wrapper, 1, "__FIRMO_ASYNC_FUNCTION_MARKER")
+  
+  return wrapper
+end
+
+--- Checks if a function was wrapped by async.async()
+--- This function identifies whether a given value is an async function that was
+--- created using the async.async() wrapper without executing it. It uses a marker
+--- explicitly added to wrapped functions to ensure reliable identification.
+---
+--- @param fn any The value to test, typically a function.
+--- @return boolean True if the function was wrapped by async.async(), false otherwise.
+---
+--- @usage
+--- -- Define a regular function
+--- local regular_fn = function() return 42 end
+---
+--- -- Define an async function
+--- local async_fn = async.async(function() 
+---   async.await(10)
+---   return "async result" 
+--- end)
+---
+--- -- Check if they're async functions
+--- assert(not async.is_async_function(regular_fn)) -- false
+--- assert(async.is_async_function(async_fn))       -- true
+function async_module.is_async_function(fn)
+  -- If not a function, it's definitely not an async function
+  if type(fn) ~= "function" then
+    return false
+  end
+  
+  -- Check for our async function marker directly
+  -- This is faster and more reliable than examining function structure
+  local success, has_marker = pcall(function()
+    -- Check for the special marker we added to async-wrapped functions
+    return debug.getupvalue(fn, 1) == "__FIRMO_ASYNC_FUNCTION_MARKER"
+  end)
+  
+  -- If there was an error during detection, assume it's not an async function
+  if not success then
+    return false
+  end
+  
+  return has_marker or false
 end
 
 --- Run multiple async operations concurrently and wait for all to complete

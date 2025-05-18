@@ -210,7 +210,7 @@ describe("Performance Tests", function()
             table.insert(files, file_path)
 
             -- Log the file path for debugging
-            firmo.log.debug({ message = "Added test file to run", file_path = file_path })
+            logger.debug("Added test file to run")
           end
         end
 
@@ -221,7 +221,7 @@ describe("Performance Tests", function()
           -- Use pcall with dofile for safer execution
           local success, err = pcall(dofile, file)
           if not success then
-            firmo.log.error({ message = "Failed to run test file", file = file, error = err, index = i })
+            logger.error("Failed to run test file")
           end
         end
 
