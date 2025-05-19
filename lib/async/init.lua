@@ -415,7 +415,7 @@ function async_module.async(fn)
   -- Mark the wrapper function with a special marker for is_async_function to detect
   local wrapper = function(...)
     local args = { ... }
-    
+
     -- Return the actual executor function
     return function()
       -- Set that we're in an async context
@@ -426,9 +426,9 @@ function async_module.async(fn)
       local error_result = nil
 
       local function error_handler(err)
-          execution_ok = false
-          error_result = err
-          return err -- Return error to xpcall result
+        execution_ok = false
+        error_result = err
+        return err -- Return error to xpcall result
       end
 
       -- Call the original function with xpcall
@@ -440,8 +440,8 @@ function async_module.async(fn)
       in_async_context = prev_context
 
       if not execution_ok then
-          -- Return explicit error status and value captured by error_handler
-          return false, error_result
+        -- Return explicit error status and value captured by error_handler
+        return false, error_result
       end
 
       -- Success path: remove xpcall's success status and return explicit success + results
@@ -449,10 +449,10 @@ function async_module.async(fn)
       return true, unpack(results)
     end
   end
-  
+
   -- Add a special marker as the first upvalue that can be reliably detected
   debug.setupvalue(wrapper, 1, "__FIRMO_ASYNC_FUNCTION_MARKER")
-  
+
   return wrapper
 end
 
@@ -469,9 +469,9 @@ end
 --- local regular_fn = function() return 42 end
 ---
 --- -- Define an async function
---- local async_fn = async.async(function() 
+--- local async_fn = async.async(function()
 ---   async.await(10)
----   return "async result" 
+---   return "async result"
 --- end)
 ---
 --- -- Check if they're async functions
@@ -482,19 +482,19 @@ function async_module.is_async_function(fn)
   if type(fn) ~= "function" then
     return false
   end
-  
+
   -- Check for our async function marker directly
   -- This is faster and more reliable than examining function structure
   local success, has_marker = pcall(function()
     -- Check for the special marker we added to async-wrapped functions
     return debug.getupvalue(fn, 1) == "__FIRMO_ASYNC_FUNCTION_MARKER"
   end)
-  
+
   -- If there was an error during detection, assume it's not an async function
   if not success then
     return false
   end
-  
+
   return has_marker or false
 end
 
@@ -580,9 +580,9 @@ function async_module.parallel_async(operations, timeout)
       -- Removed log line
       completed[i] = true
       if success_exec then
-          results[i] = result_or_err
+        results[i] = result_or_err
       else
-          errors[i] = result_or_err -- Store the error if executor returned false
+        errors[i] = result_or_err -- Store the error if executor returned false
       end
     end
   end
@@ -1012,8 +1012,6 @@ function async_module.it_async(description, options_or_fn, fn, timeout_ms)
       -- Execute the async function
       local result = async_fn()
 
-      -- Check for timeout
-      local elapsed_ms = (os.clock() - start) * 1000
       -- Check for timeout immediately after function potentially yields/returns
       local elapsed_ms = (os.clock() - start) * 1000
       if elapsed_ms > timeout_ms then
@@ -1028,8 +1026,6 @@ function async_module.it_async(description, options_or_fn, fn, timeout_ms)
     if _testing_timeout and not completed then
       -- Only throw timeout if actual execution would time out
       if (os.clock() - start) * 1000 >= 5 then
-        timed_out = true
-        success = false
         timed_out = true
         success = false -- Mark as failed
         err = string.format("Async test timeout: %dms exceeded (testing mode)", timeout_ms)

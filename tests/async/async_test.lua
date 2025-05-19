@@ -21,17 +21,24 @@ local describe = firmo.describe
 local it = firmo.it
 ---@type fun(value: any) expect Assertion generator function
 local expect = firmo.expect
+---@type fun(callback: function) after Hook that runs after each test
+local after = firmo.after
 
+local async_module = require("lib.async")
 ---@type fun(description: string, options_or_fn: table|function, fn?: function, timeout_ms?: number) it_async
-local it_async = firmo.it_async
+local it_async = async_module.it_async
 ---@type fun(fn: function) async Function to wrap a function for async execution
-local async = firmo.async
-local await = firmo.await
-local wait_until = firmo.wait_until
-local parallel_async = firmo.parallel_async
+local async = async_module.async
+local await = async_module.await
+local wait_until = async_module.wait_until
+local parallel_async = async_module.parallel_async
 local test_helper = require("lib.tools.test_helper")
 
 describe("Asynchronous Testing", function()
+  -- Reset async module state after each test to ensure clean state
+  after(function()
+    async_module.reset()
+  end)
   -- Verify basic async functionality
   describe("async() function", function()
     it("wraps a function for async execution", function()

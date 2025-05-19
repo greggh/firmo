@@ -175,7 +175,7 @@ describe("Assertion Module", function()
       -- The { expect_error = true } option will handle the assertion error properly
     end)
 
-    it("should handle errors in custom predicates", function()
+    it("should handle errors in custom predicates", { expect_error = true }, function()
       -- Use test_helper to capture the intentional error
       local test_fn = test_helper.with_error_capture(function()
         assertion.expect(5).to.satisfy(function(v)

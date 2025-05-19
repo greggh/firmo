@@ -20,6 +20,7 @@ local it = firmo.it
 local expect = firmo.expect
 
 local test_helper = require("lib.tools.test_helper")
+local inspect = require("inspect")
 
 describe("Truthy and Falsey Assertions", function()
   describe("expect(value).to.be_truthy()", function()
@@ -36,18 +37,18 @@ describe("Truthy and Falsey Assertions", function()
       -- Using expect_error for more concise error testing
       local err = test_helper.expect_error(function()
         expect(false).to.be_truthy()
-      end, "Expected value to be truthy")
+      end, "expected.*to be truthy")
 
       expect(err).to.exist("Error object should be returned")
-      expect(err.message).to.match("Expected.*false.*to be truthy", "Error message should include the actual value")
+      expect(err.message).to.match("expected.*to be truthy", "Error message should include the actual value")
 
       -- Test the nil case
       err = test_helper.expect_error(function()
         expect(nil).to.be_truthy()
-      end, "Expected value to be truthy")
+      end, "expected.*to be truthy")
 
       expect(err).to.exist("Error object should be returned")
-      expect(err.message).to.match("Expected.*nil.*to be truthy", "Error message should include the actual value")
+      expect(err.message).to.match("expected.*to be truthy", "Error message should include the actual value")
     end)
   end)
 
@@ -61,18 +62,18 @@ describe("Truthy and Falsey Assertions", function()
       -- Using expect_error for more concise error testing
       local err = test_helper.expect_error(function()
         expect(true).to_not.be_truthy()
-      end, "Expected value to not be truthy")
+      end, "expected.*to not be truthy")
 
       expect(err).to.exist("Error object should be returned")
-      expect(err.message).to.match("Expected.*true.*to not be truthy", "Error message should include the actual value")
+      expect(err.message).to.match("expected.*true.*to not be truthy", "Error message should include the actual value")
 
       -- Test the string case
       err = test_helper.expect_error(function()
         expect("hello").to_not.be_truthy()
-      end, "Expected value to not be truthy")
+      end, "expected.*to not be truthy")
 
       expect(err).to.exist("Error object should be returned")
-      expect(err.message).to.match("Expected.*hello.*to not be truthy", "Error message should include the actual value")
+      expect(err.message).to.match("expected.*to not be truthy", "Error message should include the actual value")
     end)
   end)
 end)

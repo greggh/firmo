@@ -122,6 +122,7 @@ examples/reports/auto-generated/*/
 # Generated coverage reports in the project root
 coverage-reports/
 test-reports-tmp/
+.coverage-stats
 
 # Documentation archive directory
 docs/coverage_repair/archive/

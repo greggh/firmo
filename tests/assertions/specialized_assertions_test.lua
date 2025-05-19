@@ -19,6 +19,7 @@ local it = firmo.it
 local expect = firmo.expect
 
 local test_helper = require("lib.tools.test_helper")
+local error_handler = require("lib.tools.error_handler")
 
 describe("Specialized Assertions", function()
   describe("Date Assertions", function()
