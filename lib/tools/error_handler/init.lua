@@ -47,6 +47,14 @@ M._VERSION = "1.0.0"
 -- Simple forward declarations for functions used before they're defined
 local create_error -- Forward declaration for create_error function
 
+-- Define internal modules to exclude when tracking error sources
+local INTERNAL_MODULES = {
+  ["lib/tools/error_handler"] = true,
+  ["lib/assertion/init"] = true,
+  ["lib/tools/test_helper"] = true,
+  ["lib/core/test_definition"] = true
+}
+
 -- Compatibility function for table unpacking (works with both Lua 5.1 and 5.2+)
 local unpack_table = table.unpack or unpack
 
@@ -148,6 +156,61 @@ local function get_traceback(level)
   return debug.traceback("", level)
 end
 
+--- Find the most relevant error source by traversing the stack.
+--- Skips internal framework modules to find the original source of errors.
+--- @return table|nil The debug info for the most relevant source location
+--- @private
+local function find_error_source()
+  local stack_level = 3  -- Start above our immediate caller
+  local most_relevant = nil
+  local internal_source = nil
+  
+  while true do
+    local info = debug.getinfo(stack_level, "Sl")
+    if not info then break end
+    
+    -- Always capture first internal source as fallback
+    if not internal_source and info.short_src then
+      local is_internal = false
+      for pattern in pairs(INTERNAL_MODULES) do
+        if info.short_src:match(pattern) then
+          is_internal = true
+          break
+        end
+      end
+      
+      if is_internal then
+        internal_source = info
+      end
+    end
+    
+    -- If we find a non-internal source, that's our most relevant
+    if info.short_src then
+      local is_internal = false
+      for pattern in pairs(INTERNAL_MODULES) do
+        if info.short_src:match(pattern) then
+          is_internal = true
+          break
+        end
+      end
+      
+      if not is_internal then
+        most_relevant = info
+        break
+      end
+    end
+    
+    stack_level = stack_level + 1
+  end
+  
+  -- If we found a most relevant source, store the internal source as additional context
+  if most_relevant and internal_source then
+    most_relevant.source_internal = internal_source
+  end
+  
+  return most_relevant or internal_source
+end
+
 -- Internal helper to create an error object
 create_error = function(message, category, severity, context, cause)
   local err = {
@@ -160,11 +223,20 @@ create_error = function(message, category, severity, context, cause)
     cause = cause, -- Original error that caused this one
   }
 
-  -- Add file and line information if available
-  local info = debug.getinfo(3, "Sl")
-  if info then
-    err.source_file = info.short_src
-    err.source_line = info.currentline
+  -- Find the most relevant source location
+  local source = find_error_source()
+  if source then
+    err.source_file = source.short_src
+    err.source_line = source.currentline
+    
+    -- Store internal location in debug context if different
+    if source.source_internal then
+      if not err.context.internal_source then
+        err.context.internal_source = {}
+      end
+      err.context.internal_source.file = source.source_internal.short_src
+      err.context.internal_source.line = source.source_internal.currentline
+    end
   end
 
   return err
@@ -197,14 +269,27 @@ local function format_error(err)
   table.insert(parts, err.message or "Unknown error")
 
   if err.source_file and err.source_line then
-    table.insert(parts, "(at " .. err.source_file .. ":" .. err.source_line .. ")")
+    -- Don't show internal source locations in normal messages
+    local is_internal_source = false
+    for pattern in pairs(INTERNAL_MODULES) do
+      if err.source_file:match(pattern) then
+        is_internal_source = true
+        break
+      end
+    end
+    
+    if not is_internal_source then
+      table.insert(parts, "(at " .. err.source_file .. ":" .. err.source_line .. ")")
+    end
   end
 
-  local verbose = true -- Always be verbose for error handling
+  local verbose = config.verbose -- Use configuration to determine verbosity
   if verbose and err.context and next(err.context) then
     table.insert(parts, "\nContext: ")
     for k, v in pairs(err.context) do
-      table.insert(parts, " " .. k .. ": " .. tostring(v))
+      if k ~= "internal_source" then -- Skip internal_source in regular context output
+        table.insert(parts, string.format("\n  %s: %s", k, tostring(v)))
+      end
     end
   end
 
