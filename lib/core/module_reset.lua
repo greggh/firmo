@@ -99,8 +99,6 @@ local function get_logger()
   }
 end
 
--- Enhanced validation functions using error_handler
----@private
 --- Validates that a value is not nil, throwing a standardized error if it is.
 ---@param value any The value to check.
 ---@param name string The name of the parameter being validated (for the error message).
@@ -119,7 +117,6 @@ local function validate_not_nil(value, name)
   return true
 end
 
----@private
 ---@param value any Value to check type of
 --- Validates that a value is of a specific Lua type, throwing a standardized error if not.
 ---@param value any The value to check.

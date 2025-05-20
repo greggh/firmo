@@ -342,7 +342,7 @@ describe("CLI Advanced Tests", function()
 
       it("handles non-existent config file paths gracefully", function()
         -- Use a path that doesn't exist
-        local non_existent_path = temp_dir.path .. "/does_not_exist.lua"
+        local non_existent_path = temp_dir:path() .. "/does_not_exist.lua"
 
         -- Ensure file doesn't actually exist
         if fs.file_exists(non_existent_path) then

@@ -2,10 +2,10 @@
 --- Enhanced Type Checking Tests
 ---
 --- Verifies functionality related to enhanced type checking, including:
---- - Exact primitive type checking (`expect(...).to.be.a`)
---- - Instance checking (using helper functions simulating `is_instance_of`)
---- - Interface implementation checking (using helper functions simulating `implements`)
---- - Containment assertion (using helper functions simulating `contains`)
+--- - Exact primitive type checking (`expect(...).to.be.a` and `is_exact_type`)
+--- - Instance checking using `is_instance_of`
+--- - Interface implementation checking using `implements`
+--- - Containment assertion using `contains`
 --- Tests cover correct identification, error cases, and error message verification.
 --- Uses local classes `TestClass`, `TestSubclass`, and `TestInterface` for testing.
 ---
@@ -22,6 +22,7 @@ local it = firmo.it
 local expect = firmo.expect
 
 local test_helper = require("lib.tools.test_helper")
+local type_checking = require("lib.core.type_checking")
 
 --- Test class for instance checking.
 ---@class TestClass
@@ -60,13 +61,15 @@ local TestInterface = {
 describe("Enhanced Type Checking", function()
   describe("Exact Type Checking", function()
     it("correctly identifies exact primitive types", function()
-      -- Using expect directly
-      local is_number = function(v)
-        return type(v) == "number"
-      end
-      expect(is_number(123)).to.be_truthy()
+      -- Direct validation using type_checking module
+      expect(type_checking.is_exact_type("string value", "string")).to.be_truthy()
+      expect(type_checking.is_exact_type(123, "number")).to.be_truthy()
+      expect(type_checking.is_exact_type(true, "boolean")).to.be_truthy()
+      expect(type_checking.is_exact_type(nil, "nil")).to.be_truthy()
+      expect(type_checking.is_exact_type({}, "table")).to.be_truthy()
+      expect(type_checking.is_exact_type(function() end, "function")).to.be_truthy()
 
-      -- Using expect style
+      -- Using built-in expect style
       expect("string value").to.be.a("string")
       expect(true).to.be.a("boolean")
       expect(nil).to_not.exist()
@@ -75,40 +78,23 @@ describe("Enhanced Type Checking", function()
     end)
 
     it("fails when types don't match exactly", { expect_error = true }, function()
-      local err1 = test_helper.expect_error(function()
-        expect(123).to.be.a("string")
+      local err = test_helper.expect_error(function()
+        type_checking.is_exact_type(123, "string")
       end)
+      expect(err).to.exist()
+      expect(err.message).to.match("Expected.*type.*string.*got.*number")
 
-      expect(err1).to.exist()
-
-      local err2 = test_helper.expect_error(function()
-        expect("123").to.be.a("number")
+      err = test_helper.expect_error(function()
+        type_checking.is_exact_type("123", "number")
       end)
-
-      expect(err2).to.exist()
+      expect(err).to.exist()
+      expect(err.message).to.match("Expected.*type.*number.*got.*string")
     end)
 
     it("handles error messages correctly", { expect_error = true }, function()
-      --- Helper to assert type with a custom error message.
-      ---@param value any The value to check.
-      ---@param type_name string The expected type name.
-      ---@param message? string Optional custom error message.
-      ---@return nil
-      ---@throws string If the type does not match.
-      ---@private
-      local function assert_with_message(value, type_name, message)
-        if type(value) ~= type_name then
-          error(
-            message or ("Expected value to be exactly of type '" .. type_name .. "', but got '" .. type(value) .. "'")
-          )
-        end
-      end
-
-      local result, err = test_helper.with_error_capture(function()
-        assert_with_message(123, "string", "Custom error message")
-      end)()
-
-      expect(result).to_not.exist()
+      local err = test_helper.expect_error(function()
+        type_checking.is_exact_type(123, "string", "Custom error message")
+      end)
       expect(err).to.exist()
       expect(err.message).to.match("Custom error message")
 
@@ -125,59 +111,42 @@ describe("Enhanced Type Checking", function()
   describe("Instance Checking", function()
     it("correctly identifies direct instances", function()
       local instance = TestClass.new()
-      -- Since expect doesn't have a direct is_instance_of, we use a function
-      ---@return boolean @private
-      local function is_instance_of(obj, class)
-        return type(obj) == "table" and getmetatable(obj) == class
-      end
-      expect(is_instance_of(instance, TestClass)).to.be_truthy()
+      expect(type_checking.is_instance_of(instance, TestClass)).to.be_truthy()
     end)
 
     it("correctly identifies instances of parent classes", function()
       local instance = TestSubclass.new()
-      -- Check instance against parent class
-      ---@return boolean @private
-      local function is_instance_of(obj, class)
-        if type(obj) ~= "table" or type(class) ~= "table" then
-          return false
-        end
-        local mt = getmetatable(obj)
-        while mt do
-          if mt == class then
-            return true
-          end
-          mt = getmetatable(mt)
-        end
-        return false
-      end
-      expect(is_instance_of(instance, TestClass)).to.be_truthy()
+      expect(type_checking.is_instance_of(instance, TestClass)).to.be_truthy()
+      expect(type_checking.is_instance_of(instance, TestSubclass)).to.be_truthy()
     end)
 
     it("fails when object is not an instance of class", { expect_error = true }, function()
       local instance = TestClass.new()
-      ---@return boolean @private
-      local function is_instance_of(obj, class)
-        return type(obj) == "table" and getmetatable(obj) == class
-      end
+      local err = test_helper.expect_error(function()
+        type_checking.is_instance_of(instance, TestSubclass)
+      end)
+      expect(err).to.exist()
+      expect(err.message).to.match("Expected.*instance of.*TestSubclass")
 
-      -- Direct negative assertion instead of expecting error
-      expect(is_instance_of(instance, TestSubclass)).to.be_falsy()
-      
-      -- Direct negative assertion instead of expecting error
-      expect(is_instance_of({}, TestClass)).to.be_falsy()
+      err = test_helper.expect_error(function()
+        type_checking.is_instance_of({}, TestClass)
+      end)
+      expect(err).to.exist()
+      expect(err.message).to.match("Expected.*instance of.*TestClass")
     end)
 
     it("fails when non-table values are provided", { expect_error = true }, function()
-      ---@return boolean @private
-      local function is_instance_of(obj, class)
-        return type(obj) == "table" and type(class) == "table" and getmetatable(obj) == class
-      end
+      local err = test_helper.expect_error(function()
+        type_checking.is_instance_of("string", TestClass)
+      end)
+      expect(err).to.exist()
+      expect(err.message).to.match("Expected object to be a table")
 
-      -- Direct negative assertion instead of expecting error
-      expect(is_instance_of("string", TestClass)).to.be_falsy()
-      
-      -- Direct negative assertion instead of expecting error
-      expect(is_instance_of(TestClass.new(), "not a class")).to.be_falsy()
+      err = test_helper.expect_error(function()
+        type_checking.is_instance_of(TestClass.new(), "not a class")
+      end)
+      expect(err).to.exist()
+      expect(err.message).to.match("Expected class to be a.*table")
     end)
   end)
 
@@ -191,25 +160,7 @@ describe("Enhanced Type Checking", function()
         extra_property = 123, -- Extra properties are allowed
       }
 
-      ---@return boolean @private
-      local function implements(obj, interface)
-        if type(obj) ~= "table" or type(interface) ~= "table" then
-        end
-
-        for key, value in pairs(interface) do
-          if obj[key] == nil then
-            return false
-          end
-
-          if type(obj[key]) ~= type(value) then
-            return false
-          end
-        end
-
-        return true
-      end
-
-      expect(implements(obj, TestInterface)).to.be_truthy()
+      expect(type_checking.implements(obj, TestInterface)).to.be_truthy()
     end)
 
     it("fails when required properties are missing", { expect_error = true }, function()
@@ -220,26 +171,8 @@ describe("Enhanced Type Checking", function()
         -- Missing required_property
       }
 
-      ---@return boolean @private
-      local function implements(obj, interface)
-        if type(obj) ~= "table" or type(interface) ~= "table" then
-        end
-
-        for key, value in pairs(interface) do
-          if obj[key] == nil then
-            return false
-          end
-
-          if type(obj[key]) ~= type(value) then
-            return false
-          end
-        end
-
-        return true
-      end
-
       -- Direct negative assertion instead of expecting error
-      expect(implements(obj, TestInterface)).to.be_falsy()
+      expect(type_checking.implements(obj, TestInterface)).to.be_falsy()
     end)
 
     it("fails when method types don't match", { expect_error = true }, function()
@@ -248,26 +181,8 @@ describe("Enhanced Type Checking", function()
         required_property = "value",
       }
 
-      ---@return boolean @private
-      local function implements(obj, interface)
-        if type(obj) ~= "table" or type(interface) ~= "table" then
-        end
-
-        for key, value in pairs(interface) do
-          if obj[key] == nil then
-            return false
-          end
-
-          if type(obj[key]) ~= type(value) then
-            return false
-          end
-        end
-
-        return true
-      end
-
       -- Direct negative assertion instead of expecting error
-      expect(implements(obj, TestInterface)).to.be_falsy()
+      expect(type_checking.implements(obj, TestInterface)).to.be_falsy()
     end)
 
     it("reports missing keys and wrong types in error messages", { expect_error = true }, function()
@@ -327,73 +242,33 @@ describe("Enhanced Type Checking", function()
     it("works with tables", { expect_error = true }, function()
       local t = { 1, 2, 3, "test" }
       ---@return boolean @private
-      local function contains(container, value)
-        if type(container) == "table" then
-          for _, v in pairs(container) do
-            if v == value then
-              return true
-            end
-          end
-          return false
-        elseif type(container) == "string" then
-          return string.find(container, tostring(value), 1, true) ~= nil
-        end
-        return false
-      end
 
-      expect(contains(t, 2)).to.be_truthy()
-      expect(contains(t, "test")).to.be_truthy()
+      expect(type_checking.contains(t, 2)).to.be_truthy()
+      expect(type_checking.contains(t, "test")).to.be_truthy()
 
       -- Direct negative assertion instead of expecting error
-      expect(contains(t, 5)).to.be_falsy()
+      expect(type_checking.contains(t, 5)).to.be_falsy()
     end)
 
     it("works with strings", { expect_error = true }, function()
       local s = "This is a test string"
-      ---@return boolean @private
-      local function contains(container, value)
-        return string.find(container, tostring(value), 1, true) ~= nil
-      end
 
-      expect(contains(s, "test")).to.be_truthy()
-      expect(contains(s, "This")).to.be_truthy()
-      expect(contains(s, " is ")).to.be_truthy()
+      expect(type_checking.contains(s, "test")).to.be_truthy()
+      expect(type_checking.contains(s, "This")).to.be_truthy()
+      expect(type_checking.contains(s, " is ")).to.be_truthy()
 
       -- Direct negative assertion instead of expecting error
-      expect(contains(s, "banana")).to.be_falsy()
+      expect(type_checking.contains(s, "banana")).to.be_falsy()
     end)
 
     it("converts non-string values to strings for string containment", function()
-      ---@return boolean @private
-      local function contains(container, value)
-        return string.find(container, tostring(value), 1, true) ~= nil
-      end
-      expect(contains("Testing 123", 123)).to.be_truthy()
-      expect(contains("true value", true)).to.be_truthy()
+      expect(type_checking.contains("Testing 123", 123)).to.be_truthy()
+      expect(type_checking.contains("true value", true)).to.be_truthy()
     end)
 
     it("fails with appropriate error messages", { expect_error = true }, function()
-      ---@return boolean @throws string @private
-      local function string_contains(str, substr)
-        local found = string.find(str, substr, 1, true)
-        if not found then
-          error("Expected string '" .. str .. "' to contain '" .. substr .. "'")
-        end
-        return true
-      end
-
-      ---@return boolean @throws string @private
-      local function table_contains(t, value)
-        for _, v in pairs(t) do
-          if v == value then
-            return true
-          end
-        end
-        error("Expected table to contain " .. tostring(value))
-      end
-
       local result1, err1 = test_helper.with_error_capture(function()
-        string_contains("test string", "banana")
+        type_checking.contains("test string", "banana")
       end)()
 
       expect(result1).to_not.exist()
@@ -401,7 +276,7 @@ describe("Enhanced Type Checking", function()
       expect(err1.message).to.match("Expected string 'test string' to contain 'banana'")
 
       local result2, err2 = test_helper.with_error_capture(function()
-        table_contains({ 1, 2, 3 }, 5)
+        type_checking.contains({ 1, 2, 3 }, 5)
       end)()
 
       expect(result2).to_not.exist()
