@@ -1,12 +1,9 @@
 # Quality Module API
 
-
 The quality module provides test quality validation with support for multiple quality levels,
 reporting integration, and centralized configuration.
 
 ## Key Features
-
-
 
 - 5-level quality validation system
 - Integration with coverage and reporting modules
@@ -14,12 +11,9 @@ reporting integration, and centralized configuration.
 - Multiple report format output
 - Test quality metrics and analysis
 
-
 ## Installation
 
-
 The quality module is part of the firmo test framework and is available by default:
-
 
 ```lua
 local quality = require("lib.quality")
@@ -28,10 +22,7 @@ local quality = require("lib.quality")
 -- local quality = firmo.quality -- Assuming firmo.lua would set this up
 ```
 
-
-
 ## Quality Level System
-
 
 The quality module supports 5 quality levels, each with increasing requirements:
 | Level | Name | Description |
@@ -43,7 +34,6 @@ The quality module supports 5 quality levels, each with increasing requirements:
 | 5 | Complete | Complete tests with 100% branch coverage, security validation, and performance testing |
 Level constants are provided for ease of use:
 
-
 ```lua
 quality.LEVEL_BASIC -- 1
 quality.LEVEL_BASIC         -- 1
@@ -52,14 +42,9 @@ quality.LEVEL_COMPREHENSIVE -- 3
 quality.LEVEL_ADVANCED      -- 4
 quality.LEVEL_COMPLETE      -- 5
 
-
-
 ## Configuration API
 
-
 ### init(options)
-
-
 
 Initializes and configures the quality module. This is the primary method for setup and is typically called by the test runner based on CLI arguments or central configuration. It merges provided options with defaults and central configuration values.
 
@@ -74,7 +59,6 @@ quality.init({
 })
 ```
 
-
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | options.enabled | boolean | Whether quality validation is enabled. Defaults to `false` or value from `central_config`. |
@@ -85,7 +69,6 @@ quality.init({
 | options.verbose | boolean | Enable verbose (trace) level logging for the quality module. |
 **Returns:** The quality module (`M`) for method chaining.
 **Example:**
-
 
 ```lua
 quality.init({
@@ -111,56 +94,43 @@ quality.configure({
 
 ### reset()
 
-
 Reset quality data while preserving configuration.
-
 
 ```lua
 quality.reset()
 ```
 
-
 **Returns:** The quality module for method chaining
 
 ### full_reset()
 
-
 Full reset (clears all data and resets configuration to defaults).
-
 
 ```lua
 quality.full_reset()
 ```
 
-
 **Returns:** The quality module for method chaining
 
 ### debug_config()
 
-
 Print debug information about the current quality module configuration.
-
 
 ```lua
 quality.debug_config()
 ```
 
-
 **Returns:** The quality module for method chaining
 
 ## Quality Validation API
 
-
 ### check_file(file_path, level)
 
-
 Check if a test file meets quality requirements for a specific level.
-
 
 ```lua
 local meets, issues = quality.check_file("tests/my_test.lua", 3)
 ```
-
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -168,12 +138,10 @@ local meets, issues = quality.check_file("tests/my_test.lua", 3)
 | level | number | Quality level to check against (defaults to configured level) |
 **Returns:**
 
-
 - `meets` (boolean): Whether the file meets the quality requirements
 - `issues` (table): Any quality issues found in the file
 
 **Example:**
-
 
 ```lua
 local meets, issues = quality.check_file("tests/my_test.lua", 3)
@@ -185,18 +153,13 @@ if not meets then
 end
 ```
 
-
-
 ### validate_test_quality(test_name, options)
 
-
 Validate a test against quality standards with detailed feedback.
-
 
 ```lua
 local meets, issues = quality.validate_test_quality("should properly validate user input", {level = 3})
 ```
-
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -205,12 +168,10 @@ local meets, issues = quality.validate_test_quality("should properly validate us
 | options.strict | boolean | Strict mode (fail on first issue) |
 **Returns:**
 
-
 - `meets` (boolean): Whether the test meets the quality requirements
 - `issues` (table): Any quality issues found in the test
 
 **Example:**
-
 
 ```lua
 -- After running a test
@@ -228,11 +189,7 @@ if not meets then
 end
 ```
 
-
-
 ### track_assertion(type_name, test_name)
-
-
 
 Tracks an assertion dynamically. This function is called by the assertion system (`lib/assertion/init.lua`) when an assertion (e.g., `expect(...).to.equal(...)`) is executed. The quality module maps the `action_name` to a broader category (e.g., 'equality', 'truth') for analysis.
 
@@ -241,14 +198,12 @@ Tracks an assertion dynamically. This function is called by the assertion system
 -- quality.track_assertion("equal", "current_test_name_here")
 ```
 
-
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | action_name | string | The specific assertion method used (e.g., "equal", "exist", "be_nil"). |
 | test_name_override | string | Optional. Name of the test; used if `current_test` is nil (should be rare with dynamic tracking). |
 **Returns:** The quality module (`M`) for method chaining.
 **Example:**
-
 
 ```lua
 quality.start_test("should properly validate user input")
@@ -257,18 +212,13 @@ quality.track_assertion("type_checking")
 quality.end_test()
 ```
 
-
-
 ### start_test(test_name)
 
-
 Start test analysis for a specific test and register timing.
-
 
 ```lua
 quality.start_test("should properly validate user input")
 ```
-
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -277,20 +227,15 @@ quality.start_test("should properly validate user input")
 
 ### end_test()
 
-
 End test analysis and record final results including duration.
-
 
 ```lua
 quality.end_test()
 ```
 
-
 **Returns:** The quality module for method chaining
 
 ### analyze_file(file_path)
-
-
 
 Performs static analysis on a test file primarily for its structural properties (describe/it blocks, hooks, nesting levels). Assertion metrics (count, types) are now determined dynamically via `track_assertion`.
 **Important:** This function calls `quality.start_test` and `quality.end_test` internally for each test (`it` block) it discovers via parsing. If used on a file that is also run via the normal test execution flow, tests might be processed twice by the quality module.
@@ -298,7 +243,6 @@ Performs static analysis on a test file primarily for its structural properties 
 ```lua
 local structural_analysis = quality.analyze_file("tests/my_test.lua")
 ```
-
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -312,28 +256,21 @@ print("File analysis found " .. #analysis.tests .. " tests.")
 print("Max nesting level: " .. analysis.nesting_level)
 ```
 
-
-
 ## Reporting Integration
-
 
 ### report(format)
 
-
 Generate a quality report in the specified format.
-
 
 ```lua
 local report = quality.report("html")
 ```
-
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | format | string | Report format ("summary", "json", "html") |
 **Returns:** Formatted report as string or table depending on format
 **Example:**
-
 
 ```lua
 -- Generate a summary report
@@ -356,9 +293,7 @@ fs.write_file("quality-report.html", html)
 
 Note: The section previously titled "API Reference" detailing `firmo.quality_options`, `firmo.start_quality()`, etc., has been removed as it described an API pattern not primarily used by the framework. The quality module is typically accessed via `local quality = require("lib.quality")`, and its API methods like `quality.init()`, `quality.get_report_data()`, `quality.report()` are documented above. Test runner integration handles most direct interactions.
 
-
 ## Custom Rules
-
 
 You can influence quality rules by configuring the quality `level` and using `strict` mode. The `custom_rules` field in the configuration is a conceptual placeholder; actual rule definitions and enforcement are managed by `lib/quality/level_checkers.lua`.
 
@@ -386,10 +321,7 @@ quality.init({
 ```
 Note: The `custom_rules` field in the configuration is a placeholder concept. Actual rule enforcement and quality level definitions are primarily managed by the hardcoded structures and logic within `lib/quality/level_checkers.lua`. Customization typically involves modifying `level_checkers.lua` or contributing new checkers.
 
-
 ## Examples
-
-
 
 ### Basic Quality Validation
 
@@ -467,10 +399,7 @@ reporting.save_quality_report("./quality/report.html", report_data, "html")
 reporting.save_quality_report("./quality/report.json", report_data, "json")
 ```
 
-
 ### Command Line Usage
-
-
 
 ```bash
 # Run tests with quality validation enabled (uses configured default level, e.g., from .firmo-config.lua)

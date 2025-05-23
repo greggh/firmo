@@ -1,26 +1,19 @@
 # JSON Module Guide
 
-
 The JSON module provides functions for working with JSON data in Lua. It supports encoding Lua values to JSON strings and decoding JSON strings back to Lua values.
 
 ## Overview
 
-
 The JSON module implements a fast and standards-compliant JSON encoder/decoder that:
-
 
 - Handles all standard JSON data types
 - Provides detailed error messages
 - Integrates with firmo's error handling system
 - Optimizes for common use cases
 
-
 ## Basic Usage
 
-
 ### Encoding Lua Values to JSON
-
-
 
 ```lua
 local json = require("lib.tools.json")
@@ -46,11 +39,7 @@ local nested = json.encode({
 })
 ```
 
-
-
 ### Decoding JSON to Lua Values
-
-
 
 ```lua
 local json = require("lib.tools.json")
@@ -80,14 +69,9 @@ local nested = json.decode([[
 ]])
 ```
 
-
-
 ## Common Use Cases
 
-
 ### Configuration Files
-
-
 
 ```lua
 local json = require("lib.tools.json")
@@ -116,11 +100,7 @@ config.debug = true
 save_config("config.json", config)
 ```
 
-
-
 ### API Responses
-
-
 
 ```lua
 local json = require("lib.tools.json")
@@ -148,11 +128,7 @@ local function create_request(params)
 end
 ```
 
-
-
 ### Data Storage
-
-
 
 ```lua
 local json = require("lib.tools.json")
@@ -191,11 +167,7 @@ new_store:deserialize(serialized)
 print(new_store:get("user").name)  -- "John"
 ```
 
-
-
 ## Best Practices
-
-
 
 1. **Error Handling**: Always check for errors when encoding/decoding:
 
@@ -207,7 +179,6 @@ print(new_store:get("user").name)  -- "John"
      return
    end
    ```
-
 
 2. **Type Validation**: Validate data types before encoding:
 
@@ -226,7 +197,6 @@ print(new_store:get("user").name)  -- "John"
    end
    ```
 
-
 3. **Memory Efficiency**: For large data structures, process incrementally:
 
    ```lua
@@ -244,7 +214,6 @@ print(new_store:get("user").name)  -- "John"
      end
    end
    ```
-
 
 4. **Schema Validation**: Validate decoded data against expected schema:
 
@@ -273,8 +242,6 @@ print(new_store:get("user").name)  -- "John"
 
 ## Common Pitfalls
 
-
-
 1. **Circular References**: Tables with circular references cannot be encoded:
 
    ```lua
@@ -282,7 +249,6 @@ print(new_store:get("user").name)  -- "John"
    t.self = t  -- Circular reference
    local json_str = json.encode(t)  -- Will fail
    ```
-
 
 2. **Invalid Keys**: Only string keys are supported for objects:
 
@@ -295,14 +261,12 @@ print(new_store:get("user").name)  -- "John"
    json.encode({[1.5] = "value"})
    ```
 
-
 3. **Special Numbers**: NaN and Infinity are encoded as null:
 
    ```lua
    json.encode(0/0)      -- "null" (NaN)
    json.encode(math.huge) -- "null" (Infinity)
    ```
-
 
 4. **Unicode**: Unicode escape sequences are not supported:
 
@@ -312,9 +276,7 @@ print(new_store:get("user").name)  -- "John"
 
 ## Integration with Other Modules
 
-
 The JSON module is commonly used with:
-
 
 1. **Filesystem Module**: For reading/writing JSON files
 2. **Error Handler**: For consistent error handling
@@ -322,12 +284,9 @@ The JSON module is commonly used with:
 4. **Coverage Module**: For storing coverage data
 5. **Test Helper**: For creating test fixtures
 
-
 ## Next Steps
 
-
 After mastering the JSON module, explore:
-
 
 1. [Filesystem Module](./filesystem.md)
 2. [Error Handler](./error_handler.md)

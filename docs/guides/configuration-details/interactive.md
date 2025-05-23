@@ -1,13 +1,10 @@
 # Interactive Mode Configuration
 
-
 This document describes the comprehensive configuration options for the firmo interactive testing mode, which provides a command-line interface for running tests, filtering, and debugging interactively.
 
 ## Overview
 
-
 The interactive module provides a powerful TUI (Text-based User Interface) for test execution with support for:
-
 
 - Command history with persistence
 - Tab completion for commands and filenames
@@ -17,12 +14,9 @@ The interactive module provides a powerful TUI (Text-based User Interface) for t
 - Configurable prompt and appearance
 - Integration with the central configuration system
 
-
 ## Configuration Options
 
-
 ### Core Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -40,9 +34,7 @@ The interactive module provides a powerful TUI (Text-based User Interface) for t
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the interactive mode in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -75,13 +67,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the interactive mode programmatically:
-
 
 ```lua
 local interactive = require("lib.tools.interactive")
@@ -102,13 +90,9 @@ interactive.configure({
 })
 ```
 
-
-
 ## Command History Configuration
 
-
 Control how command history is managed:
-
 
 ```lua
 -- Configure history
@@ -122,13 +106,9 @@ interactive.load_history(".custom_history")
 interactive.save_history(".saved_history")
 ```
 
-
-
 ## Watch Mode Configuration
 
-
 Configure the integrated file watcher:
-
 
 ```lua
 -- Configure watch mode
@@ -149,13 +129,9 @@ interactive.configure({
 })
 ```
 
-
-
 ## Custom Commands
 
-
 Register custom commands for the interactive mode:
-
 
 ```lua
 -- Register a custom command
@@ -182,13 +158,9 @@ interactive.register_command("db", function(args)
 end, "Database management commands")
 ```
 
-
-
 ## Output Customization
 
-
 Configure output appearance:
-
 
 ```lua
 -- Configure output
@@ -203,13 +175,9 @@ interactive.print("Skipped test", "yellow")
 interactive.clear()
 ```
 
-
-
 ## Integration with Test Runner
 
-
 The interactive mode integrates with Firmo's test runner:
-
 
 ```lua
 -- In test runner initialization
@@ -229,41 +197,30 @@ interactive.init({
 interactive.start()
 ```
 
-
-
 ## Command Line Integration
 
-
 Launch interactive mode from the command line:
-
 
 ```bash
 
 # Start interactive mode
 
-
 lua firmo.lua --interactive
 
 # Start with custom test directory
-
 
 lua firmo.lua --interactive --dir=custom/tests
 
 # Start with watch mode enabled
 
-
 lua firmo.lua --interactive --watch
 
 # Start with specific watch directories
 
-
 lua firmo.lua --interactive --watch --watch-dirs=src,tests
 ```
 
-
-
 ## Built-in Commands
-
 
 The interactive mode includes several built-in commands:
 | Command | Description |
@@ -282,9 +239,7 @@ The interactive mode includes several built-in commands:
 
 ## Command Completion
 
-
 Configure command completion behavior:
-
 
 ```lua
 -- Set custom completion handler
@@ -301,14 +256,9 @@ interactive.set_completion_handler(function(input)
 end)
 ```
 
-
-
 ## Best Practices
 
-
 ### Setting Up Developer Environment
-
-
 
 ```lua
 -- In .firmo-config.lua
@@ -329,11 +279,7 @@ return {
 }
 ```
 
-
-
 ### Custom Commands for Project Workflow
-
-
 
 ```lua
 -- Register workflow-specific commands
@@ -360,11 +306,7 @@ interactive.register_command("publish", function(args)
 end, "Publish to LuaRocks")
 ```
 
-
-
 ### Watch Mode with Filters
-
-
 
 ```lua
 -- Set up watching with filters
@@ -382,14 +324,9 @@ interactive.configure({
 })
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues
-
-
 
 1. **Colors not displaying**:
    - Some terminals don't support ANSI colors
@@ -408,13 +345,9 @@ interactive.configure({
    - Verify that custom commands are registered correctly
    - Check if required dependencies for commands are available
 
-
 ## Example Configuration Files
 
-
 ### Basic Configuration
-
-
 
 ```lua
 -- .firmo-config.lua
@@ -433,11 +366,7 @@ return {
 }
 ```
 
-
-
 ### Developer-Friendly Configuration
-
-
 
 ```lua
 -- .firmo-config.developer.lua
@@ -460,11 +389,7 @@ return {
 }
 ```
 
-
-
 ### CI Configuration
-
-
 
 ```lua
 -- .firmo-config.ci.lua
@@ -482,6 +407,5 @@ return {
   }
 }
 ```
-
 
 These configuration options give you complete control over the interactive testing mode, allowing you to create a productive and convenient environment for test-driven development.

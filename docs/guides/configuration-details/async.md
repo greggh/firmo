@@ -1,13 +1,10 @@
 # Async Module Configuration
 
-
 This document describes the comprehensive configuration options for the firmo asynchronous testing system, which enables testing and controlling asynchronous operations.
 
 ## Overview
 
-
 The async module provides a robust system for handling asynchronous operations with support for:
-
 
 - Configurable timeouts for async operations
 - Adjustable polling intervals for condition checking
@@ -17,12 +14,9 @@ The async module provides a robust system for handling asynchronous operations w
 - Task scheduling and management
 - Integration with the central configuration system
 
-
 ## Configuration Options
 
-
 ### Core Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -33,9 +27,7 @@ The async module provides a robust system for handling asynchronous operations w
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the async module in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -52,13 +44,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the async module programmatically:
-
 
 ```lua
 local async = require("lib.async")
@@ -72,13 +60,9 @@ async.set_timeout(3000)        -- 3 second timeout
      .set_check_interval(100)  -- 100ms check interval
 ```
 
-
-
 ## Timeout Configuration
 
-
 Timeouts control how long async operations will wait before failing:
-
 
 ```lua
 -- Set global default timeout
@@ -91,25 +75,18 @@ await(async.wait_until(condition, 10000))  -- 10 second timeout
 central_config.set("async.default_timeout", 3000)
 ```
 
-
-
 ### Timeout Considerations
 
-
 When setting timeouts, consider these factors:
-
 
 1. **Test Environment**: CI environments may need longer timeouts than local development
 2. **Operation Type**: Network operations need longer timeouts than local operations
 3. **Test Stability**: Too-short timeouts cause flaky tests; too-long timeouts slow test execution
 4. **Resource Constraints**: Longer timeouts consume more resources during test execution
 
-
 ## Check Interval Configuration
 
-
 The check interval determines how frequently condition functions are polled:
-
 
 ```lua
 -- Set global check interval
@@ -120,25 +97,18 @@ await(async.wait_until(condition, 5000, 100))  -- 100ms check interval
 central_config.set("async.check_interval", 25)
 ```
 
-
-
 ### Check Interval Considerations
 
-
 When setting check intervals:
-
 
 1. For CPU-intensive conditions, use longer intervals (50-100ms)
 2. For time-sensitive operations, use shorter intervals (5-20ms)
 3. Very short intervals (<5ms) can consume excessive CPU
 4. For most tests, the default 10ms provides a good balance
 
-
 ## Debug Configuration
 
-
 For troubleshooting async operations:
-
 
 ```lua
 -- Enable debug and verbose logging
@@ -153,16 +123,11 @@ print("Check interval:", config.local_config.check_interval)
 print("In async context:", config.in_async_context)
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Timeout Testing Mode
 
-
 For testing timeout-specific behavior:
-
 
 ```lua
 -- Enable timeout testing mode (for unit tests of timeout handling)
@@ -177,13 +142,9 @@ if async.is_timeout_testing() then
 end
 ```
 
-
-
 ### Custom Promise Timeout Behavior
 
-
 Configure timeout behavior for promise-like operations:
-
 
 ```lua
 -- Create promise with custom timeout
@@ -197,13 +158,9 @@ local promise = deferred.promise
 async.timeout(promise, 500)
 ```
 
-
-
 ## Integration with Test Runner
 
-
 The async module integrates with Firmo's test runner system:
-
 
 ```lua
 -- Create async-aware test
@@ -225,13 +182,9 @@ it_async("should meet condition eventually", function()
 end)
 ```
 
-
-
 ## Error Handling
 
-
 The async module provides detailed error information for timeouts:
-
 
 ```lua
 -- Catch timeout errors
@@ -256,14 +209,9 @@ if not success then
 end
 ```
 
-
-
 ## Best Practices
 
-
 ### Setting Appropriate Timeouts
-
-
 
 ```lua
 -- General recommendations:
@@ -279,11 +227,7 @@ async.wait_until(database_condition, 5000)
 async.wait_until(network_condition, 10000)
 ```
 
-
-
 ### Optimizing Check Intervals
-
-
 
 ```lua
 -- For operations where timing is critical
@@ -294,13 +238,9 @@ async.wait_until(normal_condition, 1000, 10)  -- 10ms checks (default)
 async.wait_until(expensive_condition, 1000, 50)  -- 50ms checks
 ```
 
-
-
 ### Environment-Specific Configuration
 
-
 For different environments:
-
 
 ```lua
 -- Determine environment
@@ -322,14 +262,9 @@ elseif env == "ci" then
 end
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues
-
-
 
 1. **Flaky tests due to timeouts**:
    - Increase the `default_timeout` value
@@ -348,13 +283,9 @@ end
    - Check for resource limitations in CI environment
    - Consider dedicated async settings for CI
 
-
 ## Example Configuration Files
 
-
 ### Basic Configuration
-
-
 
 ```lua
 -- .firmo-config.lua
@@ -368,11 +299,7 @@ return {
 }
 ```
 
-
-
 ### Development Configuration
-
-
 
 ```lua
 -- .firmo-config.development.lua
@@ -386,11 +313,7 @@ return {
 }
 ```
 
-
-
 ### CI Configuration
-
-
 
 ```lua
 -- .firmo-config.ci.lua
@@ -404,11 +327,7 @@ return {
 }
 ```
 
-
-
 ### Production Test Configuration
-
-
 
 ```lua
 -- .firmo-config.production.lua
@@ -421,6 +340,5 @@ return {
   }
 }
 ```
-
 
 These configuration options give you complete control over asynchronous testing behavior, allowing you to optimize for your specific testing needs and environment constraints.

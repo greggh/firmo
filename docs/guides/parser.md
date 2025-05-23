@@ -1,20 +1,15 @@
 # Parser Usage Guide
 
-
 ## Introduction
-
 
 The parser module in Firmo provides tools for analyzing Lua source code, generating Abstract Syntax Trees (ASTs), and extracting information about code structure. It serves as the foundation for several key features in Firmo, including code coverage analysis, quality validation, and static analysis.
 This guide will walk you through common use cases for the parser module and provide practical examples to help you understand how to effectively use it in your projects.
 
 ## Getting Started
 
-
 ### Basic Parsing
 
-
 The most basic operation is parsing a Lua source string into an AST:
-
 
 ```lua
 local parser = require("lib.tools.parser")
@@ -35,13 +30,9 @@ end
 print("Successfully parsed the code!")
 ```
 
-
-
 ### Parsing From Files
 
-
 For Lua files on disk, you can use the `parse_file` function:
-
 
 ```lua
 local ast, err = parser.parse_file("/path/to/module.lua")
@@ -50,8 +41,6 @@ if not ast then
   return
 end
 ```
-
-
 
 ### Inspecting the AST (`to_string`)
 
@@ -63,16 +52,11 @@ local ast_string = parser.to_string(ast)
 print(ast_string)
 ```
 
-
-
 ## Working with Code Analysis
-
 
 ### Finding Executable Lines
 
-
 One common use case is identifying which lines of code are executable (as opposed to comments, blank lines, or syntax elements):
-
 
 ```lua
 -- Get a map of executable lines
@@ -83,13 +67,9 @@ for line_number in pairs(executable_lines) do
 end
 ```
 
-
-
 ### Identifying Functions
 
-
 To find function definitions in the code:
-
 
 ```lua
 -- Get information about functions in the code
@@ -114,13 +94,9 @@ for _, func in ipairs(functions) do
 end
 ```
 
-
-
 ### Creating a Code Map
 
-
 For comprehensive code analysis, create a code map that contains all relevant information:
-
 
 ```lua
 -- Create a complete code map
@@ -146,16 +122,11 @@ if code_map and code_map.valid then
 end
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Validating AST Structure
 
-
 If you're manipulating ASTs, you can validate their structure:
-
 
 ```lua
 -- Check if an AST is valid
@@ -165,13 +136,9 @@ if not is_valid then
 end
 ```
 
-
-
 ### Error Handling Patterns
 
-
 When using the parser in larger applications, follow these error handling patterns:
-
 
 ```lua
 -- Comprehensive error handling
@@ -238,8 +205,6 @@ end
 end
 ```
 
-
-
 **Returns:**
 
 - `code_map` (table|{error: string, valid: boolean}): The code map containing AST and analysis, or an error table `{error, valid=false}` if reading or mapping failed. See `create_code_map` for structure details.
@@ -280,16 +245,11 @@ for node_type, count in pairs(node_counts) do
 end
 ```
 
-
-
 ## Best Practices
-
 
 ### Error Handling
 
-
 Always check for errors when parsing:
-
 
 ```lua
 local ast, err = parser.parse(source)
@@ -300,18 +260,13 @@ if not ast then
 end
 ```
 
-
-
 ### Performance Considerations
 
-
 For large files or when parsing frequently:
-
 
 1. **Limit file size**: The parser has a built-in 1MB limit, but you might want to set a lower threshold for your application.
 2. **Use timeouts**: The parser implements a 10-second timeout. For critical applications, you might want additional timeout handling.
 3. **Cache results**: If you're parsing the same files repeatedly, consider caching the results:
-
 
 ```lua
 local ast_cache = {}
@@ -336,13 +291,9 @@ local function get_ast(file_path)
 end
 ```
 
-
-
 ### Handling Syntax Errors
 
-
 When working with user-provided code, be prepared to handle syntax errors gracefully:
-
 
 ```lua
 -- Function to check if code has valid syntax
@@ -366,16 +317,11 @@ else
 end
 ```
 
-
-
 ## Common Pitfalls
-
 
 ### Using Too Much Memory
 
-
 When parsing large files, be aware of memory usage:
-
 
 ```lua
 -- Check file size before parsing
@@ -391,13 +337,9 @@ local function safe_parse_file(file_path, size_limit)
 end
 ```
 
-
-
 ### Not Checking Error Results
 
-
 Always check if parsing succeeded:
-
 
 ```lua
 -- BAD:
@@ -412,13 +354,9 @@ end
 process_ast(ast)
 ```
 
-
-
 ### Modifying AST Incorrectly
 
-
 If you modify the AST, make sure to maintain its structure:
-
 
 ```lua
 -- Function to safely modify an AST node
@@ -451,10 +389,7 @@ local function modify_node(node, modification_fn)
 end
 ```
 
-
-
 ## Conclusion
-
 
 The parser module is a powerful tool for analyzing Lua code and provides the foundation for many advanced features in Firmo. By understanding how to effectively use the parser, you can implement sophisticated code analysis, build code quality tools, and enhance your development workflow.
 Remember to always handle errors appropriately and be mindful of performance when working with large codebases. The parser is designed to be robust and efficient, but proper error handling and caching strategies will ensure the best experience in your applications.

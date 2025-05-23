@@ -302,62 +302,46 @@ For practical examples, see the [CLI examples](/examples/cli_examples.md) file (
 
 # Command Line Interface Guide
 
-
 This guide explains how to use Firmo's command-line interface for running tests, watch mode, and other test-related operations.
 
 ## Introduction
-
 
 Firmo provides a powerful command-line interface (CLI) for running and managing tests. The CLI allows you to run tests with various options, watch files for changes, and use an interactive mode for more complex testing workflows.
 The command-line interface is invoked through the central `test.lua` script in the project root.
 
 ## Basic Usage
 
-
 ### Running All Tests
 
-
 To run all tests in your project:
-
 
 ```bash
 lua firmo.lua tests/
 ```
 
-
 This searches for test files in the specified directory (in this case, `tests/`) and runs them.
 
 ### Running Specific Tests
 
-
 You can run specific test files directly:
-
 
 ```bash
 lua firmo.lua tests/unit/calculator_test.lua
 ```
 
-
 Or use wildcard patterns with your shell:
-
 
 ```bash
 lua firmo.lua tests/unit/*_test.lua
 ```
 
-
-
 ### Getting Help
 
-
 To see all available options:
-
 
 ```bash
 lua firmo.lua --help
 ```
-
-
 
 ## Command Line Options
 
@@ -390,7 +374,6 @@ The `lua firmo.lua` command accepts various options to control test discovery, e
 
 ### Filtering by Name (`--filter`)
 
-
 You can filter tests based on their names (including `describe` block names) using Lua patterns with the `--filter` option:
 
 ```bash
@@ -422,31 +405,22 @@ Currently, there are **limited CLI options** to control the *style* of this cons
 
 ## Watch Mode
 
-
 Watch mode automatically re-runs tests when files change, providing immediate feedback during development.
 
 ### Basic Watch Mode
-
-
 
 ```bash
 
 # Run tests in watch mode
 
-
 lua firmo.lua --watch tests/
 ```
 
-
-
 ### Customizing Watch Mode
-
-
 
 ```bash
 
 # Watch specific test file
-
 
 lua firmo.lua --watch tests/unit/calculator_test.lua
 
@@ -454,36 +428,26 @@ lua firmo.lua --watch tests/unit/calculator_test.lua
 lua firmo.lua --watch --filter unit tests/
 ```
 
-
 ### Watch Mode Controls
 
-
 Once in watch mode, you can:
-
 
 - Press `r` to re-run all tests
 - Press `f` to run only failed tests
 - Press `q` or `Ctrl+C` to exit watch mode
 
-
 ## Interactive Mode
 
-
 Interactive mode provides a command shell for running tests with more control:
-
 
 ```bash
 
 # Start interactive mode
 
-
 lua firmo.lua --interactive
 ```
 
-
-
 ### Interactive Commands
-
 
 Once in interactive mode, you can:
 | Command | Description |
@@ -499,9 +463,7 @@ Once in interactive mode, you can:
 
 ### Interactive Mode Workflow
 
-
 A typical interactive session might look like:
-
 
 ```text
 $ lua firmo.lua --interactive
@@ -510,7 +472,6 @@ Type 'help' for available commands
 -------------------------------
 > list
 Available test files:
-
 
   1. tests/unit/calculator_test.lua
   2. tests/unit/user_test.lua
@@ -531,18 +492,13 @@ Watch mode enabled
 Watching for changes...
 ```
 
-
-
 ## Coverage Tracking
 
-
 Firmo can track code coverage during test runs:
-
 
 ```bash
 
 # Run tests with coverage tracking
-
 
 lua firmo.lua --coverage tests/
 
@@ -554,30 +510,22 @@ Coverage reports are saved to the `coverage-reports` directory by default.
 
 ## Test Quality Validation
 
-
 Firmo can validate the quality of your tests:
-
 
 ```bash
 
 # Run with quality validation
 
-
 lua firmo.lua --quality tests/
 
 # Set quality validation level (1-3)
 
-
 lua firmo.lua --quality --quality-level 2 tests/
 ```
 
-
-
 ## Continuous Integration
 
-
 For CI environments, you might want to disable colors and set appropriate formatting:
-
 
 ```bash
 
@@ -586,11 +534,7 @@ lua firmo.lua tests/ --format=junit
 ```
 (Note: `--no-color` and `--format plain` for console are not implemented flags)
 
-
-
 ### Example GitHub Actions Workflow
-
-
 
 ```yaml
 name: Tests
@@ -599,7 +543,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-
 
       - uses: actions/checkout@v2
       - name: Install Lua
@@ -620,16 +563,11 @@ jobs:
         run: lua firmo.lua tests/ --filter integration --format=junit
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Environment-based Test Selection
 
-
 You can use environment variables with the CLI:
-
 
 ```bash
 
@@ -637,12 +575,9 @@ You can use environment variables with the CLI:
 TEST_TYPE=unit lua firmo.lua --filter $TEST_TYPE tests/
 ```
 
-
 ### Custom Test Runner Script
 
-
 You can create a custom test runner script:
-
 
 ```lua
 #!/usr/bin/env lua
@@ -670,14 +605,11 @@ end
 os.execute("lua " .. table.concat(test_args, " "))
 ```
 
-
 Then use it:
 
 ```bash
 lua custom_runner.lua --filter unit
 ```
-
-
 
 ## Best Practices
 
@@ -689,45 +621,33 @@ lua custom_runner.lua --filter unit
 6.  **Clear Naming**: Use descriptive test and describe block names to make filtering (`--filter`) more effective and console output easier to understand.
 7. **Quality Validation**: Use the --quality flag to ensure your tests meet quality standards.
 
-
 ## Troubleshooting
-
 
 ### No Tests Found
 
-
 If no tests are found:
-
 
 1. Check the path you're providing to test.lua
 2. Verify your test files match the default pattern (*_test.lua)
 3. If using custom patterns, ensure they're correct with --pattern
 
-
 ### Tests Not Running as Expected
 
-
 If tests don't run as expected:
-
 
 1. Use --format detailed to see more output
 2. Check your tag and filter combinations
 3. Try running a specific test file directly
 
-
 ### Watch Mode Not Detecting Changes
 
-
 If watch mode isn't detecting changes:
-
 
 1. Verify file permissions
 2. Check that the file is included in the watch path
 3. Try saving with a more significant change
 
-
 ## Conclusion
-
 
 The Firmo command-line interface provides powerful tools for running, filtering, and monitoring tests. By understanding and effectively using these features, you can create an efficient testing workflow tailored to your project's needs.
 For practical examples, see the [CLI examples](/examples/cli_examples.md) file.

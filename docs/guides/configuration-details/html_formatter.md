@@ -1,13 +1,10 @@
 # HTML Coverage Formatter
 
-
 The HTML formatter generates interactive, visual coverage reports using a class-based architecture. It provides detailed line-by-line coverage information with syntax highlighting, file navigation, summary statistics, and theme support.
 
 ## Class Usage
 
-
 The HTML formatter can be used directly as a class for more control:
-
 
 ```lua
 local HTMLFormatter = require('lib.reporting.formatters.html')
@@ -29,13 +26,9 @@ else
 end
 ```
 
-
-
 ## Configuration
 
-
 The HTML formatter can be customized through the `.firmo-config.lua` file:
-
 
 ```lua
 -- In .firmo-config.lua
@@ -77,16 +70,12 @@ return {
 }
 ```
 
-
-
 ```text
 
 ## Using HTML Formatter Programmatically
 
-
 You can configure the HTML formatter programmatically using the reporting module:
 ```lua
-
 
 local reporting = require("lib.reporting")
 -- Configure the HTML formatter
@@ -100,49 +89,37 @@ local html_report = reporting.format_coverage(coverage_data, "html")
 -- Save the report to a file
 reporting.write_file("coverage.html", html_report)
 
-
 ```text
 
 ## Understanding HTML Coverage Visualization
-
 
 The HTML formatter visualizes coverage data with several visual indicators:
 
 ### Line Coverage States
 
-
 The formatter distinguishes between four line states:
-
 
 1. **Covered** (Green): Lines that were executed and properly tested
 2. **Executed but not covered** (Amber/Orange): Lines that were executed during runtime but not validated by assertions
 3. **Not executed** (Red): Executable code that never ran
 4. **Non-executable** (Gray): Comments, blank lines, and structural code (like "end" statements)
 
-
 ### Block Coverage
 
-
 Code blocks (functions, if statements, loops) are indicated with colored borders:
-
 
 - **Green borders**: Blocks that executed at least once
 - **Red borders**: Blocks that never executed
 
-
 ### Execution Counts
 
-
 When hovering over lines, you can see:
-
 
 - How many times the line executed
 - For blocks, how many times the block executed
 - For conditions, whether they evaluated as true, false, or both
 
-
 ## Configuration Options Reference
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -166,21 +143,16 @@ When hovering over lines, you can see:
 
 ## Theme System
 
-
 The HTML formatter features a built-in theme system with light and dark themes. The theme can be selected in three ways:
-
 
 1. Configuration option `theme` (default is "dark")
 2. User preference toggle in the UI (persisted in localStorage)
 3. System preference via `prefers-color-scheme` media query
 
-
 ### Dark Theme
-
 
 The dark theme uses a dark background with light text and is optimized for low-light environments.
 ```
-
 
 Background: #1a1a1a
 Text: #e0e0e0
@@ -189,15 +161,12 @@ Covered Lines: rgba(76, 175, 80, 0.4)
 Executed Lines: rgba(255, 152, 0, 0.4)
 Not Covered Lines: rgba(244, 67, 54, 0.4)
 
-
 ```text
 
 ### Light Theme
 
-
 The light theme uses a light background with dark text, optimized for readability and printing.
 ```
-
 
 Background: #f5f5f5
 Text: #333
@@ -206,31 +175,23 @@ Covered Lines: rgba(76, 175, 80, 0.3)
 Executed Lines: rgba(255, 152, 0, 0.3)
 Not Covered Lines: rgba(244, 67, 54, 0.3)
 
-
 ```text
-
 
 - Dark gray for non-executable lines
 
-
 ### Light Theme
 
-
 The light theme uses a light background with softer colors:
-
 
 - Light green for covered lines
 - Light amber for executed-but-not-covered lines
 - Light red for uncovered lines
 - Light gray for non-executable lines
 
-
 ## Example: Dark vs Light Theme
-
 
 To see the differences between themes, you can generate both:
 ```lua
-
 
 -- Generate dark theme report
 reporting.configure_formatter("html", {theme = "dark"})
@@ -239,26 +200,20 @@ reporting.save_coverage_report("coverage-dark.html", coverage_data, "html")
 reporting.configure_formatter("html", {theme = "light"})
 reporting.save_coverage_report("coverage-light.html", coverage_data, "html")
 
-
 ```text
 
 ## Example: Configure from Command Line
 
-
 You can also configure the HTML formatter from the command line:
 ```bash
 
-
 lua run_tests.lua --coverage --html.theme=light --html.show_line_numbers=true
-
 
 ```text
 
 ## Report Legend
 
-
 The HTML formatter includes a comprehensive legend explaining all coverage states and visual indicators. The legend includes:
-
 
 - Line coverage states (covered, executed-not-covered, not executed, non-executable)
 - Block coverage indicators (executed, not executed)
@@ -269,25 +224,20 @@ You can disable the legend by setting `include_legend = false` if you prefer a m
 
 ## Asset Base Path
 
-
 If you're hosting the HTML report on a subdirectory of a website, you may need to set the `asset_base_path` to ensure CSS and JavaScript assets load correctly:
 ```lua
-
 
 reporting.configure_formatter("html", {
   asset_base_path = "/coverage-reports/"
 })
-
 
 ```text
 This is useful for CI/CD environments where reports are published to specific paths.
 
 ## Adjusting Display for Large Codebases
 
-
 For large codebases, you might want to optimize the HTML formatter:
 ```lua
-
 
 reporting.configure_formatter("html", {
   collapsible_sections = true,  -- Makes navigation easier
@@ -295,15 +245,12 @@ reporting.configure_formatter("html", {
   enhance_tooltips = true  -- Keeps detailed information available on demand
 })
 
-
 ```text
 
 ## Integration with Report Validation
 
-
 For the best results, combine HTML formatting with report validation:
 ```lua
-
 
 -- In .firmo-config.lua
 return {
@@ -321,27 +268,21 @@ return {
   }
 }
 
-
 ```text
 This ensures your HTML reports display accurate information and any issues are documented in a validation report.
 
 ## Custom Styling
 
-
 The HTML formatter uses CSS variables for styling, allowing for customization by modifying the report after generation:
-
 
 1. Generate the HTML report
 2. Open it in a text editor
 3. Modify the CSS variables in the `<style>` section
 4. Save and view the customized report
 
-
 ## Browser Compatibility
 
-
 The HTML report uses standard features and should work in all modern browsers:
-
 
 - Chrome/Edge (Chromium-based)
 - Firefox
@@ -349,7 +290,6 @@ The HTML report uses standard features and should work in all modern browsers:
 
 For older browsers, consider disabling some features:
 ```lua
-
 
 reporting.configure_formatter("html", {
   highlight_syntax = false,  -- Simplifies the DOM

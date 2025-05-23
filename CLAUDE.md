@@ -430,7 +430,7 @@ When working with Markdown files:
 
 1. **Code Block Format**: Use simple triple backticks without language specifiers when the language is obvious:
 
-   ```
+   ```lua
    -- Lua code goes here
    ```
 
@@ -714,6 +714,7 @@ expect(value).to_not.be.a("number")
 ### Complete Assertion Pattern Mapping
 
 If you're coming from a busted-style background, use this mapping to convert assertions:
+
 | busted-style | firmo style | Notes |
 | --------------------------------- | ----------------------------------- | ---------------------------------- |
 | `assert.is_not_nil(value)` | `expect(value).to.exist()` | Checks if a value is not nil |
@@ -1020,7 +1021,7 @@ The firmo project is organized as follows:
 
 The coverage system leverages Lua's `debug.sethook` mechanism to track line execution without modifying the source code directly. This approach avoids the complexities of source code instrumentation and provides accurate coverage data based on runtime execution.
 
-1.  **Coverage Core (`lib/coverage/init.lua`)**:
+1. **Coverage Core (`lib/coverage/init.lua`)**:
 
     - **Public API**: Provides functions like `init`, `start`, `stop`, `pause`, `resume`, `save_stats`, `load_stats`.
     - **State Management**: Manages the coverage state (`initialized`, `paused`), coverage data (`state.data`), and configuration cache.
@@ -1029,29 +1030,29 @@ The coverage system leverages Lua's `debug.sethook` mechanism to track line exec
     - **Stats Handling**: Implements saving/loading coverage data to/from the configured stats file, using an atomic save process and handling potential errors. Merges loaded stats with existing data.
     - **Error Handling**: Uses `lib.tools.error_handler` and `lib.tools.filesystem` for robust operation and error reporting. Tracks write failures to prevent infinite loops if saving fails repeatedly.
 
-2.  **Debug Hook (`debug_hook` function inside `init.lua`)**:
+2. **Debug Hook (`debug_hook` function inside `init.lua`)**:
 
     - **Execution Tracking**: Called by the Lua runtime for each executed line (`"l"` event).
     - **File Filtering**: Determines the source file, normalizes its path (`filesystem.normalize_path`), and checks if it should be tracked based on `include`/`exclude` patterns using `should_track_file`. Uses a cache (`ignored_files`) for efficiency.
     - **Data Recording**: If the file is tracked, increments the hit count for the specific line number in `state.data`. Initializes the file's entry if it's the first hit.
     - **Buffering & Saving**: Manages a buffer (`state.buffer`) and triggers `save_stats` periodically based on configuration (`savestepsize`, `tick`) or buffer limits (`MAX_BUFFER_SIZE`) to persist data.
 
-3.  **Configuration (`lib/core/central_config.lua`)**:
+3. **Configuration (`lib/core/central_config.lua`)**:
 
     - **Settings Source**: Provides all configuration for the coverage module (enabled status, include/exclude patterns, stats file path, save frequency).
     - **Defaults**: Defines default coverage settings.
     - **Project Overrides**: Reads project-specific settings from `.firmo-config.lua`.
 
-4.  **Filesystem (`lib/tools/filesystem/init.lua`)**:
+4. **Filesystem (`lib/tools/filesystem/init.lua`)**:
 
     - **Path Normalization**: Provides `normalize_path` used extensively for consistent file tracking.
     - **File Operations**: Used by `save_stats` and `load_stats` for reading, writing, moving, and checking file existence.
 
-5.  **Error Handling (`lib.tools.error_handler.lua`)**:
+5. **Error Handling (`lib.tools.error_handler.lua`)**:
 
     - **Error Reporting**: Used throughout the coverage module to create structured errors and handle exceptions gracefully (e.g., during file I/O).
 
-6.  **Assertion Integration for Three-State Coverage**:
+6. **Assertion Integration for Three-State Coverage**:
     - The core coverage mechanism (`debug_hook`) tracks all executed lines, recording a hit count (> 0) for each line in the coverage data (`state.data`).
     - To differentiate verified code, the assertion module (`lib/assertion/init.lua`), upon successful execution of an assertion (`expect(...).to...`), explicitly calls `coverage.mark_line_covered(file_path, line_number)`. This function flags the specific line within the coverage data as having been covered by a passing assertion.
     - The reporting system uses both pieces of information:

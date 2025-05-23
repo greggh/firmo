@@ -1,13 +1,10 @@
 # Command Line Interface Configuration
 
-
 This document describes the comprehensive configuration options for the firmo command line interface (CLI), which provides a unified interface for running tests, generating reports, and managing the testing environment.
 
 ## Overview
 
-
 The CLI module provides a powerful interface for command-line interaction with support for:
-
 
 - Comprehensive command-line argument parsing
 - Multiple test execution modes (standard, watch, interactive)
@@ -17,12 +14,9 @@ The CLI module provides a powerful interface for command-line interaction with s
 - Custom command registration
 - Configuration persistence through the central configuration system
 
-
 ## Configuration Options
 
-
 ### Core Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -37,7 +31,6 @@ The CLI module provides a powerful interface for command-line interaction with s
 
 ### Output Format Options
 
-
 | Format | Description |
 |--------|-------------|
 | `"default"` | Standard output with test name and status |
@@ -49,9 +42,7 @@ The CLI module provides a powerful interface for command-line interaction with s
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the CLI system in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -90,13 +81,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the CLI system programmatically:
-
 
 ```lua
 local cli = require("lib.tools.cli")
@@ -114,72 +101,54 @@ cli.register_command("lint", function(args)
 end, "Run linting on source files")
 ```
 
-
-
 ## Command Line Arguments
 
-
 The CLI processes various command line arguments:
-
 
 ```bash
 
 # Basic test run
 
-
 lua firmo.lua tests/
 
 # Run with pattern filter
-
 
 lua firmo.lua --pattern="database" tests/
 
 # Run with coverage
 
-
 lua firmo.lua --coverage tests/
 
 # Run in watch mode
-
 
 lua firmo.lua --watch tests/
 
 # Run in interactive mode
 
-
 lua firmo.lua --interactive tests/
 
 # Run in parallel
-
 
 lua firmo.lua --parallel tests/
 
 # Generate report
 
-
 lua firmo.lua --coverage --format=html tests/
 
 # Run quality validation
-
 
 lua firmo.lua --quality --quality-level=3 tests/
 
 # Show help
 
-
 lua firmo.lua --help
 ```
 
-
-
 ## Test Execution Modes
-
 
 The CLI supports various test execution modes:
 
 ### Standard Mode
-
-
 
 ```lua
 -- Configure standard test execution
@@ -195,11 +164,7 @@ cli.run({
 })
 ```
 
-
-
 ### Watch Mode
-
-
 
 ```lua
 -- Configure watch mode
@@ -215,11 +180,7 @@ cli.watch({
 })
 ```
 
-
-
 ### Interactive Mode
-
-
 
 ```lua
 -- Configure interactive mode
@@ -234,13 +195,9 @@ cli.interactive({
 })
 ```
 
-
-
 ## Custom Commands
 
-
 You can register custom commands for the CLI:
-
 
 ```lua
 -- Register a custom command
@@ -264,13 +221,9 @@ end, {
 })
 ```
 
-
-
 ## Report Generation
 
-
 Configure report generation through the CLI:
-
 
 ```lua
 -- Configure report generation
@@ -289,13 +242,9 @@ cli.report({
 })
 ```
 
-
-
 ## Output Formatting
 
-
 Customize the output format for test results:
-
 
 ```lua
 -- Configure output format
@@ -311,13 +260,9 @@ cli.configure({
 })
 ```
 
-
-
 ## Integration with Test Runner
 
-
 The CLI integrates with Firmo's test runner:
-
 
 ```lua
 -- In test runner initialization
@@ -337,14 +282,9 @@ else
 end
 ```
 
-
-
 ## Best Practices
 
-
 ### Setting Default Options
-
-
 
 ```lua
 -- Set sensible defaults for your project
@@ -370,13 +310,9 @@ cli.configure({
 })
 ```
 
-
-
 ### CI/CD Configuration
 
-
 For continuous integration environments:
-
 
 ```lua
 -- In .firmo-config.ci.lua
@@ -401,13 +337,9 @@ return {
 }
 ```
 
-
-
 ### Custom Command Registration
 
-
 For extending CLI functionality:
-
 
 ```lua
 -- Register helpful development commands
@@ -422,14 +354,9 @@ cli.register_command("release", function(args)
 end, "Create a new release")
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues
-
-
 
 1. **Colors not displaying**:
    - Some terminals don't support ANSI colors
@@ -444,13 +371,9 @@ end, "Create a new release")
    - Make sure the format is properly specified (check spelling)
    - Try using the full format name instead of abbreviated version
 
-
 ## Example Configuration Files
 
-
 ### Development Configuration
-
-
 
 ```lua
 -- .firmo-config.development.lua
@@ -470,11 +393,7 @@ return {
 }
 ```
 
-
-
 ### CI Configuration
-
-
 
 ```lua
 -- .firmo-config.ci.lua
@@ -498,11 +417,7 @@ return {
 }
 ```
 
-
-
 ### Local Development Configuration
-
-
 
 ```lua
 -- .firmo-config.local.lua (not checked into version control)
@@ -521,6 +436,5 @@ return {
   }
 }
 ```
-
 
 These configuration options give you complete control over the command line interface, allowing you to customize the testing experience for different environments and workflows.

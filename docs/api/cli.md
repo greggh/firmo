@@ -110,14 +110,11 @@ For detailed examples of command-line usage, refer to the [CLI Guide](/docs/guid
 
 # Command Line Interface
 
-
 This document describes the command-line interface (CLI) provided by Firmo.
 
 ## Overview
 
-
 Firmo can be run directly from the command line to discover and run tests. This provides a convenient way to run tests without writing test runner scripts. The CLI now supports three modes of operation:
-
 
 1. **Standard Mode**: Run tests and exit
 2. **Watch Mode**: Continuously run tests when files change
@@ -126,43 +123,32 @@ Firmo can be run directly from the command line to discover and run tests. This 
 Note: The CLI functionality is typically accessed via the main `test.lua` script, which loads and uses this module (`lib/tools/cli`).
 ## Basic Usage
 
-
-
 ```bash
 
 # Run all tests in the default directory (./tests)
-
 
 lua firmo.lua
 
 # Run tests in a specific directory
 
-
 lua firmo.lua --dir path/to/tests
 
 # Run a specific test file
-
 
 lua firmo.lua path/to/test_file.lua
 
 # Run tests in watch mode (continuous testing)
 
-
 lua firmo.lua --watch
 
 # Start interactive CLI mode
 
-
 lua firmo.lua --interactive
 ```
 
-
-
 ## Command Line Options
 
-
 ### Basic Options
-
 
 | Option | Description |
 |--------|-------------|
@@ -189,7 +175,6 @@ Note: Watch mode specific settings (directories, interval, exclude patterns) are
 
 ### Code Quality Options
 
-
 | Option | Description |
 |--------|-------------|
 | `--fix [DIRECTORY]` | Run code fixing on directory (specified as positional argument, default: .) |
@@ -197,30 +182,23 @@ Note: Watch mode specific settings (directories, interval, exclude patterns) are
 
 ## Examples
 
-
 ### Running Tests
-
-
 
 ```bash
 
 # Run all tests
 
-
 lua firmo.lua
 
 # Run a specific test file
-
 
 lua firmo.lua tests/specific_test.lua
 
 # Run tests with custom pattern
 
-
 lua firmo.lua --dir src --pattern "*_spec.lua"
 
 # Run tests with specific tags
-
 
 lua firmo.lua --tags unit,fast
 
@@ -241,16 +219,11 @@ lua firmo.lua --quality --quality-level=3
 lua firmo.lua --format=dot
 ```
 
-
-
 ### Using Watch Mode
-
-
 
 ```bash
 
 # Basic watch mode
-
 
 # Basic watch mode
 
@@ -261,40 +234,28 @@ lua firmo.lua --watch
 lua firmo.lua --watch tests/specific_test.lua
 ```
 
-
-
 ### Code Fixing
-
-
 
 ```bash
 
 # Fix code issues in current directory
 
-
 lua firmo.lua --fix
 
 # Fix code issues in specific directory (using positional arg)
-
 
 lua firmo.lua --fix src
 
 # Check for issues without fixing (using positional arg)
 
-
 lua firmo.lua --check src
 ```
 
-
-
 ## Watch Mode
-
 
 Watch mode is a powerful feature that continuously monitors your project files for changes and automatically re-runs tests when changes are detected. This is particularly useful during development as it provides immediate feedback.
 
 ### How Watch Mode Works
-
-
 
 1. Tests are run initially to establish baseline
 2. File system is monitored for changes to relevant files
@@ -302,20 +263,14 @@ Watch mode is a powerful feature that continuously monitors your project files f
 4. Results are displayed, and monitoring continues
 5. Process repeats until terminated (Ctrl+C)
 
-
 ### Benefits of Watch Mode
-
-
 
 - **Immediate Feedback**: See test results as soon as you save files
 - **Focused Development**: Keep your focus on code, not on running tests
 - **Faster Development Cycles**: Shortens the feedback loop in test-driven development
 - **Increased Confidence**: Continuous verification that your code still works
 
-
 ### Example Watch Mode Session
-
-
 
 ```text
 $ lua scripts/run_tests.lua --watch
@@ -330,7 +285,6 @@ Test Summary: 5 passed, 0 failed
 --- WATCHING FOR CHANGES ---
 File changes detected:
 
-
   - ./src/module.lua
   - ./tests/module_test.lua
 
@@ -343,13 +297,9 @@ Test Summary: 5 passed, 0 failed
 --- WATCHING FOR CHANGES ---
 ```
 
-
-
 ## Exit Codes
 
-
 The `test.lua` script (or a custom runner) typically sets the process exit code based on the boolean return value of the CLI functions:
-
 
 - **0**: All tests passed
 - **1**: One or more tests failed, or an error occurred during test execution
@@ -358,43 +308,32 @@ This is useful for integration with CI systems.
 
 ## Environment Variables
 
-
 Firmo doesn't use environment variables directly, but you can create wrapper scripts that use environment variables to configure test runs.
 **Example:**
-
 
 ```bash
 #!/bin/bash
 
 # run_tests.sh
 
-
 # Get test type from environment variable, default to "unit"
-
 
 TEST_TYPE=${TEST_TYPE:-unit}
 
 # Run tests with appropriate tags
 
-
 lua firmo.lua --tags $TEST_TYPE
 ```
 
-
 Then you can run specific test types with:
-
 
 ```bash
 TEST_TYPE=integration ./run_tests.sh
 ```
 
-
-
 ## Integration with Make
 
-
 You can integrate Firmo with Make for more complex test workflows:
-
 
 ```makefile
 .PHONY: test test-unit test-watch
@@ -408,29 +347,20 @@ test-coverage:
 	lua firmo.lua --coverage
 ```
 
-
-
 ## Interactive Mode
-
 
 Interactive mode provides a powerful command-line interface for running tests and configuring test options. It's ideal for development workflows where you need more flexibility than watch mode alone provides.
 
 ### Starting Interactive Mode
 
-
-
 ```bash
 
 # Start interactive mode
 
-
 lua firmo.lua --interactive
 ```
 
-
-
 ### Available Commands
-
 
 | Command | Description |
 |---------|-------------|
@@ -454,8 +384,6 @@ lua firmo.lua --interactive
 
 ### Example Interactive Session
 
-
-
 ```text
 $ lua scripts/run_tests.lua -i
 Firmo Interactive CLI
@@ -472,7 +400,6 @@ Current settings:
 ------------------------------------------------------------
 > list
 Available test files:
-
 
   1. ./tests/assertions_test.lua
   2. ./tests/async_test.lua
@@ -504,11 +431,7 @@ Starting watch mode...
 Watching directories: .
 ```
 
-
-
 ### Interactive Mode Benefits
-
-
 
 1. **Live Configuration**: Change test filters, tags, and watch settings without restarting
 2. **Workflow Flexibility**: Combine watch mode with dynamic test filtering for focused development
@@ -516,12 +439,9 @@ Watching directories: .
 4. **Clear Status**: Get immediate feedback on current settings and available tests
 5. **Command History**: Recall previous commands using history feature
 
-
 ### Using Interactive Mode in Scripts
 
-
 You can also start interactive mode programmatically:
-
 
 ```lua
 local firmo = require("firmo")
@@ -535,15 +455,11 @@ interactive.start(firmo, {
 })
 ```
 
-
 See `examples/interactive_mode_example.lua` for a complete example.
 
 ## Integration with CI Systems
 
-
 ### GitHub Actions Example
-
-
 
 ```yaml
 name: Tests
@@ -553,7 +469,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-
     - uses: actions/checkout@v2
     - name: Set up Lua
 
@@ -561,33 +476,25 @@ jobs:
       with:
         luaVersion: "5.3"
 
-
     - name: Install dependencies
 
       run: |
         luarocks install luafilesystem
 
-
     - name: Run unit tests
 
       run: lua firmo.lua --tags unit
-
 
     - name: Run integration tests
 
       run: lua firmo.lua --tags integration
 ```
 
-
-
 ## Creating Custom Test Runners
-
 
 You can create custom test runners that use Firmo's API. See the `scripts/runner.lua` file for an example of how to implement a custom runner with watch mode support.
 
 ## Best Practices
-
-
 
 1. **Use Interactive Mode for Development**: Use interactive mode during development for maximum flexibility
 2. **Use Watch Mode for Continuous Feedback**: Enable watch mode when focusing on specific test areas

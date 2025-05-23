@@ -1,13 +1,10 @@
 # Mocking System Usage Guide
 
-
 This guide explains how to effectively use Firmo's mocking system to improve your tests. The mocking system provides tools for isolating components, controlling their behavior, and verifying their interactions during testing.
 
 ## Introduction
 
-
 Mocking helps you replace real dependencies with test doubles that you can control. This allows you to:
-
 
 - Test components in isolation
 - Control the behavior of dependencies
@@ -17,14 +14,11 @@ Mocking helps you replace real dependencies with test doubles that you can contr
 
 The Firmo mocking system provides three main types of test doubles:
 
-
 - **Spies**: Track function calls without changing behavior
 - **Stubs**: Replace functions with controlled implementations
 - **Mocks**: Complete mock objects with verification capabilities
 
-
 ## When to Use Each Type of Test Double
-
 
 Each type of test double serves a specific purpose:
 | Type | Purpose | Use When |
@@ -35,12 +29,9 @@ Each type of test double serves a specific purpose:
 
 ## Basic Usage Examples
 
-
 ### Creating and Using Spies
 
-
 Spies let you track calls to functions without changing their behavior:
-
 
 ```lua
 -- Import mocking system
@@ -60,13 +51,9 @@ assert(spy_calculate.calls[1][1] == 5)
 assert(spy_calculate.calls[1][2] == 3)
 ```
 
-
-
 ### Creating and Using Stubs
 
-
 Stubs replace real functions with controlled implementations:
-
 
 ```lua
 -- Import mocking system
@@ -89,13 +76,9 @@ local result = calculateStub(5, 3)
 assert(result == 15)  -- 5 * 3, not 5 + 3
 ```
 
-
-
 ### Creating and Using Mock Objects
 
-
 Mock objects replace entire objects and provide verification:
-
 
 ```lua
 -- Import mocking system
@@ -131,16 +114,11 @@ assert(success == true, err and err.message or "Verification failed")
 mock_db:restore()
 ```
 
-
-
 ## Advanced Features
-
 
 ### Sequential Return Values
 
-
 You can configure stubs to return different values on successive calls:
-
 
 ```lua
 -- Create a stub that returns different values in sequence
@@ -161,13 +139,9 @@ assert(statusStub() == "connected")
 assert(statusStub() == nil)
 ```
 
-
-
 ### Cycling Sequences
 
-
 For repeating patterns, you can make sequences cycle back to the beginning:
-
 
 ```lua
 -- Create a cycling stub for traffic light states
@@ -185,13 +159,9 @@ assert(lightStub() == "red")
 assert(lightStub() == "yellow")
 ```
 
-
-
 ### Custom Behavior When Sequence Is Exhausted
 
-
 Control what happens when a sequence is exhausted:
-
 
 ```lua
 -- Define an API client
@@ -209,9 +179,7 @@ assert(api_client.get_status() == "connecting")
 assert(api_client.get_status() == "real status")
 ```
 
-
 Or return a custom value when exhausted:
-
 
 ```lua
 local mocking = require("lib.mocking")
@@ -222,13 +190,9 @@ assert(stub() == "second")
 assert(stub() == "sequence ended")
 ```
 
-
-
 ### Simulating Errors
 
-
 Test error handling by making stubs throw errors:
-
 
 ```lua
 -- Create a stub that throws an error
@@ -243,13 +207,9 @@ assert(success == false)
 assert(string.match(error_message, "Test error message"))
 ```
 
-
-
 ### Tracking Call Order
 
-
 Verify the sequence of calls:
-
 
 ```lua
 -- Create spies for multiple functions
@@ -269,13 +229,9 @@ assert(spy1:called_before(spy3) == true)
 assert(spy3:called_after(spy1) == true)
 ```
 
-
-
 ## Using the Context Manager
 
-
 The `with_mocks` context manager automatically cleans up all mocks created within it, even if an error occurs:
-
 
 ```lua
 -- Define test objects
@@ -308,13 +264,9 @@ mocking.with_mocks(function(mock_creator, spy_creator, stub_creator)
 assert(service.getData() == "real data")
 ```
 
-
-
 ## Integration with Expect
 
-
 The mocking system integrates with Firmo's expectation system for more readable tests:
-
 
 ```lua
 local firmo = require("firmo")
@@ -357,14 +309,9 @@ describe("User Service", function()
 end)
 ```
 
-
-
 ## Testing Patterns
 
-
 ### Testing Database-Dependent Code
-
-
 
 ```lua
 describe("User Repository", function()
@@ -412,11 +359,7 @@ describe("User Repository", function()
   end)
 ```
 
-
-
 ### Testing API Clients
-
-
 
 ```lua
 describe("Weather API Client", function()
@@ -496,11 +439,7 @@ describe("Weather API Client", function()
 end)
 ```
 
-
-
 ### Testing Asynchronous Code
-
-
 
 ```lua
 describe("Async Task Manager", function()
@@ -560,13 +499,9 @@ describe("Async Task Manager", function()
 end)
 ```
 
-
-
 ## Best Practices
 
-
 ### Do's and Don'ts
-
 
 | Do | Don't |
 |----|-------|
@@ -581,9 +516,7 @@ end)
 
 ### Always Clean Up Your Mocks
 
-
 Failing to clean up mocks can cause tests to interfere with each other. Always restore mocks or use the `with_mocks` context manager:
-
 
 ```lua
 -- BAD: No cleanup
@@ -607,13 +540,9 @@ mocking.with_mocks(function(mock_creator)
 end)
 ```
 
-
-
 ### Keep Stub Implementations Simple
 
-
 Stubs should be simple and deterministic. Avoid complex logic that could make your tests brittle:
-
 
 ```lua
 -- BAD: Complex stub with side effects
@@ -630,13 +559,9 @@ local calculateStub = stub(function(a, b)
 end)
 ```
 
-
-
 ### Verify Meaningful Interactions
 
-
 Focus verification on the interactions that matter for the test, not implementation details:
-
 
 ```lua
 -- BAD: Testing implementation details
@@ -647,13 +572,9 @@ expect(success).to.be_truthy(err and err.message or "Verification failed")
 -- Or if using spies: expect(db_spy).to.be.called()
 ```
 
-
-
 ### Isolate Tests
 
-
 Each test should create its own fresh mocks to avoid interference between tests:
-
 
 ```lua
 -- BAD: Shared mock across tests
@@ -701,13 +622,9 @@ it("test 2", function()
 end)
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues and Solutions
-
 
 | Issue | Solution |
 |-------|----------|
@@ -720,9 +637,7 @@ end)
 
 ### Debugging Mocks
 
-
 If you're having trouble with mocks, use these debugging techniques:
-
 
 ```lua
 -- Print all calls to a spy
@@ -744,13 +659,9 @@ spy_fn("hello", 123)
 spy_fn("world")
 ```
 
-
-
 ### Restore Original Implementation If Test Fails
 
-
 Make sure to restore original methods even if a test fails, to avoid affecting other tests:
-
 
 ```lua
 -- Using pcall for error handling
@@ -770,7 +681,6 @@ if not success then
 end
 ```
 
-
 Or better, use the `mocking.with_mocks` context manager which handles this automatically:
 
 ```lua
@@ -784,10 +694,7 @@ mocking.with_mocks(function(mock_creator)
 end)
 ```
 
-
-
 ## Conclusion
-
 
 The Firmo mocking system provides powerful tools for isolated testing. By following the patterns and best practices in this guide, you can write more reliable and maintainable tests.
 For more detailed API information, see the [Mocking API Reference](/docs/api/mocking.md), and for practical examples, see the [Mocking Examples](/examples/mocking_examples.md) file.

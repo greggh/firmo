@@ -1,33 +1,26 @@
 # Test Discovery API
 
-
 This document describes the test discovery capabilities provided by Firmo.
 
 ## Overview
-
 
 Firmo provides automatic test discovery functionality that finds and runs test files without requiring you to manually list all test files. This is particularly useful for larger projects with many test files.
 
 ## Discovery Functions
 
-
 ### firmo.discover(root_dir, pattern)
-
 
 Finds test files matching the specified pattern in the given directory.
 **Parameters:**
-
 
 - `root_dir` (string, optional): Directory to search for test files. Defaults to "."
 - `pattern` (string, optional): File pattern to match. Defaults to "**/*_test.lua"
 
 **Returns:**
 
-
 - A table of paths to discovered test files
 
 **Example:**
-
 
 ```lua
 -- Find all test files in the current directory
@@ -38,14 +31,10 @@ local test_files = firmo.discover("./src/tests")
 local test_files = firmo.discover("./tests", "*_spec.lua")
 ```
 
-
-
 ### firmo.run_discovered(root_dir, pattern, options)
-
 
 Discovers and runs test files matching the specified pattern in the given directory.
 **Parameters:**
-
 
 - `root_dir` (string, optional): Directory to search for test files. Defaults to "./tests"
 - `pattern` (string, optional): File pattern to match. Defaults to "**/*_test.lua"
@@ -54,7 +43,6 @@ Discovers and runs test files matching the specified pattern in the given direct
   - `filter` (string): Pattern to filter test names by
 
 **Returns:**
-
 
 - A table with test results, including:
   - `total_files` (number): Total number of test files found
@@ -67,7 +55,6 @@ Discovers and runs test files matching the specified pattern in the given direct
   - `failures` (table): List of test failures
 
 **Example:**
-
 
 ```lua
 -- Run all discovered tests in the default directory
@@ -83,19 +70,14 @@ local results = firmo.run_discovered("./tests", "*_test.lua", {
 print("Passed: " .. results.passed_tests .. "/" .. results.total_tests)
 ```
 
-
-
 ### firmo.run_file(file_path)
-
 
 Runs a single test file.
 **Parameters:**
 
-
 - `file_path` (string): Path to the test file to run
 
 **Returns:**
-
 
 - A table with test results, including:
   - `success` (boolean): Whether the file loaded without errors
@@ -105,7 +87,6 @@ Runs a single test file.
   - `skipped` (number): Number of skipped tests
 
 **Example:**
-
 
 ```lua
 -- Run a specific test file
@@ -118,14 +99,10 @@ else
 end
 ```
 
-
-
 ### firmo.cli_run(dir, options)
-
 
 Command-line runner that finds and runs tests. This is primarily used internally when Firmo is invoked from the command line.
 **Parameters:**
-
 
 - `dir` (string, optional): Directory to search for test files. Defaults to "./tests"
 - `options` (table, optional): Options for test execution, including:
@@ -134,11 +111,9 @@ Command-line runner that finds and runs tests. This is primarily used internally
 
 **Returns:**
 
-
 - `true` if all tests passed, `false` otherwise
 
 **Example:**
-
 
 ```lua
 -- Run all tests from the command line
@@ -152,65 +127,49 @@ local success = firmo.cli_run("./tests", {
 os.exit(success and 0 or 1)
 ```
 
-
-
 ## Command Line Usage
 
-
 Firmo can be run directly from the command line to discover and run tests.
-
 
 ```bash
 
 # Run all tests in the ./tests directory
 
-
 lua firmo.lua tests/
 
 # Run tests in a specific directory
-
 
 lua firmo.lua src/tests/
 
 # Run a specific test file
 
-
 lua firmo.lua ./tests/user_test.lua
 
 # Run tests with tag filtering
-
 
 lua firmo.lua tests/ --tags unit
 
 # Run tests with multiple tags
 
-
 lua firmo.lua tests/ --tags unit,fast
 
 # Run tests with name filtering
-
 
 lua firmo.lua tests/ --filter validation
 
 # Run tests with both tag and name filtering
 
-
 lua firmo.lua tests/ --tags unit --filter validation
 
 # Show help
 
-
 lua firmo.lua --help
 ```
 
-
-
 ## Test File Naming Conventions
-
 
 By default, Firmo looks for files matching the pattern `*_test.lua`. This is a common convention in many testing frameworks.
 Some common naming conventions include:
-
 
 - `module_test.lua`: Tests for a module named `module.lua`
 - `test_module.lua`: Alternative naming style for tests
@@ -220,10 +179,7 @@ You can customize the pattern when calling `discover` or `run_discovered` to mat
 
 ## Examples
 
-
 ### Basic Test Discovery
-
-
 
 ```lua
 local firmo = require("firmo")
@@ -234,11 +190,7 @@ print("Files: " .. results.passed_files .. "/" .. results.total_files .. " passe
 print("Tests: " .. results.passed_tests .. "/" .. results.total_tests .. " passed")
 ```
 
-
-
 ### Custom Discovery Pattern
-
-
 
 ```lua
 local firmo = require("firmo")
@@ -249,11 +201,7 @@ print("Found " .. results.total_files .. " spec files")
 print("Ran " .. results.total_tests .. " specs")
 ```
 
-
-
 ### Dynamic Test Directory
-
-
 
 ```lua
 local firmo = require("firmo")
@@ -269,11 +217,7 @@ end
 local results = firmo.run_discovered(test_dir)
 ```
 
-
-
 ### Conditional CLI Execution
-
-
 
 ```lua
 local firmo = require("firmo")
@@ -305,11 +249,7 @@ if is_main then
 end
 ```
 
-
-
 ## Best Practices
-
-
 
 1. **Consistent naming**: Use a consistent naming convention for your test files (e.g., `*_test.lua`) to make discovery reliable.
 2. **Organized directory structure**: Group related test files in directories that mirror your source code structure.

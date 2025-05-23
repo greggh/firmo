@@ -1,39 +1,27 @@
 # Getting Started with Firmo
 
-
 This guide will help you get started with Firmo, a lightweight and powerful testing framework for Lua.
 
 ## Installation
 
-
 ### Method 1: Copy the File
 
-
 The simplest way to use Firmo is to copy the `firmo.lua` file directly into your project.
-
 
 1. Download the `firmo.lua` file from the repository
 2. Place it in your project directory or in a lib/vendor directory
 
-
 ### Method 2: LuaRocks (Coming Soon)
-
-
 
 ```bash
 luarocks install firmo
 ```
 
-
-
 ## Basic Usage
-
 
 ### 1. Create Your First Test File
 
-
 Create a file named `example_test.lua` with the following content:
-
 
 ```lua
 -- Require the Firmo library
@@ -59,10 +47,7 @@ describe("Math operations", function()
 end)
 ```
 
-
-
 ### 2. Run the Test
-
 
 Run the test using the main `test.lua` script:
 
@@ -70,9 +55,7 @@ Run the test using the main `test.lua` script:
 lua firmo.lua example_test.lua
 ```
 
-
 You should see output similar to:
-
 
 ```text
 Math operations
@@ -81,28 +64,21 @@ Math operations
  PASS raises an error when dividing by zero
 ```
 
-
 Note: Tests are run by `scripts/runner.lua` or `run_all_tests.lua`, not by directly executing the test file.
 
 ## Writing Tests
 
-
 ### Test Structure
 
-
 Firmo uses a BDD-style syntax with describe and it blocks:
-
 
 - `describe(name, fn)`: Groups related tests
 - `it(name, fn)`: Defines an individual test
 - `expect(value)`: Creates assertions about a value
 
-
 ### Assertions
 
-
 Firmo provides a rich set of assertions:
-
 
 ```lua
 -- Basic assertions
@@ -146,13 +122,9 @@ expect(function() error("invalid") end).to.throw.error_matching("invalid")
 expect(complex_object).to.deep_equal(expected_object)
 ```
 
-
-
 ### Before and After Hooks
 
-
 First import the hooks, then use them for setup and teardown:
-
 
 ```lua
 -- Import hooks along with other test functions
@@ -182,16 +154,11 @@ end)
 end)
 ```
 
-
-
 ## Organizing Tests
-
 
 ### Nested Describe Blocks
 
-
 You can nest `describe` blocks to organize your tests:
-
 
 ```lua
 describe("User module", function()
@@ -211,13 +178,9 @@ describe("User module", function()
 end)
 ```
 
-
-
 ### Tagging Tests
 
-
 You can add tags to your tests for filtering:
-
 
 ```lua
 describe("User module", function()
@@ -232,23 +195,15 @@ describe("User module", function()
 end)
 ```
 
-
-
 ## Running Tests
 
-
 ### Running a Single Test File
-
-
 
 ```bash
 lua firmo.lua tests/example_test.lua
 ```
 
-
-
 ### Running Multiple Test Files
-
 
 Create a directory for your tests (e.g., `tests`) and use Firmo's test discovery:
 
@@ -257,8 +212,6 @@ Use the standard runner, passing the directory path:
 ```bash
 lua firmo.lua tests/
 ```
-
-
 
 ### Filtering Tests
 Run only tests matching a name pattern using `--filter`:
@@ -270,25 +223,17 @@ lua firmo.lua --filter authentication tests/example_test.lua
 Filtering by tags directly via the command line (`--tags`) is not currently supported. Use programmatic filtering (`firmo.only_tags(...)`) in your test setup or custom scripts for tag-based execution control.
 ```
 
-
-
 ### Running Tests with Watch Mode
 
-
 For continuous testing that automatically reruns tests when files change:
-
 
 ```bash
 lua firmo.lua --watch tests/example_test.lua
 ```
 
-
-
 ## Asynchronous Testing
 
-
 For testing asynchronous code, use the async testing support:
-
 
 ```lua
 firmo.it_async("fetches data asynchronously", function()
@@ -305,13 +250,9 @@ firmo.it_async("fetches data asynchronously", function()
 end)
 ```
 
-
-
 ## Mocking
 
-
 For isolating your tests, use the mocking system:
-
 
 ```lua
 local mocking = require("lib.mocking")
@@ -330,13 +271,9 @@ local users = UserService.get_users()
 db_mock:restore()
 ```
 
-
-
 ## Next Steps
 
-
 Now that you understand the basics of Firmo, you can:
-
 
 1. Explore the [API Reference](../api/README.md) for detailed documentation.
 2. Browse the [Examples Index](examples.md) for practical usage scenarios.

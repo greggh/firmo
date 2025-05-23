@@ -1,13 +1,10 @@
 # Test Runner API Reference
 
-
 This document provides a comprehensive reference for firmo's test runner system, which manages test discovery, execution, and reporting.
 
 ## Overview
 
-
 The test runner system handles the end-to-end process of running tests, from discovering test files to executing tests and generating reports. It consists of multiple components:
-
 
 1. **Main Test Entry Point** (`test.lua`): A simple redirector that serves as the primary entry point for running tests.
 2. **Core Runner Module** (`lib/core/runner.lua`): The central logic for executing tests with configurable options.
@@ -17,31 +14,24 @@ These components work together to provide a seamless experience for running test
 
 ## Test Entry Point Functions
 
-
 ### Running Tests from Command Line
 
-
 The main entry point for running tests is the `test.lua` file at the project root. This file forwards all arguments to the runner script and is invoked as follows:
-
 
 ```bash
 lua firmo.lua [options] [path]
 ```
 
-
 Any arguments passed to `test.lua` are forwarded to `scripts/runner.lua`, maintaining the same options and behavior.
 
 ## Core Runner API
-
 
 The core runner module (`lib/core/runner.lua`) provides the following functions:
 
 ### runner.format(options)
 
-
 Configures output formatting options for test result display.
 **Parameters:**
-
 
 - `options` (table): Formatting options
   - `use_color` (boolean, optional): Whether to use ANSI color codes in output
@@ -55,11 +45,9 @@ Configures output formatting options for test result display.
 
 **Returns:**
 
-
 - (TestRunner): The runner instance for method chaining
 
 **Example:**
-
 
 ```lua
 local runner = require("lib.core.runner")
@@ -72,14 +60,10 @@ runner.format({
 })
 ```
 
-
-
 ### runner.configure(options)
-
 
 Configures the test runner with execution and feature options.
 **Parameters:**
-
 
 - `options` (table): Configuration options
   - `format` (table, optional): Output format options for test results
@@ -91,11 +75,9 @@ Configures the test runner with execution and feature options.
 
 **Returns:**
 
-
 - (TestRunner): The module instance for method chaining
 
 **Example:**
-
 
 ```lua
 runner.configure({
@@ -106,19 +88,14 @@ runner.configure({
 })
 ```
 
-
-
 ### runner.run_file(file)
-
 
 Runs a single test file and collects test results.
 **Parameters:**
 
-
 - `file` (string): The absolute path to the test file to run
 
 **Returns:**
-
 
 - (table): Test execution results with counts
   - `success` (boolean): Whether all tests passed
@@ -129,7 +106,6 @@ Runs a single test file and collects test results.
 - (table, optional): Error information if execution failed
 
 **Example:**
-
 
 ```lua
 local results, err = runner.run_file("/path/to/my_test.lua")
@@ -144,26 +120,20 @@ else
 end
 ```
 
-
-
 ### runner.run_discovered(dir, pattern)
-
 
 Runs all automatically discovered test files in a directory.
 **Parameters:**
-
 
 - `dir` (string, optional): Directory to search for test files (default: "tests")
 - `pattern` (string, optional): Pattern to filter test files (default: "*_test.lua")
 
 **Returns:**
 
-
 - (boolean): Whether all discovered tests passed successfully
 - (table, optional): Error information if discovery or execution failed
 
 **Example:**
-
 
 ```lua
 -- Run all tests in the default directory
@@ -182,14 +152,10 @@ if not success then
 end
 ```
 
-
-
 ### runner.run_tests(files, options)
-
 
 Runs a list of test files with specified options.
 **Parameters:**
-
 
 - `files` (table): List of test file paths to run
 - `options` (table, optional): Additional options for test execution
@@ -200,11 +166,9 @@ Runs a list of test files with specified options.
 
 **Returns:**
 
-
 - (boolean): Whether all tests passed successfully
 
 **Example:**
-
 
 ```lua
 local test_files = {
@@ -223,37 +187,27 @@ else
 end
 ```
 
-
-
 ### runner.nocolor()
-
 
 Disables colors in the output, useful for terminals that don't support ANSI color codes.
 **Returns:**
-
 
 - (TestRunner): The runner instance for method chaining
 
 **Example:**
 
-
 ```lua
 runner.nocolor().run_discovered("tests")
 ```
 
-
-
 ## Runner Script API
-
 
 The runner script (`scripts/runner.lua`) provides the following functions:
 
 ### runner.run_file(file_path, firmo, options)
 
-
 Runs a specific test file and returns structured results.
 **Parameters:**
-
 
 - `file_path` (string): The path to the test file to run
 - `firmo` (table): The firmo module instance
@@ -263,7 +217,6 @@ Runs a specific test file and returns structured results.
   - `json_output` (boolean, optional): Whether to output JSON results
 
 **Returns:**
-
 
 - (table): Test execution results with detailed information
   - `success` (boolean): Whether the file executed without errors
@@ -278,7 +231,6 @@ Runs a specific test file and returns structured results.
   - `test_errors` (table): Array of test errors
 
 **Example:**
-
 
 ```lua
 local firmo = require("firmo")
@@ -295,14 +247,10 @@ print(string.format(
 ))
 ```
 
-
-
 ### runner.find_test_files(dir_path, options)
-
 
 Finds test files in a directory based on specified options.
 **Parameters:**
-
 
 - `dir_path` (string): The path to the directory to search
 - `options` (table, optional): Options for finding test files
@@ -312,11 +260,9 @@ Finds test files in a directory based on specified options.
 
 **Returns:**
 
-
 - (table): Array of file paths matching the criteria
 
 **Example:**
-
 
 ```lua
 local runner = require("scripts.runner")
@@ -330,14 +276,10 @@ for _, file in ipairs(files) do
 end
 ```
 
-
-
 ### runner.run_all(files_or_dir, firmo, options)
-
 
 Runs tests in a directory or file list and aggregates results.
 **Parameters:**
-
 
 - `files_or_dir` (string|table): Either a directory path or array of file paths
 - `firmo` (table): The firmo module instance
@@ -352,11 +294,9 @@ Runs tests in a directory or file list and aggregates results.
 
 **Returns:**
 
-
 - (boolean): Whether all tests passed
 
 **Example:**
-
 
 ```lua
 local firmo = require("firmo")
@@ -374,14 +314,10 @@ else
 end
 ```
 
-
-
 ### runner.watch_mode(path, firmo, options)
-
 
 Runs tests in watch mode, automatically rerunning tests when files change.
 **Parameters:**
-
 
 - `path` (string): The path to watch (file or directory)
 - `firmo` (table): The firmo module instance
@@ -393,11 +329,9 @@ Runs tests in watch mode, automatically rerunning tests when files change.
 
 **Returns:**
 
-
 - (boolean): Whether the last test run was successful
 
 **Example:**
-
 
 ```lua
 local firmo = require("firmo")
@@ -409,25 +343,19 @@ runner.watch_mode("tests/unit", firmo, {
 })
 ```
 
-
-
 ### runner.parse_arguments(args)
-
 
 Parses command-line arguments for test running options.
 **Parameters:**
-
 
 - `args` (table): Array of command-line arguments
 
 **Returns:**
 
-
 - (string): The path to run tests from
 - (table): Options parsed from arguments
 
 **Example:**
-
 
 ```lua
 local runner = require("scripts.runner")
@@ -440,38 +368,28 @@ print("Path: " .. path)
 print("Coverage enabled: " .. tostring(options.coverage))
 ```
 
-
-
 ### runner.print_usage()
-
 
 Prints the usage instructions for the runner script.
 **Example:**
-
 
 ```lua
 local runner = require("scripts.runner")
 runner.print_usage()
 ```
 
-
-
 ### runner.main(args)
-
 
 Main function to run tests from command line arguments.
 **Parameters:**
-
 
 - `args` (table): Array of command-line arguments
 
 **Returns:**
 
-
 - (boolean): Whether all tests passed
 
 **Example:**
-
 
 ```lua
 local runner = require("scripts.runner")
@@ -483,16 +401,11 @@ local success = runner.main({
 os.exit(success and 0 or 1)
 ```
 
-
-
 ## Integration with Other Modules
-
 
 ### Central Configuration Integration
 
-
 The test runner integrates with the central configuration system to load options from `.firmo-config.lua`:
-
 
 ```lua
 -- Example .firmo-config.lua
@@ -510,13 +423,9 @@ return {
 }
 ```
 
-
-
 ### Coverage Integration
 
-
 The test runner can automatically initialize and manage code coverage:
-
 
 ```lua
 -- Run tests with coverage from command line
@@ -527,13 +436,9 @@ runner.configure({ coverage = true })
       .run_discovered("tests")
 ```
 
-
-
 ### Module Reset Integration
 
-
 The test runner automatically uses module_reset if available to ensure test isolation:
-
 
 ```lua
 -- This happens automatically, but can be configured:
@@ -545,13 +450,9 @@ module_reset.configure({
 })
 ```
 
-
-
 ## Error Handling
 
-
 The test runner includes comprehensive error handling for various scenarios:
-
 
 1. **File not found errors**: When specified test files don't exist
 2. **Test execution errors**: When a test file has syntax errors or runtime errors
@@ -562,17 +463,13 @@ All errors are handled with proper error objects containing detailed context inf
 
 ## Command Line Interface
 
-
 The test runner can be invoked from the command line with various options:
-
 
 ```bash
 lua firmo.lua [options] [path]
 ```
 
-
 Where `[options]` can include:
-
 
 - `--coverage`, `-c`: Enable coverage tracking
 - `--verbose`, `-v`: Show verbose output
@@ -590,10 +487,7 @@ And `[path]` can be a file or directory path.
 
 ## Examples
 
-
 ### Basic Test Running
-
-
 
 ```lua
 local runner = require("lib.core.runner")
@@ -614,11 +508,7 @@ runner.configure({
 })
 ```
 
-
-
 ### Creating a Custom Test Runner
-
-
 
 ```lua
 local firmo = require("firmo")
@@ -650,11 +540,7 @@ else
 end
 ```
 
-
-
 ## See Also
-
-
 
 - [Test Runner Guide](../guides/test_runner.md): Practical guide for using the test runner
 - [Test Runner Examples](../../examples/test_runner_examples.md): Real-world examples of test runner usage

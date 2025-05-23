@@ -1,19 +1,14 @@
 # Benchmark Usage Guide
 
-
 ## Introduction
-
 
 The benchmark module in Firmo provides tools for measuring and analyzing the performance of your code. Whether you're optimizing critical code paths, comparing different implementation approaches, or testing how your code scales, this module offers a comprehensive set of utilities to help you make informed decisions.
 
 ## Getting Started
 
-
 ### Basic Benchmarking
 
-
 The simplest way to benchmark a function is using the `measure` function:
-
 
 ```lua
 local benchmark = require("lib.tools.benchmark")
@@ -32,14 +27,11 @@ local result = benchmark.measure(calculate_sum, {1000000}, {
 benchmark.print_result(result)
 ```
 
-
 This measures the execution time and memory usage of the `calculate_sum` function, running it multiple times to provide statistical information.
 
 ### Understanding Results
 
-
 The `measure` function returns a detailed results table:
-
 
 ```lua
 -- Hypothetical output (abbreviated)
@@ -64,9 +56,7 @@ The `measure` function returns a detailed results table:
 }
 ```
 
-
 The `print_result` function formats these results for human readability:
-
 
 ```text
 Mean execution time: 54.20 ms
@@ -76,16 +66,11 @@ Mean memory delta: 0.22 KB
 Memory Min: 0.21 KB  Max: 0.23 KB
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Comparing Implementations
 
-
 One of the most common use cases is comparing different implementations:
-
 
 ```lua
 -- String concatenation approach
@@ -108,9 +93,7 @@ end, {10000}, {label = "Table concat"})
 benchmark.compare(concat_result, table_result)
 ```
 
-
 The `compare` function will output detailed information about the relative performance:
-
 
 ```text
 Benchmark Comparison: String concatenation vs Table concat
@@ -127,13 +110,9 @@ Memory Usage:
   Table concat uses 70.6% less memory
 ```
 
-
-
 ### Running Benchmark Suites
 
-
 For more complex scenarios, you can define a benchmark suite:
-
 
 ```lua
 local suite_results = benchmark.suite({
@@ -175,14 +154,11 @@ local suite_results = benchmark.suite({
 })
 ```
 
-
 This makes it easy to compare multiple approaches in a single operation.
 
 ### Generating Test Suites
 
-
 For testing the performance of larger test suites, you can use the test suite generator:
-
 
 ```lua
 local suite = benchmark.generate_large_test_suite({
@@ -194,17 +170,13 @@ local suite = benchmark.generate_large_test_suite({
 print("Generated " .. suite.total_tests .. " tests in " .. suite.output_dir)
 ```
 
-
 This is especially useful for evaluating test runner performance or optimizing large test suites.
 
 ## Best Practices
 
-
 ### 1. Use Warmup Iterations
 
-
 Always use warmup iterations (at least 1-2) to allow the Lua VM to optimize code before measuring:
-
 
 ```lua
 local result = benchmark.measure(my_function, args, {
@@ -213,14 +185,11 @@ local result = benchmark.measure(my_function, args, {
 })
 ```
 
-
 This is especially important when using LuaJIT, as the JIT compiler needs some iterations to optimize the code.
 
 ### 2. Run Multiple Iterations
 
-
 Single measurements can be misleading due to system variability. Always use multiple iterations to get statistical information:
-
 
 ```lua
 local result = benchmark.measure(my_function, args, {
@@ -230,14 +199,11 @@ local result = benchmark.measure(my_function, args, {
 print("Standard deviation: " .. result.time_stats.std_dev)
 ```
 
-
 A high standard deviation relative to the mean indicates inconsistent performance, which might require investigation.
 
 ### 3. Control Garbage Collection
 
-
 Memory allocation can significantly impact benchmark results. Use the `gc_before` option to control when garbage collection happens:
-
 
 ```lua
 local result = benchmark.measure(my_function, args, {
@@ -245,14 +211,11 @@ local result = benchmark.measure(my_function, args, {
 })
 ```
 
-
 You might want to run benchmarks both with and without forced GC to understand the impact of memory management on your code.
 
 ### 4. Isolate What You're Measuring
 
-
 Make sure you're only measuring what you intend to measure:
-
 
 ```lua
 -- BAD: Setup work contaminates the measurement
@@ -270,24 +233,17 @@ local result = benchmark.measure(function(input_data)
 end, {data})
 ```
 
-
-
 ### 5. Consider System Load
 
-
 System load can affect benchmark results. For critical measurements:
-
 
 - Close other applications
 - Run the benchmark multiple times
 - Be aware of background processes or services
 
-
 ## Integration with Firmo
 
-
 The benchmark module can be registered with the Firmo framework for easier usage in tests:
-
 
 ```lua
 local firmo = require("firmo")
@@ -306,35 +262,26 @@ describe("Performance tests", function()
 end)
 ```
 
-
-
 ## Troubleshooting
-
 
 ### Inconsistent Results
 
-
 If you're seeing highly variable results (high standard deviation):
-
 
 1. **Increase iterations**: More samples provide better statistical information
 2. **Check for external factors**: Background processes, system load, etc.
 3. **Isolate your code**: Make sure external resources aren't affecting the measurement
 4. **Warm up more**: Try increasing warmup iterations, especially for JIT-compiled code
 
-
 ### Memory Measurement Issues
 
-
 Memory measurement depends on Lua's `collectgarbage("count")` function, which has some limitations:
-
 
 1. It only reports Lua-allocated memory, not external resources
 2. The resolution is in kilobytes
 3. It may not capture short-lived allocations between GC cycles
 
 For more precise memory measurement, consider using:
-
 
 ```lua
 -- Measure memory growth over multiple iterations
@@ -353,13 +300,9 @@ local function measure_memory_growth(func, iterations)
 end
 ```
 
-
-
 ### Benchmarking Asynchronous Code
 
-
 The benchmark module is designed for synchronous code. For asynchronous operations, you'll need to adapt:
-
 
 ```lua
 local async_results = {}
@@ -380,10 +323,7 @@ my_async_function(function(result)
 end)
 ```
 
-
-
 ## Conclusion
-
 
 The benchmark module provides a powerful toolkit for measuring and optimizing your code's performance. By using the techniques described in this guide, you can make informed decisions about implementation approaches, identify bottlenecks, and ensure your code meets performance requirements.
 Remember that performance optimization should typically come after correctness and maintainability. Benchmark to identify real issues, not to prematurely optimize working code.

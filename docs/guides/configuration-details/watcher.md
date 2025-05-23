@@ -1,13 +1,10 @@
 # File Watcher Configuration
 
-
 This document describes the comprehensive configuration options for the firmo file watcher system, which provides automated file monitoring and change detection for continuous testing and other tasks.
 
 ## Overview
 
-
 The file watcher module provides a robust system for monitoring file changes with support for:
-
 
 - Monitoring specific files or directories
 - Pattern-based file filtering
@@ -16,12 +13,9 @@ The file watcher module provides a robust system for monitoring file changes wit
 - Integration with the test runner for continuous testing
 - Custom change handlers
 
-
 ## Configuration Options
 
-
 ### Core Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -33,7 +27,6 @@ The file watcher module provides a robust system for monitoring file changes wit
 
 ### Watch Mode Options
 
-
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `interval` | number | `1.0` | Time in seconds between checking for changes (maps to `check_interval`). |
@@ -42,9 +35,7 @@ The file watcher module provides a robust system for monitoring file changes wit
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the watcher system in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -84,13 +75,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the watcher system programmatically:
-
 
 ```lua
 local watcher = require("lib.tools.watcher")
@@ -108,13 +95,9 @@ watcher.set_check_interval(0.5)
       .set_debug(true)
 ```
 
-
-
 ## Watch Patterns
 
-
 Watch patterns determine which files the watcher will monitor for changes:
-
 
 ```lua
 -- Configure watch patterns
@@ -132,20 +115,15 @@ watcher.configure({
 watcher.add_patterns({"%.xml$", "%.yaml$"})
 ```
 
-
 Patterns use Lua's pattern matching syntax, which is similar to but not identical to regular expressions:
-
 
 - `%.` matches a literal dot (in Lua patterns, `.` means "any character")
 - `$` matches the end of the string
 - So `%.lua$` matches any string ending with ".lua"
 
-
 ## Excluding Files and Directories
 
-
 You can exclude specific files or directories from being watched:
-
 
 ```lua
 -- Initialize with exclusions
@@ -166,18 +144,13 @@ watcher = {
 }
 ```
 
-
-
 ## Change Detection
 
-
 The watcher detects three types of changes:
-
 
 1. **Modified files**: Files with a newer modification time
 2. **New files**: Files that match watch patterns but weren't previously tracked
 3. **Removed files**: Files that were previously tracked but no longer exist
-
 
 ```lua
 -- Check for changes
@@ -194,40 +167,30 @@ if changed_files and #changed_files > 0 then
 end
 ```
 
-
-
 ## Integration with Test Runner
 
-
 The watcher integrates directly with the test runner to implement continuous testing:
-
 
 ```bash
 
 # Run tests in watch mode
 
-
 lua firmo.lua --watch tests/
 
 # Set custom watch interval
-
 
 lua firmo.lua --watch --watch-interval=0.5 tests/
 
 # Exclude specific patterns
 
-
 lua firmo.lua --watch --exclude="node_modules,%.git" tests/
 
 # Set debounce time
 
-
 lua firmo.lua --watch --debounce=1.0 tests/
 ```
 
-
 When the test runner is in watch mode:
-
 
 1. It initializes the watcher with the specified test directory
 2. It continuously monitors for changes to test or source files
@@ -235,15 +198,11 @@ When the test runner is in watch mode:
 4. It clears the terminal and re-runs the specified tests
 5. It returns to watching for changes
 
-
 ## Advanced Usage
-
 
 ### Manual File and Directory Management
 
-
 You can manually add specific files or directories to watch:
-
 
 ```lua
 -- Add a specific directory
@@ -261,13 +220,9 @@ for file_path, file_info in pairs(files) do
 end
 ```
 
-
-
 ### Custom Watch Loop
 
-
 You can implement your own watch loop for custom behavior:
-
 
 ```lua
 local watcher = require("lib.tools.watcher")
@@ -309,13 +264,9 @@ end
 watch_loop()
 ```
 
-
-
 ### Debugging the Watcher
 
-
 The watcher includes debugging tools to help troubleshoot issues:
-
 
 ```lua
 -- Enable debug mode
@@ -330,13 +281,9 @@ watcher.reset()
 watcher.full_reset()
 ```
 
-
-
 ## Error Handling
 
-
 The watcher implements comprehensive error handling:
-
 
 ```lua
 -- Initialize with error checking
@@ -353,18 +300,13 @@ if not changed_files then
 end
 ```
 
-
 All watcher functions:
-
 
 - Validate inputs and return `nil, error_object` for failures
 - Use the `error_handler` module for standardized error creation
 - Include appropriate context in error objects
 
-
 ## Integration Example
-
-
 
 ```lua
 local watcher = require("lib.tools.watcher")
@@ -399,46 +341,35 @@ end
 watch_files()
 ```
 
-
-
 ## Command Line Options
 
-
 When using the test runner's watch mode, you can configure the watcher through command line options:
-
 
 ```bash
 
 # Basic watch mode
 
-
 lua firmo.lua --watch tests/
 
 # Set custom check interval (0.5 seconds)
-
 
 lua firmo.lua --watch --watch-interval=0.5 tests/
 
 # Set custom debounce time
 
-
 lua firmo.lua --watch --debounce=1.0 tests/
 
 # Set custom exclude patterns
-
 
 lua firmo.lua --watch --exclude="node_modules,%.git,%.vscode" tests/
 
 # Verbose output (show more details about file changes)
 
-
 lua firmo.lua --watch --verbose tests/
 
 # Focus on specific test patterns in watch mode
 
-
 lua firmo.lua --watch --pattern="database" tests/
 ```
-
 
 These command line options override any settings from the configuration file for that specific run.

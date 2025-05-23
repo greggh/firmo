@@ -1,31 +1,22 @@
 # Error Handling API Reference
 
-
 ## Overview
-
 
 The error handling system in firmo provides a structured, consistent approach to handling errors throughout the framework. It creates standardized error objects, manages error propagation, integrates with logging, and provides specialized support for testing error conditions.
 
 ## Core Error Handler Module
 
-
 The `error_handler` module is the foundation of firmo's error handling system.
 
 ### Importing the Module
-
-
 
 ```lua
 local error_handler = require("lib.tools.error_handler")
 ```
 
-
-
 ### Error Categories
 
-
 The error handler defines standard categories for different types of errors:
-
 
 ```lua
 -- Access error categories
@@ -42,13 +33,9 @@ local CATEGORY = error_handler.CATEGORY
 -- CATEGORY.TEST_EXPECTED - Errors expected during tests
 ```
 
-
-
 ### Error Severity Levels
 
-
 The error handler provides different severity levels:
-
 
 ```lua
 -- Access severity levels
@@ -60,14 +47,9 @@ local SEVERITY = error_handler.SEVERITY
 -- SEVERITY.INFO - Informational messages about error conditions
 ```
 
-
-
 ## Creating Error Objects
 
-
 ### Generic Error Creation
-
-
 
 ```lua
 -- Create a generic error object
@@ -83,12 +65,9 @@ local error_obj = error_handler.create(
 - `error_obj` (table): The created error object
 ```
 
-
 ### Specialized Error Creators
 
-
 The module provides convenience functions for common error types:
-
 
 ```lua
 -- Validation error (for parameter validation)
@@ -140,13 +119,9 @@ local not_found_err = error_handler.not_found_error(
 )
 ```
 
-
 ## Error Handling Patterns
 
-
 ### The Try-Catch Pattern
-
-
 
 ```lua
 -- Execute a function and catch any errors
@@ -178,11 +153,7 @@ end, 5, 10)
 -- result will be 15 if successful
 ```
 
-
-
 ### Safe I/O Operations
-
-
 
 ```lua
 -- Execute a file operation safely
@@ -214,11 +185,7 @@ local data, err = error_handler.safe_io_operation(
 )
 ```
 
-
-
 ### Asserting Conditions
-
-
 
 ```lua
 -- Assert that a condition is true, or throw an error
@@ -246,11 +213,7 @@ error_handler.assert(
 local name = error_handler.assert(config.name, "Name is required")
 ```
 
-
-
 ### Throwing Errors
-
-
 
 ```lua
 -- Throw an error with proper logging
@@ -275,14 +238,9 @@ error_handler.rethrow(
 **Returns:** `nil` (Never actually returns).
 **Throws:** `table` Always throws an error based on `original_error`, potentially adding context.
 
-
-
 ## Testing-Specific Functions
 
-
 ### Test Mode Functions
-
-
 
 ```lua
 -- Set error handler to test mode
@@ -295,11 +253,7 @@ local in_test_mode = error_handler.is_test_mode()
 local logs_suppressed = error_handler.is_suppressing_test_logs()
 ```
 
-
-
 ### Test Metadata Management
-
-
 
 ```lua
 -- Set metadata for the current test
@@ -315,11 +269,7 @@ local metadata = error_handler.get_current_test_metadata()
 local expects_errors = error_handler.current_test_expects_errors()
 ```
 
-
-
 ### Expected Error Management
-
-
 
 ```lua
 - Check if an error is an expected test error
@@ -333,13 +283,9 @@ local expected_errors = error_handler.get_expected_test_errors()
 error_handler.clear_expected_test_errors()
 ```
 
-
-
 ## Error Object Structure
 
-
 Error objects created by the error handler have a standardized structure:
-
 
 ```lua
 local error_obj = {
@@ -365,11 +311,7 @@ local error_obj = {
 }
 ```
 
-
-
 ## Error Formatting Functions
-
-
 
 ```lua
 -- Format an error object as a string (basic)
@@ -378,11 +320,7 @@ local error_str = error_handler.format_error(error_obj)
 local detailed_error = error_handler.format_error(error_obj, true)
 ```
 
-
-
 ## Configuration Functions
-
-
 
 ```lua
 -- Configure the error handler module
@@ -403,11 +341,7 @@ error_handler.configure_from_config()
 -- Returns: ErrorHandler self
 ```
 
-
-
 ## Utility Functions
-
-
 
 ```lua
 -- Check if a value is an error object
@@ -416,13 +350,9 @@ local is_error = error_handler.is_error(value)
 error_handler.log_error(error_obj) -- Returns: nil
 ```
 
-
-
 ## Integration with Testing Framework
 
-
 The error handler integrates with firmo's testing system through:
-
 
 1. **Test Mode Detection**: Tests can be marked to expect errors using `{ expect_error = true }`
 2. **Error Suppression**: Expected errors are properly suppressed in test output
@@ -432,9 +362,7 @@ For detailed test integration, see the Error Handling Guide and Error Testing Be
 
 ## Error Handler Behavior by Default
 
-
 The default error handler configuration:
-
 
 - Creates structured error objects with category, context, and severity
 - Captures file and line information for errors
@@ -444,10 +372,7 @@ The default error handler configuration:
 - Detects the test environment automatically
 - Works with central configuration system
 
-
 ## Error Handling Best Practices
-
-
 
 1. Always use structured error objects with proper categorization
 2. Add detailed context to error objects for better diagnostics

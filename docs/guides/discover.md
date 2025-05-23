@@ -1,28 +1,21 @@
 # Test Discovery Guide
 
-
 This guide covers how to use the Test Discovery module in Firmo for finding and working with test files programmatically. While the test runner uses this module internally, you may want to leverage it for custom test tooling, reporting, or automation.
 
 ## Introduction
 
-
 The Test Discovery module (`lib.tools.discover`) helps locate test files in your project structure based on configurable patterns, extensions, and filtering rules. It's particularly useful when you need to:
-
 
 - Create custom test runners or watchers
 - Generate test reports or statistics
 - Implement test file management tools
 - Build test organization and validation tools
 
-
 ## Basic Usage
-
 
 ### Finding Test Files
 
-
 The simplest way to use the discovery module is to find all test files in a directory:
-
 
 ```lua
 local discover = require("lib.tools.discover")
@@ -38,41 +31,28 @@ else
 end
 ```
 
-
-
 ### Specifying a Different Directory
 
-
 You can specify a different directory to search for tests:
-
 
 ```lua
 local result, err = discover.discover("src/tests")
 ```
 
-
-
 ### Filtering by Pattern
 
-
 To find test files that match a specific pattern:
-
 
 ```lua
 -- Find all test files containing "user" in their path
 local result, err = discover.discover("tests", "user")
 ```
 
-
-
 ## Configuring Discovery
-
 
 ### Complete Configuration
 
-
 For more control, you can configure all discovery options at once:
-
 
 ```lua
 discover.configure({
@@ -93,13 +73,9 @@ discover.configure({
 })
 ```
 
-
-
 ### Method Chaining
 
-
 The configuration functions support method chaining for a more fluent interface:
-
 
 ```lua
 discover.configure({recursive = false})
@@ -107,13 +83,9 @@ discover.configure({recursive = false})
         .add_exclude_pattern("*_wip.lua")
 ```
 
-
-
 ### Adding Individual Patterns
 
-
 You can add individual include or exclude patterns:
-
 
 ```lua
 -- Add a new pattern for integration tests
@@ -122,16 +94,11 @@ discover.add_include_pattern("integration_*.lua")
 discover.add_exclude_pattern("*_wip.lua")
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Custom Test File Detection
 
-
 Sometimes you may want to check if individual files are test files according to your configuration:
-
 
 ```lua
 local discover = require("lib.tools.discover")
@@ -149,13 +116,9 @@ for _, file in ipairs(files) do
 end
 ```
 
-
-
 ### Building a Custom Test Runner
 
-
 You can use the discovery module to build a simple custom test runner:
-
 
 ```lua
 local discover = require("lib.tools.discover")
@@ -198,13 +161,9 @@ end
 run_tests("tests/unit", "user")
 ```
 
-
-
 ## Working with the Test Discovery Results
 
-
 The discovery results provide information you can use for reporting or further processing:
-
 
 ```lua
 local discover = require("lib.tools.discover")
@@ -227,13 +186,9 @@ if result then
 end
 ```
 
-
-
 ## Integration with File Watchers
 
-
 The discover module works well with file watchers for implementing test-on-change functionality:
-
 
 ```lua
 local discover = require("lib.tools.discover")
@@ -268,11 +223,7 @@ watcher.create()
        :start()
 ```
 
-
-
 ## Best Practices
-
-
 
 1. **Use specific include/exclude patterns**: Narrower patterns improve performance in large codebases.
 2. **Consider recursion settings**: For very large projects, you might want to set `recursive = false` and manually specify subdirectories.
@@ -280,15 +231,11 @@ watcher.create()
 4. **Check error returns**: Always check for errors when calling `discover()`.
 5. **Cache discovery results**: If you're using discovery in a long-running process, consider caching the results and refreshing only when files change.
 
-
 ## Troubleshooting
-
 
 ### Tests Not Being Found
 
-
 If your tests aren't being found:
-
 
 1. **Check your include patterns**: Make sure they match your file naming convention.
 
@@ -296,20 +243,17 @@ If your tests aren't being found:
    discover.configure({include = {"your_pattern_*.lua"}})
    ```
 
-
 2. **Verify exclude patterns**: Ensure you're not accidentally excluding your test files.
 
    ```lua
    discover.configure({exclude = {}}) -- Clear all exclude patterns
    ```
 
-
 3. **Check ignored directories**: Make sure your tests aren't in ignored directories.
 
    ```lua
    discover.configure({ignore = {}}) -- Clear all ignore patterns
    ```
-
 
 4. **Enable logging**: The discovery module logs detailed information about the discovery process.
 
@@ -320,16 +264,12 @@ If your tests aren't being found:
 
 ### Performance Issues
 
-
 If discovery is slow:
-
 
 1. **Limit recursion**: If you have a deep directory structure but tests are only in specific locations, set `recursive = false` and specify the exact test directories.
 2. **Add specific ignore patterns**: Exclude large directories that don't contain tests.
 3. **Use more specific include patterns**: This helps filter files earlier in the process.
 
-
 ## Conclusion
-
 
 The Test Discovery module provides a flexible system for finding test files in your project structure. By customizing its configuration, you can adapt it to any project organization or test file naming convention. Whether used directly or as part of a larger system, it simplifies the task of programmatically working with your test suite.

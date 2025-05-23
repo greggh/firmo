@@ -85,24 +85,18 @@ local obj = { method = function(self, arg) return arg end }
 local spy_method = mocking.spy(obj, "method")
 obj:method("test") -- Calls original method, but tracks the call
 
-
-
 ### mocking.spy.new(fn)
-
 
 Creates a standalone spy function that wraps the provided function.
 **Parameters**:
-
 
 - `fn` (function, optional): The function to spy on (defaults to an empty function)
 
 **Returns**:
 
-
 - A spy object that records calls
 
 **Example**:
-
 
 ```lua
 -- Create a spy on a function
@@ -187,24 +181,18 @@ spy_fn("a", "b")
 expect(spy_fn.calls[1].args[1]).to.equal(1) -- First call, first argument
 expect(spy_fn.calls[2].args[2]).to.equal("b") -- Second call, second argument
 
-
-
 ### spy:called_with(...)
-
 
 Checks whether the spy was called with the specified arguments.
 **Parameters**:
-
 
 - `...`: The arguments to check for
 
 **Returns**:
 
-
 - `true` if the spy was called with the specified arguments, `false` otherwise
 
 **Example**:
-
 
 ```lua
 local fn = function() end
@@ -277,10 +265,7 @@ expect(spy_fn:called_once()).to.equal(false)
 
 ````
 
-
-
 ### spy:last_call()
-
 
 Gets the call record object for the most recent call to the spy.
 **Returns**:
@@ -288,7 +273,6 @@ Gets the call record object for the most recent call to the spy.
 - A table containing the call record (`{args, timestamp, result?, error?}`) for the most recent call, or nil if the spy was never called.
 
 **Example**:
-
 
 ```lua
 local mocking = require("lib.mocking")
@@ -327,7 +311,6 @@ expect(spy2:called_before(spy1)).to.equal(false)
 expect(spy1:called_after(spy2)).to.equal(false)
 
 ````
-
 
 ### spy:called_after(other_spy, [call_index])
 
@@ -443,25 +426,20 @@ Creates a spy wrapping `fn` with optional behavior modifiers. Similar to `new` b
 
 ### mocking.stub(return_value_or_implementation)
 
-
 Creates a standalone stub function that returns a specific value or uses a custom implementation. The stub system integrates with the logging system for detailed diagnostics and error handling.
 **Parameters**:
 ```lua
 
-
 ---@param return_value_or_implementation any|function Value to return when stub is called, or function to use as implementation
 ---@return Stub The created stub object
 
-
 ```text
 **Returns**:
-
 
 - A stub function that returns the specified value or executes the specified function
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 -- Stub with a return value
@@ -480,25 +458,20 @@ local validate_user = firmo.stub(function(user_data)
   return true
 end)
 
-
 ```text
 ### mocking.stub.new(return_value_or_implementation)
 
-
 Creates a new standalone stub function that returns a specified value or uses custom implementation.
 **Parameters**:
-
 
 - `return_value_or_implementation` (any|function, optional): Value to return when stub is called, or function to use as implementation
 
 **Returns**:
 
-
 - A stub object
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 -- Create a stub with a fixed return value
@@ -510,15 +483,12 @@ local custom_stub = mocking.stub.new(function(arg1, arg2)
 end)
 expect(custom_stub(3, 4)).to.equal(12)
 
-
 ```text
 
 ### mocking.stub.on(obj, method_name, value_or_impl)
 
-
 Replace an object's method with a stub.
 **Parameters**:
-
 
 - `obj` (table): The object containing the method to stub
 - `method_name` (string): The name of the method to stub
@@ -526,12 +496,10 @@ Replace an object's method with a stub.
 
 **Returns**:
 
-
 - A stub object for the method
 
 **Example**:
 ```lua
-
 
 local obj = {
   method = function() return "original" end
@@ -544,52 +512,42 @@ expect(obj.method()).to.equal("stubbed")
 stub:restore()
 expect(obj.method()).to.equal("original")
 
-
 ```text
 
 ### stub:returns(value)
 
-
 Configure stub to return a specific value.
 **Parameters**:
-
 
 - `value` (any): The value to return when the stub is called
 
 **Returns**:
-
 
 - A new stub configured to return the specified value
 
 **Example**:
 ```lua
 
-
 local mocking = require("lib.mocking")
 local stub = mocking.stub(nil)
 stub:returns("new value") -- Modifies stub in-place
 expect(stub()).to.equal("new value")
 
-
 ```text
 
 ### stub:returns_in_sequence(values)
 
-
 Configure stub to return values from a sequence in order.
 **Parameters**:
-
 
 - `values` (table): An array of values to return in sequence
 
 **Returns**:
 
-
 - A new stub configured with sequence behavior
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 local stub = mocking.stub():returns_in_sequence({"first", "second", "third"})
@@ -598,30 +556,24 @@ expect(stub()).to.equal("second")
 expect(stub()).to.equal("third")
 expect(stub()).to.equal(nil) -- Sequence exhausted
 
-
 ```text
 
 ### stub:matches(matcher_fn)
-
 
 Configure a stub to respond differently based on argument matching.
 **Parameters**:
 ```lua
 
-
 ---@param matcher_fn function Function that takes arguments and returns boolean
 ---@return Stub The stub object for method chaining
 
-
 ```text
 **Returns**:
-
 
 - The stub object for method chaining
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 local api_stub = mocking.stub()
@@ -634,26 +586,21 @@ local api_stub = mocking.stub()
 expect(api_stub(123)).to.deep_equal({ status = "success", data = "valid id" })
 expect(api_stub("abc")).to.deep_equal({ status = "error", message = "invalid id" })
 
-
 ```text
 
 ### stub:cycle_sequence(enable)
 
-
 Configure whether the sequence of return values should cycle.
 **Parameters**:
-
 
 - `enable` (boolean, optional): Whether to enable cycling (defaults to true)
 
 **Returns**:
 
-
 - The stub object for method chaining
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 local stub = mocking.stub()
@@ -664,15 +611,12 @@ expect(stub()).to.equal("yellow")
 expect(stub()).to.equal("green")
 expect(stub()).to.equal("red") -- Cycles back to beginning
 
-
 ```text
 
 ### stub:when_exhausted(behavior, [custom_value])
 
-
 Configure what happens when a sequence is exhausted.
 **Parameters**:
-
 
 - `behavior` (string): One of:
 - `"nil"`: Return nil (default behavior)
@@ -683,12 +627,10 @@ Configure what happens when a sequence is exhausted.
 
 **Returns**:
 
-
 - The stub object for method chaining
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 -- Return a custom error object when exhausted
@@ -699,21 +641,17 @@ expect(stub()).to.equal("first")
 expect(stub()).to.equal("second")
 expect(stub()).to.equal("sequence ended")
 
-
 ```text
 
 ### stub:reset_sequence()
 
-
 Reset sequence to the beginning.
 **Returns**:
-
 
 - The stub object for method chaining
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 local stub = mocking.stub():returns_in_sequence({1, 2, 3})
@@ -724,16 +662,13 @@ expect(stub()).to.equal(nil) -- Exhausted
 stub:reset_sequence() -- Reset to start
 expect(stub()).to.equal(1) -- Starts over
 
-
 ```text
 
 ### stub:with_error_handling(options)
 
-
 Configure stub with enhanced error handling options.
 **Parameters**:
 ```lua
-
 
 ---@param options table
 ---@field capture_stack boolean Whether to capture stack information
@@ -742,11 +677,9 @@ Configure stub with enhanced error handling options.
 ---@field debug_mode boolean Whether to enable detailed debug information
 ---@return Stub The stub object for method chaining
 
-
 ```text
 **Example**:
 ```lua
-
 
 local error_handler = require("lib.tools.error_handler")
 local logging = require("lib.tools.logging")
@@ -764,7 +697,6 @@ local logging = require("lib.tools.logging")
 -- When the stub is called, it would (if implemented) throw a detailed error
 -- with stack info, arguments, and automatically log to the logging system
 
-
 ```text
 
 ### stub:with_error_handling(options)
@@ -773,7 +705,6 @@ Configure stub with enhanced error handling options. **(Not Currently Implemente
 **Parameters**:
 ```lua
 
-
 ---@param options table
 ---@field capture_stack boolean Whether to capture stack information
 ---@field capture_args boolean Whether to capture arguments in errors
@@ -781,26 +712,21 @@ Configure stub with enhanced error handling options. **(Not Currently Implemente
 ---@field debug_mode boolean Whether to enable detailed debug information
 ---@return Stub The stub object for method chaining
 
-
 ```text
 
 ### stub:throws(error_message)
 
-
 Configure stub to throw an error when called.
 **Parameters**:
-
 
 - `error_message` (string|table): The error message or error object to throw
 
 **Returns**:
 
-
 - A new stub configured to throw the specified error
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 local stub = mocking.stub():throws("test error")
@@ -809,16 +735,13 @@ expect(function()
   stub()
 end).to.throw("test error")
 
-
 ```text
 
 ### stub:restore()
 
-
 Restore the original method (for stubs created with stub.on).
 **Example**:
 ```lua
-
 
 local obj = {
   method = function() return "original" end
@@ -828,7 +751,6 @@ local stub = mocking.stub.on(obj, "method", "stubbed")
 expect(obj.method()).to.equal("stubbed")
 stub:restore() -- Restore the original method
 expect(obj.method()).to.equal("original")
-
 
 ```text
 ### mocking.stub.from_spy(spy_obj)
@@ -854,10 +776,8 @@ Creates a stub that returns values from a table in sequence. **(Currently Unimpl
 
 ### mocking.mock(target, [method_or_options], [impl_or_value])
 
-
 Create a mock object with controlled behavior.
 **Parameters**:
-
 
 - `target` (table): The object to create a mock of
 - `method_or_options` (string|table, optional): Either a method name to stub or options table
@@ -865,12 +785,10 @@ Create a mock object with controlled behavior.
 
 **Returns**:
 
-
 - A mock object
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 -- Create a mock object and stub a method in one call
@@ -881,15 +799,12 @@ expect(database.query()).to.deep_equal({ rows = 10 })
 local obj = { method = function() end }
 local mock_obj = mocking.mock(obj, { verify_all_expectations_called = true })
 
-
 ```text
 
 ### mocking.mock.create(target, [options])
 
-
 Create a mock object with verifiable behavior.
 **Parameters**:
-
 
 - `target` (table): The object to create a mock of
 - `options` (table, optional): Optional configuration:
@@ -897,12 +812,10 @@ Create a mock object with verifiable behavior.
 
 **Returns**:
 
-
 - A mockable object
 
 **Example**:
 ```lua
-
 
 local file_system = {
   read_file = function(path) return io.open(path, "r"):read("*a") end,
@@ -915,22 +828,18 @@ local mock_fs = mocking.mock.create(file_system)
 
 ### mock:stub(name, implementation_or_value)
 
-
 Stub a method on the mock object with a specific implementation or return value.
 **Parameters**:
-
 
 - `name` (string): Name of the method to stub
 - `implementation_or_value` (any|function): Function to run when the method is called, or value to return
 
 **Returns**:
 
-
 - The mock object for method chaining
 
 **Example**:
 ```lua
-
 
 local database = { query = function() end }
 local mocking = require("lib.mocking")
@@ -944,22 +853,18 @@ end)
 
 ### mock:stub_in_sequence(name, sequence_values)
 
-
 Stub a method on the mock object to return different values on successive calls.
 **Parameters**:
-
 
 - `name` (string): Name of the method to stub
 - `sequence_values` (table): Array of values to return in sequence on successive calls
 
 **Returns**:
 
-
 - The stub object for method chaining
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 local api = { get_status = function() return "online" end }
@@ -971,26 +876,21 @@ mock_api:stub_in_sequence("get_status", {
   "disconnecting"
 })
 
-
 ```text
 
 ### mock:restore_stub(name)
 
-
 Restore the original implementation of a specific stubbed method.
 **Parameters**:
-
 
 - `name` (string): Name of the method to restore
 
 **Returns**:
 
-
 - The mock object for method chaining
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 local obj = { method = function() return "original" end }
@@ -1000,21 +900,17 @@ expect(obj.method()).to.equal("stubbed")
 mock_obj:restore_stub("method")
 expect(obj.method()).to.equal("original")
 
-
 ```text
 
 ### mock:restore()
 
-
 Restore all stubbed methods to their original implementations.
 **Returns**:
-
 
 - The mock object for method chaining
 
 **Example**:
 ```lua
-
 
 local obj = {
   method1 = function() return "original1" end,
@@ -1033,7 +929,6 @@ mock_obj:restore()
 
 ### mock:verify()
 
-
 Verify that all expected method calls were made. Checks stubs marked with `verify_all_expectations_called` (default true) and any specific expectations set with `mock:expect()`.
 **Returns**:
 - `success` (boolean|nil): `true` if verification passes, `false` if expectations unmet, `nil` on critical error.
@@ -1042,7 +937,6 @@ Verify that all expected method calls were made. Checks stubs marked with `verif
 **Example**:
 ```lua
 
-
 local mocking = require("lib.mocking")
 local obj = { method = function() end }
 local mock_obj = mocking.mock(obj)
@@ -1050,7 +944,6 @@ mock_obj:stub("method", function() return "stubbed" end)
 obj.method() -- Call the stubbed method
 local success, err = mock_obj:verify() -- Passes because method was called
 expect(success).to.be_truthy()
-
 
 ```text
 
@@ -1093,9 +986,7 @@ Resets all mocks created by the module globally. Alias for `restore_all()`.
 
 ## Context Manager
 
-
 ### mocking.with_mocks(fn)
-
 
 Execute a function with automatic mock cleanup, even if an error occurs.
 Executes a function within a managed context that guarantees automatic restoration of all mocks created inside it, even if errors occur.
@@ -1105,7 +996,6 @@ Executes a function within a managed context that guarantees automatic restorati
 
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 local obj = { method = function() return "original" end }
@@ -1122,15 +1012,12 @@ end)
 -- Outside the context, original method is restored
 expect(obj.method()).to.equal("original")
 
-
 ```text
 
 ## Integration with Expect
 
-
 The mocking system integrates with Firmo's expectation system for fluent verification of mock behaviors:
 ```lua
-
 
 -- Using the expect API with mocks and spies
 local mocking = require("lib.mocking")
@@ -1144,11 +1031,9 @@ expect(spy_fn).to.be.called.times(1)
 expect(spy_fn).to.be.called.with("test")
 expect(spy_fn).to.have.been.called.before(other_spy)
 
-
 ```text
 
 ## Type Annotations
-
 
 The mocking system includes comprehensive type annotations for IDE support (Luau).
 
@@ -1224,39 +1109,31 @@ Configures the mocking system (placeholder, currently no options).
 
 ### mocking.mock._VERSION
 
-
 String identifier for the mock module version.
 **Example**:
 ```lua
 
-
 local mocking = require("lib.mocking")
 print(mocking.mock._VERSION) -- e.g., "1.0.0"
-
 
 ```text
 
 ### mocking.spy._VERSION
 
-
 String identifier for the spy module version.
 **Example**:
 ```lua
 
-
 local mocking = require("lib.mocking")
 print(mocking.spy._VERSION) -- e.g., "1.0.0"
-
 
 ```text
 
 ### mocking.stub._VERSION
 
-
 String identifier for the stub module version.
 **Example**:
 ```lua
-
 
 local mocking = require("lib.mocking")
 print(mocking.stub._VERSION) -- e.g., "1.0.0"

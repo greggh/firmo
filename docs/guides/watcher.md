@@ -1,15 +1,12 @@
 # Watcher Module Guide
 
-
 This guide explains how to use Firmo's watcher module to monitor filesystem changes and implement continuous testing and reloading capabilities.
 
 ## Introduction
 
-
 The watcher module helps you monitor files and directories for changes, allowing you to trigger actions like running tests when code is modified. This is particularly useful for development workflows where you want immediate feedback as you make changes.
 For detailed configuration options, see [File Watcher Configuration](./configuration-details/watcher.md).
 Key capabilities of the watcher module include:
-
 
 - Monitoring multiple directories for changes
 - Filtering which files to watch using pattern matching
@@ -17,15 +14,11 @@ Key capabilities of the watcher module include:
 - Integration with Firmo's central configuration system
 - Comprehensive error handling
 
-
 ## Getting Started
-
 
 ### Basic File Watching
 
-
 To get started with the watcher module, you need to initialize it with directories to watch and then periodically check for changes:
-
 
 ```lua
 local watcher = require("lib.tools.watcher")
@@ -49,13 +42,9 @@ if changed_files then
 end
 ```
 
-
-
 ### Continuous Watching Loop
 
-
 For continuous watching, you'll typically use a loop that periodically checks for changes:
-
 
 ```lua
 local watcher = require("lib.tools.watcher")
@@ -91,16 +80,11 @@ while true do
 end
 ```
 
-
-
 ## Configuration Options
-
 
 ### File Patterns
 
-
 The watcher module uses Lua patterns to determine which files to watch. You can configure these patterns when setting up the watcher:
-
 
 ```lua
 watcher.configure({
@@ -114,21 +98,15 @@ watcher.configure({
 })
 ```
 
-
 You can also add patterns later:
-
 
 ```lua
 watcher.add_patterns({"%.js$", "%.ts$"})
 ```
 
-
-
 ### Check Interval
 
-
 The check interval determines how frequently the watcher checks for file changes:
-
 
 ```lua
 -- Check every 0.5 seconds
@@ -137,14 +115,11 @@ watcher.set_check_interval(0.5)
 watcher.set_check_interval(2.0)
 ```
 
-
 A smaller interval provides quicker feedback but uses more CPU. A larger interval uses less CPU but has delayed notifications.
 
 ### Excluding Files and Directories
 
-
 When initializing the watcher, you can specify patterns for files and directories to exclude:
-
 
 ```lua
 -- Exclude patterns
@@ -157,16 +132,11 @@ local exclude_patterns = {
 watcher.init("./src", exclude_patterns)
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Integration with Central Configuration
 
-
 The watcher module integrates with Firmo's central configuration system:
-
 
 ```lua
 local central_config = require("lib.core.central_config")
@@ -183,13 +153,9 @@ local watcher = require("lib.tools.watcher")
 watcher.init()
 ```
 
-
-
 ### Error Handling
 
-
 The watcher module includes comprehensive error handling. All functions return error information when operations fail:
-
 
 ```lua
 local watcher = require("lib.tools.watcher")
@@ -214,13 +180,9 @@ if not success then
 end
 ```
 
-
-
 ### Resetting the Watcher
 
-
 If you need to reset the watcher's configuration:
-
 
 ```lua
 -- Reset to default configuration
@@ -229,13 +191,9 @@ watcher.reset()
 watcher.full_reset()
 ```
 
-
-
 ### Debugging
 
-
 For debugging watcher configuration and state:
-
 
 ```lua
 -- Get detailed configuration information
@@ -247,16 +205,11 @@ print("  Watching " .. config_info.file_count .. " files")
 print("  Status: " .. config_info.status)
 ```
 
-
-
 ## Implementation Patterns
-
 
 ### Test Runner with File Watching
 
-
 Here's a pattern for implementing a test runner with file watching:
-
 
 ```lua
 local watcher = require("lib.tools.watcher")
@@ -323,13 +276,9 @@ end
 watch_and_test()
 ```
 
-
-
 ### Auto-Reloading Configuration
 
-
 Here's a pattern for auto-reloading configuration:
-
 
 ```lua
 local watcher = require("lib.tools.watcher")
@@ -401,32 +350,23 @@ end
 watch_config()
 ```
 
-
-
 ## Best Practices
-
 
 ### Setting Appropriate Check Intervals
 
-
 Choose an appropriate check interval based on your use case:
-
 
 - **Development feedback**: 0.2-0.5 seconds for quick feedback during development
 - **Documentation generation**: 1-2 seconds for less frequent tasks
 - **Production monitoring**: 5+ seconds for low-impact monitoring
 
-
 ### Limiting Watched Directories
 
-
 For better performance:
-
 
 - Only watch relevant directories
 - Use exclude patterns for large directories you don't need to monitor
 - Be specific with file patterns to reduce the number of files tracked
-
 
 ```lua
 -- Good practice - specific directories and exclusions
@@ -438,13 +378,9 @@ watcher.init(
 watcher.init(".")
 ```
 
-
-
 ### Handling Rapid Changes
 
-
 When files change rapidly (e.g., during a large copy or build operation), implement debouncing:
-
 
 ```lua
 local last_action_time = 0
@@ -465,13 +401,9 @@ if changed_files then
 end
 ```
 
-
-
 ### Resource Management
 
-
 Always clean up watcher resources when they're no longer needed:
-
 
 ```lua
 -- Good practice - reset when done
@@ -486,22 +418,15 @@ local function run_watched_tests()
 end
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues
-
-
 
 1. **No changes detected**: Ensure your file patterns match the files you expect. Check if `watcher.debug_config()` shows files being watched.
 2. **High CPU usage**: Your check interval might be too small. Increase it using `watcher.set_check_interval()`.
 3. **Missing file notifications**: Some editors write temporary files first and then rename them. This can sometimes confuse timestamp-based watchers. Consider using direct file access APIs if available.
 4. **Initialization failures**: Check directory permissions and ensure the directory exists before calling `watcher.init()`.
 
-
 ## Conclusion
-
 
 The watcher module provides a powerful tool for monitoring filesystem changes and implementing continuous test execution and auto-reloading functionality. By following the patterns and best practices in this guide, you can create efficient and responsive development workflows.

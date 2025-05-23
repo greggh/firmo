@@ -1,13 +1,10 @@
 # JSON Formatter API Reference
 
-
 The JSON formatter produces machine-readable coverage reports in structured JSON format, suitable for automated processing, CI/CD integration, and custom tooling.
 
 ## Overview
 
-
 The JSON formatter generates standards-compliant, well-structured JSON coverage reports with these key features:
-
 
 - Comprehensive coverage data in machine-readable format
 - Configurable output formatting (pretty-printed or compact)
@@ -17,24 +14,16 @@ The JSON formatter generates standards-compliant, well-structured JSON coverage 
 - Metadata and summary statistics
 - Options for data reduction to control file size
 
-
 ## Class Reference
 
-
 ### Inheritance
-
-
 
 ```text
 Formatter (Base)
   └── JSONFormatter
 ```
 
-
-
 ### Class Definition
-
-
 
 ```lua
 ---@class JSONFormatter : Formatter
@@ -42,16 +31,11 @@ Formatter (Base)
 local JSONFormatter = Formatter.extend("json", "json")
 ```
 
-
-
 ## Core Methods
-
 
 ### format(data, options)
 
-
 Formats coverage data into JSON.
-
 
 ```lua
 ---@param data table Normalized coverage data
@@ -61,13 +45,9 @@ Formats coverage data into JSON.
 function JSONFormatter:format(data, options)
 ```
 
-
-
 ### generate(data, output_path, options)
 
-
 Generate and save a complete JSON report.
-
 
 ```lua
 ---@param data table Coverage data
@@ -78,31 +58,41 @@ Generate and save a complete JSON report.
 function JSONFormatter:generate(data, output_path, options)
 ```
 
-
-
 ## Configuration Options
 
-
 The JSON formatter supports these configuration options:
+
 | Option | Type | Default | Description |
+
 |--------|------|---------|-------------|
+
 | `pretty` | boolean | `false` | Enable pretty-printing with indentation |
+
 | `indent` | string/number | `2` | Indentation level or string for pretty-print |
+
 | `include_source` | boolean | `false` | Include source code in output |
+
 | `include_line_content` | boolean | `false` | Include line content in output |
+
 | `truncate_content` | boolean | `true` | Truncate long line content strings |
+
 | `content_limit` | number | `100` | Max characters per line when truncating |
+
 | `include_metadata` | boolean | `true` | Include metadata about the report |
+
 | `include_execution_counts` | boolean | `true` | Include execution count data |
+
 | `include_function_coverage` | boolean | `true` | Include function-level coverage |
+
 | `include_details` | boolean | `true` | Include detailed line/function information |
+
 | `minify` | boolean | `false` | Produce minified JSON (overrides pretty) |
+
 | `null_value` | any | `null` | Value to use for JSON null |
+
 | `compact_arrays` | boolean | `false` | Use compact array format for lines |
 
 ### Configuration Example
-
-
 
 ```lua
 local reporting = require("lib.reporting")
@@ -117,13 +107,9 @@ reporting.configure_formatter("json", {
 })
 ```
 
-
-
 ## JSON Schema and Structure
 
-
 The JSON formatter produces output conforming to this structure:
-
 
 ```json
 {
@@ -191,23 +177,16 @@ The JSON formatter produces output conforming to this structure:
 }
 ```
 
-
-
 ### Schema Validation
 
-
 The JSON formatter validates its output against an internal schema to ensure:
-
 
 - Required fields are present
 - Field types match expected types
 - Numeric ranges are valid (e.g., percentages are 0-100)
 - Data consistency (e.g., line counts match summary statistics)
 
-
 ## Usage Example
-
-
 
 ```lua
 local reporting = require("lib.reporting")
@@ -230,23 +209,16 @@ reporting.write_file("coverage-report.json", json_content)
 reporting.save_coverage_report("coverage-report.json", data, "json")
 ```
 
-
-
 ## Error Handling
 
-
 The JSON formatter handles these common issues:
-
 
 1. **Invalid Data Structure**: Validates input and reports detailed error information
 2. **JSON Serialization Errors**: Catches and reports errors during JSON encoding
 3. **File System Issues**: Reports errors when saving to disk fails
 4. **Large Data Sets**: Offers configuration to reduce output size for large codebases
 
-
 ### Error Response Example
-
-
 
 ```lua
 local success, result_or_error = reporting.format_coverage(data, "json")
@@ -257,16 +229,11 @@ if not success then
 end
 ```
 
-
-
 ## Performance Considerations
-
 
 ### Output Size Management
 
-
 For large codebases, consider these settings to reduce output size:
-
 
 ```lua
 reporting.configure_formatter("json", {
@@ -278,47 +245,34 @@ reporting.configure_formatter("json", {
 })
 ```
 
-
-
 ### Memory Usage
 
-
 The JSON formatter's memory usage is directly related to the size of your codebase and the configuration options. For very large projects:
-
 
 1. Set `include_details = false` to only include summary information
 2. Process the coverage report in chunks if necessary
 3. Consider using `compact_arrays = true` to reduce memory overhead
 
-
 ### Processing Performance
 
-
 JSON parsing performance in downstream tools may be affected by:
-
 
 1. **Output Size**: Control with configuration options above
 2. **String Encoding**: Control with `include_line_content` option
 3. **Numeric Precision**: Fixed at standard JSON numeric precision
 
-
 ## CI/CD Integration
 
-
 ### GitHub Actions
-
-
 
 ```yaml
 
 # .github/workflows/coverage.yml
 
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-
 
       - uses: actions/checkout@v2
 
@@ -342,20 +296,15 @@ jobs:
         run: ./scripts/process_coverage.sh
 ```
 
-
-
 ### Jenkins
 
-
 To integrate with Jenkins:
-
 
 1. Generate the JSON report in the appropriate format
 2. Use the Jenkins Coverage API to publish the results
 3. Consider the Cobertura plugin (may require conversion)
 
 Example pipeline stage:
-
 
 ```groovy
 stage('Test with Coverage') {
@@ -371,13 +320,9 @@ stage('Test with Coverage') {
 }
 ```
 
-
-
 ### Custom Processing
 
-
 The JSON format enables custom analysis and visualization:
-
 
 ```lua
 -- Custom coverage trend analysis script
@@ -399,11 +344,7 @@ store_trend_data({
 })
 ```
 
-
-
 ## See Also
-
-
 
 - [JSON Formatter Guide](../../guides/configuration-details/json_formatter.md)
 - [Reporting API](../reporting.md)

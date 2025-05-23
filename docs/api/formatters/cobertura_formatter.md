@@ -115,27 +115,49 @@ function CoberturaFormatter:generate(data, output_path, options)
 ## Configuration Options
 
 The Cobertura formatter supports these configuration options:
+
 | Option | Type | Default | Description |
+
 |--------|------|---------|-------------|
+
 | `xml_version` | string | `"1.0"` | XML version declaration |
+
 | `xml_encoding` | string | `"UTF-8"` | XML document encoding |
+
 | `include_dtd` | boolean | `true` | Include Cobertura DTD reference |
+
 | `pretty` | boolean | `true` | Use pretty printing with indentation |
+
 | `sources_root` | string | `"."` | Root directory for source files |
+
 | `base_directory` | string | `nil` | Base directory to remove from paths |
+
 | `normalize_paths` | boolean | `true` | Normalize paths for cross-platform use |
+
 | `path_separator` | string | `"/"` | Path separator to use in report |
+
 | `include_methods` | boolean | `true` | Include method-level coverage information |
+
 | `include_branches` | boolean | `false` | Include branch coverage information |
+
 | `complexity` | boolean | `false` | Include complexity metrics (not yet implemented) |
+
 | `version` | string | `"firmo-1.0"` | Cobertura version attribute |
+
 | `timestamp` | number or string | `os.time()` | Timestamp (epoch seconds or formatted string) |
+
 | `structure_style` | string | `"directory"` | Structure style (directory, namespace, flat) |
+
 | `indent_string` | string | `"  "` | Indentation string for pretty printing |
+
 | `min_hits` | number | `0` | Minimum hits to consider branch/line covered |
+
 | `package_depth` | number | `1` | Number of path segments to use for package name |
+
 | `include_source_content` | boolean | `false` | Include source code in report (non-standard) |
+
 | `zero_fill_hits` | boolean | `false` | Include 0-hit lines for uncovered code |
+
 | `escape_xml` | boolean | `true` | Escape XML special characters |
 
 ### Configuration Example
@@ -292,7 +314,6 @@ SonarQube can import Cobertura reports:
 ```properties
 
 # sonar-project.properties
-
 
 sonar.language=lua
 sonar.lua.coverage.reportPaths=coverage-report.cobertura

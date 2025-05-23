@@ -1,13 +1,10 @@
 # Temporary File Management Guide
 
-
 This guide explains how to use Firmo's temporary file management system to create, use, and clean up temporary files and directories in your tests.
 
 ## Introduction
 
-
 When writing tests, you often need to create temporary files or directories to test functionality that interacts with the file system. Firmo provides a comprehensive system for managing temporary resources:
-
 
 - Automatic creation of temporary files and directories
 - Tracking of resources to ensure proper cleanup
@@ -18,12 +15,9 @@ Using the temp_file module properly will ensure your tests don't leave orphaned 
 
 ## Getting Started
 
-
 ### Basic Temporary File Creation
 
-
 The simplest way to create a temporary file is with `create_with_content`:
-
 
 ```lua
 local temp_file = require("lib.tools.filesystem.temp_file")
@@ -41,13 +35,9 @@ print("File created at: " .. file_path)
 local content = fs.read_file(file_path)
 ```
 
-
-
 ### Creating Temporary Directories
 
-
 For cases where you need a directory structure for testing:
-
 
 ```lua
 local dir_path, err = temp_file.create_temp_directory()
@@ -63,16 +53,11 @@ local file_path = dir_path .. "/test.txt"
 fs.write_file(file_path, "Test content")
 ```
 
-
-
 ## Best Practices
-
 
 ### Using the With-Pattern
 
-
 For simple use cases, the "with" pattern automatically handles cleanup:
-
 
 ```lua
 -- Use a temporary file with automatic cleanup
@@ -89,14 +74,11 @@ local result, err = temp_file.with_temp_directory(function(dir_path)
 end)
 ```
 
-
 These patterns ensure cleanup occurs even if an error is raised during execution, making your tests more robust.
 
 ### Registering External Files
 
-
 If you create files through other means, you can still register them for automatic cleanup:
-
 
 ```lua
 -- Create a file using a different mechanism
@@ -108,13 +90,9 @@ f:close()
 temp_file.register_file(file_path)
 ```
 
-
-
 ### Creating Complex Directory Structures
 
-
 For tests that need a more complex directory structure:
-
 
 ```lua
 -- Create a test directory
@@ -132,16 +110,11 @@ fs.write_file(test_dir .. "/README.md", "# Test Directory")
 -- All these will be cleaned up automatically when the test completes
 ```
 
-
-
 ## Integration with Firmo Tests
-
 
 ### Automatic Integration
 
-
 The temp_file module integrates with Firmo's test framework to automatically track and clean up temporary resources:
-
 
 ```lua
 local firmo = require("firmo")
@@ -163,13 +136,9 @@ firmo.describe("File processor", function()
 end)
 ```
 
-
-
 ### Manual Cleanup
 
-
 If you need more control, you can manually clean up resources:
-
 
 ```lua
 -- Clean up all resources for the current test
@@ -181,16 +150,11 @@ end
 local success, errors, stats = temp_file.cleanup_all()
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Resource Statistics
 
-
 You can get statistics about temporary resources:
-
 
 ```lua
 local stats = temp_file.get_stats()
@@ -199,13 +163,9 @@ print("Files: " .. stats.files)
 print("Directories: " .. stats.directories)
 ```
 
-
-
 ### Resilient Cleanup
 
-
 For cases where files might be locked or in use, the integration module provides resilient cleanup with multiple attempts:
-
 
 ```lua
 local temp_file_integration = require("lib.tools.filesystem.temp_file_integration")
@@ -213,36 +173,25 @@ local temp_file_integration = require("lib.tools.filesystem.temp_file_integratio
 local success, errors, stats = temp_file_integration.cleanup_all(3)
 ```
 
-
-
 ## Troubleshooting
-
 
 ### Files Not Being Cleaned Up
 
-
 If temporary files aren't being cleaned up properly:
-
 
 1. **Check registration**: Make sure files are being created with `create_with_content` or manually registered with `register_file`
 2. **Verify test context**: Ensure temp file integration is properly initialized
 3. **Manual cleanup**: Try calling `temp_file.cleanup_all()` explicitly
 
-
 ### Permission Issues
 
-
 If you encounter permission errors:
-
 
 1. **Check file states**: Make sure files aren't still open or in use
 2. **Verify directory permissions**: Ensure the test has permissions to both create and delete files in the temp directory
 3. **Use proper cleanup**: The `remove_with_retry` internal function tries multiple approaches to handle permission issues
 
-
 ## Best Practices Summary
-
-
 
 1. **Use the with-pattern** when possible for automatic cleanup
 2. **Register all external files** created through other mechanisms
@@ -251,8 +200,6 @@ If you encounter permission errors:
 5. **Check cleanup success** for potential issues
 6. **Clean up after tests** even if they fail (which happens automatically with proper integration)
 
-
 ## Conclusion
-
 
 The temp_file module provides a robust solution for managing temporary files and directories in your tests. By following the patterns and best practices in this guide, you can ensure that your tests don't leave orphaned resources behind, leading to more reliable and maintainable tests.

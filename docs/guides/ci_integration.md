@@ -1,31 +1,23 @@
 # CI/CD Integration with Firmo
 
-
 This guide explains how to set up Firmo in various Continuous Integration (CI) environments to automate your Lua testing workflow.
 
 ## Benefits of CI Integration
-
-
 
 - Automatically run tests on every commit or pull request
 - Catch issues early in the development process
 - Ensure code quality across your team
 - Generate test reports for tracking quality metrics
 
-
 ## Common CI Systems
 
-
 ### GitHub Actions
-
 
 GitHub Actions is a CI/CD platform integrated with GitHub that allows you to automate your build, test, and deployment pipeline.
 
 #### Sample Configuration
 
-
 Create a file at `.github/workflows/test.yml`:
-
 
 ```yaml
 name: Lua Tests
@@ -40,7 +32,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-
       - uses: actions/checkout@v3
       - name: Install Lua
 
@@ -48,13 +39,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lua5.3
 
-
       - name: Run tests
 
         run: |
           # Run all tests in the tests directory
           lua firmo.lua tests/
-
 
       - name: Generate test report (optional)
 
@@ -76,27 +65,21 @@ jobs:
           # Adjust path based on where reports are saved (e.g., coverage-reports/)
           path: coverage-reports/test-results.xml
 
-
 ### GitLab CI
-
 
 GitLab CI/CD is GitLab's built-in tool for software development using continuous integration and delivery.
 
 #### Sample Configuration
 
-
 Create a file at `.gitlab-ci.yml`:
-
 
 ```yaml
 image: ubuntu:latest
 stages:
 
-
   - test
 
 before_script:
-
 
   - apt-get update -qq
   - apt-get install -y lua5.3
@@ -105,13 +88,11 @@ run_tests:
   stage: test
   script:
 
-
     - lua firmo.lua tests/
 
   artifacts:
     when: always
     paths:
-
 
       # Adjust path based on where reports are saved (e.g., coverage-reports/)
       - coverage-reports/test-results.xml
@@ -121,18 +102,13 @@ run_tests:
       junit: coverage-reports/test-results.xml
 ```
 
-
-
 ### CircleCI
-
 
 CircleCI is a CI/CD platform that automates the build, test, and deployment process.
 
 #### Sample Configuration
 
-
 Create a file at `.circleci/config.yml`:
-
 
 ```yaml
 version: 2.1
@@ -140,11 +116,9 @@ jobs:
   test:
     docker:
 
-
       - image: cimg/base:2023.03
 
     steps:
-
 
       - checkout
       - run:
@@ -154,13 +128,11 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y lua5.3
 
-
       - run:
 
           name: Run tests
           command: |
             lua firmo.lua tests/
-
 
       - store_test_results:
 
@@ -170,23 +142,17 @@ workflows:
   build-and-test:
     jobs:
 
-
       - test
 
 ```
 
-
-
 ### Jenkins
-
 
 Jenkins is an open-source automation server that enables developers to build, test, and deploy their software.
 
 #### Sample Jenkinsfile
 
-
 Create a file at `Jenkinsfile`:
-
 
 ```groovy
 pipeline {
@@ -211,25 +177,17 @@ pipeline {
 }
 ```
 
-
-
 ## Best Practices for CI Testing
-
 
 ### 1. Organize Tests Properly
 
-
 Structure your tests in a way that makes them easy to run in CI:
-
 
 - Place all tests in a dedicated `tests` directory
 - Use a consistent naming pattern (e.g., `*_test.lua`)
 - Group tests logically by feature or component
 
-
 ### 2. Use Tags for Test Organization
-
-
 
 ```lua
 describe("Database module", function()
@@ -239,7 +197,6 @@ describe("Database module", function()
   end)
 end)
 ```
-
 
 The command-line runner does not currently support direct filtering using `--tags`. However, you can achieve similar results:
 
@@ -252,21 +209,15 @@ The command-line runner does not currently support direct filtering using `--tag
     ```
 2.  **Programmatic Filtering**: Set up different CI jobs or steps where each step configures Firmo programmatically using `firmo.only_tags(...)` before running the tests.
 
-
-
 ### 3. Manage Test Environments
 
-
 For tests that require specific environment setup:
-
 
 ```yaml
 
 # In GitHub Actions
 
-
 steps:
-
 
   - name: Set up test environment
 
@@ -275,28 +226,21 @@ steps:
       echo "DB_HOST=localhost" >> $GITHUB_ENV
       echo "API_KEY=test-key" >> $GITHUB_ENV
 
-
   - name: Run integration tests
 
     run: |
       lua firmo.lua tests/ --tags integration
 ```
 
-
-
 ### 4. Configure Test Timeouts
 
-
 For long-running tests, set appropriate timeouts:
-
 
 ```yaml
 
 # In GitHub Actions
 
-
 steps:
-
 
   - name: Run tests with timeout
 
@@ -304,8 +248,6 @@ steps:
     run: |
       lua firmo.lua tests/
 ```
-
-
 
 ### 5. Parallel Test Execution
 
@@ -334,18 +276,13 @@ jobs:
           lua firmo.lua tests/ --filter ${{ matrix.test-group }}
 ```
 
-
-
 ## Interpreting Test Results
-
 
 Firmo provides different output formats to help you interpret test results in CI environments.
 
 ### Standard Output
 
-
 By default, Firmo outputs test results to the console:
-
 
 ```text
 Math operations
@@ -354,8 +291,6 @@ Math operations
   FAIL raises an error when dividing by zero
     Expected function to fail but it did not
 ```
-
-
 
 ### JUnit XML Format (For CI Systems)
 
@@ -371,7 +306,6 @@ Most CI systems can automatically find and parse `junit.xml` (or similar) files 
 ### JSON Format (For Custom Processing)
 ### JSON Format (For Custom Processing)
 
-
 For custom processing of test results:
 
 ```bash
@@ -380,11 +314,7 @@ lua firmo.lua tests/ --format=json
 ```
 This generates a structured JSON file (e.g., in `./coverage-reports/test-results.json`) containing detailed test results, suitable for custom processing or analysis tools.
 
-
-
 ## Tips for Effective CI Configuration
-
-
 
 1. **Cache dependencies**: Speed up CI runs by caching Lua modules and dependencies.
 2. **Fail fast**: Configure your tests to fail as soon as any test fails to get faster feedback.
@@ -392,12 +322,9 @@ This generates a structured JSON file (e.g., in `./coverage-reports/test-results
 4. **Branch protection**: Require passing tests before merging pull requests.
 5. **Scheduled runs**: Set up scheduled test runs for nightly builds or integration tests.
 
-
 ## Complete Example: GitHub Actions Workflow
 
-
 This comprehensive example shows a complete GitHub Actions workflow for testing a Lua project with Firmo:
-
 
 ```yaml
 name: Lua Testing
@@ -408,7 +335,6 @@ on:
     branches: [ main, master ]
   schedule:
     # Run nightly at midnight UTC
-
 
     - cron: '0 0 * * *'
 
@@ -423,7 +349,6 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
 
-
       - uses: actions/checkout@v3
       - name: Setup Lua
 
@@ -431,13 +356,11 @@ jobs:
         with:
           lua-version: ${{ matrix.lua-version }}
 
-
       - name: Install dependencies
 
         run: |
           luarocks install luafilesystem
           luarocks install luasocket
-
 
       - name: Run unit tests
 
@@ -461,11 +384,7 @@ jobs:
           path: coverage-reports/*.xml # Adjust path if reports are saved elsewhere
 ```
 
-
-
 ## Further Resources
-
-
 
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [GitLab CI/CD Documentation](https://docs.gitlab.com/ee/ci/)

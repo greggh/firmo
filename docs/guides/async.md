@@ -1,32 +1,24 @@
 # Async Testing Guide
 
-
 ## Introduction
-
 
 Asynchronous testing is crucial for validating code that involves timers, callbacks, network operations, and other non-immediate processes. The Firmo framework provides comprehensive support for asynchronous testing through its async module.
 This guide explains how to write effective asynchronous tests, handle common async patterns, and avoid common pitfalls.
 
 ## Core Concepts
 
-
 ### Async Context
-
 
 The async module uses the concept of an "async context" to manage asynchronous test execution. An async context is an execution environment where async operations can be performed safely with appropriate timeout handling and error propagation.
 Key points about async context:
-
 
 - Created implicitly when using `it_async()` or explicitly with `async()`
 - Required for using `await()`, `wait_until()`, and other async operations
 - Tracks the execution state and provides proper error handling
 
-
 ### Async Flow Control
 
-
 The async module provides several mechanisms for controlling async flow:
-
 
 1. **`await()`**: Pauses execution for a specified time
 2. **`wait_until()`**: Waits for a condition to become true
@@ -36,12 +28,9 @@ These functions allow for fine-grained control over the execution of async tests
 
 ## Basic Usage Patterns
 
-
 ### Writing Simple Async Tests
 
-
 The simplest way to write an async test is using the `it_async()` function:
-
 
 ```lua
 local firmo = require("firmo")
@@ -63,13 +52,9 @@ describe("User Service", function()
 end)
 ```
 
-
-
 ### Using await for Timed Delays
 
-
 When you need to wait for a specific amount of time:
-
 
 ```lua
 it_async("processes data after a delay", function()
@@ -82,13 +67,9 @@ it_async("processes data after a delay", function()
 end)
 ```
 
-
-
 ### Using wait_until for Conditional Waiting
 
-
 For more precise control, use `wait_until()` to wait for a specific condition:
-
 
 ```lua
 it_async("waits for a specific condition", function()
@@ -103,13 +84,9 @@ it_async("waits for a specific condition", function()
 end)
 ```
 
-
-
 ### Handling Timeouts
 
-
 Async tests have timeouts to prevent hanging. You can customize these timeouts:
-
 
 ```lua
 -- Set longer timeout for a specific test
@@ -131,16 +108,11 @@ end)
 ```
 The primary function for setting options after loading the module is `async.configure({ default_timeout = ..., check_interval = ... })`.
 
-
-
 ## Advanced Usage Patterns
-
 
 ### Parallel Operations
 
-
 For testing multiple concurrent operations:
-
 
 ```lua
 it_async("handles multiple concurrent operations", function()
@@ -161,13 +133,9 @@ it_async("handles multiple concurrent operations", function()
 end)
 ```
 
-
-
 ### Testing Callbacks
 
-
 Many async APIs use callbacks. Here's how to test them:
-
 
 ```lua
 it_async("tests callback-based API", function()
@@ -188,12 +156,9 @@ it_async("tests callback-based API", function()
 end)
 ```
 
-
 ### Testing Async Error Handling
 
-
 For testing error conditions in async code:
-
 
 ```lua
 it_async("handles async errors correctly", { expect_error = true }, function()
@@ -211,16 +176,11 @@ it_async("handles async errors correctly", { expect_error = true }, function()
 end)
 ```
 
-
-
 ## Integration with Other Modules
-
 
 ### Using Async with Mocks
 
-
 Combining async testing with mocking:
-
 
 ```lua
 it_async("tests async function with mocked dependencies", function()
@@ -249,13 +209,9 @@ it_async("tests async function with mocked dependencies", function()
 end)
 ```
 
-
-
 ### Using Async with Filesystem Operations
 
-
 For testing async filesystem operations:
-
 
 ```lua
 it_async("tests async file operations", function()
@@ -277,16 +233,11 @@ it_async("tests async file operations", function()
 end)
 ```
 
-
-
 ## Best Practices
-
 
 ### 1. Always Call done() or Complete Test Flow
 
-
 When using callback-style async tests, always call `done()` or ensure your test flow completes by returning or reaching the end of the test function:
-
 
 ```lua
 it_async("always completes test flow", function(done)
@@ -298,13 +249,9 @@ it_async("always completes test flow", function(done)
 })
 ```
 
-
-
 ### 2. Set Appropriate Timeouts
 
-
 Always set timeouts based on the expected operation duration, not too short or too long:
-
 
 ```lua
 -- Bad: timeout too short, may fail intermittently
@@ -315,13 +262,9 @@ firmo.wait_until(condition, 60000)
 firmo.wait_until(condition, 2000)
 ```
 
-
-
 ### 3. Clean Up Resources
 
-
 Always clean up resources created during async tests:
-
 
 ```lua
 it_async("cleans up resources", function()
@@ -339,13 +282,9 @@ it_async("cleans up resources", function()
 end)
 ```
 
-
-
 ### 4. Use wait_until Instead of Fixed Delays
 
-
 Prefer `wait_until` over fixed `await` times when possible:
-
 
 ```lua
 -- Bad: uses fixed delay
@@ -354,13 +293,9 @@ firmo.await(500) -- Might be too short or too long
 firmo.wait_until(function() return operation_complete() end)
 ```
 
-
-
 ### 5. Handle Both Success and Error Cases
 
-
 Test both success and error conditions:
-
 
 ```lua
 it_async("handles both success and error", function()
@@ -375,13 +310,9 @@ it_async("handles both success and error", function()
 end)
 ```
 
-
-
 ### 6. Avoid Nested Callbacks
 
-
 Avoid deeply nested callbacks that make tests hard to follow:
-
 
 ```lua
 -- Bad: deeply nested callbacks
@@ -504,12 +435,9 @@ describe_async("Current Feature W", function()
 end)
 ```
 
-
 ### 7. Isolate Tests
 
-
 Make sure each async test is independent and doesn't rely on state from other tests:
-
 
 ```lua
 -- Each test initializes its own state
@@ -522,17 +450,12 @@ after(function()
 })
 ```
 
-
-
 ## Common Pitfalls and Solutions
-
 
 ### Forgetting to Wait for Async Operations
 
-
 **Problem**: Assertions run before async operations complete.
 **Solution**: Always use `wait_until` to ensure operations finish before assertions:
-
 
 ```lua
 -- Problem: assertion may run before callback
@@ -550,14 +473,10 @@ it_async("waits properly", function()
 })
 ```
 
-
-
 ### Timeout Too Short
-
 
 **Problem**: Test fails with timeout because the operation takes longer than expected.
 **Solution**: Set appropriate timeouts based on the operation:
-
 
 ```lua
 -- Problem: timeout too short
@@ -566,14 +485,10 @@ firmo.wait_until(condition, 100) // Only 100ms timeout
 firmo.wait_until(condition, 2000) // 2 second timeout
 ```
 
-
-
 ### Not Cleaning Up Resources
-
 
 **Problem**: Resources from one test affect other tests.
 **Solution**: Always clean up in after() hooks:
-
 
 ```lua
 it_async("properly cleans up", function()
@@ -585,14 +500,10 @@ it_async("properly cleans up", function()
 })
 ```
 
-
-
 ### Leaking Async Operations
-
 
 **Problem**: Starting async operations that continue running after the test completes.
 **Solution**: Save references to operations and cancel them in cleanup:
-
 
 ```lua
 it_async("cleans up ongoing operations", function()
@@ -608,16 +519,11 @@ it_async("cleans up ongoing operations", function()
 })
 ```
 
-
-
 ## Performance Considerations
-
 
 ### Setting Appropriate Check Intervals
 
-
 The `check_interval` parameter in `wait_until` determines how frequently the condition is checked. Balance between responsiveness and CPU usage:
-
 
 ```lua
 -- Check condition every 50ms instead of default 10ms
@@ -625,13 +531,9 @@ The `check_interval` parameter in `wait_until` determines how frequently the con
 firmo.wait_until(condition, 2000, 50)
 ```
 
-
-
 ### Using parallel_async for Independent Operations
 
-
 When testing multiple operations that don't depend on each other, use `parallel_async` for better performance:
-
 
 ```lua
 -- Sequential (slower)
@@ -643,13 +545,9 @@ local results = firmo.parallel_async({operation1, operation2, operation3})
 local result1, result2, result3 = results[1], results[2], results[3]
 ```
 
-
-
 ### Batch Assertions When Possible
 
-
 Group related assertions together to minimize the number of async waits:
-
 
 ```lua
 -- Inefficient: multiple wait_until calls
@@ -665,14 +563,10 @@ expect(user.name).to.be.a("string")
 expect(user.email).to.be.a("string")
 ```
 
-
-
 ## Conclusion
-
 
 Asynchronous testing is essential for validating code with delayed execution or callbacks. The Firmo async module provides powerful tools for writing clear, reliable async tests.
 Key takeaways:
-
 
 - Use `it_async()` for simple async tests
 - Use `wait_until()` for conditional waiting

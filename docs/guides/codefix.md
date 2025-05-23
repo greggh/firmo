@@ -1,11 +1,8 @@
 # Codefix Usage Guide
 
-
 The Firmo codefix module provides tools for automating code quality improvements in Lua projects. This guide explains how to use the module effectively, covering common scenarios and best practices.
 
 ## Table of Contents
-
-
 
 - [Introduction](#introduction)
 - [Getting Started](#getting-started)
@@ -18,12 +15,9 @@ The Firmo codefix module provides tools for automating code quality improvements
 - [Integrating with CI/CD](#integrating-with-cicd)
 - [Troubleshooting](#troubleshooting)
 
-
 ## Introduction
 
-
 The codefix module offers a unified approach to code quality by combining:
-
 
 1. **Formatting** using StyLua
 2. **Linting** using Luacheck
@@ -35,28 +29,20 @@ These tools work together to automate code quality improvements while maintainin
 
 ## Getting Started
 
-
 ### Basic Setup
-
-
 
 1. Ensure you have the Firmo framework properly installed
 2. Make sure StyLua and/or Luacheck are installed if you plan to use them
 3. Import the module in your script:
-
 
 ```lua
 local firmo = require("firmo")
 -- The codefix module is available through firmo
 ```
 
-
-
 ### Simple Usage
 
-
 Fix a single file:
-
 
 ```lua
 -- Enable codefix
@@ -70,9 +56,7 @@ else
 end
 ```
 
-
 Fix multiple files:
-
 
 ```lua
 local files = {
@@ -93,22 +77,16 @@ else
 end
 ```
 
-
 Find and fix all Lua files in a directory:
-
 
 ```lua
 local success, results = firmo.fix_lua_files("src")
 print("Fixed " .. #results .. " files")
 ```
 
-
-
 ## Configuration Options
 
-
 The codefix module is highly configurable. You can set options through the `firmo.codefix_options` table:
-
 
 ```lua
 firmo.codefix_options = {
@@ -146,16 +124,11 @@ firmo.codefix_options = {
 }
 ```
 
-
-
 ## Common Usage Patterns
-
 
 ### Quick Pre-Commit Check and Fix
 
-
 Before committing code, you can run a quick check and fix:
-
 
 ```lua
 -- Check and fix modified files only
@@ -168,13 +141,9 @@ end
 return true
 ```
 
-
-
 ### Selective Fixing
 
-
 Only run specific fixers on selective files:
-
 
 ```lua
 -- Only run StyLua, not Luacheck or custom fixers
@@ -185,13 +154,9 @@ firmo.codefix_options.custom_fixers.unused_variables = false
 local success = firmo.fix_lua_files("src")
 ```
 
-
-
 ### Diagnostic Mode
 
-
 Run in diagnostic mode to see issues without fixing them:
-
 
 ```lua
 -- Check files without modifying them
@@ -200,13 +165,9 @@ local codefix = require("lib.tools.codefix")
 codefix.run_cli({"check", "src"})
 ```
 
-
-
 ### Batch Processing with Options
 
-
 Process files in batches with custom options:
-
 
 ```lua
 local options = {
@@ -218,42 +179,30 @@ local options = {
 firmo.fix_lua_files("src", options)
 ```
 
-
-
 ## StyLua Integration
-
 
 [StyLua](https://github.com/JohnnyMorganz/StyLua) is a powerful Lua formatter. The codefix module can detect and use StyLua if it's installed.
 
 ### Setting Up StyLua
 
-
-
 1. Install StyLua following the instructions from its repository
 2. (Optional) Create a StyLua configuration file (`.stylua.toml` or `stylua.toml`)
 3. Configure codefix to use StyLua:
-
 
 ```lua
 firmo.codefix_options.use_stylua = true
 firmo.codefix_options.stylua_path = "stylua" -- Or specific path
 ```
 
-
-
 ### Customizing StyLua Integration
 
-
 You can specify a custom StyLua configuration file:
-
 
 ```lua
 firmo.codefix_options.stylua_config = "path/to/stylua.toml"
 ```
 
-
 Or let codefix find the configuration automatically:
-
 
 ```lua
 local codefix = require("lib.tools.codefix")
@@ -263,13 +212,9 @@ if config_file then
 end
 ```
 
-
-
 ### Running StyLua Directly
 
-
 You can also run StyLua on a specific file:
-
 
 ```lua
 local codefix = require("lib.tools.codefix")
@@ -279,42 +224,30 @@ if not success then
 end
 ```
 
-
-
 ## Luacheck Integration
-
 
 [Luacheck](https://github.com/mpeterv/luacheck) is a static analyzer and linter for Lua. The codefix module can integrate with it to identify and fix issues.
 
 ### Setting Up Luacheck
 
-
-
 1. Install Luacheck (`luarocks install luacheck` or follow the repository instructions)
 2. (Optional) Create a Luacheck configuration file (`.luacheckrc`)
 3. Configure codefix to use Luacheck:
-
 
 ```lua
 firmo.codefix_options.use_luacheck = true
 firmo.codefix_options.luacheck_path = "luacheck" -- Or specific path
 ```
 
-
-
 ### Customizing Luacheck Integration
 
-
 You can specify a custom Luacheck configuration file:
-
 
 ```lua
 firmo.codefix_options.luacheck_config = "path/to/.luacheckrc"
 ```
 
-
 Or let codefix find the configuration automatically:
-
 
 ```lua
 local codefix = require("lib.tools.codefix")
@@ -324,13 +257,9 @@ if config_file then
 end
 ```
 
-
-
 ### Retrieving and Processing Luacheck Issues
 
-
 Get issues from Luacheck without fixing:
-
 
 ```lua
 local codefix = require("lib.tools.codefix")
@@ -342,13 +271,9 @@ for _, issue in ipairs(issues) do
 end
 ```
 
-
-
 ### Fixing Luacheck Issues
 
-
 Fix specific Luacheck issues like unused variables:
-
 
 ```lua
 local codefix = require("lib.tools.codefix")
@@ -356,16 +281,11 @@ local _, issues = codefix.run_luacheck("path/to/file.lua")
 local modified = codefix.fix_unused_variables("path/to/file.lua", issues)
 ```
 
-
-
 ## Custom Fixers
-
 
 Custom fixers address common issues that aren't handled by StyLua or Luacheck.
 
 ### Available Custom Fixers
-
-
 
 1. **Trailing Whitespace** (`trailing_whitespace`): Removes trailing whitespace in multiline strings
 2. **Unused Variables** (`unused_variables`): Prefixes unused variables with underscore
@@ -373,10 +293,7 @@ Custom fixers address common issues that aren't handled by StyLua or Luacheck.
 4. **Type Annotations** (`type_annotations`): Adds type annotations to function documentation
 5. **Lua Version Compatibility** (`lua_version_compat`): Fixes Lua version compatibility issues
 
-
 ### Enabling/Disabling Specific Fixers
-
-
 
 ```lua
 -- Enable only specific fixers
@@ -392,11 +309,7 @@ firmo.codefix_options.custom_fixers.trailing_whitespace = true
 firmo.codefix_options.custom_fixers.unused_variables = false
 ```
 
-
-
 ### Running Specific Fixers
-
-
 
 ```lua
 local codefix = require("lib.tools.codefix")
@@ -406,13 +319,9 @@ local fixed_content = codefix.fix_trailing_whitespace(content)
 write_file("path/to/file.lua", fixed_content)
 ```
 
-
-
 ### Creating Custom Fixers
 
-
 You can register your own custom fixers:
-
 
 ```lua
 codefix.register_custom_fixer("remove_print", {
@@ -423,16 +332,11 @@ codefix.register_custom_fixer("remove_print", {
 })
 ```
 
-
-
 ## Command Line Interface
-
 
 The codefix module provides a command-line interface for easy integration with scripts and build tools.
 
 ### Basic CLI Commands
-
-
 
 ```lua
 local codefix = require("lib.tools.codefix")
@@ -446,13 +350,9 @@ codefix.run_cli({"find", "src", "--include", "%.lua$", "--exclude", "_test%.lua$
 codefix.run_cli({"help"})
 ```
 
-
-
 ### CLI Options
 
-
 The CLI supports various options:
-
 
 ```text
 Options:
@@ -469,11 +369,7 @@ Options:
   --exclude PATTERN, -e PATTERN - Add file pattern to exclude
 ```
 
-
-
 ### Usage Examples
-
-
 
 ```lua
 -- Fix 10 most recently modified files
@@ -484,16 +380,11 @@ codefix.run_cli({"check", "src", "--include", "model_.+%.lua$"})
 codefix.run_cli({"fix", "src", "--generate-report", "--report-file", "fixes.json"})
 ```
 
-
-
 ## Integrating with CI/CD
-
 
 The codefix module can be integrated into continuous integration pipelines to ensure code quality.
 
 ### GitHub Actions Example
-
-
 
 ```yaml
 name: Lua Code Quality
@@ -506,7 +397,6 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-
 
       - uses: actions/checkout@v2
 
@@ -530,19 +420,14 @@ jobs:
           lua -e 'require("firmo").codefix.run_cli({"check", "src"})'
 ```
 
-
-
 ### Pre-commit Hook Example
 
-
 Create a pre-commit hook script:
-
 
 ```bash
 #!/bin/sh
 
 # .git/hooks/pre-commit
-
 
 lua -e '
 local firmo = require("firmo")
@@ -573,14 +458,9 @@ end
 '
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues and Solutions
-
-
 
 1. **StyLua not found**
 
@@ -593,7 +473,6 @@ end
    firmo.codefix_options.stylua_path = "/path/to/stylua"
    ```
 
-
 2. **Luacheck not found**
 
    ```
@@ -604,7 +483,6 @@ end
    ```lua
    firmo.codefix_options.luacheck_path = "/path/to/luacheck"
    ```
-
 
 3. **File not found**
 
@@ -618,14 +496,12 @@ end
    local success = firmo.fix_file("/absolute/path/to/file.lua")
    ```
 
-
 4. **Permission issues**
 
    ```
    Failed to write file: Permission denied
    ```
    **Solution**: Ensure the process has write permissions to the files and directories.
-
 
 5. **Backup failures**
 
@@ -640,30 +516,22 @@ end
 
 ### Debugging
 
-
 Enable debug mode for more detailed logs:
-
 
 ```lua
 firmo.codefix_options.debug = true
 firmo.codefix_options.verbose = true
 ```
 
-
 Or use the CLI debug flag:
-
 
 ```lua
 codefix.run_cli({"fix", "src", "--debug"})
 ```
 
-
-
 ### Reporting Issues
 
-
 If you encounter persistent issues:
-
 
 1. Enable debug mode to capture detailed logs
 2. Verify StyLua and Luacheck are working properly standalone

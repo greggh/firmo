@@ -1,6 +1,5 @@
 # Output Formatting Guide
 
-
 # Output Formatting Guide
 
 This guide explains how to customize the **console output** of test results in Firmo and clarifies the role of the `--format` flag for **report file generation**.
@@ -18,9 +17,7 @@ This guide focuses mainly on configuring the **console output**. See the [Report
 
 ### Programmatic Formatting (`firmo.format`)
 
-
 You can also configure output programmatically:
-
 
 ```lua
 local firmo = require("firmo")
@@ -34,15 +31,11 @@ firmo.format({
 })
 ```
 
-
 ## Customizing Output Appearance
-
 
 ### Color Configuration
 
-
 Colors help highlight important information:
-
 
 ```lua
 -- Enable colors (default)
@@ -53,13 +46,9 @@ firmo.format({ use_color = false })
 firmo.nocolor()
 ```
 
-
-
 ### Indentation Settings
 
-
 Control how nested tests are indented:
-
 
 ```lua
 -- Use two spaces per level
@@ -74,13 +63,9 @@ firmo.format({
 })
 ```
 
-
-
 ### Error Reporting
 
-
 Configure how much detail is shown for errors:
-
 
 ```lua
 -- Show stack traces for errors
@@ -89,13 +74,9 @@ firmo.format({ show_trace = true })
 firmo.format({ show_trace = false })
 ```
 
-
-
 ### Success Details
 
-
 Control whether passing tests show details:
-
 
 ```lua
 -- Show details for passing tests (default)
@@ -104,16 +85,11 @@ firmo.format({ show_success_detail = true })
 firmo.format({ show_success_detail = false })
 ```
 
-
-
 ## Advanced Output Options
-
 
 ### Environment-based Configuration
 
-
 Adapt output based on the execution environment:
-
 
 ```lua
 -- Configure output based on environment
@@ -140,13 +116,9 @@ else
 end
 ```
 
-
-
 ### Custom Formatters
 
-
 For specialized output needs, consider using **report file** formatters (configured via the reporting module and triggered by `--format`):
-
 
 ```lua
 -- Configure HTML formatter using central_config
@@ -162,8 +134,6 @@ reporting.configure_formatter("html", {
 -- Run tests, generating an HTML file report (does not change console output)
 -- lua firmo.lua --format=html tests/
 ```
-
-
 
 ### Report File Generation
 
@@ -181,10 +151,7 @@ lua firmo.lua --format=junit tests/
 ```
 See the [Reporting Guide](./reporting.md) for more details on available report formats and configuration.
 
-
-
 ## Common Use Cases
-
 
 ### Large Test Suites
 
@@ -200,8 +167,6 @@ Run tests as usual:
 lua firmo.lua tests/
 ```
 
-
-
 ### Continuous Integration
 
 For CI systems, you typically want standard console output (potentially disabling color via `NO_COLOR` environment variable if needed) and generate a structured report file like JUnit XML using `--format`:
@@ -213,13 +178,9 @@ lua firmo.lua --format=junit tests/
 ```
 You can configure programmatic options like `summary_only` via central config if desired for CI runs.
 
-
-
 ### Debugging Tests
 
-
 When debugging, use detailed output with stack traces:
-
 
 ```lua
 -- Configure for debugging
@@ -231,28 +192,20 @@ firmo.format({
 })
 ```
 
-
-
 ### Terminal Output vs. HTML Reports
 
-
 Different formats serve different purposes:
-
 
 ```bash
 
 # Quick feedback in terminal
 
-
 lua firmo.lua --format compact tests/
 
 # Generate comprehensive HTML report
 
-
 lua firmo.lua --format html --output-file coverage-report.html tests/
 ```
-
-
 
 ## Best Practices
 
@@ -269,7 +222,6 @@ lua firmo.lua --format html --output-file coverage-report.html tests/
    firmo.format({ use_color = true })
    ```
 
-
 3. If colors can't be supported, explicitly disable them:
 
    ```lua
@@ -278,9 +230,7 @@ lua firmo.lua --format html --output-file coverage-report.html tests/
 
 ### Too Much or Too Little Information
 
-
 If output is hard to read:
-
 
 1. For too much console output, try configuring compact or dot mode programmatically:
    ```lua
@@ -293,7 +243,6 @@ If output is hard to read:
    ```lua
    firmo.format({ compact = false, dot_mode = false, summary_only = false })
    ```
-
 
 3. For debugging errors, enable stack traces:
 

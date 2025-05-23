@@ -1,16 +1,12 @@
 # Quality Configuration Reference
 
-
 This document provides detailed configuration options for Firmo's quality validation system. Use these options to customize quality validation according to your project's needs.
 
 ## Central Configuration Schema
 
-
 The quality module is configured through the central configuration system, which can be set in `.firmo-config.lua` or programmatically through the `central_config` module.
 
 ### Core Quality Options
-
-
 
 ```lua
 -- In .firmo-config.lua
@@ -33,7 +29,6 @@ return {
 }
 ```
 
-
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enabled` | boolean | `false` | Enable quality validation |
@@ -43,8 +38,6 @@ return {
 | `coverage_data` | table | `nil` | Reference to coverage module (set automatically) |
 
 ### Integration with Reporting Configuration
-
-
 
 ```lua
 -- In .firmo-config.lua
@@ -82,13 +75,9 @@ return {
 }
 ```
 
-
-
 ### Coverage Integration Settings
 
-
 The quality module integrates with the coverage module to validate test coverage thresholds:
-
 
 ```lua
 -- In .firmo-config.lua
@@ -105,16 +94,11 @@ return {
 }
 ```
 
-
-
 ## Detailed Level Requirements
-
 
 The quality module defines five progressive quality levels, each with specific requirements:
 
 ### Level 1: Basic
-
-
 
 ```lua
 {
@@ -132,11 +116,7 @@ The quality module defines five progressive quality levels, each with specific r
 }
 ```
 
-
-
 ### Level 2: Standard
-
-
 
 ```lua
 {
@@ -155,11 +135,7 @@ The quality module defines five progressive quality levels, each with specific r
 }
 ```
 
-
-
 ### Level 3: Comprehensive
-
-
 
 ```lua
 {
@@ -179,11 +155,7 @@ The quality module defines five progressive quality levels, each with specific r
 }
 ```
 
-
-
 ### Level 4: Advanced
-
-
 
 ```lua
 {
@@ -204,11 +176,7 @@ The quality module defines five progressive quality levels, each with specific r
 }
 ```
 
-
-
 ### Level 5: Complete
-
-
 
 ```lua
 {
@@ -232,10 +200,7 @@ The quality module defines five progressive quality levels, each with specific r
 }
 ```
 
-
-
 ## Assertion Type Requirements
-
 
 The quality module can recognize and validate the following assertion types:
 | Assertion Type | Example Patterns | Description |
@@ -252,9 +217,7 @@ The quality module can recognize and validate the following assertion types:
 
 ## Report Configuration
 
-
 ### Available Report Formats
-
 
 The quality module supports multiple report formats through the reporting module:
 | Format | Description | Extension |
@@ -265,9 +228,7 @@ The quality module supports multiple report formats through the reporting module
 
 ### Report Path Templates
 
-
 Configure report paths using templates in the central configuration:
-
 
 ```lua
 reporting = {
@@ -277,21 +238,15 @@ reporting = {
 }
 ```
 
-
 Available template variables:
-
 
 - `{timestamp}` - Current date/time (format configurable)
 - `{format}` - Report format (html, json, etc.)
 - `{date}` - Current date only
 
-
 ### Format-Specific Options
 
-
 #### HTML Format Options
-
-
 
 ```lua
 reporting = {
@@ -310,11 +265,7 @@ reporting = {
 }
 ```
 
-
-
 #### JSON Format Options
-
-
 
 ```lua
 reporting = {
@@ -331,11 +282,7 @@ reporting = {
 }
 ```
 
-
-
 #### Summary Format Options
-
-
 
 ```lua
 reporting = {
@@ -352,16 +299,11 @@ reporting = {
 }
 ```
 
-
-
 ## Integration Configuration
-
 
 ### Coverage Integration
 
-
 The quality module integration with the coverage system is configured automatically by the runner, but can be manually configured:
-
 
 ```lua
 local quality = require("lib.quality")
@@ -378,13 +320,9 @@ quality.init({
 local meets, issues = quality.check_file("tests/my_test.lua", 5)
 ```
 
-
-
 ### Reporting Integration
 
-
 Configure the quality module to use the reporting system:
-
 
 ```lua
 local quality = require("lib.quality")
@@ -399,35 +337,26 @@ quality.report("html")  -- Returns the formatted report
 quality.save_report("quality-report.html", "html")  -- Saves the report to a file
 ```
 
-
-
 ### Test Runner Integration
 
-
 The quality module is integrated with the test runner by default:
-
 
 ```bash
 
 # Run tests with quality validation
 
-
 lua firmo.lua --quality --quality-level=3 tests/
 
 # Run with quality and generate reports
-
 
 lua firmo.lua --quality --quality-level=3 --report-dir=./reports tests/
 
 # Run with both quality and coverage
 
-
 lua firmo.lua --quality --coverage tests/
 ```
 
-
 Or programmatically:
-
 
 ```lua
 local runner = require("lib.core.runner")
@@ -443,14 +372,9 @@ if not result then
 end
 ```
 
-
-
 ## Examples
 
-
 ### Complete Configuration with All Options
-
-
 
 ```lua
 -- In .firmo-config.lua
@@ -497,11 +421,7 @@ return {
 }
 ```
 
-
-
 ### Direct Configuration in Code
-
-
 
 ```lua
 -- file: tests/setup.lua
@@ -537,18 +457,13 @@ if not success then
 end
 ```
 
-
-
 # Quality Validation Configuration
-
 
 This document describes the comprehensive configuration options for the firmo quality validation system, which ensures tests meet required standards for reliability, completeness, and maintainability.
 
 ## Overview
 
-
 The quality module provides a powerful system for validating test quality with support for:
-
 
 - Multiple quality levels with progressive requirements
 - Assertion type tracking and verification
@@ -558,12 +473,9 @@ The quality module provides a powerful system for validating test quality with s
 - Integration with the central configuration system
 - Customizable quality requirements
 
-
 ## Configuration Options
 
-
 ### Core Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -573,12 +485,9 @@ The quality module provides a powerful system for validating test quality with s
 
 ### Quality Level Requirements
 
-
 Each quality level has specific requirements that tests must meet:
 
 #### Level 1 (Basic)
-
-
 
 ```lua
 {
@@ -590,11 +499,7 @@ Each quality level has specific requirements that tests must meet:
 }
 ```
 
-
-
 #### Level 2 (Standard)
-
-
 
 ```lua
 {
@@ -607,11 +512,7 @@ Each quality level has specific requirements that tests must meet:
 }
 ```
 
-
-
 #### Level 3 (Comprehensive)
-
-
 
 ```lua
 {
@@ -624,11 +525,7 @@ Each quality level has specific requirements that tests must meet:
 }
 ```
 
-
-
 #### Level 4 (Advanced)
-
-
 
 ```lua
 {
@@ -642,11 +539,7 @@ Each quality level has specific requirements that tests must meet:
 }
 ```
 
-
-
 #### Level 5 (Complete)
-
-
 
 ```lua
 {
@@ -661,13 +554,9 @@ Each quality level has specific requirements that tests must meet:
 }
 ```
 
-
-
 ## Configuration in .firmo-config.lua
 
-
 You can configure the quality validation system in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -688,13 +577,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the quality module programmatically:
-
 
 ```lua
 local quality = require("lib.quality")
@@ -712,13 +597,9 @@ local level_name = quality.level_name(level)
 print("Current quality level:", level, "(", level_name, ")")
 ```
 
-
-
 ## Assertion Types
 
-
 The quality module tracks and validates various assertion types:
-
 
 ```lua
 -- Core assertion types
@@ -734,13 +615,9 @@ local assertion_types = {
 }
 ```
 
-
-
 ## Quality Reports
 
-
 The quality module can generate various report formats:
-
 
 ```lua
 -- Generate a quality report
@@ -751,13 +628,9 @@ local summary = quality.summary_report()
 local success, err = quality.save_report("quality-report.html", "html")
 ```
 
-
-
 ## Integration with Test Runner
 
-
 The quality module integrates with Firmo's test runner:
-
 
 ```lua
 -- In test runner
@@ -784,13 +657,9 @@ if not quality.is_quality_passing() then
 end
 ```
 
-
-
 ## Custom Quality Rules
 
-
 You can define custom quality rules:
-
 
 ```lua
 -- Add custom quality requirement
@@ -821,13 +690,9 @@ return {
 }
 ```
 
-
-
 ## Quality Template Generation
 
-
 The quality module can generate template test files that meet quality requirements:
-
 
 ```lua
 -- Generate a template test file for level 3
@@ -836,14 +701,9 @@ local template, err = quality.create_test_file(3, "tests/my_module_test.lua")
 local results, err = quality.analyze_directory("tests/", true)  -- true = recursive
 ```
 
-
-
 ## Best Practices
 
-
 ### Setting the Right Quality Level
-
-
 
 ```lua
 -- For a new project, start with level 1
@@ -854,11 +714,7 @@ quality.set_level(3)
 quality.set_level(5)
 ```
 
-
-
 ### Progressive Quality Implementation
-
-
 
 ```lua
 -- Start with non-strict mode
@@ -877,11 +733,7 @@ quality.init({
 quality.set_level(3)
 ```
 
-
-
 ### Focus on Specific Assertion Types
-
-
 
 ```lua
 -- Check which assertion types are being used
@@ -895,14 +747,9 @@ for _, required_type in ipairs(quality.levels[3].requirements.assertion_types_re
 end
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues
-
-
 
 1. **Tests failing quality validation**: 
    - Lower the quality level temporarily while improving tests
@@ -922,13 +769,9 @@ end
    - Add missing assertion types
    - Improve test naming and structure
 
-
 ## Example Configuration Files
 
-
 ### Development Configuration
-
-
 
 ```lua
 -- .firmo-config.development.lua
@@ -947,11 +790,7 @@ return {
 }
 ```
 
-
-
 ### CI Configuration
-
-
 
 ```lua
 -- .firmo-config.ci.lua
@@ -970,11 +809,7 @@ return {
 }
 ```
 
-
-
 ### Production Configuration
-
-
 
 ```lua
 -- .firmo-config.production.lua
@@ -993,6 +828,5 @@ return {
   }
 }
 ```
-
 
 These configuration options give you complete control over test quality validation, allowing you to enforce standards appropriate for your project's maturity level and requirements.

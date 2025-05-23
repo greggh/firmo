@@ -1,11 +1,8 @@
 # Logging Module Components
 
-
 The firmo logging system consists of several integrated components that together provide a comprehensive, flexible, and performance-optimized logging solution. This document details the individual components and their APIs.
 
 ## Table of Contents
-
-
 
 1. [Core Logging Module](#core-logging-module)
 2. [Export Module](#export-module)
@@ -19,17 +16,12 @@ The export module provides functionality for exporting logs to various external 
 
 ### Key Features
 
-
-
 - Export logs to popular logging platforms (Elasticsearch, Logstash, Splunk, Datadog, Loki)
 - Convert between log formats (text, JSON, platform-specific)
 - Generate configuration files for logging platforms
 - Create real-time log exporters for streaming logs to external systems
 
-
 ### Supported Platforms
-
-
 
 - **Elasticsearch**: JSON-based search and analytics engine
 - **Logstash**: Log collection, parsing, and forwarding
@@ -37,13 +29,9 @@ The export module provides functionality for exporting logs to various external 
 - **Datadog**: Cloud monitoring and analytics
 - **Loki**: Grafana's log aggregation system
 
-
 ### API Reference
 
-
 #### Platform-Specific Export
-
-
 
 ```lua
 -- Import the export module
@@ -62,11 +50,7 @@ local entries, err = log_export.export_to_platform(
 )
 ```
 
-
-
 #### Configuration File Generation
-
-
 
 ```lua
 -- Create a configuration file for a specific platform
@@ -80,11 +64,7 @@ local result, err = log_export.create_platform_config(
 )
 ```
 
-
-
 #### Log File Conversion
-
-
 
 ```lua
 -- Convert a log file to a platform-specific format
@@ -106,11 +86,7 @@ local result, err = log_export.create_platform_file(
 -- }
 ```
 
-
-
 #### Real-Time Exporters
-
-
 
 ```lua
 -- Create a real-time log exporter
@@ -138,17 +114,12 @@ local endpoint = exporter.http_endpoint
 -- { method = "POST", url = "https://http-intake.logs.datadoghq.com/v1/input", ... }
 ```
 
-
-
 ## Search Module
-
 
 **File:** `lib/tools/logging/search.lua`
 The search module provides functionality for searching and analyzing log files.
 
 ### Key Features
-
-
 
 - Search log files with flexible filtering criteria
 - Parse log files in various formats (text, JSON)
@@ -157,13 +128,9 @@ The search module provides functionality for searching and analyzing log files.
 - Export log data to different formats (CSV, JSON, HTML)
 - Create real-time log processors for continuous log analysis
 
-
 ### API Reference
 
-
 #### Basic Log Search
-
-
 
 ```lua
 -- Import the search module
@@ -188,11 +155,7 @@ local results = log_search.search_logs({
 -- }
 ```
 
-
-
 #### Log Statistics
-
-
 
 ```lua
 -- Get statistics about a log file
@@ -223,11 +186,7 @@ local stats = log_search.get_log_stats(
 -- }
 ```
 
-
-
 #### Log Export
-
-
 
 ```lua
 -- Export logs to a different format
@@ -246,11 +205,7 @@ local result = log_search.export_logs(
 -- }
 ```
 
-
-
 #### Real-Time Log Processing
-
-
 
 ```lua
 -- Create a log processor for real-time analysis
@@ -279,11 +234,7 @@ processor.process({
 processor.close()
 ```
 
-
-
 #### Log Export Adapters
-
-
 
 ```lua
 -- Create an adapter for a specific platform
@@ -304,17 +255,12 @@ local formatted = adapter({
 })
 ```
 
-
-
 ## Formatter Integration Module
-
 
 **File:** `lib/tools/logging/formatter_integration.lua`
 The formatter integration module provides integration between the logging system and test output formatters.
 
 ### Key Features
-
-
 
 - Enhance test formatters with logging capabilities
 - Create test-specific loggers with context
@@ -322,13 +268,9 @@ The formatter integration module provides integration between the logging system
 - Create specialized formatters for log-friendly output
 - Step-based logging for test execution phases
 
-
 ### API Reference
 
-
 #### Formatter Enhancement
-
-
 
 ```lua
 -- Import the formatter integration module
@@ -337,10 +279,7 @@ local formatter_integration = require("lib.tools.logging.formatter_integration")
 local formatters = formatter_integration.enhance_formatters()
 ```
 
-
 #### Test-Specific Logging
-
-
 
 ```lua
 -- Create a test-specific logger with context
@@ -363,7 +302,6 @@ step_logger.info("Connecting to database")
 
 ```
 
-
 #### Log Capture
 
 ##### `formatter_integration.capture_start(test_name, test_id)`
@@ -384,7 +322,6 @@ formatter_integration.capture_start("My Test Case", "run-123")
 -- Logs generated after this point will be captured under "run-123"
 ```
 
-
 ##### `formatter_integration.capture_end(test_id)`
 
 Stops capturing logs for a specific test run and returns the collected logs.
@@ -402,7 +339,6 @@ Stops capturing logs for a specific test run and returns the collected logs.
 local captured_logs = formatter_integration.capture_end("run-123")
 print("Captured " .. #captured_logs .. " log entries.")
 ```
-
 
 ##### `formatter_integration.attach_logs_to_results(test_results, captured_logs)`
 
@@ -427,7 +363,6 @@ local results_with_logs = formatter_integration.attach_logs_to_results(results, 
 ```
 ```
 
-
 #### Log Capture
 
 ##### `formatter_integration.capture_start(test_name, test_id)`
@@ -448,7 +383,6 @@ formatter_integration.capture_start("My Test Case", "run-123")
 -- Logs generated after this point will be captured under "run-123"
 ```
 
-
 ##### `formatter_integration.capture_end(test_id)`
 
 Stops capturing logs for a specific test run and returns the collected logs.
@@ -466,7 +400,6 @@ Stops capturing logs for a specific test run and returns the collected logs.
 local captured_logs = formatter_integration.capture_end("run-123")
 print("Captured " .. #captured_logs .. " log entries.")
 ```
-
 
 ##### `formatter_integration.attach_logs_to_results(test_results, captured_logs)`
 
@@ -489,7 +422,6 @@ local logs = formatter_integration.capture_end("run-123")
 local results_with_logs = formatter_integration.attach_logs_to_results(results, logs)
 -- results_with_logs now has a .logs field
 ```
-
 
 #### Custom Log Formatter
 ```lua
@@ -504,11 +436,7 @@ log_formatter:init({
 local result = log_formatter:format(test_results)
 ```
 
-
-
 #### Integration with Reporting System
-
-
 
 ```lua
 -- Integrate logging with the test reporting system
@@ -520,13 +448,9 @@ local reporting = formatter_integration.integrate_with_reporting({
 })
 ```
 
-
-
 ## Component Interactions
 
-
 The logging system components work together in the following ways:
-
 
 1. **Core Logging Module**
    - Provides the main API that users interact with directly
@@ -546,10 +470,7 @@ The logging system components work together in the following ways:
    - Enhances test formatters with logging capabilities
    - Provides context-aware logging during test execution
 
-
 ### Usage Flow
-
-
 
 1. **Application Initialization**
    - Import core logging module
@@ -568,12 +489,9 @@ The logging system components work together in the following ways:
    - Export module converts to external formats
    - Log data is presented in reports or dashboards
 
-
 ### Configuration Flow
 
-
 The logging system follows this configuration priority:
-
 
 1. Direct configuration (`logging.configure()`)
 2. Central configuration system (`.firmo-config.lua`)

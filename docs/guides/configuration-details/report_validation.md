@@ -1,15 +1,12 @@
 # Report Validation Configuration
 
-
 This document describes how to configure the report validation system in firmo. The report validation system ensures that coverage reports are accurate and consistent by validating data structure, performing statistical analysis, and cross-checking with static analysis.
 
 ## Configuration Options
 
-
 The validation system can be configured both programmatically and through the configuration file. Here are the available options:
 
 ### Basic Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -25,7 +22,6 @@ The validation system can be configured both programmatically and through the co
 
 ### Advanced Options
 
-
 When using `auto_save_reports()` or saving reports through the reporting API, you can also use these additional options:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -35,9 +31,7 @@ When using `auto_save_reports()` or saving reports through the reporting API, yo
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the validation system in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -61,13 +55,9 @@ return {
 }
 ```
 
-
-
 ## Using Validation Programmatically
 
-
 You can validate coverage reports programmatically using the reporting module:
-
 
 ```lua
 local reporting = require("lib.reporting")
@@ -98,13 +88,9 @@ else
 end
 ```
 
-
-
 ## Saving Reports with Validation
 
-
 When saving reports, you can control validation behavior:
-
 
 ```lua
 local reporting = require("lib.reporting")
@@ -125,13 +111,9 @@ reporting.auto_save_reports(coverage_data, nil, nil, {
 })
 ```
 
-
-
 ## Validation Report Format
 
-
 When generating a validation report (by setting `validation_report = true`), the report contains comprehensive validation data in JSON format:
-
 
 ```json
 {
@@ -179,13 +161,9 @@ When generating a validation report (by setting `validation_report = true`), the
 }
 ```
 
-
-
 ## CI/CD Integration
 
-
 For Continuous Integration environments, it's recommended to use strict validation to ensure accurate reports:
-
 
 ```lua
 -- In .firmo-config.lua for CI environments
@@ -201,26 +179,19 @@ return {
 }
 ```
 
-
 When running in CI, you can specify strict validation on the command line:
-
 
 ```bash
 lua firmo.lua --coverage --strict-validation tests/
 ```
 
-
-
 ## Common Validation Issues
-
 
 Here are some common validation issues and how to resolve them:
 
 ### Line Count Discrepancies
 
-
 If total line counts don't match, this could indicate:
-
 
 - A problem with the coverage data collection
 - Files being added or removed during the test run
@@ -230,9 +201,7 @@ Resolution: Ensure all tests are run with the same code state and no files are m
 
 ### Percentage Calculation Errors
 
-
 If percentages don't match calculations, this could indicate:
-
 
 - Rounding errors in the calculation
 - Inclusion of non-executable lines in the calculation
@@ -242,9 +211,7 @@ Resolution: Check the calculation method and ensure consistency.
 
 ### File Path Issues
 
-
 If file paths are reported as missing, this could indicate:
-
 
 - Absolute paths that don't match the current environment
 - Files that were moved or deleted after the tests ran
@@ -254,9 +221,7 @@ Resolution: Use relative paths or check path normalization.
 
 ### Cross-Module Inconsistencies
 
-
 If there are inconsistencies between data sections, this could indicate:
-
 
 - A bug in the coverage collection
 - Data corruption during report generation
@@ -266,9 +231,7 @@ Resolution: Check for bugs in the coverage module and ensure consistent file inc
 
 ## Next Steps
 
-
 After configuring validation, consider using the following features:
-
 
 - **HTML formatter** with enhanced visualizations
 - **Statistical analysis** to identify areas for testing improvement

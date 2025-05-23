@@ -1,26 +1,19 @@
 # Parallel Module API Reference
 
-
 The parallel module in Firmo provides functionality to run test files in parallel for better resource utilization and faster test execution.
 
 ## Overview
 
-
 The parallel module allows you to execute multiple test files concurrently across separate worker processes. This can significantly reduce the total test execution time, especially for test suites with many independent test files.
 
 ## Module Interface
-
-
 
 ```lua
 local parallel = require("lib.tools.parallel")
 parallel.register_with_firmo(firmo)
 ```
 
-
-
 ### Configuration Options
-
 
 The parallel module can be configured through the `parallel.options` table:
 | Option | Type | Default | Description |
@@ -36,12 +29,9 @@ The parallel module can be configured through the `parallel.options` table:
 
 ## Core Functions
 
-
 ### `parallel.configure(options)`
 
-
 Configure the parallel module with custom options.
-
 
 ```lua
 parallel.configure({
@@ -51,23 +41,17 @@ parallel.configure({
 })
 ```
 
-
 **Parameters:**
-
 
 - `options` (table, optional): Configuration options to override defaults
 
 **Returns:**
 
-
 - The parallel module instance (for method chaining)
-
 
 ### `parallel.run_tests(files, options)`
 
-
 Run multiple test files in parallel worker processes.
-
 
 ```lua
 local results = parallel.run_tests({
@@ -80,9 +64,7 @@ local results = parallel.run_tests({
 })
 ```
 
-
 **Parameters:**
-
 
 - `files` (table): Array of file paths to run
 - `options` (table, optional): Run options that override module configuration
@@ -103,94 +85,69 @@ local results = parallel.run_tests({
 
 ### `parallel.register_with_firmo(firmo)`
 
-
 Register parallel testing functionality with the Firmo framework.
-
 
 ```lua
 local firmo = require("firmo")
 parallel.register_with_firmo(firmo)
 ```
 
-
 **Parameters:**
-
 
 - `firmo` (table): The Firmo framework instance
 
 **Returns:**
 
-
 - The parallel module instance
 
 This function also adds CLI options for parallel execution to Firmo, allowing you to run:
-
 
 ```text
 lua firmo.lua --parallel --workers 4 tests/
 ```
 
-
-
 ### `parallel.reset()`
 
-
 Reset the module to default configuration.
-
 
 ```lua
 parallel.reset()
 ```
 
-
 **Returns:**
-
 
 - The parallel module instance (for method chaining)
 
-
 ### `parallel.full_reset()`
 
-
 Fully reset both local and central configuration.
-
 
 ```lua
 parallel.full_reset()
 ```
 
-
 **Returns:**
-
 
 - The parallel module instance (for method chaining)
 
-
 ### `parallel.debug_config()`
 
-
 Debug helper to show current configuration.
-
 
 ```lua
 local config_info = parallel.debug_config()
 ```
 
-
 **Returns:**
-
 
 - `debug_info` (table): Detailed information about the current configuration:
   - `local_config` (table): Local configuration values
   - `using_central_config` (boolean): Whether central configuration is in use
   - `central_config` (table): Central configuration values (if available)
 
-
 ## Integration with Central Configuration
 
-
 The parallel module integrates with Firmo's central configuration system, if available:
-
 
 ```lua
 -- Configuration will be stored in the central config system
@@ -198,10 +155,7 @@ local central_config = require("lib.core.central_config")
 central_config.set("parallel.workers", 8)
 ```
 
-
-
 ## CLI Options
-
 
 When registered with Firmo, the following command-line options become available:
 | Option | Description |
@@ -215,8 +169,6 @@ When registered with Firmo, the following command-line options become available:
 | `--no-aggregate-coverage` | Don't combine coverage data from workers |
 
 ## Example Usage
-
-
 
 ```lua
 local firmo = require("firmo")
@@ -243,13 +195,9 @@ print("Skipped: " .. results.skipped)
 print("Total time: " .. string.format("%.2f", results.elapsed) .. " seconds")
 ```
 
-
-
 ## Result Structure
 
-
 The results table returned by `parallel.run_tests()` has the following structure:
-
 
 ```lua
 {

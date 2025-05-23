@@ -22,9 +22,7 @@ For comprehensive control, firmo includes the `module_reset` system which manage
 
 ### Basic Setup
 
-
 To use the enhanced system, first require and register it with firmo:
-
 
 ```lua
 local firmo = require("firmo")
@@ -38,13 +36,9 @@ module_reset.configure({
 })
 ```
 
-
-
 ### Protecting Essential Modules
 
-
 Some modules should never be reset. The system automatically protects core Lua modules and firmo itself, but you can add your own:
-
 
 ```lua
 -- Protect a single module
@@ -57,13 +51,9 @@ module_reset.protect({
 })
 ```
 
-
-
 ### Resetting Modules Selectively
 
-
 Reset all non-protected modules:
-
 
 ```lua
 -- Reset all modules and return count of modules reset
@@ -71,9 +61,7 @@ local reset_count = module_reset.reset_all()
 print("Reset " .. reset_count .. " modules")
 ```
 
-
 Reset modules matching a pattern:
-
 
 ```lua
 -- Reset all modules in the "app.services" namespace
@@ -81,13 +69,9 @@ local count = module_reset.reset_pattern("app%.services%.")
 print("Reset " .. count .. " service modules")
 ```
 
-
-
 ### Analyzing Memory Usage
 
-
 Track memory usage of your modules:
-
 
 ```lua
 -- Get overall memory usage
@@ -102,16 +86,11 @@ for i, entry in ipairs(module_memory) do
 end
 ```
 
-
-
 ## Common Patterns and Best Practices
-
 
 ### Database Test Pattern
 
-
 When testing database operations, reset the database module before each test:
-
 
 ```lua
 describe("User database", function()
@@ -160,13 +139,9 @@ describe("User database", function()
 end)
 ```
 
-
-
 ### Configuration Test Pattern
 
-
 When testing with different configurations:
-
 
 ```lua
 describe("Application with different configs", function()
@@ -200,13 +175,9 @@ describe("Application with different configs", function()
 end)
 ```
 
-
-
 ### Module Dependencies Pattern
 
-
 When a module has dependencies, reset the highest-level module to ensure all dependencies get re-required correctly:
-
 
 ```lua
 describe("Authentication service", function()
@@ -229,13 +200,9 @@ describe("Authentication service", function()
 end)
 ```
 
-
-
 ### Memory Leak Detection Pattern
 
-
 Use memory tracking to find potential memory leaks in your modules:
-
 
 ```lua
 describe("Memory usage tests", function()
@@ -262,38 +229,27 @@ describe("Memory usage tests", function()
 end)
 ```
 
-
-
 ## Troubleshooting
-
 
 ### Module State Not Resetting
 
-
 If module state seems to persist despite resetting:
-
 
 1. Check if the module is protected: `module_reset.is_protected("module_name")`
 2. Verify module caching: some modules might cache data in global variables
 3. Use verbose mode to see what's being reset: `module_reset.reset_all({verbose = true})`
 
-
 ### Performance Issues
 
-
 If tests are slow due to frequent module resets:
-
 
 1. Be more selective with resets, using `reset_pattern` instead of `reset_all`
 2. Only reset modules in `before_each` when truly needed
 3. Use `with_fresh_module` for isolated cases
 
-
 ### Identifying Memory-Intensive Modules
 
-
 If your tests use excessive memory:
-
 
 ```lua
 -- Run at the end of your test suite
@@ -306,16 +262,11 @@ for i, entry in ipairs(memory_hogs) do
 end
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Integration with Test Runner
 
-
 For automatic module reset between test files, configure your test runner:
-
 
 ```lua
 -- In your test runner
@@ -330,13 +281,9 @@ module_reset.configure({
 firmo.run_tests(test_files)
 ```
 
-
-
 ### Customizing Module Reset Behavior
 
-
 You can customize which modules get reset by combining protection and pattern reset:
-
 
 ```lua
 -- Protect critical modules
@@ -349,8 +296,6 @@ module_reset.protect({
 module_reset.reset_pattern("app%.services%.")
 module_reset.reset_pattern("app%.controllers%.")
 ```
-
-
 
 ## Summary
 

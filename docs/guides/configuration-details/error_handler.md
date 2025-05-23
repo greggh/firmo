@@ -1,13 +1,10 @@
 # Error Handler Configuration
 
-
 This document describes the comprehensive configuration options for the firmo error handling system, which standardizes error creation, reporting, and handling across the framework.
 
 ## Overview
 
-
 The error handler module provides a robust system for structured error handling with support for:
-
 
 - Standardized error objects with categories and severity levels
 - Contextual error information with detailed metadata
@@ -17,12 +14,9 @@ The error handler module provides a robust system for structured error handling 
 - Safe operation wrappers for error-prone code
 - Integration with the central configuration system
 
-
 ## Configuration Options
 
-
 ### Core Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -35,7 +29,6 @@ The error handler module provides a robust system for structured error handling 
 
 ### Test-Related Options
 
-
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `in_test_run` | boolean | `false` | Indicates if code is running in a test environment. |
@@ -44,9 +37,7 @@ The error handler module provides a robust system for structured error handling 
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the error handler in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -69,13 +60,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the error handler programmatically:
-
 
 ```lua
 local error_handler = require("lib.tools.error_handler")
@@ -95,16 +82,11 @@ error_handler.set_current_test_metadata({
 })
 ```
 
-
-
 ## Error Categories and Severity
-
 
 The error handler uses standardized categories and severity levels:
 
 ### Error Categories
-
-
 
 ```lua
 -- Main error categories
@@ -121,11 +103,7 @@ CATEGORY.UNKNOWN     -- Unknown errors
 CATEGORY.TEST_EXPECTED -- Errors expected during tests
 ```
 
-
-
 ### Error Severity Levels
-
-
 
 ```lua
 -- Severity levels
@@ -137,13 +115,9 @@ SEVERITY.WARNING  -- Warnings that need attention but don't stop execution
 SEVERITY.INFO     -- Informational messages about error conditions
 ```
 
-
-
 ## Test Mode Configuration
 
-
 Test mode changes error handling behavior to support testing error conditions:
-
 
 ```lua
 -- Enable test mode
@@ -164,13 +138,9 @@ error_handler.set_current_test_metadata({
 })
 ```
 
-
-
 ## Error Logging Configuration
 
-
 Control how errors are logged:
-
 
 ```lua
 -- Enable verbose logging
@@ -188,13 +158,9 @@ error_handler.configure({
 })
 ```
 
-
-
 ## Stack Trace Configuration
 
-
 Control stack trace capture and display:
-
 
 ```lua
 -- Enable stack trace capture and display
@@ -209,13 +175,9 @@ error_handler.configure({
 })
 ```
 
-
-
 ## Integration with Test Runner
 
-
 The error handler integrates with Firmo's test runner:
-
 
 ```lua
 -- In test runner
@@ -233,16 +195,11 @@ error_handler.set_test_mode(false)
 error_handler.set_current_test_metadata(nil)
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Custom Error Categories
 
-
 Add your own error categories for specific domains:
-
 
 ```lua
 -- Add custom error categories
@@ -260,13 +217,9 @@ local function database_error(message, context)
 end
 ```
 
-
-
 ### Error Suppression Patterns
 
-
 Configure error suppression for specific test scenarios:
-
 
 ```lua
 -- Configure test-specific error handling
@@ -282,13 +235,9 @@ error_handler.set_current_test_metadata({
 })
 ```
 
-
-
 ### Fatal Error Handling
 
-
 Configure how fatal errors are handled:
-
 
 ```lua
 -- Configure fatal error handling
@@ -306,16 +255,11 @@ local err = error_handler.create(
 error_handler.handle_error(err)
 ```
 
-
-
 ## Best Practices
-
 
 ### Standardized Error Objects
 
-
 Create standardized error objects with proper context:
-
 
 ```lua
 -- Create a validation error
@@ -338,13 +282,9 @@ local err = error_handler.io_error(
 )
 ```
 
-
-
 ### Try/Catch Pattern
 
-
 Use the try/catch pattern for operations that might fail:
-
 
 ```lua
 local success, result, err = error_handler.try(function()
@@ -362,13 +302,9 @@ end
 return result
 ```
 
-
-
 ### Safe I/O Operations
 
-
 Use safe I/O operations with consistent error handling:
-
 
 ```lua
 local content, err = error_handler.safe_io_operation(
@@ -386,13 +322,9 @@ if not content then
 end
 ```
 
-
-
 ### Assertion Pattern
 
-
 Use the assertion pattern for precondition checking:
-
 
 ```lua
 -- Validate input parameters
@@ -409,14 +341,9 @@ error_handler.assert(config.api_key,
 )
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues
-
-
 
 1. **Too many error logs**:
    - Set `verbose = false` to reduce log verbosity
@@ -435,13 +362,9 @@ error_handler.assert(config.api_key,
    - Use specialized creators like validation_error() and io_error()
    - Return nil, error instead of throwing errors directly
 
-
 ## Example Configuration Files
 
-
 ### Development Configuration
-
-
 
 ```lua
 -- .firmo-config.development.lua
@@ -459,11 +382,7 @@ return {
 }
 ```
 
-
-
 ### Production Test Configuration
-
-
 
 ```lua
 -- .firmo-config.production.lua
@@ -481,11 +400,7 @@ return {
 }
 ```
 
-
-
 ### CI Configuration
-
-
 
 ```lua
 -- .firmo-config.ci.lua
@@ -502,6 +417,5 @@ return {
   }
 }
 ```
-
 
 These configuration options give you complete control over error handling behavior, allowing you to balance detailed error information with performance considerations across different environments.

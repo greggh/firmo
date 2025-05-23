@@ -10,9 +10,7 @@ The coverage system leverages Lua's debug hook mechanism to provide reliable and
 
 ## Architecture
 
-
 The coverage system consists of several integrated components:
-
 
 1. **Debug Hook System**:
    - **Line Hook**: Tracks which lines of code are executed via debug.sethook
@@ -30,23 +28,15 @@ The coverage system consists of several integrated components:
    - **Integration**: Integration with Firmo's main reporting system (`lib.reporting`) for report generation in various formats.
    - **Data Normalization**: Internal coverage data is processed into a standard structure before being passed to the reporting system.
 
-
 ## API Reference
 
-
 ### Coverage Module
-
-
 
 ```lua
 local coverage = require("lib.coverage")
 ```
 
-
-
 #### Public Functions
-
-
 
 - `coverage.init()`
   - **Description:** Initializes the coverage system and hooks. Resets state, compiles patterns, sets hooks.
@@ -104,12 +94,9 @@ local coverage = require("lib.coverage")
   - **Parameters:** `filename` (string, normalized path), `line_nr` (number).
   - **Returns:** `nil`.
 
-
 ### Configuration
 
-
 Coverage settings are controlled via the central configuration system:
-
 
 ```lua
 -- .firmo-config.lua
@@ -138,14 +125,9 @@ return {
 }
 ```
 
-
-
 ## Usage Examples
 
-
 ### Basic Usage
-
-
 
 ```lua
 -- Load necessary modules

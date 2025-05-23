@@ -1,13 +1,10 @@
 # Temporary File Management Configuration
 
-
 This document describes the comprehensive configuration options for the firmo temporary file management system, which creates, tracks, and cleans up temporary files and directories during test execution.
 
 ## Overview
 
-
 The temporary file module provides a robust system for managing temporary files with support for:
-
 
 - Automatic tracking and cleanup of temporary files
 - Test context-aware file management
@@ -16,12 +13,9 @@ The temporary file module provides a robust system for managing temporary files 
 - Configurable cleanup policies
 - Integration with the central configuration system
 
-
 ## Configuration Options
 
-
 ### Core Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -35,9 +29,7 @@ The temporary file module provides a robust system for managing temporary files 
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the temporary file management system in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -62,13 +54,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the temporary file system programmatically:
-
 
 ```lua
 local temp_file = require("lib.tools.filesystem.temp_file")
@@ -83,16 +71,11 @@ temp_file.configure({
 temp_file.set_temp_dir("./my-test-temp")
 ```
 
-
-
 ## Creating and Using Temporary Files
-
 
 ### Recommended Approach: Automatic Cleanup
 
-
 Always prefer automatic cleanup functions to ensure proper resource management, even when errors occur:
-
 
 ```lua
 -- Use a temporary file with automatic cleanup
@@ -138,13 +121,9 @@ local dir_result, dir_err = temp_file.with_temp_directory(function(dir_path)
 end)
 ```
 
-
-
 ### Alternative Approach (For Advanced Use Cases)
 
-
 For specialized scenarios where you need direct control over file lifecycle, you can use these functions:
-
 
 ```lua
 -- Create a temporary file with content (requires manual cleanup)
@@ -168,14 +147,11 @@ end
 temp_file.register_directory(dir_path)
 ```
 
-
 > ⚠️ **Warning**: Always prefer `with_temp_file()` and `with_temp_directory()` for automatic cleanup. Manual file management should only be used in cases where you need to control the lifecycle across multiple functions.
 
 ## Test Context Integration
 
-
 Manage files within test context for automatic cleanup:
-
 
 ```lua
 -- Set the current test context
@@ -192,11 +168,7 @@ local file2 = temp_file.create_with_content("logs", "txt")
 temp_file.clear_current_test_context()
 ```
 
-
-
 ## Using Temporary Files Safely
-
-
 
 ```lua
 -- Use a temporary file with automatic cleanup
@@ -219,13 +191,9 @@ temp_file.with_temp_directory(function(dir_path)
 end)
 ```
 
-
-
 ## Managing Existing Files
 
-
 Register existing files for cleanup:
-
 
 ```lua
 -- Register an existing file for cleanup
@@ -240,13 +208,9 @@ if temp_file.is_registered(file_path) then
 end
 ```
 
-
-
 ## Cleanup Management
 
-
 Control the cleanup process:
-
 
 ```lua
 -- Clean up files for a specific test context
@@ -265,13 +229,9 @@ print("Total size: " .. stats.total_size .. " bytes")
 print("Orphaned files: " .. stats.orphaned_files)
 ```
 
-
-
 ## Integration with Test Runner
 
-
 The temporary file module integrates with Firmo's test runner:
-
 
 ```lua
 -- In test runner (before tests)
@@ -307,14 +267,9 @@ after_all(function()
 end)
 ```
 
-
-
 ## Best Practices
 
-
 ### Secure File Management
-
-
 
 ```lua
 -- Configure for secure file management
@@ -340,11 +295,7 @@ if not success then
 end
 ```
 
-
-
 ### Efficient Test Setup with Temporary Files
-
-
 
 ```lua
 -- Create a test directory structure efficiently
@@ -365,13 +316,9 @@ temp_file.with_temp_directory(function(base_dir)
 end)
 ```
 
-
-
 ### CI/CD Environment Setup
 
-
 For continuous integration environments:
-
 
 ```lua
 -- In .firmo-config.ci.lua
@@ -387,14 +334,9 @@ return {
 }
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues
-
-
 
 1. **Files not being cleaned up**:
    - Verify the test context is being properly set with `set_current_test_context()`
@@ -414,13 +356,9 @@ return {
    - Check if proper test contexts are being used
    - Ensure `cleanup_test_context()` is called after tests
 
-
 ## Example Configuration Files
 
-
 ### Development Configuration
-
-
 
 ```lua
 -- .firmo-config.development.lua
@@ -435,11 +373,7 @@ return {
 }
 ```
 
-
-
 ### CI Configuration
-
-
 
 ```lua
 -- .firmo-config.ci.lua
@@ -456,11 +390,7 @@ return {
 }
 ```
 
-
-
 ### Production Test Configuration
-
-
 
 ```lua
 -- .firmo-config.production.lua
@@ -476,6 +406,5 @@ return {
   }
 }
 ```
-
 
 These configuration options give you complete control over temporary file management, ensuring clean test environments and preventing file leaks in your test suite.

@@ -1,23 +1,18 @@
 # Core Module Guide
 
-
 This guide explains how to use Firmo's core testing functionality for organizing and structuring your tests.
 
 ## Introduction
-
 
 The core module provides the essential building blocks for writing tests with Firmo. These include functions for organizing tests into groups, defining individual test cases, and setting up test environments.
 
 ## Basic Test Structure
 
-
 A Firmo test suite consists of nested `describe` blocks containing individual test cases defined with `it` functions.
 
 ### Setting Up a Test File
 
-
 A typical test file starts by requiring Firmo and extracting the core functions:
-
 
 ```lua
 local firmo = require("firmo")
@@ -25,13 +20,9 @@ local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 -- Test groups and cases go here
 ```
 
-
-
 ### Organizing Tests with Describe
 
-
 The `describe` function creates a group of related tests:
-
 
 ```lua
 describe("String utilities", function()
@@ -39,13 +30,9 @@ describe("String utilities", function()
 end)
 ```
 
-
-
 ### Writing Individual Tests
 
-
 Inside a `describe` block, use `it` to define specific test cases:
-
 
 ```lua
 describe("String utilities", function()
@@ -59,13 +46,9 @@ describe("String utilities", function()
 end)
 ```
 
-
-
 ## Nested Test Groups
 
-
 You can nest `describe` blocks to create a hierarchical structure:
-
 
 ```lua
 describe("Math operations", function()
@@ -91,19 +74,15 @@ describe("Math operations", function()
 end)
 ```
 
-
 This hierarchical structure helps organize your tests and make the output more readable.
 
 ## Test Setup and Teardown
-
 
 Firmo provides `before` and `after` functions for setting up and cleaning up test environments.
 
 ### Setting Up with Before
 
-
 The `before` function runs before each test in the current `describe` block:
-
 
 ```lua
 describe("File operations", function()
@@ -137,13 +116,9 @@ describe("File operations", function()
 end)
 ```
 
-
-
 ### Cleaning Up with After
 
-
 The `after` function runs after each test in the current `describe` block:
-
 
 ```lua
 describe("Database operations", function()
@@ -177,20 +152,15 @@ describe("Database operations", function()
 end)
 ```
 
-
-
 ### Hook Execution Order
 
-
 When using nested `describe` blocks, hooks execute in the following order:
-
 
 1. Parent `before` hooks
 2. Child `before` hooks
 3. Test function
 4. Child `after` hooks
 5. Parent `after` hooks
-
 
 ```lua
 describe("Parent", function()
@@ -214,13 +184,9 @@ end)
 -- Parent after
 ```
 
-
-
 ## Test Aliases
 
-
 Firmo provides some aliases for improved readability:
-
 
 ```lua
 local test = firmo.test  -- Alias for firmo.it
@@ -229,16 +195,11 @@ test("adds two numbers", function()
 end)
 ```
 
-
-
 ## Advanced Test Organization
-
 
 ### Using Tags for Test Categories
 
-
 Tags allow you to categorize and selectively run tests:
-
 
 ```lua
 describe("API Client", function()
@@ -261,13 +222,9 @@ describe("API Client", function()
 end)
 ```
 
-
-
 ### Shared Setup Across Tests
 
-
 For setup that's common across multiple test files, you can create shared setup modules:
-
 
 ```lua
 -- test_helpers.lua
@@ -284,9 +241,7 @@ end
 return TestHelpers
 ```
 
-
 Then in your tests:
-
 
 ```lua
 local firmo = require("firmo")
@@ -307,16 +262,11 @@ describe("User Repository", function()
 end)
 ```
 
-
-
 ## Best Practices
-
 
 ### Test Naming
 
-
 Names should clearly describe the expected behavior, not the implementation:
-
 
 ```lua
 -- Good: describes behavior
@@ -331,13 +281,9 @@ it("concatenates first_name and last_name with a space", function()
 end)
 ```
 
-
-
 ### Test Structure
 
-
 Each test should focus on a single aspect of behavior:
-
 
 ```lua
 -- Good: separate tests for different behaviors
@@ -361,13 +307,9 @@ it("validates user data", function()
 end)
 ```
 
-
-
 ### Setup and Teardown
 
-
 Use `before` and `after` hooks consistently:
-
 
 ```lua
 describe("File operations", function()
@@ -393,13 +335,9 @@ describe("File operations", function()
 end)
 ```
 
-
-
 ### Test Independence
 
-
 Each test should be independent of others:
-
 
 ```lua
 describe("Counter", function()
@@ -422,16 +360,11 @@ describe("Counter", function()
 end)
 ```
 
-
-
 ## Common Patterns
-
 
 ### Test for Errors
 
-
 Test that functions throw errors when expected:
-
 
 ```lua
 describe("Division function", function()
@@ -449,13 +382,9 @@ describe("Division function", function()
 end)
 ```
 
-
-
 ### Conditional Tests
 
-
 Sometimes you may need to conditionally run tests:
-
 
 ```lua
 describe("Platform-specific features", function()
@@ -471,46 +400,33 @@ describe("Platform-specific features", function()
 end)
 ```
 
-
-
 ## Troubleshooting
-
 
 ### Test Not Running
 
-
 If your test isn't running:
-
 
 1. Check for typos in `describe` or `it` function names
 2. Verify that you're properly requiring and importing functions
 3. Check if the test is being filtered out by tags or patterns
 
-
 ### Setup/Teardown Issues
 
-
 If setup or teardown isn't working as expected:
-
 
 1. Ensure `before` and `after` functions are inside the correct `describe` block
 2. Check for errors in the setup/teardown code
 3. Verify that resources are properly created and cleaned up
 
-
 ### Test Independence Problems
 
-
 If tests affect each other:
-
 
 1. Reset state in `before` hooks
 2. Ensure cleanup in `after` hooks
 3. Don't rely on global state unless it's explicitly part of the test
 
-
 ## Conclusion
-
 
 The core module provides the fundamental building blocks for organizing and writing tests with Firmo. By using `describe`, `it`, `before`, and `after` effectively, you can create well-structured, maintainable test suites that clearly document your code's behavior.
 For practical examples, see the [core examples](/examples/core_examples.md) file.

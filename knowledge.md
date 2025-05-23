@@ -378,11 +378,11 @@ expect({name = "John"}).to.have_property("name", "John")
 
 ### Considerations for Debug Hook Coverage
 
-1.  **Hook Management:** Ensure `debug.sethook` is correctly installed and removed by `coverage.init()` and `coverage.shutdown()`.
-2.  **File Access:** The hook needs to access original source files to map execution lines. Ensure correct paths and permissions.
-3.  **Coroutine Handling:** The LuaCov integration handles standard coroutines, but be mindful of complex async patterns.
-4.  **Performance:** Debug hooks add overhead. Use `coverage.pause()`/`resume()` for non-relevant sections if performance is critical. Configure `savestepsize` appropriately.
-5.  **Configuration:** Use `central_config` (`coverage.include`, `coverage.exclude`, etc.) to control which files are tracked.
+1. **Hook Management:** Ensure `debug.sethook` is correctly installed and removed by `coverage.init()` and `coverage.shutdown()`.
+2. **File Access:** The hook needs to access original source files to map execution lines. Ensure correct paths and permissions.
+3. **Coroutine Handling:** The LuaCov integration handles standard coroutines, but be mindful of complex async patterns.
+4. **Performance:** Debug hooks add overhead. Use `coverage.pause()`/`resume()` for non-relevant sections if performance is critical. Configure `savestepsize` appropriately.
+5. **Configuration:** Use `central_config` (`coverage.include`, `coverage.exclude`, etc.) to control which files are tracked.
 
 ### Available Tools
 

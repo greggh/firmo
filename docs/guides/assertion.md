@@ -1,32 +1,24 @@
 # Assertion Module Usage Guide
 
-
 ## Introduction
-
 
 The assertion module provides a comprehensive system for making assertions in tests using an expect-style syntax. It features a rich set of chainable assertions, deep equality comparisons, and structured error reporting, all in a standalone module that avoids circular dependencies.
 
 ## Key Concepts
 
-
 ### Expect-Style Assertions
 
-
 The assertion module uses an expect-style syntax, which reads naturally from left to right:
-
 
 ```lua
 expect(actual_value).to.equal(expected_value)
 ```
 
-
 This syntax follows the intuitive pattern of "expect what you have to equal what you want" and is designed to make tests more readable and maintainable.
 
 ### Chainable API
 
-
 The assertion module provides a chainable API that allows you to express complex assertions in a natural, fluent manner:
-
 
 ```lua
 expect(user)
@@ -35,26 +27,18 @@ expect(user)
   .to.have_property("name")   -- Check it has a name property
 ```
 
-
-
 ### Assertion Negation
 
-
 To negate assertions, use the `to_not` property instead of `to`:
-
 
 ```lua
 expect(value).to_not.equal(other_value)
 expect(value).to_not.be_truthy()
 ```
 
-
-
 ### Structured Error Reporting
 
-
 When an assertion fails, the module provides detailed error messages that make it clear what went wrong:
-
 
 ```text
 Values are not equal:
@@ -65,14 +49,9 @@ Different value for key name:
   Got:      "Jane"
 ```
 
-
-
 ## Basic Usage
 
-
 ### Importing the Module
-
-
 
 ```lua
 local assertion = require("lib.assertion")
@@ -81,11 +60,7 @@ local firmo = require("firmo")
 local describe, it, expect = firmo.describe, firmo.it, firmo.expect
 ```
 
-
-
 ### Making Simple Assertions
-
-
 
 ```lua
 -- Basic equality check
@@ -98,11 +73,7 @@ assertion.expect(user).to.exist()
 assertion.expect(is_valid).to.be_truthy()
 ```
 
-
-
 ### Testing Collections
-
-
 
 ```lua
 -- Check array length
@@ -115,11 +86,7 @@ assertion.expect({name = "John"}).to.have_property("name", "John")
 assertion.expect({"a", "b", "c"}).to.contain("b")
 ```
 
-
-
 ### Testing Functions
-
-
 
 ```lua
 -- Check if a function throws an error
@@ -133,16 +100,11 @@ assertion.expect(function() obj.count = obj.count + 1 end).to.change(function() 
 assertion.expect(function() obj.count = obj.count + 1 end).to.increase(function() return obj.count end)
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Object Schema Validation
 
-
 The `match_schema` assertion provides a powerful way to validate object structures:
-
 
 ```lua
 local user = {
@@ -168,13 +130,9 @@ assertion.expect(user).to.match_schema({
 })
 ```
 
-
-
 ### Date Assertions
 
-
 Test date strings with specialized date assertions:
-
 
 ```lua
 -- Basic date validation
@@ -229,9 +187,7 @@ assertion.expect("2023-05-01").to.be_between_dates("2023-05-01", "2023-05-31", t
 
 ### Async Assertions
 
-
 When testing asynchronous code within an async context:
-
 
 ```lua
 local async = require("lib.async")
@@ -258,13 +214,9 @@ async.test(function()
 end)
 ```
 
-
-
 ### Custom Assertions
 
-
 You can extend the assertion module with custom assertions:
-
 
 ```lua
 -- Add a custom assertion for even numbers
@@ -284,16 +236,11 @@ assertion.expect(4).to.be_even()
 assertion.expect(5).to_not.be_even()
 ```
 
-
-
 ## Best Practices
-
 
 ### 1. Use the Right Assertion for the Job
 
-
 Choose assertions that best express your intent:
-
 
 ```lua
 -- GOOD: Clear intent, specific error message
@@ -302,13 +249,9 @@ expect(value).to.be.a("string")
 expect(type(value) == "string").to.be_truthy()
 ```
 
-
-
 ### 2. Check for Existence Before Checking Properties
 
-
 When dealing with potentially nil values, check for existence first:
-
 
 ```lua
 -- GOOD: Graceful handling of nil
@@ -320,13 +263,9 @@ end
 expect(result.status).to.equal("success")
 ```
 
-
-
 ### 3. Use Descriptive Variable Names in Tests
 
-
 Make your tests more readable with descriptive variable names:
-
 
 ```lua
 -- GOOD: Clear what's being tested
@@ -337,13 +276,9 @@ local a = calculate_total(items)
 expect(a).to.equal(b)
 ```
 
-
-
 ### 4. Group Related Assertions
 
-
 Group related assertions to make test intent clear:
-
 
 ```lua
 -- Testing a user object
@@ -353,13 +288,9 @@ expect(user.name).to.be.a("string")
 expect(user.email).to.match("%w+@%w+%.%w+")
 ```
 
-
-
 ### 5. Use match_schema for Complex Object Validation
 
-
 For complex objects, use schema validation instead of multiple separate assertions:
-
 
 ```lua
 -- GOOD: Concise schema validation
@@ -376,13 +307,9 @@ expect(user.email).to.be.a("string")
 expect(user.active).to.be.a("boolean")
 ```
 
-
-
 ### 6. Testing Error Conditions
 
-
 Use the standardized error testing pattern with `expect_error` flag:
-
 
 ```lua
 -- Import the test helper
@@ -400,13 +327,9 @@ it("should handle invalid input", { expect_error = true }, function()
 end)
 ```
 
-
-
 ### 7. Avoid Brittle Assertions
 
-
 Focus assertions on behavior, not implementation details:
-
 
 ```lua
 -- GOOD: Tests the behavior
@@ -415,14 +338,9 @@ expect(calculator.add(2, 3)).to.equal(5)
 expect(calculator.internal_sum_buffer).to.equal(5)
 ```
 
-
-
 ## Common Mistakes and How to Avoid Them
 
-
 ### Incorrect Negation Syntax
-
-
 
 ```lua
 -- WRONG: "not_to" is not valid
@@ -431,11 +349,7 @@ expect(value).not_to.equal(other_value)
 expect(value).to_not.equal(other_value)
 ```
 
-
-
 ### Incorrect Member Access Syntax
-
-
 
 ```lua
 -- WRONG: "to_be" is not a valid method
@@ -444,11 +358,7 @@ expect(value).to_be(true)
 expect(value).to.be(true)
 ```
 
-
-
 ### Inconsistent Parameter Order
-
-
 
 ```lua
 -- WRONG: Parameters reversed
@@ -457,11 +367,7 @@ expect(expected_value).to.equal(actual_value)
 expect(actual_value).to.equal(expected_value)
 ```
 
-
-
 ### Forgetting to Check for Existence First
-
-
 
 ```lua
 -- WRONG: Will error if value is nil
@@ -473,11 +379,7 @@ if value then
 end
 ```
 
-
-
 ### Using the Wrong Assertion Type
-
-
 
 ```lua
 -- WRONG: Using truthiness for equality
@@ -486,16 +388,11 @@ expect(value == expected).to.be_truthy()
 expect(value).to.equal(expected)
 ```
 
-
-
 ## Error Handling
-
 
 ### Structured Error Objects
 
-
 The assertion module integrates with the error_handler module to provide structured error objects:
-
 
 ```lua
 {
@@ -511,13 +408,9 @@ The assertion module integrates with the error_handler module to provide structu
 }
 ```
 
-
-
 ### Custom Error Messages
 
-
 You can provide better context by creating custom errors with more information:
-
 
 ```lua
 if not is_valid then
@@ -533,13 +426,9 @@ if not is_valid then
 end
 ```
 
-
-
 ## Integration with firmo
 
-
 The standalone assertion module is seamlessly integrated with firmo:
-
 
 ```lua
 -- Import firmo
@@ -557,10 +446,7 @@ describe("Calculator", function()
 end)
 ```
 
-
-
 ## Conclusion
-
 
 The assertion module provides a powerful, flexible system for making assertions in tests. By using the expect-style syntax and chainable API, you can write tests that are both expressive and maintainable.
 For a complete reference of all available assertions, see the [Assertion Module API Reference](/docs/api/assertion.md).

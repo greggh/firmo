@@ -1,26 +1,19 @@
 # Hash Module Guide
 
-
 The hash module provides utilities for generating hashes of strings and files, primarily used for caching and change detection in the framework.
 
 ## Overview
 
-
 The hash module implements a simple but fast FNV-1a hashing algorithm. This algorithm is:
-
 
 - Fast to compute
 - Has good distribution
 - Suitable for caching and change detection
 - Not cryptographically secure (do not use for security purposes)
 
-
 ## Basic Usage
 
-
 ### Hashing Strings
-
-
 
 ```lua
 local hash = require("lib.tools.hash")
@@ -36,11 +29,7 @@ local data_str = require("lib.tools.json").encode(data)
 local data_hash = hash.hash_string(data_str)
 ```
 
-
-
 ### Hashing Files
-
-
 
 ```lua
 local hash = require("lib.tools.hash")
@@ -53,14 +42,9 @@ else
 end
 ```
 
-
-
 ## Common Use Cases
 
-
 ### Caching
-
-
 
 ```lua
 local hash = require("lib.tools.hash")
@@ -75,11 +59,7 @@ local function cache_result(input, result)
 end
 ```
 
-
-
 ### Change Detection
-
-
 
 ```lua
 local hash = require("lib.tools.hash")
@@ -105,21 +85,14 @@ local function has_file_changed(path)
 end
 ```
 
-
-
 ## Best Practices
-
-
 
 1. **Error Handling**: Always check for errors when hashing files
 2. **Performance**: Cache hash results when appropriate
 3. **Security**: Do not use for security purposes (not cryptographic)
 4. **Validation**: Validate input types before hashing
 
-
 ## Common Pitfalls
-
-
 
 1. **File Access**: Remember that file hashing can fail if:
    - File doesn't exist
@@ -132,22 +105,16 @@ end
 
 3. **String Length**: Very long strings may impact performance
 
-
 ## Integration with Other Modules
 
-
 The hash module is commonly used with:
-
 
 - **Cache Module**: For caching computed results
 - **Filesystem Module**: For file operations
 - **JSON Module**: For hashing structured data
 - **Coverage Module**: For tracking file changes
 
-
 ## Example: Complete Caching System
-
-
 
 ```lua
 local hash = require("lib.tools.hash")
@@ -224,13 +191,9 @@ if data then
 end
 ```
 
-
-
 ## Next Steps
 
-
 After mastering the hash module, explore:
-
 
 1. [Cache Module](./cache.md)
 2. [Filesystem Module](./filesystem.md)

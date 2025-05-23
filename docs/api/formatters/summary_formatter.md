@@ -1,13 +1,10 @@
 # Summary Formatter API Reference
 
-
 The Summary formatter generates text-based coverage reports that provide a concise overview of coverage statistics, suitable for display in terminals, logs, and continuous integration output.
 
 ## Overview
 
-
 The Summary formatter produces text reports with these key features:
-
 
 - Compact, readable overview of coverage statistics
 - Terminal-friendly output with ANSI color support
@@ -18,24 +15,16 @@ The Summary formatter produces text reports with these key features:
 - Threshold-based highlighting
 - Direct terminal integration
 
-
 ## Class Reference
 
-
 ### Inheritance
-
-
 
 ```text
 Formatter (Base)
   └── SummaryFormatter
 ```
 
-
-
 ### Class Definition
-
-
 
 ```lua
 ---@class SummaryFormatter : Formatter
@@ -43,16 +32,11 @@ Formatter (Base)
 local SummaryFormatter = Formatter.extend("summary", "txt")
 ```
 
-
-
 ## Text-Based Summary Format
-
 
 The Summary formatter provides several output formats tailored for different use cases:
 
 ### Compact Format (Default)
-
-
 
 ```text
 Coverage Summary:
@@ -66,11 +50,7 @@ Files below threshold (<75%):
   lib/other.lua               58.9%  ███████████▒▒▒▒▒▒▒
 ```
 
-
-
 ### Detailed Format
-
-
 
 ```text
 Coverage Summary (2025-04-12 21:45:14)
@@ -92,11 +72,7 @@ Performance:
   Processed 2547 lines at 2070 lines/s
 ```
 
-
-
 ### Hierarchical Format
-
-
 
 ```text
 Coverage Summary:
@@ -112,16 +88,11 @@ lib/ (75.2%)
       └── format.lua              86.7%  █████████████████▒▒▒
 ```
 
-
-
 ## Core Methods
-
 
 ### format(data, options)
 
-
 Formats coverage data into text summary.
-
 
 ```lua
 ---@param data table Normalized coverage data
@@ -131,13 +102,9 @@ Formats coverage data into text summary.
 function SummaryFormatter:format(data, options)
 ```
 
-
-
 ### generate(data, output_path, options)
 
-
 Generate and save a complete text summary report.
-
 
 ```lua
 ---@param data table Coverage data
@@ -148,43 +115,65 @@ Generate and save a complete text summary report.
 function SummaryFormatter:generate(data, output_path, options)
 ```
 
-
-
 ## Configuration Options
 
-
 The Summary formatter supports these configuration options:
+
 | Option | Type | Default | Description |
+
 |--------|------|---------|-------------|
+
 | `style` | string | `"compact"` | Output style ("compact", "detailed", "hierarchical") |
+
 | `include_timestamp` | boolean | `true` | Include timestamp in the report |
+
 | `color` | boolean | `true` | Use ANSI color escape sequences |
+
 | `progress_bars` | boolean | `true` | Show visual progress bars for coverage |
+
 | `progress_char` | string | `"█"` | Character for progress bar filled sections |
+
 | `progress_empty` | string | `"▒"` | Character for progress bar empty sections |
+
 | `progress_width` | number | `20` | Width of progress bars in characters |
+
 | `sort_by` | string | `"coverage"` | Sort files by ("coverage", "path", "name") |
+
 | `sort_direction` | string | `"desc"` | Sort direction ("asc", "desc") |
+
 | `thresholds` | table | `{good=80, warn=70}` | Coverage thresholds for status indicators |
+
 | `show_uncovered_files` | boolean | `true` | Include files with 0% coverage |
+
 | `show_files` | boolean | `true` | Show individual file information |
+
 | `max_files` | number | `10` | Maximum number of files to show (0 = all) |
+
 | `max_filename_length` | number | `30` | Truncate filenames to this length |
+
 | `show_execution_count` | boolean | `false` | Show execution counts for lines |
+
 | `min_coverage` | number | `0` | Minimum coverage to show a file |
+
 | `max_coverage` | number | `100` | Maximum coverage to show a file |
+
 | `filter_pattern` | string | `nil` | Pattern to filter files (Lua pattern) |
+
 | `exclude_pattern` | string | `nil` | Pattern to exclude files (Lua pattern) |
+
 | `directory_depth` | number | `0` | Max directory depth for hierarchical view (0 = all) |
+
 | `show_statistics` | boolean | `true` | Show overall statistics section |
+
 | `show_performance` | boolean | `false` | Show performance information |
+
 | `precision` | number | `1` | Decimal precision for percentages |
+
 | `status_indicator` | boolean | `true` | Show status indicators (✓, ⚠, ✗) |
+
 | `status_chars` | table | `{good="✓",warn="⚠",bad="✗"}` | Characters for status indicators |
 
 ### Configuration Example
-
-
 
 ```lua
 local reporting = require("lib.reporting")
@@ -206,13 +195,9 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
-
 ## Color and Formatting Support
 
-
 The Summary formatter supports ANSI color codes for terminal output:
-
 
 ```lua
 -- Configure with custom colors
@@ -231,13 +216,9 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
-
 ### Disabling Colors
 
-
 For environments that don't support ANSI codes:
-
 
 ```lua
 -- CI/CD environment with no color support
@@ -254,14 +235,9 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
-
 ## Output Customization
 
-
 ### Custom Progress Bars
-
-
 
 ```lua
 -- Custom progress bar appearance
@@ -275,12 +251,9 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
 Produces bars like: `[======    ]` instead of the default `██████▒▒▒▒`.
 
 ### Custom Thresholds
-
-
 
 ```lua
 -- Custom thresholds for coverage quality
@@ -298,11 +271,7 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
-
 ### Custom File Selection
-
-
 
 ```lua
 -- Show only specific files
@@ -314,13 +283,9 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
-
 ## Terminal Integration
 
-
 The Summary formatter is designed for direct terminal output:
-
 
 ```lua
 local reporting = require("lib.reporting")
@@ -338,11 +303,7 @@ print(summary)
 reporting.write_file("coverage-summary.txt", summary)
 ```
 
-
-
 ### Integration with Test Runner
-
-
 
 ```lua
 -- In runner.lua
@@ -384,27 +345,31 @@ local function run_tests_with_coverage(args)
 end
 ```
 
-
-
 ## Statistics Calculation
 
-
 The Summary formatter calculates these statistics:
+
 | Statistic | Description | Calculation |
+
 |-----------|-------------|-------------|
+
 | Total Files | Number of files in coverage data | `#data.files` |
+
 | Total Lines | Total lines analyzed | Sum of `file.summary.total_lines` |
+
 | Covered Lines | Lines covered by tests | Sum of `file.summary.covered_lines` |
+
 | Executed Lines | Lines that executed | Sum of `file.summary.executed_lines` |
+
 | Coverage % | Percentage of covered lines | `(covered_lines / total_lines) * 100` |
+
 | Execution % | Percentage of executed lines | `(executed_lines / total_lines) * 100` |
+
 | Function Coverage % | Percentage of covered functions | `(covered_functions / total_functions) * 100` |
 
 ### Custom Statistics
 
-
 Add custom statistics to the summary:
-
 
 ```lua
 -- Add custom metrics
@@ -438,16 +403,11 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
-
 ## File Filtering
-
 
 The Summary formatter supports robust file filtering:
 
 ### Pattern-Based Filtering
-
-
 
 ```lua
 -- Include only specific files
@@ -457,11 +417,7 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
-
 ### Coverage-Based Filtering
-
-
 
 ```lua
 -- Show files needing attention
@@ -473,11 +429,7 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
-
 ### Combined Filtering
-
-
 
 ```lua
 -- Focused view of core modules needing work
@@ -491,16 +443,11 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
-
 ## Output Styles
-
 
 ### Compact Style
 
-
 The compact style focuses on a brief summary with minimal file details:
-
 
 ```lua
 reporting.configure_formatter("summary", {
@@ -512,9 +459,7 @@ reporting.configure_formatter("summary", {
 })
 ```
 
-
 Output example:
-
 
 ```text
 Coverage Summary:
@@ -524,13 +469,9 @@ Files below threshold (<75%):
   lib/other.lua               58.9%  ████████▒▒▒▒▒▒
 ```
 
-
-
 ### Detailed Style
 
-
 The detailed style provides comprehensive information:
-
 
 ```lua
 reporting.configure_formatter("summary", {
@@ -541,6 +482,5 @@ reporting.configure_formatter("summary", {
   progress_bars = true
 })
 ```
-
 
 Output example:

@@ -1,13 +1,10 @@
 # Codefix API
 
-
 The codefix module in firmo provides comprehensive code quality checking and fixing capabilities. It integrates with external tools like StyLua and Luacheck while also providing custom fixers for issues that neither tool handles well.
 
 ## Overview
 
-
 The codefix module can:
-
 
 1. Format Lua code using StyLua
 2. Lint Lua code using Luacheck
@@ -15,9 +12,7 @@ The codefix module can:
 4. Provide a unified API for all code quality operations
 5. Be used through a simple CLI interface
 
-
 ## Configuration Options
-
 
 The codefix module can be configured via the `central_config` system under the `codefix` key, or by calling `codefix.init(options)`. The available options (shown below with defaults) can also be accessed via `codefix.config` after initialization:
 
@@ -85,14 +80,9 @@ local current_config = codefix.config
 }
 ```
 
-
-
 ## Basic Usage
 
-
 ### In Lua Scripts
-
-
 
 ```lua
 local codefix = require("lib.tools.codefix")
@@ -124,22 +114,17 @@ local success_dir, results_table = codefix.fix_lua_files("path/to/directory")
 
 ### From Command Line
 
-
-
 ```bash
 
 # Fix a specific file
-
 
 lua firmo.lua --fix path/to/file.lua
 
 # Fix all Lua files in a directory
 
-
 lua firmo.lua --fix path/to/directory
 
 # Check a file without fixing
-
 
 lua firmo.lua --check path/to/file.lua
 ```
@@ -147,7 +132,6 @@ lua firmo.lua --check path/to/file.lua
 *Note: The `--fix` and `--check` commands are registered with the main test runner (usually `test.lua`) via `codefix.register_with_firmo(firmo)`.*
 
 ## API Reference
-
 
 ### `codefix.init(options?)`
 
@@ -165,11 +149,9 @@ Initializes the codefix module, merging provided options with defaults and centr
 Applies the full code fixing process to a single file: Luacheck (optional) -> Custom Fixers -> StyLua (optional) -> Luacheck verification (optional).
 **Parameters:**
 
-
 - `file_path` (string): Path to the Lua file to fix
 
 **Returns:**
-
 
 - `success` (boolean): `true` if all enabled steps completed successfully (Luacheck may have warnings), `false` otherwise.
 
@@ -177,7 +159,6 @@ Applies the full code fixing process to a single file: Luacheck (optional) -> Cu
 - `table`: Can throw errors if validation, file I/O, or external tool execution fails critically.
 
 **Example:**
-
 
 ```lua
 local success = firmo.fix_file("src/module.lua")
@@ -188,18 +169,14 @@ else
 end
 ```
 
-
-
 ### `codefix.fix_files(file_paths)`
 
 Fixes multiple files by calling `codefix.fix_file` for each path in the input array. Logs overall progress and summary statistics.
 **Parameters:**
 
-
 - `file_paths` (table): Array of file paths to fix
 
 **Returns:**
-
 
 - `success` (boolean): `true` if *all* files were fixed successfully, `false` otherwise.
 - `results` (table): An array of result tables, one for each file: `{ file: string, success: boolean, error?: string }`.
@@ -209,7 +186,6 @@ Fixes multiple files by calling `codefix.fix_file` for each path in the input ar
 
 **Example:**
 
-
 ```lua
 local files = {
   "src/module1.lua",
@@ -218,8 +194,6 @@ local files = {
 }
 local success = firmo.fix_files(files)
 ```
-
-
 
 ### `codefix.fix_lua_files(directory, options?)`
 
@@ -244,7 +218,6 @@ Finds Lua files in a directory (using include/exclude patterns) and fixes them u
 - `table`: Can throw errors if validation or file discovery/fixing fails critically.
 
 **Example:**
-
 
 ```lua
 local success = firmo.fix_lua_files("src")
@@ -404,15 +377,12 @@ Registers the codefix module and commands with a Firmo instance.
 
 ## Custom Fixers
 
-
 The codefix module includes several custom fixers for issues that StyLua and Luacheck don't handle well:
 
 ### 1. Trailing Whitespace in Multiline Strings
 
-
 Fixes trailing whitespace in multiline strings, which StyLua doesn't modify.
 **Before:**
-
 
 ```lua
 local str = [[
@@ -421,9 +391,7 @@ local str = [[
 ]]
 ```
 
-
 **After:**
-
 
 ```lua
 local str = [[
@@ -432,14 +400,10 @@ local str = [[
 ]]
 ```
 
-
-
 ### 2. Unused Variables
-
 
 Prefixes unused variables with underscore to indicate they're intentionally unused.
 **Before:**
-
 
 ```lua
 local function process(data, options, callback)
@@ -448,9 +412,7 @@ local function process(data, options, callback)
 end
 ```
 
-
 **After:**
-
 
 ```lua
 local function process(data, _options, _callback)
@@ -459,28 +421,20 @@ local function process(data, _options, _callback)
 end
 ```
 
-
-
 ### 3. String Concatenation
-
 
 Optimizes string concatenation patterns by merging adjacent string literals.
 **Before:**
-
 
 ```lua
 local greeting = "Hello " .. "there " .. name .. "!"
 ```
 
-
 **After:**
-
 
 ```lua
 local greeting = "Hello there " .. name .. "!"
 ```
-
-
 
 ### 4. Type Annotations (Optional)
 
@@ -488,16 +442,13 @@ Adds basic JSDoc type annotations to function documentation (experimental, disab
 **Before:**
 **Before:**
 
-
 ```lua
 function calculate(x, y)
   return x * y
 end
 ```
 
-
 **After:**
-
 
 ```lua
 --- Function documentation
@@ -509,45 +460,33 @@ function calculate(x, y)
 end
 ```
 
-
-
 ### 5. Lua Version Compatibility (Optional)
 
 Fixes Lua version compatibility issues (targets Lua 5.1, disabled by default). Comments out `goto` and labels, replaces `table.pack` and `bit32.*` calls.
 **Before:**
 **Before:**
 
-
 ```lua
 local packed = table.pack(...)  -- Lua 5.2+ feature
 ```
 
-
 **After:**
-
 
 ```lua
 local packed = {...}  -- table.pack replaced for Lua 5.1 compatibility
 ```
 
-
-
 ## Integration with hooks-util
 
-
 The codefix module is designed to integrate seamlessly with the hooks-util framework:
-
 
 1. It can be used in pre-commit hooks to ensure code quality
 2. It shares configuration with hooks-util's existing StyLua and Luacheck integration
 3. It provides additional fixing capabilities beyond what hooks-util currently offers
 
-
 ## Examples
 
-
 See the [codefix_example.lua](../../examples/codefix_example.lua) file for a complete example of using the codefix module.
-
 
 ## Unimplemented Functions
 

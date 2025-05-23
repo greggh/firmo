@@ -1,13 +1,10 @@
 # TAP Formatter API Reference
 
-
 The TAP formatter produces coverage and test results in the Test Anything Protocol (TAP) format, compatible with TAP consumers, harnesses, and CI/CD systems that support TAP output.
 
 ## Overview
 
-
 The TAP formatter generates TAP v13 compliant output with these key features:
-
 
 - Full TAP v13 specification compliance
 - Rich YAML diagnostics for test and coverage details
@@ -18,24 +15,16 @@ The TAP formatter generates TAP v13 compliant output with these key features:
 - Hierarchical test organization support
 - Embedded source snippets (optional)
 
-
 ## Class Reference
 
-
 ### Inheritance
-
-
 
 ```text
 Formatter (Base)
   └── TAPFormatter
 ```
 
-
-
 ### Class Definition
-
-
 
 ```lua
 ---@class TAPFormatter : Formatter
@@ -43,13 +32,9 @@ Formatter (Base)
 local TAPFormatter = Formatter.extend("tap", "tap")
 ```
 
-
-
 ## TAP v13 Specification
 
-
 The TAP formatter implements TAP Version 13, which enhances the original TAP format with:
-
 
 - YAML diagnostics blocks
 - Explicit version declaration
@@ -57,7 +42,6 @@ The TAP formatter implements TAP Version 13, which enhances the original TAP for
 - Structured diagnostics
 
 Basic TAP format structure:
-
 
 ```text
 TAP version 13
@@ -69,13 +53,9 @@ ok 4 # TODO Not implemented yet
 Bail out! Fatal error occurred
 ```
 
-
-
 ### YAML Diagnostics
 
-
 YAML diagnostics blocks provide detailed information:
-
 
 ```text
 not ok 1 - Test failed
@@ -94,16 +74,11 @@ not ok 1 - Test failed
   ...
 ```
 
-
-
 ## Core Methods
-
 
 ### format(data, options)
 
-
 Formats coverage or test results data into TAP format.
-
 
 ```lua
 ---@param data table Normalized coverage or test results data
@@ -113,13 +88,9 @@ Formats coverage or test results data into TAP format.
 function TAPFormatter:format(data, options)
 ```
 
-
-
 ### format_coverage(data, options)
 
-
 Specialized method for formatting coverage data into TAP.
-
 
 ```lua
 ---@param data table Normalized coverage data
@@ -129,13 +100,9 @@ Specialized method for formatting coverage data into TAP.
 function TAPFormatter:format_coverage(data, options)
 ```
 
-
-
 ### format_results(data, options)
 
-
 Specialized method for formatting test results into TAP.
-
 
 ```lua
 ---@param data table Test results data
@@ -145,13 +112,9 @@ Specialized method for formatting test results into TAP.
 function TAPFormatter:format_results(data, options)
 ```
 
-
-
 ### generate(data, output_path, options)
 
-
 Generate and save a complete TAP report.
-
 
 ```lua
 ---@param data table Coverage or test results data
@@ -162,33 +125,45 @@ Generate and save a complete TAP report.
 function TAPFormatter:generate(data, output_path, options)
 ```
 
-
-
 ## Configuration Options
 
-
 The TAP formatter supports these configuration options:
+
 | Option | Type | Default | Description |
+
 |--------|------|---------|-------------|
+
 | `tap_version` | string | `"13"` | TAP version to declare |
+
 | `include_yaml` | boolean | `true` | Include YAML diagnostics blocks |
+
 | `yaml_indent` | string | `"  "` | Indentation for YAML blocks |
+
 | `include_source` | boolean | `false` | Include source code in YAML diagnostics |
+
 | `source_context` | number | `3` | Lines of context around source errors |
+
 | `include_coverage` | boolean | `true` | Include coverage data in diagnostics |
+
 | `include_summary` | boolean | | Include summary information |
+
 | `strict_mode` | boolean | `false` | Strict TAP compliance mode |
+
 | `handle_bailout` | boolean | `true` | Process BailOut directives |
+
 | `directive_style` | string | `"#"` | Directive indicator style (`#` or `-`) |
+
 | `max_line_length` | number | `0` | Max line length (0 = unlimited) |
+
 | `wrap_long_lines` | boolean | `false` | Wrap lines exceeding max_line_length |
+
 | `show_execution_count` | boolean | `true` | Show execution counts in output |
+
 | `escape_non_ascii` | boolean | `true` | Escape non-ASCII characters |
+
 | `file_as_tests` | boolean | `false` | Treat each file as a separate test |
 
 ### Configuration Example
-
-
 
 ```lua
 local reporting = require("lib.reporting")
@@ -204,14 +179,9 @@ reporting.configure_formatter("tap", {
 })
 ```
 
-
-
 ## Test Result Formatting
 
-
 ### Basic Test Structure
-
-
 
 ```text
 TAP version 13
@@ -226,20 +196,15 @@ not ok 2 - Database connection fails on invalid credentials
 ok 3 - Configuration loads from default path # SKIP Not implemented
 ```
 
-
-
 ### Subtests Support
 
-
 The TAP formatter supports nested tests with proper indentation:
-
 
 ```text
 TAP version 13
 1..2
 
 # Database tests
-
 
 ok 1 - Database connection
     1..3
@@ -252,26 +217,18 @@ ok 2 - User operations
     ok 2 - Updates user profile
 ```
 
-
-
 ### Skip and TODO Support
 
-
 The TAP formatter properly handles Skip and TODO directives:
-
 
 ```text
 ok 1 - Has proper permissions # SKIP Not relevant on this platform
 ok 2 - Implements advanced search # TODO Planned for next release
 ```
 
-
-
 ### BailOut Handling
 
-
 When fatal errors occur, the formatter can generate BailOut directives:
-
 
 ```text
 1..5
@@ -280,20 +237,15 @@ ok 2 - Test two
 Bail out! Fatal error: Database connection lost
 ```
 
-
-
 ## Coverage Information in TAP Format
 
-
 Coverage data is represented in TAP format as a series of tests, with one test per file:
-
 
 ```text
 TAP version 13
 1..2
 
 # Coverage for lib/module.lua (75.0%)
-
 
 ok 1 - lib/module.lua
   ---
@@ -305,13 +257,11 @@ ok 1 - lib/module.lua
     execution_percent: 90.0
   lines:
 
-
     - line: 10
 
       executed: true
       covered: true
       execution_count: 5
-
 
     - line: 11
 
@@ -322,7 +272,6 @@ ok 1 - lib/module.lua
   ...
 
 # Coverage for lib/other.lua (50.0%)
-
 
 not ok 2 - lib/other.lua
   ---
@@ -336,16 +285,11 @@ not ok 2 - lib/other.lua
   ...
 ```
 
-
-
 ## YAML Diagnostics Support
-
 
 YAML blocks in TAP v13 provide structured diagnostic information:
 
 ### Error Details
-
-
 
 ```text
 not ok 1 - Test failed
@@ -362,11 +306,7 @@ not ok 1 - Test failed
   ...
 ```
 
-
-
 ### Coverage Details
-
-
 
 ```text
 ok 1 - Module has sufficient coverage
@@ -378,11 +318,9 @@ ok 1 - Module has sufficient coverage
     coverage_percent: 70.0
   uncovered_files:
 
-
     - path: lib/rarely_used.lua
 
       coverage: 20.0%
-
 
     - path: lib/utility.lua
 
@@ -390,56 +328,39 @@ ok 1 - Module has sufficient coverage
   ...
 ```
 
-
-
 ## Producer/Consumer Integration
-
 
 ### Integration with Prove
 
-
 The TAP formatter integrates seamlessly with the Perl `prove` tool:
-
 
 ```bash
 
 # Generate TAP report
 
-
 lua firmo.lua --coverage --format=tap tests/ > results.tap
 
 # Process with prove
 
-
 prove --tap results.tap
 ```
 
-
-
 ### Integration with TAP Harness
-
-
 
 ```bash
 
 # Run with TAP::Harness
 
-
 tap-harness results.tap
 ```
 
-
-
 ### Integration with Jenkins TAP Plugin
 
-
 Configure Jenkins to collect and display TAP reports:
-
 
 1. Install the TAP Plugin in Jenkins
 2. Add a "Publish TAP Results" post-build action
 3. Configure the TAP file pattern (e.g., `coverage-reports/*.tap`)
-
 
 ```groovy
 // Jenkinsfile example
@@ -464,26 +385,19 @@ pipeline {
 }
 ```
 
-
-
 ### Integration with GitLab CI
-
-
 
 ```yaml
 
 # .gitlab-ci.yml
 
-
 test:
   script:
-
 
     - lua firmo.lua --coverage --format=tap tests/ > coverage-reports/results.tap
 
   artifacts:
     paths:
-
 
       - coverage-reports/results.tap
 
@@ -491,11 +405,7 @@ test:
       junit: coverage-reports/results.tap
 ```
 
-
-
 ## Usage Example
-
-
 
 ```lua
 local reporting = require("lib.reporting")
@@ -519,13 +429,9 @@ reporting.write_file("coverage-report.tap", tap_content)
 reporting.save_coverage_report("coverage-report.tap", data, "tap")
 ```
 
-
-
 ## Combining Test Results and Coverage
 
-
 To generate a comprehensive TAP report with both test results and coverage:
-
 
 ```lua
 local reporting = require("lib.reporting")
@@ -567,11 +473,7 @@ function combine_tap_reports(coverage_tap, test_tap)
 end
 ```
 
-
-
 ## See Also
-
-
 
 - [TAP Specification](https://testanything.org/tap-version-13-specification.html)
 - [Reporting API](../reporting.md)

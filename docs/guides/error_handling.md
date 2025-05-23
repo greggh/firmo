@@ -1,19 +1,14 @@
 # Error Handling Guide
 
-
 ## Introduction
-
 
 Effective error handling is essential for creating robust, maintainable code. This guide provides a comprehensive overview of firmo's error handling system, explaining key concepts, patterns, and best practices to use throughout your codebase.
 
 ## Key Concepts
 
-
 ### Structured Error Objects
 
-
 The foundation of firmo's error handling is the structured error object. Unlike simple string errors, structured error objects contain rich information:
-
 
 - A human-readable error message
 - A categorical classification of the error
@@ -27,9 +22,7 @@ This structure makes errors more informative, easier to debug, and enables progr
 
 ### Standard Error Return Pattern
 
-
 Firmo uses the Lua convention of returning `nil` plus an error object for functions that fail:
-
 
 ```lua
 -- Function that might fail
@@ -67,28 +60,21 @@ if not config then
 end
 ```
 
-
 This pattern provides consistent error handling throughout your codebase.
 
 ### Error Handling Integration
 
-
 The error handling system integrates with:
-
 
 1. **Logging System**: Automatically logs errors with appropriate severity
 2. **Test Framework**: Suppresses expected errors during tests
 3. **Central Configuration**: Configurable through the central config system
 
-
 ## Common Error Handling Patterns
-
 
 ### 1. Input Validation
 
-
 Start functions with input validation to catch issues early:
-
 
 ```lua
 function process_user_data(user)
@@ -112,13 +98,9 @@ function process_user_data(user)
 end
 ```
 
-
-
 ### 2. Try-Catch Pattern
 
-
 Use the try-catch pattern for operations that might throw errors:
-
 
 ```lua
 -- Execute potentially risky code
@@ -136,13 +118,9 @@ end
 return process_data(result)
 ```
 
-
-
 ### 3. Safe I/O Operations
 
-
 For file operations, use the specialized I/O error handling:
-
 
 ```lua
 -- Read a file safely
@@ -160,13 +138,9 @@ if not content then
 end
 ```
 
-
-
 ### 4. Error Propagation
 
-
 When calling other functions that might fail, propagate errors with additional context:
-
 
 ```lua
 function process_directory(dir_path)
@@ -186,13 +160,9 @@ function process_directory(dir_path)
 end
 ```
 
-
-
 ### 5. Resource Management with Error Handling
 
-
 When working with resources that need cleanup, use this pattern:
-
 
 ```lua
 function process_file_safely(file_path)
@@ -243,18 +213,13 @@ function process_file_safely(file_path)
 end
 ```
 
-
-
 ## Testing Error Conditions
-
 
 A critical part of error handling is verifying that errors work correctly. Firmo provides specialized patterns for testing error conditions.
 
 ### 1. Using the expect_error Flag
 
-
 When a test specifically validates error behavior, add the `expect_error` flag:
-
 
 ```lua
 it("should reject invalid input", { expect_error = true }, function()
@@ -269,20 +234,15 @@ it("should reject invalid input", { expect_error = true }, function()
 end)
 ```
 
-
 The `expect_error` flag tells the test runner:
-
 
 - Don't mark the test as failed if errors occur
 - Suppress error messages in normal output
 - Allow assertions about the errors
 
-
 ### 2. Testing Functions that Throw Errors
 
-
 For functions that throw errors directly (not returning nil, error):
-
 
 ```lua
 it("should throw on invalid config", { expect_error = true }, function()
@@ -296,13 +256,9 @@ it("should throw on invalid config", { expect_error = true }, function()
 end)
 ```
 
-
-
 ### 3. Testing Functions with Complex Error Paths
 
-
 For more detailed error testing:
-
 
 ```lua
 it("should handle complex error conditions", { expect_error = true }, function()
@@ -318,13 +274,9 @@ it("should handle complex error conditions", { expect_error = true }, function()
 })
 ```
 
-
-
 ### 4. Testing Different Error Return Patterns
 
-
 Some functions return `nil, error` while others return `false`:
-
 
 ```lua
 it("handles both error patterns", { expect_error = true }, function()
@@ -343,40 +295,28 @@ it("handles both error patterns", { expect_error = true }, function()
 end)
 ```
 
-
-
 ## Error Suppression in Tests
 
-
 The firmo error handling system intelligently suppresses expected errors during tests:
-
 
 1. **Automatic Downgrading**: ERROR/WARNING logs are downgraded to DEBUG level in tests with `expect_error = true`
 2. **Error Marking**: Adds `[EXPECTED]` prefix to suppressed errors in debug mode
 3. **Error History**: Maintains a global registry of expected errors for programmatic access
 
-
 ### Viewing Suppressed Errors
 
-
 To see suppressed errors during debugging:
-
 
 ```bash
 
 # Run tests with debug flag
 
-
 lua firmo.lua --debug tests/my_module_test.lua
 ```
 
-
-
 ### Accessing Error History
 
-
 For advanced use cases, access expected errors programmatically:
-
 
 ```lua
 local function count_expected_errors()
@@ -396,11 +336,7 @@ it("should record multiple errors", { expect_error = true }, function()
 end)
 ```
 
-
-
 ## Error Testing Best Practices
-
-
 
 1. **Always Use expect_error Flag**: Mark tests that expect errors with `{ expect_error = true }`
 2. **Be Flexible with Error Checking**: Use `match()` instead of `equal()` for error messages
@@ -411,40 +347,29 @@ end)
    - Direct testing for functions that return nil + error
 5. **Test Error Propagation**: Verify errors propagate correctly through function calls
 
-
 ## Module-Specific Error Handling
-
 
 ### Coverage Module
 
-
 When implementing error handling in coverage components:
-
 
 1. **File paths**: Always normalize and validate file paths
 2. **Source code analysis**: Use try/catch for parser operations
 3. **Data flow**: Validate data structures before processing
 4. **Report generation**: Implement fallbacks for invalid data
 
-
 ### Assertions
 
-
 For assertion-related error handling:
-
 
 1. **Clear error messages**: Include expected and actual values
 2. **Source location**: Include file and line information when available
 3. **Failure isolation**: Prevent assertion failures from affecting other tests
 4. **Custom formatting**: Use formatted messages for complex values
 
-
 ## Common Error Handling Mistakes
 
-
 ### 1. Swallowing Errors
-
-
 
 ```lua
 -- BAD: Error is lost
@@ -467,11 +392,7 @@ function process_data(data)
 end
 ```
 
-
-
 ### 2. Insufficient Context
-
-
 
 ```lua
 -- BAD: Generic error with no context
@@ -487,11 +408,7 @@ if not file_exists(path) then
 end
 ```
 
-
-
 ### 3. Inconsistent Error Handling
-
-
 
 ```lua
 -- BAD: Inconsistent error handling
@@ -528,11 +445,7 @@ function operation_b()
 end
 ```
 
-
-
 ### 4. Not Handling All Error Cases
-
-
 
 ```lua
 -- BAD: Missing error handling
@@ -548,13 +461,9 @@ end
 process_result(result)
 ```
 
-
-
 ## Error Handling Implementation Checklist
 
-
 When implementing error handling in a module, ensure you cover these aspects:
-
 
 1. **Input Validation**
    - [x] Add parameter validation at the start of functions
@@ -585,9 +494,7 @@ When implementing error handling in a module, ensure you cover these aspects:
    - [x] Use expect_error flag for error tests
    - [x] Test all error paths and conditions
 
-
 ## Conclusion
-
 
 Effective error handling is essential for creating reliable, maintainable code. By following the patterns and best practices in this guide, you can create a consistent approach to error handling that improves code quality, simplifies debugging, and enhances the overall robustness of your application.
 For detailed API reference of the error handling system, see the [Error Handling API Reference](../api/error_handling.md).

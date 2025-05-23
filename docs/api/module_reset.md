@@ -1,10 +1,8 @@
 # Module Reset API Reference
 
-
 This document provides a comprehensive reference for firmo's module reset functionality, which helps maintain clean state between tests.
 
 ## Overview
-
 
 Firmo provides utilities for managing Lua's module cache (`package.loaded`) to ensure test isolation. The module reset functionality is available in two forms:
 
@@ -13,15 +11,12 @@ Firmo provides utilities for managing Lua's module cache (`package.loaded`) to e
 - [How Module Reset Works](#how-module-reset-works)
 - [Error Handling](#error-handling)
 
-
 The enhanced module reset system is available through the `lib.core.module_reset` module and provides comprehensive module management capabilities.
 
 ### module_reset.init()
 
-
 Initializes the module reset system and takes a snapshot of the current module state.
 **Returns:**
-
 
 - (module_reset): The module_reset instance for chaining
 
@@ -29,32 +24,25 @@ Initializes the module reset system and takes a snapshot of the current module s
 This function initializes the module reset system by taking a snapshot of the currently loaded modules. It also protects these initial modules from being reset. You should call this once at the start of your test suite.
 **Example:**
 
-
 ```lua
 local module_reset = require("lib.core.module_reset")
 module_reset.init()
 ```
 
-
-
 ### module_reset.register_with_firmo(firmo)
-
 
 Registers the module reset system with firmo and enhances firmo's reset functionality.
 **Parameters:**
 
-
 - `firmo` (table): The firmo instance to register with
 
 **Returns:**
-
 
 - (table): The enhanced firmo instance
 
 **Description:**
 This function integrates the module reset system with firmo by enhancing firmo's `reset()` function to include module reset capabilities. After registration, firmo can automatically reset modules between tests.
 **Example:**
-
 
 ```lua
 local firmo = require("firmo")
@@ -63,14 +51,10 @@ local module_reset = require("lib.core.module_reset")
 module_reset.register_with_firmo(firmo)
 ```
 
-
-
 ### module_reset.configure(options)
-
 
 Configures the isolation options for the module reset system.
 **Parameters:**
-
 
 - `options` (table): Configuration options
   - `reset_modules` (boolean, optional): Whether to automatically reset modules (default: false)
@@ -79,13 +63,11 @@ Configures the isolation options for the module reset system.
 
 **Returns:**
 
-
 - (table): The firmo instance with updated configuration
 
 **Description:**
 This function configures how the module reset system behaves during test runs. The most important setting is `reset_modules`, which enables automatic module reset between test files.
 **Example:**
-
 
 ```lua
 module_reset.configure({
@@ -95,27 +77,21 @@ module_reset.configure({
 })
 ```
 
-
-
 ### module_reset.reset_all(options)
-
 
 Resets all non-protected modules.
 **Parameters:**
-
 
 - `options` (table, optional): Options for reset operation
   - `verbose` (boolean, optional): Whether to show detailed output (default: false)
   - `force` (boolean, optional): **(Not Implemented)** Whether to force reset of all modules, including protected (default: false)
 **Returns:**
 
-
 - (number): Number of modules that were reset
 
 **Description:**
 This function resets all non-protected modules by removing them from `package.loaded`. When modules are required again, they'll be loaded fresh with their initial state.
 **Example:**
-
 
 ```lua
 -- Reset all modules and report how many were reset
@@ -125,14 +101,10 @@ print("Reset " .. count .. " modules")
 module_reset.reset_all({ verbose = true })
 ```
 
-
-
 ### module_reset.reset_pattern(pattern, options)
-
 
 Resets modules whose names match the given Lua pattern.
 **Parameters:**
-
 
 - `pattern` (string): Lua pattern to match against module names
 - `options` (table, optional): Options for reset operation
@@ -140,13 +112,11 @@ Resets modules whose names match the given Lua pattern.
 
 **Returns:**
 
-
 - (number): Number of modules that were reset
 
 **Description:**
 This function selectively resets modules whose names match the given Lua pattern. This is useful for resetting modules in a specific namespace while leaving others untouched.
 **Example:**
-
 
 ```lua
 -- Reset all modules in the "app.services" namespace
@@ -156,26 +126,20 @@ print("Reset " .. count .. " service modules")
 module_reset.reset_pattern("model", { verbose = true })
 ```
 
-
-
 ### module_reset.protect(modules)
-
 
 Protects specified modules from being reset.
 **Parameters:**
 
-
 - `modules` (string|table): Module name or array of module names to protect
 
 **Returns:**
-
 
 - (module_reset): The module_reset instance
 
 **Description:**
 This function adds modules to the protected list, preventing them from being reset by `reset_all()` or `reset_pattern()`. This is useful for modules that should maintain their state across tests, such as configuration or logging modules.
 **Example:**
-
 
 ```lua
 -- Protect a single module
@@ -188,26 +152,20 @@ module_reset.protect({
 })
 ```
 
-
-
 ### module_reset.is_protected(module_name)
-
 
 Checks if a module is protected from reset.
 **Parameters:**
 
-
 - `module_name` (string): Name of the module to check
 
 **Returns:**
-
 
 - (boolean): Whether the module is protected
 
 **Description:**
 This function checks if a module is in the protected list and thus safe from being reset.
 **Example:**
-
 
 ```lua
 if module_reset.is_protected("app.config") then
@@ -217,26 +175,20 @@ else
 end
 ```
 
-
-
 ### module_reset.add_protected_module(module_name)
-
 
 Adds a single module to the protected list.
 **Parameters:**
 
-
 - `module_name` (string): Name of the module to protect
 
 **Returns:**
-
 
 - (boolean): Whether the module was newly added (false if already protected)
 
 **Description:**
 This function adds a single module to the protected list. It differs from `protect()` in that it only accepts a single module name and returns whether the module was newly added.
 **Example:**
-
 
 ```lua
 local was_added = module_reset.add_protected_module("app.critical_module")
@@ -247,14 +199,10 @@ else
 end
 ```
 
-
-
 ### module_reset.count_protected_modules()
-
 
 Counts the number of protected modules.
 **Returns:**
-
 
 - (number): Number of protected modules
 
@@ -262,20 +210,15 @@ Counts the number of protected modules.
 This function returns the total count of modules that are protected from reset.
 **Example:**
 
-
 ```lua
 local count = module_reset.count_protected_modules()
 print("There are " .. count .. " protected modules")
 ```
 
-
-
 ### module_reset.snapshot()
-
 
 Takes a snapshot of the current module state.
 **Returns:**
-
 
 - (table): Table mapping module names to boolean (true)
 - (number): Count of modules in the snapshot
@@ -284,27 +227,21 @@ Takes a snapshot of the current module state.
 This function takes a snapshot of the currently loaded modules. This is mainly used internally but can be useful for tracking module loading during tests.
 **Example:**
 
-
 ```lua
 local snapshot, count = module_reset.snapshot()
 print("There are " .. count .. " modules loaded")
 ```
 
-
-
 ### module_reset.get_loaded_modules()
-
 
 Gets a list of currently loaded, non-protected modules.
 **Returns:**
-
 
 - (table): Array of module names
 
 **Description:**
 This function returns a sorted list of all currently loaded modules that are not protected from reset.
 **Example:**
-
 
 ```lua
 local modules = module_reset.get_loaded_modules()
@@ -314,14 +251,10 @@ for _, name in ipairs(modules) do
 end
 ```
 
-
-
 ### module_reset.get_memory_usage()
-
 
 Gets current memory usage information.
 **Returns:**
-
 
 - (table): Memory usage information
   - `current` (number): Current memory usage in kilobytes
@@ -330,25 +263,19 @@ Gets current memory usage information.
 This function returns information about the current memory usage of the Lua state, useful for tracking memory during tests.
 **Example:**
 
-
 ```lua
 local memory = module_reset.get_memory_usage()
 print("Current memory usage: " .. memory.current .. " KB")
 ```
 
-
-
 ### module_reset.analyze_memory_usage(options)
-
 
 Analyzes memory usage by module.
 **Parameters:**
 
-
 - `options` (table, optional): Options for analysis
   - `track_level` (string, optional): **(Not Implemented)** Level of detail for tracking
 **Returns:**
-
 
 - (table): Array of tables with module memory information
   - Each entry has `name` (string) and `memory` (number) fields
@@ -357,7 +284,6 @@ Analyzes memory usage by module.
 **Description:**
 This function analyzes the memory usage of loaded modules by measuring the memory difference when each module is temporarily unloaded. This helps identify which modules are using the most memory.
 **Example:**
-
 
 ```lua
 local module_memory = module_reset.analyze_memory_usage()
@@ -369,35 +295,26 @@ for i, entry in ipairs(module_memory) do
 end
 ```
 
-
-
 ## Integration with firmo Test Framework
-
 
 After registering with firmo, the module reset system enhances firmo's reset functionality to automatically reset modules between tests.
 
 ### firmo.reset()
-
 
 The enhanced reset function provided by module_reset integration.
 **Description:**
 This function is enhanced by the module_reset system to reset modules automatically based on the configured options. It's called automatically by the test runner between test files.
 **Example:**
 
-
 ```lua
 -- This will reset all modules if reset_modules is enabled
 firmo.reset()
 ```
 
-
-
 ### firmo.isolation_options
-
 
 The isolation options configured through module_reset.
 **Type:**
-
 
 - (table): The configuration options for isolation
   - `reset_modules` (boolean): Whether to automatically reset modules
@@ -408,7 +325,6 @@ The isolation options configured through module_reset.
 This property holds the isolation options configured through `module_reset.configure()`. It's used by the enhanced `reset()` function to determine whether to reset modules.
 **Example:**
 
-
 ```lua
 if firmo.isolation_options and firmo.isolation_options.reset_modules then
   print("Automatic module reset is enabled")
@@ -417,13 +333,9 @@ else
 end
 ```
 
-
-
 ## How Module Reset Works
 
-
 Understanding how module reset works internally can help you use it effectively:
-
 
 1. **In Lua, modules are singletons**: When you call `require("module_name")`, Lua:
    - Checks if the module is already in `package.loaded[module_name]`
@@ -443,12 +355,9 @@ Understanding how module reset works internally can help you use it effectively:
    - Any modules that were loaded when `module_reset.init()` was called
    - Any modules explicitly added through `module_reset.protect()`
 
-
 ## Error Handling
 
-
 The module reset system includes comprehensive error handling using firmo's error_handler system:
-
 
 1. **Validation errors** for invalid parameters:
    - Invalid module names
@@ -465,8 +374,6 @@ The module reset system includes comprehensive error handling using firmo's erro
 All errors include detailed context information to help diagnose issues.
 
 ## See Also
-
-
 
 - [Module Reset Guide](../guides/module_reset.md): Practical guide to using module reset
 - [Module Reset Examples](../../examples/module_reset_examples.md): Real-world usage examples

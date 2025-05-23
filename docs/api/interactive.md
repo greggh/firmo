@@ -1,11 +1,8 @@
 # Interactive CLI API Reference
 
-
 The Interactive CLI module provides a powerful and flexible command-line interface for the Firmo test framework. It allows users to run tests, manage test filters, configure watch mode, and work with codefix features in an interactive shell environment.
 
 ## Table of Contents
-
-
 
 - [Module Overview](#module-overview)
 - [Configuration](#configuration)
@@ -13,12 +10,9 @@ The Interactive CLI module provides a powerful and flexible command-line interfa
 - [Command Interface](#command-interface)
 - [Integration with Other Modules](#integration-with-other-modules)
 
-
 ## Module Overview
 
-
 The interactive module provides a command-line interface with the following capabilities:
-
 
 - Running tests interactively through a command shell
 - Filtering tests by name, patterns, and tags
@@ -27,9 +21,7 @@ The interactive module provides a command-line interface with the following capa
 - History management for previously entered commands
 - Extensive configuration options and central config integration
 
-
 ## Configuration
-
 
 The interactive module provides several configuration options that can be set via the initialization function or updated during runtime:
 
@@ -58,8 +50,6 @@ The module uses the following default configuration values:
 }
 ```
 
-
-
 ## Core Functions
 
 ### configure
@@ -70,19 +60,15 @@ Configures the interactive CLI module settings. This is the primary function for
 function interactive.configure(options)
 ```
 
-
 **Parameters:**
-
 
 - `options` (table, optional): Configuration options to override defaults
 
 **Returns:**
 
-
 - (interactive_module): The module instance for method chaining
 
 **Example:**
-
 
 ```lua
 interactive.configure({
@@ -92,32 +78,24 @@ interactive.configure({
 })
 ```
 
-
-
 ### start
 
-
 Start the interactive CLI session.
-
 
 ```lua
 function interactive.start(firmo, options)
 ```
 
-
 **Parameters:**
-
 
 - `firmo` (table): The firmo framework instance
 - `options` (table, optional): Additional options for the CLI session
 
 **Returns:**
 
-
 - (boolean): Whether the session was started successfully
 
 **Example:**
-
 
 ```lua
 local firmo = require("firmo")
@@ -127,86 +105,62 @@ interactive.start(firmo, {
 })
 ```
 
-
-
 ### reset
 
-
 Reset the interactive CLI to default configuration.
-
 
 ```lua
 function interactive.reset()
 ```
 
-
 **Returns:**
-
 
 - (interactive_module): The module instance for method chaining
 
 **Example:**
-
 
 ```lua
 interactive.reset()
 ```
 
-
-
 ### full_reset
 
-
 Fully reset both configuration and state.
-
 
 ```lua
 function interactive.full_reset()
 ```
 
-
 **Returns:**
-
 
 - (interactive_module): The module instance for method chaining
 
 **Example:**
 
-
 ```lua
 interactive.full_reset()
 ```
 
-
-
 ### debug_config
 
-
 Get debug information about the current configuration.
-
 
 ```lua
 function interactive.debug_config()
 ```
 
-
 **Returns:**
-
 
 - (table): Detailed information about the current configuration and state
 
 **Example:**
-
 
 ```lua
 local config_info = interactive.debug_config()
 print(config_info.runtime_state.file_count)
 ```
 
-
-
 ## Command Interface
-
 
 The interactive CLI supports the following commands:
 | Command | Description | Example |
@@ -230,12 +184,9 @@ The interactive CLI supports the following commands:
 
 ## Integration with Other Modules
 
-
 ### Integration with Central Config
 
-
 The interactive module integrates with the central configuration system to ensure consistency across the framework. When central_config is available, it:
-
 
 1. Loads initial settings from central_config
 2. Registers changes made to settings
@@ -243,7 +194,6 @@ The interactive module integrates with the central configuration system to ensur
 4. Responds to changes in central_config made by other modules
 
 Example of central_config integration:
-
 
 ```lua
 -- The module automatically integrates with central_config
@@ -260,20 +210,15 @@ central_config.set("interactive.watch_mode", true)
 -- This will enable watch mode in the interactive CLI
 ```
 
-
-
 ### Integration with Watcher Module
 
-
 The interactive module integrates with the watcher module to provide file watching capabilities:
-
 
 1. Configures the watcher with watch directories and exclude patterns
 2. Handles file change events to rerun tests automatically
 3. Controls watcher settings through CLI commands
 
 Example of watcher integration:
-
 
 ```lua
 -- Watch mode is started automatically when watch_mode is true
@@ -287,20 +232,15 @@ Example of watcher integration:
 -- 3. Provide feedback on which files changed
 ```
 
-
-
 ### Integration with Codefix Module
 
-
 The interactive module integrates with the codefix module to provide code quality fixing capabilities:
-
 
 1. Initializes codefix with appropriate settings
 2. Provides commands to run codefix operations
 3. Displays results of codefix operations
 
 Example of codefix integration:
-
 
 ```lua
 -- Codefix can be run via commands:

@@ -1,6 +1,3 @@
-<div align="center">
-THIS IS ALPHA SOFTWARE, DO NOT USE UNLESS YOU UNDERSTAND THAT, AND ARE LOOKING TO HELP.
-
 # Firmo
 
 [![CI](https://github.com/greggh/firmo/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/greggh/firmo/actions/workflows/ci.yml)
@@ -154,37 +151,29 @@ Firmo provides a comprehensive command line interface:
 
 # Run all tests in the tests directory
 
-
 lua firmo.lua tests/
 
 # Run with coverage and generate HTML report
-
 
 lua firmo.lua --coverage --report-format=html tests/
 
 # Run in watch mode
 
-
 lua firmo.lua --watch tests/
 
 # Run in parallel with 8 workers
-
 
 lua firmo.lua --parallel tests/
 
 # Run with quality validation
 
-
 lua firmo.lua --quality --quality-level=3 tests/
 
 # Run in interactive mode
 
-
 lua firmo.lua --interactive
 
-
 # Filter tests by pattern
-
 
 lua firmo.lua --filter="database" tests/
 ```
@@ -359,11 +348,9 @@ Simply copy `firmo.lua` into your project directory:
 
 # Download the file
 
-
 curl -O https://raw.githubusercontent.com/greggh/firmo/main/firmo.lua
 
 # Or clone and copy
-
 
 git clone https://github.com/greggh/firmo.git
 cp firmo/firmo.lua your-project/
@@ -381,11 +368,9 @@ luarocks install firmo
 
 # Add as submodule
 
-
 git submodule add https://github.com/greggh/firmo.git deps/firmo
 
 # Update your package path in your main Lua file
-
 
 package.path = package.path .. ";./deps/firmo/?.lua"
 ```

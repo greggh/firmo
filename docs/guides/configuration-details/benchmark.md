@@ -1,13 +1,10 @@
 # Benchmark Module Configuration
 
-
 This document describes the comprehensive configuration options for the firmo benchmark module, which provides precise performance measurement and analysis tools for code optimization.
 
 ## Overview
 
-
 The benchmark module provides a robust system for measuring code performance with support for:
-
 
 - Multiple iteration benchmarking with statistical analysis
 - Memory usage tracking
@@ -16,12 +13,9 @@ The benchmark module provides a robust system for measuring code performance wit
 - Human-readable formatting of results
 - Integration with the central configuration system
 
-
 ## Configuration Options
 
-
 ### Core Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -35,9 +29,7 @@ The benchmark module provides a robust system for measuring code performance wit
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the benchmark module in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -64,13 +56,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the benchmark module programmatically:
-
 
 ```lua
 local benchmark = require("lib.tools.benchmark")
@@ -84,13 +72,9 @@ benchmark.configure({
 benchmark.reset()
 ```
 
-
-
 ## Benchmark Execution 
 
-
 Control how benchmarks execute:
-
 
 ```lua
 -- Run a benchmark with custom options
@@ -114,13 +98,9 @@ print("Memory used: " .. results.memory_used .. " KB")
 print("Standard deviation: " .. results.stddev)
 ```
 
-
-
 ## Comparative Benchmarking
 
-
 Configure how benchmark comparisons work:
-
 
 ```lua
 -- Create a benchmark suite for comparison
@@ -157,13 +137,9 @@ for name, significant in pairs(comparison.statistical_significance) do
 end
 ```
 
-
-
 ## Result Formatting
 
-
 Configure how benchmark results are formatted:
-
 
 ```lua
 -- Configure output formatting
@@ -180,13 +156,9 @@ benchmark.print_results(results, "json")    -- JSON format
 benchmark.save_results(results, "benchmark-results.md", "markdown")
 ```
 
-
-
 ## Memory Tracking
 
-
 Configure memory usage tracking:
-
 
 ```lua
 -- Enable memory tracking
@@ -202,13 +174,9 @@ local after = benchmark.memory()
 print("Memory used: " .. (after - before) .. " KB")
 ```
 
-
-
 ## Statistical Analysis
 
-
 Configure statistical analysis of benchmark results:
-
 
 ```lua
 -- Enable statistical reporting
@@ -227,13 +195,9 @@ print("StdDev: " .. stats.stddev)
 print("95% CI: " .. stats.confidence_interval.lower .. " - " .. stats.confidence_interval.upper)
 ```
 
-
-
 ## Performance Visualization
 
-
 Configure benchmark visualization:
-
 
 ```lua
 -- Configure visualization options
@@ -258,13 +222,9 @@ local hist_chart = benchmark.plot(histogram, {
 print(hist_chart)
 ```
 
-
-
 ## Integration with Test Runner
 
-
 The benchmark module integrates with Firmo's test framework:
-
 
 ```lua
 -- In test files
@@ -308,14 +268,9 @@ describe("Performance Tests", function()
 end)
 ```
 
-
-
 ## Best Practices
 
-
 ### Setting Appropriate Iterations
-
-
 
 ```lua
 -- For quick initial benchmarks
@@ -335,11 +290,7 @@ benchmark.configure({
 })
 ```
 
-
-
 ### Memory Management
-
-
 
 ```lua
 -- Before I/O bound benchmarks
@@ -355,11 +306,7 @@ benchmark.configure({
 })
 ```
 
-
-
 ### Statistically Valid Benchmarks
-
-
 
 ```lua
 -- For high-variance operations
@@ -378,14 +325,9 @@ else
 end
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues
-
-
 
 1. **High variance in results**:
    - Increase the number of iterations with `iterations = 30` or higher
@@ -407,13 +349,9 @@ end
    - Save and compare benchmark results from controlled environments
    - Use statistical analysis to check significance of differences
 
-
 ## Example Configuration Files
 
-
 ### Development Configuration
-
-
 
 ```lua
 -- .firmo-config.development.lua
@@ -431,11 +369,7 @@ return {
 }
 ```
 
-
-
 ### CI Configuration
-
-
 
 ```lua
 -- .firmo-config.ci.lua
@@ -456,11 +390,7 @@ return {
 }
 ```
 
-
-
 ### Performance Testing Configuration
-
-
 
 ```lua
 -- .firmo-config.performance.lua
@@ -482,6 +412,5 @@ return {
   }
 }
 ```
-
 
 These configuration options give you complete control over the benchmarking process, allowing you to balance between quick development feedback and comprehensive performance analysis.

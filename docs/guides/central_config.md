@@ -1,13 +1,10 @@
 # Central Configuration Guide
 
-
 The central configuration system in Firmo provides a unified approach to managing configuration across all framework components. This guide explains how to use the system effectively in your projects.
 
 ## Introduction
 
-
 Firmo's centralized configuration system replaces the legacy module-specific configuration approach, offering significant advantages:
-
 
 - **Hierarchical Configuration**: Access configuration using intuitive dot notation
 - **Schema Validation**: Verify configuration values against defined schemas
@@ -15,25 +12,17 @@ Firmo's centralized configuration system replaces the legacy module-specific con
 - **File-Based Persistence**: Load and save configuration from/to files
 - **Consistent API**: All framework components use the same configuration interface
 
-
 ## Basic Usage
 
-
 ### Importing the Module
-
-
 
 ```lua
 local central_config = require("lib.core.central_config")
 ```
 
-
-
 ### Getting Configuration Values
 
-
 Access configuration values using the `get()` function with dot notation paths:
-
 
 ```lua
 -- Get with default values (recommended)
@@ -46,14 +35,11 @@ local include_patterns = central_config.get("coverage.include", {})
 local full_config = central_config.get()
 ```
 
-
 Always provide a default value as the second parameter to handle cases where the configuration value doesn't exist.
 
 ### Setting Configuration Values
 
-
 Set configuration values using the `set()` function:
-
 
 ```lua
 -- Set simple values
@@ -74,13 +60,9 @@ central_config
   .set("coverage.threshold", 95)
 ```
 
-
-
 ### Deleting Configuration Values
 
-
 Remove configuration values using the `delete()` function:
-
 
 ```lua
 -- Delete a configuration value
@@ -90,16 +72,11 @@ if not success then
 end
 ```
 
-
-
 ## Configuration Files
-
 
 ### Creating a Configuration File
 
-
 Create a `.firmo-config.lua` file in your project root:
-
 
 ```lua
 -- .firmo-config.lua
@@ -130,13 +107,9 @@ return {
 }
 ```
 
-
-
 ### Loading Configuration from a File
 
-
 Load configuration from a file using the `load_from_file()` function:
-
 
 ```lua
 -- Load from default config file (.firmo-config.lua)
@@ -152,13 +125,9 @@ end
 local config, err = central_config.load_from_file("/path/to/custom-config.lua")
 ```
 
-
-
 ### Saving Configuration to a File
 
-
 Save your current configuration to a file using the `save_to_file()` function:
-
 
 ```lua
 -- Save to default config file
@@ -170,16 +139,11 @@ end
 local success, err = central_config.save_to_file("/path/to/saved-config.lua")
 ```
 
-
-
 ## Module Registration
-
 
 Modules should register their configuration schema and defaults with the central configuration system.
 
 ### Registering a Module
-
-
 
 ```lua
 central_config.register_module("my_module", {
@@ -200,13 +164,9 @@ central_config.register_module("my_module", {
 })
 ```
 
-
-
 ### Schema Definition
 
-
 The schema table supports these validation options:
-
 
 - `required_fields`: Array of field names that must be present
 - `field_types`: Mapping of field names to expected types
@@ -216,7 +176,6 @@ The schema table supports these validation options:
 - `validators`: Custom validator functions for complex validation
 
 Example of a detailed schema:
-
 
 ```lua
 {
@@ -254,13 +213,9 @@ Example of a detailed schema:
 }
 ```
 
-
-
 ### Default Values
 
-
 Provide reasonable defaults for your module:
-
 
 ```lua
 {
@@ -272,22 +227,16 @@ Provide reasonable defaults for your module:
 }
 ```
 
-
 Defaults will be applied when:
-
 
 1. A user doesn't specify a value
 2. The configuration is reset
 
-
 ## Change Notifications
-
 
 The central configuration system can notify your code when configuration values change.
 
 ### Registering for Change Notifications
-
-
 
 ```lua
 -- Listen for changes to a specific setting
@@ -312,13 +261,9 @@ central_config.on_change("", function(path, old_value, new_value)
 end)
 ```
 
-
-
 ## Configuration Validation
 
-
 Validate configuration values against registered schemas:
-
 
 ```lua
 -- Validate a specific module's configuration
@@ -342,13 +287,9 @@ if not valid then
 end
 ```
 
-
-
 ## Configuration Reset
 
-
 Reset configuration to defaults:
-
 
 ```lua
 -- Reset a specific module
@@ -357,16 +298,11 @@ central_config.reset("logging")
 central_config.reset()
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Command Line Integration
 
-
 Integrate configuration with command-line arguments:
-
 
 ```lua
 local function parse_cli_args()
@@ -388,13 +324,9 @@ end
 central_config.configure_from_options(parse_cli_args())
 ```
 
-
-
 ### Environment-Specific Configuration
 
-
 Load different configuration files based on the environment:
-
 
 ```lua
 -- Determine the environment
@@ -409,13 +341,9 @@ else
 end
 ```
 
-
-
 ### Configuration Layers
 
-
 Implement configuration layers with priority:
-
 
 ```lua
 -- 1. Start with defaults from module registration
@@ -436,16 +364,11 @@ end
 central_config.configure_from_options(parse_cli_args())
 ```
 
-
-
 ## Integration with Modules
-
 
 ### Accessing Configuration in Modules
 
-
 Modules should access configuration using the central configuration system:
-
 
 ```lua
 local function initialize_module(options)
@@ -498,13 +421,9 @@ local function initialize_module(options)
 end
 ```
 
-
-
 ### Error Handling
 
-
 Handle configuration errors gracefully:
-
 
 ```lua
 local success, user_config = pcall(function()
@@ -528,11 +447,7 @@ if not success then
 end
 ```
 
-
-
 ## Best Practices
-
-
 
 1. **Register Module Schemas**: All modules should register their schema with default values.
 2. **Use Dot Notation**: Access configuration using dot notation for consistency.
@@ -545,15 +460,11 @@ end
 9. **Local Overrides**: Support local developer overrides not checked into version control.
 10. **Command-Line Options**: Allow command-line options to override file-based configuration.
 
-
 ## Common Use Cases
-
 
 ### Testing Configuration
 
-
 Set up test-specific configuration:
-
 
 ```lua
 -- Before tests
@@ -571,13 +482,9 @@ central_config.set({
 central_config.reset() -- Reset to defaults
 ```
 
-
-
 ### CI/CD Configuration
 
-
 Create CI/CD-specific configuration:
-
 
 ```lua
 -- .firmo-ci-config.lua
@@ -595,13 +502,9 @@ return {
 }
 ```
 
-
-
 ### Configuration Migration
 
-
 Transitioning from a legacy configuration system:
-
 
 ```lua
 -- Old approach
@@ -639,52 +542,38 @@ my_module.configure = function(opts)
 end
 ```
 
-
-
 ## Troubleshooting
-
 
 ### Configuration Not Applying
 
-
 If configuration changes aren't being applied:
-
 
 1. Verify the config file path is correct
 2. Check if there are any syntax errors in the config file
 3. Make sure you're using the correct path when getting values
 4. Check if the module has registered with the central configuration system
 
-
 ### Schema Validation Errors
 
-
 If you encounter validation errors:
-
 
 1. Double-check the types of your configuration values
 2. Ensure required fields are present
 3. Verify values are within the specified ranges
 4. Check custom validator functions for errors
 
-
 ### Configuration File Not Found
 
-
 If the configuration file can't be found:
-
 
 1. Verify the file exists at the expected path
 2. Check if the file has the correct permissions
 3. Try using an absolute path instead of a relative path
 4. Verify the file extension is `.lua`
 
-
 ## Next Steps
 
-
 After mastering the central configuration system, explore these related topics:
-
 
 - [Coverage Configuration](./coverage_configuration.md)
 - [Reporting Configuration](./reporting_configuration.md)

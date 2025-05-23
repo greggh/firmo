@@ -1,24 +1,17 @@
 # Benchmark API Reference
 
-
 ## Overview
 The Benchmark module provides utilities for measuring code performance (`measure`), running benchmark suites (`suite`), comparing results (`compare`), printing results (`print_result`), and generating large test suites for framework benchmarking (`generate_large_test_suite`).
 
 ## Module: `lib.tools.benchmark`
 
-
-
 ```lua
 local benchmark = require("lib.tools.benchmark")
 ```
 
-
-
 ### Configuration Options
 
-
 The benchmark module provides several configuration options that control its behavior:
-
 
 ```lua
 benchmark.options = {
@@ -32,17 +25,12 @@ benchmark.options = {
 }
 ```
 
-
-
 ## Core Functions
-
 
 ### `benchmark.measure(func, args, options)`
 
-
 Measures the execution time and performance metrics of a function.
 **Parameters:**
-
 
 - `func` (function): The function to benchmark
 - `args` (table, optional): Arguments to pass to the function
@@ -54,7 +42,6 @@ Measures the execution time and performance metrics of a function.
   - `label` (string): Name for this benchmark (default: "Benchmark")
 
 **Returns:**
-
 
 - `results` (table): Detailed benchmark results including:
   - `times` (table): Array of execution times for each iteration
@@ -80,7 +67,6 @@ Measures the execution time and performance metrics of a function.
 
 **Example:**
 
-
 ```lua
 local function test_function(iterations)
   local sum = 0
@@ -100,10 +86,8 @@ print("Average execution time: " .. results.time_stats.mean .. " seconds")
 
 ### `benchmark.suite(suite_def, options)`
 
-
 Runs a benchmark suite containing multiple benchmark cases.
 **Parameters:**
-
 
 - `suite_def` (table): Suite definition with name and test cases
   - `name` (string): Name of the benchmark suite
@@ -117,7 +101,6 @@ Runs a benchmark suite containing multiple benchmark cases.
 
 **Returns:**
 
-
 - `results` (table): Combined results from all benchmark cases
   - `name` (string): Suite name
   - `benchmarks` (table): Array of individual benchmark results
@@ -128,7 +111,6 @@ Runs a benchmark suite containing multiple benchmark cases.
   - `errors` (table): Any errors encountered
 
 **Example:**
-
 
 ```lua
 local suite_results = benchmark.suite({
@@ -167,10 +149,8 @@ local suite_results = benchmark.suite({
 
 ### `benchmark.compare(benchmark1, benchmark2, options)`
 
-
 Compares two benchmark results and calculates performance differences.
 **Parameters:**
-
 
 - `benchmark1` (table): First benchmark result (from `benchmark.measure`)
 - `benchmark2` (table): Second benchmark result (from `benchmark.measure`)
@@ -178,7 +158,6 @@ Compares two benchmark results and calculates performance differences.
   - `silent` (boolean): Don't print results to console (default: false)
 
 **Returns:**
-
 
 - `comparison` (table): Detailed comparison between benchmarks
   - `benchmarks` (table): Array of the two benchmark results
@@ -191,7 +170,6 @@ Compares two benchmark results and calculates performance differences.
 - `nil, error` (table): If validation or comparison calculation fails.
 
 **Example:**
-
 
 ```lua
 local string_concat = benchmark.measure(function(size)
@@ -216,10 +194,8 @@ print(comparison.faster .. " is " .. comparison.time_percent .. "% faster")
 
 ### `benchmark.print_result(result, options)`
 
-
 Prints formatted benchmark results to the console.
 **Parameters:**
-
 
 - `result` (table): Benchmark result from `benchmark.measure`
 - `options` (table, optional): Formatting options
@@ -229,7 +205,6 @@ Prints formatted benchmark results to the console.
   - `quiet` (boolean): Don't print to console (default: false)
 
 **Example:**
-
 
 ```lua
 local result = benchmark.measure(function()
@@ -247,10 +222,8 @@ benchmark.print_result(result, {report_stats = true})
 
 ### `benchmark.generate_large_test_suite(options)`
 
-
 Generates a large test suite for benchmarking purposes.
 **Parameters:**
-
 
 - `options` (table, optional): Generation options
   - `file_count` (number): Number of test files to generate (default: 100)
@@ -260,7 +233,6 @@ Generates a large test suite for benchmarking purposes.
   - `silent` (boolean): Don't print console output (default: false)
 
 **Returns:**
-
 
 - `suite` (table): Generated test suite definition
   - `output_dir` (string): Output directory path
@@ -272,7 +244,6 @@ Generates a large test suite for benchmarking purposes.
 - `nil, error` (table): If validation or file I/O fails.
 
 **Example:**
-
 
 ```lua
 local suite = benchmark.generate_large_test_suite({
@@ -287,10 +258,8 @@ print("Generated " .. suite.total_tests .. " tests in " .. suite.output_dir)
 
 ### `benchmark.register_with_firmo(firmo)`
 
-
 Registers benchmark functionality with the firmo framework.
 **Parameters:**
-
 
 - `firmo` (table): The firmo framework instance
 
@@ -303,7 +272,6 @@ Registers benchmark functionality with the firmo framework.
 **Example:**
 **Example:**
 
-
 ```lua
 local firmo = require("firmo")
 local benchmark = require("lib.tools.benchmark")
@@ -312,10 +280,7 @@ benchmark.register_with_firmo(firmo)
 firmo.benchmark.measure(function() return 1 + 1 end)
 ```
 
-
-
 ## Utility Functions
-
 
 ### `format_time(time_seconds)`
 - `@private`
@@ -339,9 +304,7 @@ firmo.benchmark.measure(function() return 1 + 1 end)
 
 ## Error Handling
 
-
 The benchmark module has comprehensive error handling for all operations:
-
 
 1. **Input Validation**: All public functions validate their inputs and return appropriate error messages for invalid parameters.
 2. **Safe Execution**: Benchmark code execution is protected to prevent crashes if the benchmarked function throws errors.
@@ -349,19 +312,14 @@ The benchmark module has comprehensive error handling for all operations:
 4. **Fallback Mechanisms**: When high-precision timing is unavailable, the module falls back to lower-precision alternatives.
 5. **Safe I/O**: Console output operations use protected I/O functions to prevent crashes.
 
-
 ## Performance Considerations
-
-
 
 1. **Warmup Iterations**: The module supports warmup iterations to prime caches and JIT compilation before measurement.
 2. **Garbage Collection**: Optionally forces garbage collection before benchmarks to reduce interference.
 3. **Statistical Analysis**: Calculates mean, min, max, and standard deviation to help identify performance variability.
 4. **Memory Tracking**: Measures memory usage changes during benchmark execution.
 
-
 ## Version Information
-
 
 The benchmark module follows semantic versioning and includes a `_VERSION` field with the current version.
 

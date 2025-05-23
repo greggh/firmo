@@ -1,11 +1,8 @@
 # Firmo Mocking Test Files Fixes
 
-
 This document summarizes the changes made to fix structural and functional issues in the mocking test files.
 
 ## mock_test.lua Changes
-
-
 
 - **Structure Fixes**:
   - Removed duplicate "Mock Object" describe block around lines 329-330
@@ -24,10 +21,7 @@ This document summarizes the changes made to fix structural and functional issue
   - Set proper expectations using firmo's expect-style assertions
   - Cleaned up test pollution by using isolated objects for each test
 
-
 ## spy_test.lua Changes
-
-
 
 - **Structure Fixes**:
   - Fixed incomplete expect statement around line 155
@@ -46,10 +40,7 @@ This document summarizes the changes made to fix structural and functional issue
   - Adjusted error handling tests to use test_helper.expect_error properly
   - Added comprehensive error case testing
 
-
 ## stub_test.lua Changes
-
-
 
 - **Structure Fixes**:
   - Fixed nil logging module error by properly importing and initializing the module
@@ -67,10 +58,7 @@ This document summarizes the changes made to fix structural and functional issue
   - Used firmo's expect-style assertions consistently
   - Added better cleanup between tests
 
-
 ## Common Improvements Across All Files
-
-
 
 - **Consistent Error Handling**:
   - Using test_helper.with_error_capture() for error handling

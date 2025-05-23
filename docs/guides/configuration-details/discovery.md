@@ -1,13 +1,10 @@
 # Test Discovery Configuration
 
-
 This document describes the comprehensive configuration options for the firmo test discovery system, which locates test files in your project based on naming patterns and directory structure.
 
 ## Overview
 
-
 The test discovery module provides a flexible system for finding test files with support for:
-
 
 - Customizable test file patterns (e.g., `*_test.lua`, `test_*.lua`)
 - Directory exclusion patterns for skipping irrelevant folders
@@ -15,12 +12,9 @@ The test discovery module provides a flexible system for finding test files with
 - File extension filtering
 - Integration with the central configuration system
 
-
 ## Configuration Options
 
-
 ### Core Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -32,9 +26,7 @@ The test discovery module provides a flexible system for finding test files with
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the test discovery system in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -73,13 +65,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the test discovery system programmatically:
-
 
 ```lua
 local discover = require("lib.tools.discover")
@@ -96,13 +84,9 @@ discover.add_include_pattern("*_spec.lua")
 discover.add_exclude_pattern("temp_*")
 ```
 
-
-
 ## Test File Patterns
 
-
 Test file patterns determine which files are identified as tests:
-
 
 ```lua
 -- Common test file naming patterns
@@ -119,13 +103,9 @@ discover.configure({
 })
 ```
 
-
-
 ## Directory Exclusion
 
-
 Exclude directories you don't want to scan for tests:
-
 
 ```lua
 -- Common directories to exclude
@@ -144,13 +124,9 @@ discover.configure({
 })
 ```
 
-
-
 ## Integration with Test Runner
 
-
 The discovery module integrates with Firmo's test runner:
-
 
 ```lua
 -- In test runner
@@ -173,16 +149,11 @@ for _, file in ipairs(result.files) do
 end
 ```
 
-
-
 ## Best Practices
-
 
 ### Targeted Test Discovery
 
-
 Define patterns that match your project's test naming convention:
-
 
 ```lua
 -- For a project that uses test_*.lua convention
@@ -197,13 +168,9 @@ discover.configure({
 })
 ```
 
-
-
 ### Performance Optimization
 
-
 Optimize test discovery for large codebases:
-
 
 ```lua
 -- For large codebases with many dependencies
@@ -230,13 +197,9 @@ discover.configure({
 })
 ```
 
-
-
 ### Nested Test Directory Structure
 
-
 For projects with nested test directory structures:
-
 
 ```lua
 -- For a project with feature-based test organization
@@ -253,14 +216,9 @@ discover.configure({
 })
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues
-
-
 
 1. **Tests not being discovered**:
    - Check if test files match your include patterns
@@ -275,12 +233,9 @@ discover.configure({
    - Exclude large directories that don't contain tests
    - Use more specific include patterns to reduce the number of files examined
 
-
 ## Integration with CI/CD Systems
 
-
 For continuous integration environments:
-
 
 ```lua
 -- In .firmo-config.ci.lua
@@ -300,14 +255,9 @@ return {
 }
 ```
 
-
-
 ## Example Configuration Files
 
-
 ### Basic Configuration
-
-
 
 ```lua
 -- .firmo-config.lua
@@ -322,11 +272,7 @@ return {
 }
 ```
 
-
-
 ### Feature-Based Test Structure
-
-
 
 ```lua
 -- .firmo-config.feature.lua
@@ -344,11 +290,7 @@ return {
 }
 ```
 
-
-
 ### Integration Test Configuration
-
-
 
 ```lua
 -- .firmo-config.integration.lua
@@ -364,6 +306,5 @@ return {
   }
 }
 ```
-
 
 These configuration options give you complete control over test file discovery, allowing you to tailor the process to your project's specific structure and naming conventions.

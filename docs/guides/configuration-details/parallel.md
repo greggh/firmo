@@ -1,13 +1,10 @@
 # Parallel Execution Configuration
 
-
 This document describes the comprehensive configuration options for the firmo parallel execution system, which enables running tests across multiple worker processes for improved performance.
 
 ## Overview
 
-
 The parallel execution module provides a powerful system for running tests across multiple worker processes with support for:
-
 
 - Configurable number of worker processes
 - Individual test file timeouts
@@ -17,12 +14,9 @@ The parallel execution module provides a powerful system for running tests acros
 - Integration with the central configuration system
 - Command-line configuration options
 
-
 ## Configuration Options
 
-
 ### Core Options
-
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -37,9 +31,7 @@ The parallel execution module provides a powerful system for running tests acros
 
 ## Configuration in .firmo-config.lua
 
-
 You can configure the parallel execution system in your `.firmo-config.lua` file:
-
 
 ```lua
 return {
@@ -62,13 +54,9 @@ return {
 }
 ```
 
-
-
 ## Programmatic Configuration
 
-
 You can also configure the parallel execution system programmatically:
-
 
 ```lua
 local parallel = require("lib.tools.parallel")
@@ -87,62 +75,46 @@ local config = parallel.debug_config()
 print("Using", config.local_config.workers, "workers with", config.local_config.timeout, "second timeout")
 ```
 
-
-
 ## Command Line Integration
 
-
 The parallel execution module integrates with Firmo's command-line interface:
-
 
 ```bash
 
 # Basic parallel execution
 
-
 lua firmo.lua --parallel tests/
 
 # Set number of workers
-
 
 lua firmo.lua --parallel --workers 6 tests/
 
 # Set timeout per file
 
-
 lua firmo.lua --parallel --timeout 120 tests/
 
 # Enable verbose output
-
 
 lua firmo.lua --parallel --verbose-parallel tests/
 
 # Hide worker output
 
-
 lua firmo.lua --parallel --no-worker-output tests/
 
 # Stop on first failure
-
 
 lua firmo.lua --parallel --fail-fast tests/
 
 # Don't combine coverage data
 
-
 lua firmo.lua --parallel --no-aggregate-coverage tests/
 ```
 
-
-
 ## Performance Considerations
-
 
 ### Selecting the Optimal Number of Workers
 
-
 The optimal number of worker processes depends on your system resources:
-
 
 ```lua
 -- General recommendations:
@@ -161,13 +133,9 @@ end
 parallel.configure({ workers = workers })
 ```
 
-
-
 ### Timeout Management
 
-
 Set timeouts appropriate for your test suite:
-
 
 ```lua
 -- Example for different test types
@@ -180,13 +148,9 @@ parallel.configure({
 })
 ```
 
-
-
 ## Coverage Data Aggregation
 
-
 When running tests in parallel, coverage data from each worker process can be combined:
-
 
 ```lua
 -- Enable coverage aggregation (default)
@@ -199,20 +163,15 @@ parallel.configure({
 })
 ```
 
-
 The coverage aggregation combines:
-
 
 1. Line execution counts across all processes
 2. Function call counts from all processes
 3. Branch execution data if available
 
-
 ## Integration with Test Runner
 
-
 The parallel execution module integrates with Firmo's test runner system:
-
 
 ```lua
 -- In your test runner
@@ -230,16 +189,11 @@ local results = parallel.run_tests(files, {
 })
 ```
 
-
-
 ## Advanced Usage
-
 
 ### Custom Worker Configuration
 
-
 For specialized test scenarios, you can customize worker behavior:
-
 
 ```lua
 local parallel = require("lib.tools.parallel")
@@ -260,13 +214,9 @@ central_config.set("parallel", {
 parallel.configure_from_config()
 ```
 
-
-
 ### Fail-Fast Mode
 
-
 To stop testing at the first failure:
-
 
 ```lua
 -- Enable fail-fast mode
@@ -283,13 +233,9 @@ return {
 -- lua firmo.lua --parallel --fail-fast tests/
 ```
 
-
-
 ### Output Control
 
-
 Managing test output for readability:
-
 
 ```lua
 -- Hide individual worker output for cleaner logs
@@ -307,13 +253,9 @@ parallel.configure({
 })
 ```
 
-
-
 ## Debugging Parallel Execution
 
-
 The parallel execution module includes debugging tools:
-
 
 ```lua
 -- Enable debug mode
@@ -331,13 +273,9 @@ if config_info.central_config then
 end
 ```
 
-
-
 ## Error Handling
 
-
 The parallel execution module implements comprehensive error handling and reporting:
-
 
 ```lua
 -- Run with proper error handling
@@ -365,13 +303,9 @@ else
 end
 ```
 
-
-
 ## Worker Result Processing
 
-
 Results from worker processes include:
-
 
 - Success/failure status per file
 - Execution duration
@@ -379,7 +313,6 @@ Results from worker processes include:
 - Detailed error information
 - Test outputs
 - Coverage data (if enabled)
-
 
 ```lua
 -- Example of processing worker results
@@ -405,14 +338,9 @@ local function process_results(results)
 end
 ```
 
-
-
 ## Best Practices
 
-
 ### Setting the Right Number of Workers
-
-
 
 ```lua
 -- General guidelines:
@@ -440,11 +368,7 @@ parallel.configure({
 })
 ```
 
-
-
 ### Memory Considerations
-
-
 
 ```lua
 -- For memory-intensive tests
@@ -460,13 +384,9 @@ parallel.configure({
 })
 ```
 
-
-
 ### CI/CD Integration
 
-
 For continuous integration environments:
-
 
 ```lua
 -- In .firmo-config.ci.lua
@@ -485,14 +405,9 @@ local env = os.getenv("CI") and "ci" or "dev"
 local config_file = ".firmo-config." .. env .. ".lua"
 ```
 
-
-
 ## Troubleshooting
 
-
 ### Common Issues
-
-
 
 1. **Workers time out unexpectedly**:
    - Increase the `timeout` value
@@ -511,9 +426,7 @@ local config_file = ".firmo-config." .. env .. ".lua"
    - Check for file path consistency across workers
    - Ensure coverage is enabled for all workers
 
-
 ## Command Line Reference
-
 
 | Option | Description |
 |--------|-------------|
@@ -527,10 +440,7 @@ local config_file = ".firmo-config." .. env .. ".lua"
 
 ## Example Configuration Files
 
-
 ### Basic Configuration
-
-
 
 ```lua
 -- .firmo-config.lua
@@ -544,11 +454,7 @@ return {
 }
 ```
 
-
-
 ### High-Performance Configuration
-
-
 
 ```lua
 -- .firmo-config-high-perf.lua
@@ -563,11 +469,7 @@ return {
 }
 ```
 
-
-
 ### Debug Configuration
-
-
 
 ```lua
 -- .firmo-config-debug.lua
@@ -582,6 +484,5 @@ return {
   }
 }
 ```
-
 
 These configuration options give you complete control over parallel test execution, allowing you to optimize for your specific testing needs and system environment.
