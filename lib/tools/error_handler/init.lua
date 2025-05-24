@@ -52,7 +52,7 @@ local INTERNAL_MODULES = {
   ["lib/tools/error_handler"] = true,
   ["lib/assertion/init"] = true,
   ["lib/tools/test_helper"] = true,
-  ["lib/core/test_definition"] = true
+  ["lib/core/test_definition"] = true,
 }
 
 -- Compatibility function for table unpacking (works with both Lua 5.1 and 5.2+)
@@ -161,14 +161,16 @@ end
 --- @return table|nil The debug info for the most relevant source location
 --- @private
 local function find_error_source()
-  local stack_level = 3  -- Start above our immediate caller
+  local stack_level = 3 -- Start above our immediate caller
   local most_relevant = nil
   local internal_source = nil
-  
+
   while true do
     local info = debug.getinfo(stack_level, "Sl")
-    if not info then break end
-    
+    if not info then
+      break
+    end
+
     -- Always capture first internal source as fallback
     if not internal_source and info.short_src then
       local is_internal = false
@@ -178,12 +180,12 @@ local function find_error_source()
           break
         end
       end
-      
+
       if is_internal then
         internal_source = info
       end
     end
-    
+
     -- If we find a non-internal source, that's our most relevant
     if info.short_src then
       local is_internal = false
@@ -193,21 +195,21 @@ local function find_error_source()
           break
         end
       end
-      
+
       if not is_internal then
         most_relevant = info
         break
       end
     end
-    
+
     stack_level = stack_level + 1
   end
-  
+
   -- If we found a most relevant source, store the internal source as additional context
   if most_relevant and internal_source then
     most_relevant.source_internal = internal_source
   end
-  
+
   return most_relevant or internal_source
 end
 
@@ -228,7 +230,7 @@ create_error = function(message, category, severity, context, cause)
   if source then
     err.source_file = source.short_src
     err.source_line = source.currentline
-    
+
     -- Store internal location in debug context if different
     if source.source_internal then
       if not err.context.internal_source then
@@ -277,7 +279,7 @@ local function format_error(err)
         break
       end
     end
-    
+
     if not is_internal_source then
       table.insert(parts, "(at " .. err.source_file .. ":" .. err.source_line .. ")")
     end
@@ -596,9 +598,6 @@ function M.throw(message, category, severity, context, cause)
   -- 3. Check if we're in a test context that expects errors
   local test_metadata = config.current_test_metadata
   if test_metadata and test_metadata.expect_error then
-    -- In test contexts with expect_error flag, use TEST_EXPECTED category
-    error_category = M.CATEGORY.TEST_EXPECTED
-
     -- Add test context information to the error context if not already present
     context = context or {}
     context.in_test_context = true
@@ -607,10 +606,17 @@ function M.throw(message, category, severity, context, cause)
       context.test_source_file = test_metadata.caller_info.source
       context.test_source_line = test_metadata.caller_info.currentline
     end
-  end
-
-  -- 4. If the error is for validation and we're in test context
-  if category == M.CATEGORY.VALIDATION and M.is_test_mode() then
+    
+    -- For validation errors in tests with expect_error, preserve the category
+    if category == M.CATEGORY.VALIDATION then
+      -- Keep original category for explicit validation testing
+      error_category = M.CATEGORY.VALIDATION
+    else
+      -- Use TEST_EXPECTED for other errors in test context
+      error_category = M.CATEGORY.TEST_EXPECTED
+    end
+  elseif category == M.CATEGORY.VALIDATION and M.is_test_mode() then
+    -- 4. If the error is for validation and we're in test context (without expect_error)
     -- Tests with validation errors should generally use TEST_EXPECTED
     error_category = M.CATEGORY.TEST_EXPECTED
   end
@@ -1110,7 +1116,7 @@ end
 --- Sets metadata associated with the currently executing test.
 --- Used by `log_error` and `is_expected_test_error` to adjust behavior based on test context (e.g., `expect_error` flag).
 --- Should be called by the test runner before and after each test execution.
----@param metadata table|nil The test metadata table (e.g., `{ name = "...", expect_error = true }`) or `nil` to clear.
+---@param metadata table|nil The test metadata table (e.g., `{ name = "...", expect_error = true, preserve_category = true, expected_category = "VALIDATION" }`) or `nil` to clear.
 ---@return table|nil metadata The metadata that was just set, or `nil` if cleared.
 function M.set_current_test_metadata(metadata)
   -- Log the metadata change
@@ -1118,6 +1124,8 @@ function M.set_current_test_metadata(metadata)
     get_logger().debug("Setting test metadata", {
       metadata_name = metadata.name,
       expect_error = metadata.expect_error or false,
+      preserve_category = metadata.preserve_category or false,
+      expected_category = metadata.expected_category,
     })
   else
     get_logger().debug("Clearing test metadata")
